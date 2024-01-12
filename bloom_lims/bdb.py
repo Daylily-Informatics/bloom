@@ -604,7 +604,7 @@ class BloomObj:
         )
 
     # centralizing creation more cleanly.
-    def create_instance(self, template_euid, json_addl_overrides={}):
+    def create_instance(self, template_euid, json_addl_overrides=None):
         """Given an EUID for an object template, instantiate an instance from the thmplate.
             No child objects defined by the tmplate will be generated.
 
@@ -612,6 +612,8 @@ class BloomObj:
         Args:
             template_euid (_type_): _description_
         """
+        if json_addl_overrides is None:
+            json_addl_overrides = {}
 
         self.logger.debug(f"Creating instance from template EUID {template_euid}")
 
@@ -1218,11 +1220,13 @@ class BloomObj:
 
 
     # Doing this globally for now
-    def do_action_set_printer_config(self, euid, action_ds={}):
+    def do_action_set_printer_config(self, euid, action_ds=None):
+        if action_ds is None:
+            action_ds = {}
         pass
         
         
-    def do_action_print_barcode_label(self, euid, action_ds={}):
+    def do_action_print_barcode_label(self, euid, action_ds=None):
         """_summary_
 
         Args:
@@ -1231,7 +1235,8 @@ class BloomObj:
             action_ds (dict): the dictionary keyed by the object json_addl['action'][action]
         """
         
-
+        if action_ds is None:
+            action_ds = {}
         lab = action_ds.get("lab","")
         printer_name = action_ds.get("printer_name","")
         label_zpl_style = action_ds.get("label_style","")
@@ -1551,8 +1556,10 @@ class BloomWorkflow(BloomObj):
     def create_empty_workflow(self, template_euid):
         return self.create_instances(template_euid)
 
-    def do_action(self, wf_euid, action, action_group, action_ds={}):
+    def do_action(self, wf_euid, action, action_group, action_ds=None):
         
+        if action_ds is None:
+            action_ds = {}
         action_method = action_ds["method_name"]
         now_dt = get_datetime_string()
         if action_method == "do_action_create_and_link_child":
@@ -1601,7 +1608,9 @@ class BloomWorkflow(BloomObj):
                 self.logger.exception(f"ERROR: {e}")
                 # self.session.rollback()
 
-    def do_action_create_package_and_first_workflow_step(self, wf_euid, action_ds={}):
+    def do_action_create_package_and_first_workflow_step(self, wf_euid, action_ds=None):
+        if action_ds is None:
+            action_ds = {}
         wf = self.get_by_euid(wf_euid)
         # 1001897582860000245100773464327825
         fx_opsmd = {}
@@ -1662,8 +1671,10 @@ class BloomWorkflowStep(BloomObj):
     # NOTE!  This action business seems to be evolving around from a workflow step centered thing and
     #        feels like it would be better more generalized. For now, most actions being jammed through this approach, even if the parent is now a WFS
     # .      Though... also.... is there benefit to restricting actions to be required to be associated with a WFS?  Ask Adam his thoughts.
-    def do_action(self, wfs_euid, action, action_group, action_ds={}):
+    def do_action(self, wfs_euid, action, action_group, action_ds=None):
         now_dt = get_datetime_string()
+        if action_ds is None:
+            action_ds = {}
 
         action_method = action_ds["method_name"]
         if action_method == "do_action_create_and_link_child":

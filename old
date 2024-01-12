@@ -1,0 +1,46 @@
+pg_get_functiondef | CREATE OR REPLACE FUNCTION public.record_update()                                                                                                  +
+                   |  RETURNS trigger                                                                                                                                   +
+                   |  LANGUAGE plpgsql                                                                                                                                  +
+                   | AS $function$                                                                                                                                      +
+                   | DECLARE                                                                                                                                            +
+                   |     col_name TEXT; -- Changed variable name to avoid conflict                                                                                      +
+                   |     old_value TEXT;                                                                                                                                +
+                   |     new_value TEXT;                                                                                                                                +
+                   |     app_username TEXT;                                                                                                                             +
+                   | BEGIN                                                                                                                                              +
+                   |     -- Handle the app_username                                                                                                                     +
+                   |     BEGIN                                                                                                                                          +
+                   |         app_username := current_setting('session.current_username', true);                                                                         +
+                   |     EXCEPTION WHEN OTHERS THEN                                                                                                                     +
+                   |         app_username := current_user;                                                                                                              +
+                   |     END;                                                                                                                                           +
+                   |                                                                                                                                                    +
+                   |     -- Loop through each column                                                                                                                    +
+                   |     FOR col_name IN                                                                                                                                +
+                   |         SELECT column_name                                                                                                                         +
+                   |         FROM information_schema.columns                                                                                                            +
+                   |         WHERE table_name = TG_TABLE_NAME -- AND table_schema = 'your_schema_name'                                                                  +
+                   |     LOOP                                                                                                                                           +
+                   |         -- Extract old and new values based on column type                                                                                         +
+                   |         EXECUTE format('SELECT ().%I, ().%I', col_name, col_name) USING OLD, NEW INTO old_value, new_value;                                        +
+                   |                                                                                                                                                    +
+                   |         -- Special handling for jsonb type                                                                                                         +
+                   |         IF col_name = 'json_addl' THEN                                                                                                             +
+                   |             IF OLD.json_addl IS NOT DISTINCT FROM NEW.json_addl THEN                                                                               +
+                   |                 CONTINUE;                                                                                                                          +
+                   |             END IF;                                                                                                                                +
+                   |         ELSE                                                                                                                                       +
+                   |             -- Skip if values are not distinct                                                                                                     +
+                   |             IF old_value IS NOT DISTINCT FROM new_value THEN                                                                                       +
+                   |                 CONTINUE;                                                                                                                          +
+                   |             END IF;                                                                                                                                +
+                   |         END IF;                                                                                                                                    +
+                   |                                                                                                                                                    +
+                   |         -- Insert into audit_log for changed column                                                                                                +
+                   |         INSERT INTO audit_log (rel_table_name, column_name, old_value, new_value, changed_by, rel_table_uuid_fk, rel_table_euid_fk, operation_type)+
+                   |         VALUES (TG_TABLE_NAME, col_name, old_value, new_value, app_username, NEW.uuid, NEW.euid, TG_OP);                                           +
+                   |     END LOOP;                                                                                                                                      +
+                   |                                                                                                                                                    +
+                   |     RETURN NEW;                                                                                                                                    +
+                   | END;                                                                                                                                               +
+                   | $function$                                                                                                                                         +
