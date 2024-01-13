@@ -141,7 +141,22 @@ class WorkflowService(object):
             assays.append(ay_ds[i])
             ay_dss[i] = {"Instantaneous COGS" : round(bobdb.get_cost_of_euid_children(i),2)}
             ay_dss[i]['tot'] = 0
+            ay_dss[i]['tit_s'] = 0
+            ay_dss[i]['tot_fx'] = 0
+
             for q in ay_ds[i].parent_of_lineages:
+                for c in q.child_instance.parent_of_lineages:
+                    for cc in c.child_instance.parent_of_lineages:
+                        if cc.child_instance.name == "package:generic:1.0":
+                            try:
+                                ay_dss[i]['tit_s'] += int(cc.child_instance.json_addl['properties']['fedex_tracking_data'][0]['Transit_Time_sec'])
+                                ay_dss[i]['tot_fx'] += 1
+                            except Exception as e:
+                                pass
+                try:
+                    ay_dss[i]['avg_d_fx'] = float(ay_dss[i]['tit_s'])/60.0/60.0/24.0 / float(ay_dss[i]['tot_fx'])
+                except Exception as e:
+                    ay_dss[i]['avg_d_fx'] = 'na'
                 wset = ''
                 n = q.child_instance.json_addl['properties']['name']
                 if n.startswith('In'):

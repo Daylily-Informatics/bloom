@@ -47,7 +47,16 @@
         <br>    
         /// COGS  ( <b>${{ ay_stats.get(assay.euid,{}).get('wsetp','na') }}</b> per workset ) ( <b>${{ ay_stats.get(assay.euid,{}).get('Instantaneous COGS','na') }}</b> this assay total ) 
         <br>
-        /// WORKSET OCCUPANCY ( <b>{{ ay_stats.get(assay.euid,{}).get('workset_occupancy','%unused capacity') }}</b> ) </ul>
+        /// WORKSET OCCUPANCY ( <b>{{ ay_stats.get(assay.euid,{}).get('workset_occupancy','%unused capacity') }}</b> ) 
+        
+        {% if atype.get('type', 'Assay') == 'Accessioning' %}
+        <br>
+        /// FEDEX ( <b>{{ ay_stats.get(assay.euid,{}).get('avg_d_fx','na') }}</b> avg package transit days ) 
+        {% endif %}
+    
+    </ul>
+
+
             </button>
     <div class="panel">
         <div>
