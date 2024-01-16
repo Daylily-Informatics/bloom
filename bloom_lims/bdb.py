@@ -461,9 +461,9 @@ class BLOOMdb3:
     def __init__(
         self,
         db_url_prefix="postgresql://",
-        db_hostname="localhost",
+        db_hostname=os.environ.get("PGHOST", "localhost"),
         db_pass=None if 'PGPASSWORD' not in os.environ else os.environ.get("PGPASSWORD"),
-        db_user=os.environ.get("USER", "bloom"),
+        db_user="bloom",
         db_name="bloom",
         app_username=os.environ.get("USER", "bloomdborm"),
     ):
@@ -1264,8 +1264,10 @@ class BloomObj:
                          )
 
     def do_action_set_object_status(
-        self, euid, action_ds={}, action_group=None, action=None
+        self, euid, action_ds=None, action_group=None, action=None
     ):
+        if action_ds is None:
+            aciton_ds = {}
         bobj = self.get_by_euid(euid)
 
         now_dt = get_datetime_string()
@@ -2011,6 +2013,7 @@ class BloomWorkflowStep(BloomObj):
         # could look for this key dynamically in the future.
         # ___workflow/assay/ .... this indicates the template to use is 'worflow/assay' and the remaining is the assay_selection value
         # I made some progress in this direction, now using state to flag locked AYs
+        import ipdb; ipdb.set_trace()
         super_type = "workflow"
         btype = "assay"
         b_sub_type = action_ds["captured_data"]["assay_selection"].split("/")[0]
@@ -2082,8 +2085,10 @@ class BloomWorkflowStep(BloomObj):
         return wfs
 
     def do_action_create_child_container_and_link_child_workflow_step(
-        self, wfs_euid, action_ds={}
+        self, wfs_euid, action_ds=None
     ):
+        if action_ds is None:
+            action_ds = {}
         wfs = self.get_by_euid(wfs_euid)
         ## TODO: pull out common lineage and child creation more cleanly
 
