@@ -815,7 +815,6 @@ class BloomObj:
         )
         self.session.add(lineage_record)
         self.session.flush()
-        #self.session.commit()
 
         return lineage_record
 
@@ -851,8 +850,8 @@ class BloomObj:
         new_instance = self.create_instance(template.euid)
         _update_recursive(new_instance.json_addl, defaults_ds)
         flag_modified(new_instance, "json_addl")
-        ##self.session.flush()
-        self.session.commit()
+        self.session.flush()
+        #### MAYBE KEEP >>> self.session.commit()
 
         return new_instance
 
@@ -1253,9 +1252,10 @@ class BloomObj:
 
         container.json_addl['properties']['name'] = content.json_addl['properties']["name"]
         flag_modified(container, "json_addl")
-        ##self.session.flush()
+        
         self.create_generic_instance_lineage_by_euids(container.euid, content.euid)
-        self.session.commit() 
+        self.session.flush()
+        ### <<< MAYBE KEEP self.session.commit() 
 
         return container, content
 
@@ -1412,18 +1412,14 @@ class BloomObj:
         lineage_link = wfset.child_of_lineages[0]
         self.create_generic_instance_lineage_by_euids(destination_q.euid, wfset.euid)
         self.delete_obj(lineage_link)
-        ##self.session.flush()
+
         self.session.commit()
                                                   
-
-
 
     # Doing this globally for now
     def do_action_create_package_and_first_workflow_step_assay(self, euid, action_ds={}):   
         wf = self.get_by_euid(euid)
-            
-        #'workflow_step_to_attach_as_child': {'workflow_step/queue/all-purpose/1.0/': {'json_addl': {'properties': {'name': 'hey user, SET THIS NAME ',
-        
+                    
         active_workset_q_wfs = ""
         (super_type, btype, b_sub_type, version) = list(action_ds["workflow_step_to_attach_as_child"].keys())[0].lstrip('/').rstrip('/').split('/')
         for pwf_child_lin in wf.parent_of_lineages:
@@ -1452,8 +1448,7 @@ class BloomObj:
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
             self.create_generic_instance_lineage_by_euids(active_workset_q_wfs.euid, wfs.euid)
-            ##self.session.flush()
-            self.session.commit()
+            ###self.session.commit()
     
         package = ""
         for layout_str in action_ds["new_container_obj"]:
@@ -1468,11 +1463,10 @@ class BloomObj:
             package = self.create_instance_by_code(
                 layout_str, action_ds["new_container_obj"][layout_str]
             )
-            ##elf.session.flush()
-            self.session.commit()
+            
+            ###self.session.commit()
 
-        ##self.session.flush()
-        self.session.commit()
+        ### self.session.commit()
 
         self.create_generic_instance_lineage_by_euids(wfs.euid, package.euid)
         self.session.commit()
@@ -1572,7 +1566,7 @@ class BloomObj:
 
             flag_modified(bobj, "json_addl")
             flag_modified(bobj, "bstatus")
-            ##self.session.flush()
+            
             self.session.commit()
         except Exception as e:
             self.logger.exception(f"ERROR: {e}")
@@ -1648,7 +1642,7 @@ class BloomObj:
 
         # from sqlalchemy.orm.attributes import flag_modified
         flag_modified(bobj, "json_addl")
-        ##self.session.flush()
+        
         self.session.commit()
 
         return bobj
@@ -1901,14 +1895,13 @@ class BloomWorkflow(BloomObj):
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
             self.create_generic_instance_lineage_by_euids(wf.uuid, wfs.euid)
-            # wfs.workflow_instance_uuid = wf.uuid
-            ##self.session.flush()
-            self.session.commit()
+            
+            ###self.session.commit()
 
         wf.bstatus = "in_progress"
         flag_modified(wf, "bstatus")
-        ##self.session.flush()
-        self.session.commit()
+        
+        ### self.session.commit()
 
         for euid in action_ds["captured_data"]["discard_barcodes"].split("\n"):
             try:
@@ -1916,18 +1909,22 @@ class BloomWorkflow(BloomObj):
                 a_container.bstatus = "destroyed"
                 flag_modified(a_container, "bstatus")
                 ##self.session.flush()
-                self.session.commit()
+                ###self.session.commit()
 
                 self.create_generic_instance_lineage_by_euids(
                     wfs.euid, a_container.euid
                 )
-                self.session.commit()
+                ###self.session.commit()
 
             except Exception as e:
                 self.logger.exception(f"ERROR: {e}")
                 self.logger.exception(f"ERROR: {e}")
                 self.logger.exception(f"ERROR: {e}")
-                # self.session.rollback()
+                self.session.rollback()
+
+        self.session.commit()
+        
+        return wfs
 
     def do_action_create_package_and_first_workflow_step(self, wf_euid, action_ds={}):
         wf = self.get_by_euid(wf_euid)
@@ -1952,7 +1949,7 @@ class BloomWorkflow(BloomObj):
             self.create_generic_instance_lineage_by_euids(wf.euid, wfs.euid)
 
             ##self.session.flush()
-            self.session.commit()
+            ### self.session.commit()
 
         package = ""
         for layout_str in action_ds["new_container_obj"]:
@@ -1968,15 +1965,17 @@ class BloomWorkflow(BloomObj):
                 layout_str, action_ds["new_container_obj"][layout_str]
             )
             ##self.session.flush()
-            self.session.commit()
+            ### self.session.commit()
             # wfs.json_addl["properties"]["actual_output_euid"].append(package.euid)
         wf.bstatus = "in_progress"
         flag_modified(wf, "bstatus")
         ##self.session.flush()
-        self.session.commit()
+        ###self.session.commit()
 
         self.create_generic_instance_lineage_by_euids(wfs.euid, package.euid)
+        
         self.session.commit()
+        
         return wfs
 
 
@@ -2117,7 +2116,7 @@ class BloomWorkflowStep(BloomObj):
             child_wfs = self.create_instance_by_code(
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
         self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
 
         new_plt_parts = self.create_instances_from_uuid(str(in_plt.template_uuid))
@@ -2125,7 +2124,7 @@ class BloomWorkflowStep(BloomObj):
         new_wells = new_plt_parts[1]
         self.create_generic_instance_lineage_by_euids(child_wfs.euid, new_plt.euid)
         self.create_generic_instance_lineage_by_euids(in_plt.euid, new_plt.euid)
-        self.session.commit()
+        ### self.session.commit()
         
         for new_w in new_wells:
             nwn = new_w.json_addl["cont_address"]["name"]
@@ -2154,16 +2153,16 @@ class BloomWorkflowStep(BloomObj):
             child_wfs = self.create_instance_by_code(
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
         self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
-        self.session.commit()
+        ### self.session.commit()
         
         child_data = ""
         for dlayout_str in action_ds["child_container_obj"]:
             child_data = self.create_instance_by_code(
                 dlayout_str, action_ds["child_container_obj"][dlayout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
 
         # Think this through more... I should move to more explicit inheritance from checks?
         self.create_generic_instance_lineage_by_euids(child_wfs.euid, child_data.euid)
@@ -2232,7 +2231,7 @@ class BloomWorkflowStep(BloomObj):
             new_wf = self.create_instance_by_code(
                 wlayout_str, action_ds["workflow_step_to_attach_as_child"][wlayout_str]
             )
-            self.session.commit()
+            #### self.session.commit()
         self.create_generic_instance_lineage_by_euids(active_workset_q_wfs.euid, new_wf.euid)
 
         child_wfs = ""
@@ -2240,7 +2239,7 @@ class BloomWorkflowStep(BloomObj):
             child_wfs = self.create_instance_by_code(
                 layout_strc, action_ds["child_workflow_step_obj"][layout_strc]
             )
-            self.session.commit()
+            ### self.session.commit()
 
         # self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
         self.create_generic_instance_lineage_by_euids(new_wf.euid, child_wfs.euid)
@@ -2334,7 +2333,7 @@ class BloomWorkflowStep(BloomObj):
             child_wfs = self.create_instance_by_code(
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
 
         self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
         self.create_generic_instance_lineage_by_euids(child_wfs.euid, plate.euid)
@@ -2425,7 +2424,7 @@ class BloomWorkflowStep(BloomObj):
             child_wfs = self.create_instance_by_code(
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
 
 
         # AND THIS LOGIC NEEDS TIGHTENING UP too
@@ -2448,7 +2447,7 @@ class BloomWorkflowStep(BloomObj):
             child_cont = self.create_instance_by_code(
                 layout_str, action_ds["child_container_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
 
             for content_layouts in (
                 []
@@ -2463,7 +2462,7 @@ class BloomWorkflowStep(BloomObj):
                     for cli_k in cli:
                         new_ctnt = self.create_instance_by_code(cli_k, cli[cli_k])
                         ##self.session.flush()
-                        self.session.commit()
+                        ###self.session.commit()
                         self.create_generic_instance_lineage_by_euids(
                             child_cont.euid, new_ctnt.euid
                         )
@@ -2493,7 +2492,7 @@ class BloomWorkflowStep(BloomObj):
             child_wfs = self.create_instance_by_code(
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
 
         self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
 
@@ -2502,7 +2501,7 @@ class BloomWorkflowStep(BloomObj):
             new_test_req = self.create_instance_by_code(
                 layout_str, action_ds["test_requisition_obj"][layout_str]
             )
-            self.session.commit()
+            ### self.session.commit()
 
         prior_cont_euid = ""
         prior_cont_euid_n = 0
@@ -2522,7 +2521,9 @@ class BloomWorkflowStep(BloomObj):
             new_test_req.euid, prior_cont_euid
         )
         self.create_generic_instance_lineage_by_euids(child_wfs.euid, new_test_req.euid)
+
         self.session.commit()
+
         return (child_wfs, new_test_req, prior_cont_euid)
 
 
