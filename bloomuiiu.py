@@ -1091,7 +1091,7 @@ WHERE
         print(f"All DAG JSON saved to {output_file}")
 
                                  
-                         
+    # CX295 CX296
     @cherrypy.expose
     @require_auth(redirect_url="/login")
     def generate_dag_json_from_all_objects_v2(self, output_file="dag.json", euid='AY1',depth=6):
@@ -1100,7 +1100,7 @@ WHERE
             euid = 'AY1'
         BO = BloomObj(BLOOMdb3(app_username=cherrypy.session['user']))           
         last_schema_edit_dt = BO.get_most_recent_schema_audit_log_entry()
-        cherrypy.session["user_data"]["dag_fnv2"] = f"./dags/{str(cherrypy.session)}_{depth}_dagv2.json"
+        cherrypy.session["user_data"]["dag_fnv2"] = f"./dags/{str(cherrypy.session)}_{depth}_{euid}_dagv2.json"
         output_file = cherrypy.session["user_data"]["dag_fnv2"]
 
         if (
@@ -1165,7 +1165,7 @@ WHERE
                     "name": instance['name'],
                     "btype": instance['btype'],
                     "super_type": instance['super_type'],
-                    "b_sub_type": instance['super_type'] + "." + instance['btype'] + "." + instance['b_sub_type'],
+                    "b_sub_type": instance['b_sub_type'],
                     "version": instance['version'],
                     "color": colors.get(instance['super_type'], "pink"),
                 },

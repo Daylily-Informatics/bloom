@@ -25,7 +25,7 @@
                 <button class="accordion"
                         data-state="{{ accordion_states[step.euid] }}"
                         id="{{ step.euid }}">
-                    <small style="color:var(--accordion-prefix);"> {{ step.btype }} </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a> <a href=dindex2?globalStartNodeEUID="{{ step.euid }}" target="bloom_dag">🕸️</a>  {{ step.json_addl['properties'].get('name', 'NONAME') }}  :: {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
+                    <small style="color:var(--accordion-prefix);"> {{ step.btype }} </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a> <a href=dindex2?globalStartNodeEUID={{ step.euid }} target="bloom_dag">🕸️</a>  {{ step.json_addl['properties'].get('name', 'NONAME') }}  :: {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
                 </button>
                 <div class="workflow-step"
                      style="display: {{ 'block' if accordion_states[step.euid] == 'open' else 'none' }}">
@@ -36,7 +36,7 @@
                                 class="accordion non-wf-step"
                                 data-state="{{ accordion_states[step.euid] }}"
                                 id="{{ step.euid }}">
-                            <small><a href=plate_visualization?plate_euid={{ step.euid }}> {{ step.b_sub_type }}</a> </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>  <a href=dindex2?globalStartNodeEUID="{{ step.euid }}" target="bloom_dag">🕸️</a>  {{ step.json_addl['properties']['name'] }} ::  & {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
+                            <small><a href=plate_visualization?plate_euid={{ step.euid }}> {{ step.b_sub_type }}</a> </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>  <a href=dindex2?globalStartNodeEUID={{ step.euid }} target="bloom_dag">🕸️</a>  {{ step.json_addl['properties']['name'] }} ::  & {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
                         </button>
                         <div class="workflow-step"
                              style="font-size: 2px;
@@ -50,7 +50,7 @@
                                         id="{{ step.euid }}">
                                     <small style="color: var(--accordion-prefix);">{{ step.btype }}</small>
                                     <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>
-                                    <a href=dindex2?globalStartNodeEUID="{{ step.euid }}" target="bloom_dag">🕸️</a>
+                                    <a href=dindex2?globalStartNodeEUID={{ step.euid }} target="bloom_dag">🕸️</a>
 				    {{ step.json_addl['properties']['name'] }}
 				    WW{{ step.b_sub_type }} {{ step.version }}
                                     :: ({{ step.bstatus }})

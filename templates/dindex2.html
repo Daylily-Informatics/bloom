@@ -182,7 +182,7 @@
             <button align=right id="saveButton" class="button">Save Changes</button>
         </div>
         <script>
-        var globalFilterLevel = parseFloat('{{ globalFilterLevel }}') || 4;
+        var globalFilterLevel = parseFloat('{{ globalFilterLevel }}') || 5;
         var globalZoom = parseFloat('{{ globalZoom }}') || 4;
         var globalStartNodeEUID = '{{ globalStartNodeEUID }}' || 'AY1';
         var currentLayoutName = 'dagre'; // Default layout
@@ -805,12 +805,14 @@ updateNodeTransparency();
         
             if (node.length > 0) {
                 var currentURL = window.location.href;
-                
                 var newURL = new URL(currentURL);
+                //globalFilterLevel
+                globalStartNodeEUID = euid
+                                
                 newURL.searchParams.set('globalStartNodeEUID', euid);
         
                 // Optional: Reset globalFilterLevel if needed
-                newURL.searchParams.set('globalFilterLevel', '4'); // Replace 'defaultLevel' with the appropriate value
+                newURL.searchParams.set('globalFilterLevel', globalFilterLevel); // Replace 'defaultLevel' with the appropriate value
 
                 // Redirect to the new URL
                 window.location.href = newURL.toString();
@@ -822,7 +824,18 @@ updateNodeTransparency();
                     duration: 200
                 });
             } else {
-                alert('EUID not found in the DAG.');
+                alert('EUID not found in the DAGx.');
+
+                var newURL = new URL(currentURL);
+                //globalFilterLevel
+                globalStartNodeEUID = euid
+                newURL.searchParams.set('globalStartNodeEUID', euid);
+        
+                // Optional: Reset globalFilterLevel if needed
+                newURL.searchParams.set('globalFilterLevel', globalFilterLevel); // Replace 'defaultLevel' with the appropriate value
+
+                // Redirect to the new URL
+                window.location.href = newURL.toString();
             }
         }
 

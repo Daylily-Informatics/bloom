@@ -1340,7 +1340,7 @@ class BloomObj:
     def do_stamp_plates_into_plate(self, euid, action_ds):
         # Taking a stab at moving to a non obsessive commit world
         from IPython import embed; embed(); 
-        pass
+        #pass CX301 CX302
         euid_obj = self.get_by_euid(euid)
 
         dest_plate = self.get_by_euid(action_ds['captured_data']['Destination Plate EUID'])
@@ -1362,7 +1362,7 @@ class BloomObj:
         
         for spo in source_plates:
             self.create_generic_instance_lineage_by_euids(wfs.euid, spo.euid)
-        
+        #CX292 CX293
         # For all plates being stamped into the destination, link all source plate wells to the destination plate wells, and the contensts of source wells to destination wells.
         # Further, if a dest well is empty, create a new content instance for it and link appropriately.
         for dest_well in dest_plate.parent_of_lineages:
@@ -2539,11 +2539,12 @@ class BloomReagent(BloomObj):
                 "container", "plate", "fixed-plate-24", "1.0"
             )[0].euid
         )
+        #CX397 8
         
         plate = containers[0][0]
         wells = containers[1]   
         probe_ctr = 1
-        
+        plate.json_addl["properties"]["name"] = rg_code
         for i in wells:
             probe_name = f"id_probe_{probe_ctr}"
             seq_1 = ''.join(random.choices('ATCG', k=18))
@@ -2552,7 +2553,7 @@ class BloomReagent(BloomObj):
             new_reagent = self.create_instance(
                 self.query_template_by_component_v2(
                     "content", "reagent", rg_code, "1.0"
-                )[0].euid, {"properties": {"probe_name": probe_name, "probe_seq_1": seq_1, "probe_seq_2": seq_2}}
+                )[0].euid, {"properties": {"name": f"idt probe set {probe_name}", "probe_name": probe_name, "probe_seq_1": seq_1, "probe_seq_2": seq_2}}
             )
             self.create_generic_instance_lineage_by_euids(i.euid, new_reagent.euid)
             probe_ctr += 1
