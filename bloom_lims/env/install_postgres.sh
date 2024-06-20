@@ -34,6 +34,7 @@ fi
 
 export PGPORT=5445
 
+conda info
 # Create database
 initdb -D $PGDATA
 
