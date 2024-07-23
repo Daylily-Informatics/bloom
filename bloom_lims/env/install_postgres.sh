@@ -83,4 +83,3 @@ echo """\n\n\nBloom Installation Is Complete. Postgres should be running in the 
 source run_bloomui.sh' and then navigate to http://localhost:8911 in your browser.\n\n\n"""
 
 return 0
-
