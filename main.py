@@ -720,7 +720,7 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
 
     user_data = request.session.get("user_data", {})
 
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]), cfg_printers=True,cfg_fedex=True)
 
     # Mock or real printer_info data
 
@@ -1574,7 +1574,7 @@ async def user_home(request: Request):
     session_data = request.session.get("session_data", {})  # Extract session_data from session
 
 
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]), cfg_printers=True,cfg_fedex=True)
 
     if not user_data:
         return RedirectResponse(url="/login")
