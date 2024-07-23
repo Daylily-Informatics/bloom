@@ -54,7 +54,7 @@ jobs:
           cd $ogpwd
           ls -lta .
           source bloom_lims/env/install_postgres.sh
-          pytest
+          pytest -vv
           EOF
 
           # Make the script executable
