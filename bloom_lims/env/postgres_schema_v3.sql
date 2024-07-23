@@ -88,6 +88,8 @@ CREATE INDEX idx_generic_template_mod_df ON generic_template(modified_dt);
 CREATE INDEX idx_generic_template_instance_prefix ON generic_template(instance_prefix);
 CREATE INDEX idx_generic_template_polymorphic_discriminator  ON generic_template(polymorphic_discriminator);
 CREATE INDEX idx_generic_template_json_addl_gin ON generic_template USING GIN (json_addl);
+CREATE INDEX idx_generic_template_composite 
+ON generic_template(super_type, btype, b_sub_type, version, is_deleted);
 
 ALTER TABLE generic_template
 ADD CONSTRAINT unique_super_type_btype_b_sub_type_version
@@ -150,6 +152,8 @@ CREATE INDEX idx_generic_instance_version ON generic_instance(version);
 CREATE INDEX idx_generic_instance_mod_df ON generic_instance(modified_dt);
 CREATE INDEX idx_generic_instance_json_addl_gin ON generic_instance USING GIN (json_addl);
 CREATE INDEX idx_generic_instance_singleton ON generic_instance(is_singleton);
+CREATE INDEX idx_generic_instance_composite 
+ON generic_template(super_type, btype, b_sub_type, version, is_deleted);
 
 CREATE OR REPLACE TRIGGER trigger_generic_instance_soft_delete
 BEFORE DELETE ON generic_instance

@@ -2511,6 +2511,41 @@ class FormField(BaseModel):
     label: str
     options: List[str] = []
 
+@app.get("/create_instance/{template_euid}", response_class=HTMLResponse)
+async def create_instance_form(request: Request, template_euid: str):
+    bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    
+    template_instance = bobj.get_by_euid(template_euid)
+    template_data = template_instance.json_addl
+    
+    form_fields = generate_form_fields(template_data)
+    ui_form_properties = template_data.get("ui_form_properties", [])
+    ui_form_fields = generate_ui_form_fields(ui_form_properties, template_data.get("controlled_properties", {}))
+    
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    
+    controlled_properties_js = json.dumps(template_data.get("controlled_properties", {}))
+    
+    content = templates.get_template("create_instance_form.html").render(
+        request=request,
+        fields=form_fields,
+        ui_fields=ui_form_fields,
+        style=style,
+        udat=user_data,
+        template_euid=template_euid,
+        polymorphic_discriminator=template_instance.polymorphic_discriminator,
+        super_type=template_instance.super_type,
+        btype=template_instance.btype,
+        b_sub_type=template_instance.b_sub_type,
+        version=template_instance.version,
+        name=template_instance.name,
+        controlled_properties=template_data.get("controlled_properties", {}),
+        has_ui_form_properties=bool(ui_form_properties),
+        controlled_properties_js=controlled_properties_js
+    )
+    return HTMLResponse(content=content)
+
 def generate_form_fields(template_data: Dict) -> List[FormField]:
     properties = template_data.get("properties", {})
     controlled_properties = template_data.get("controlled_properties", {})
@@ -2541,7 +2576,6 @@ def generate_form_fields(template_data: Dict) -> List[FormField]:
             ))
 
     return form_fields
-
 
 def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict) -> List[FormField]:
     form_fields = []
@@ -2574,40 +2608,6 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
             ))
 
     return form_fields
-
-@app.get("/create_instance/{template_euid}", response_class=HTMLResponse)
-async def create_instance_form(request: Request, template_euid: str):
-    bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    
-    tempi = bobj.get_by_euid(template_euid)
-    template_data = tempi.json_addl
-    form_fields = generate_form_fields(template_data)
-
-    ui_form_properties = template_data.get("ui_form_properties")
-    if ui_form_properties:
-        ui_form_fields = generate_ui_form_fields(ui_form_properties, template_data.get("controlled_properties", {}))
-    else:
-        ui_form_fields = form_fields
-
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-    content = templates.get_template("create_instance_form.html").render(
-        request=request,
-        fields=form_fields,
-        ui_fields=ui_form_fields,
-        style=style,
-        udat=user_data,
-        template_euid=template_euid,
-        polymorphic_discriminator=tempi.polymorphic_discriminator,
-        super_type=tempi.super_type,
-        btype=tempi.btype,
-        b_sub_type=tempi.b_sub_type,
-        version=tempi.version,
-        name=tempi.name,
-        controlled_properties=template_data.get("controlled_properties", {}),
-        has_ui_form_properties=bool(ui_form_properties)
-    )
-    return HTMLResponse(content=content)
 
 
 @app.post("/create_instance")

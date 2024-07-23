@@ -9,7 +9,7 @@
 </head>
 <body>
     {% include 'bloom_header.html' %}
-    <h1>Create New Instance From Template <a href=/euid_details?euid={{ template_euid }} target=template >{{ template_euid }}</a></h1>
+    <h1>Create New Instance From Template <a href="/euid_details?euid={{ template_euid }}" target="template">{{ template_euid }}</a></h1>
     <h2 style="padding-left: 25px;">{{ name }}</h2>
     <hr style="padding-left: 25px;">
 
@@ -63,40 +63,32 @@
     </form>
 
     <script>
-        const controlledProperties = {{ controlled_properties | tojson | safe }};
+        const controlledProperties = {{ controlled_properties_js | safe }};
         
         function updateDependentFields(prefix) {
-            $('#' + prefix + 'variable').change(function() {
-                const selectedVariable = $(this).val();
-                const subVariableOptions = controlledProperties.sub_variable.enum[selectedVariable] || [];
-                const subVariableSelect = $('#' + prefix + 'sub_variable');
-
-                subVariableSelect.empty();
-                subVariableOptions.forEach(function(option) {
-                    subVariableSelect.append(new Option(option, option));
+            function populateSelectField(selectFieldId, options) {
+                const selectField = $(`#${selectFieldId}`);
+                selectField.empty();
+                options.forEach(function(option) {
+                    selectField.append(new Option(option, option));
                 });
-            });
+                selectField.trigger('change');
+            }
 
-            $('#' + prefix + 'category').change(function() {
-                const selectedCategory = $(this).val();
-                const subCategoryOptions = controlledProperties.sub_category.enum[selectedCategory] || [];
-                const subCategorySelect = $('#' + prefix + 'sub_category');
-
-                subCategorySelect.empty();
-                subCategoryOptions.forEach(function(option) {
-                    subCategorySelect.append(new Option(option, option));
+            function handleFieldChange(field, dependentField, enumObj) {
+                $(`#${field}`).change(function() {
+                    const selectedValue = $(this).val();
+                    const dependentOptions = enumObj[selectedValue] || [];
+                    populateSelectField(`${prefix}${dependentField}`, dependentOptions);
                 });
-            });
+            }
 
-            $('#' + prefix + 'sub_category').change(function() {
-                const selectedSubCategory = $(this).val();
-                const subCategory2Options = controlledProperties.sub_category_2.enum[selectedSubCategory] || [];
-                const subCategory2Select = $('#' + prefix + 'sub_category_2');
-
-                subCategory2Select.empty();
-                subCategory2Options.forEach(function(option) {
-                    subCategory2Select.append(new Option(option, option));
-                });
+            Object.keys(controlledProperties).forEach(function(prop) {
+                if (controlledProperties[prop].type === "dependent string") {
+                    const dependentField = controlledProperties[prop].on;
+                    const enumObj = controlledProperties[prop].enum;
+                    handleFieldChange(`${prefix}${dependentField}`, prop, enumObj);
+                }
             });
         }
 

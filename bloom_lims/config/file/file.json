@@ -49,23 +49,27 @@
       "controlled_properties": { 
         "purpose": {
           "type": "string",
-          "enum": ["Clinical", "Research", "Other"]
-        }
+          "enum": ["","Clinical", "Research", "Other"]
         },
-      "purpose_subtype": {
-          "type": "dependent string",
-          "on": "purpose",
-          "enum": {
-            "Clinical": ["Institution record", "xCures record", "Summary document", "Other"],
-            "Research": ["Data file", "Summary document", "Literature", "Other"],
-            "Other": [""]
-          }
+        "purpose_subtype": {
+          "type": "string",
+          "enum": [ 
+            "",
+            "Institution record", 
+            "xCures record", 
+            "Summary document",
+            "Data file", 
+            "Summary document", 
+            "Literature", 
+            "Other"
+          ]
         },
         "category": {
           "type": "dependent string", 
           "on": "purpose",
           "enum":
           {
+            "":[""],
             "Clinical": ["","Diagnosis","Staging","Procedure","Treatments","Testing","Imaging","Hospitalization","Biospecimen collection","Disease status","Other"],
             "Research": ["","Test results summary","Sequencing file","Other"],
             "Other": [""]
@@ -75,6 +79,7 @@
           "type": "dependent string", 
           "on": "category",
           "enum": {
+            "":[""],
             "Diagnosis" : [""],
             "Staging" : [""],
             "Procedure" : [""],
@@ -93,9 +98,11 @@
           "type": "dependent string",
           "on": "category",
           "enum": {
-            "Imaging" : ["", "CT", "PET CT", "MRI", "X-Ray", "Ultrasound"]
-          }
-        },
+            "":[""],
+          "Imaging" : ["", "CT", "PET CT", "MRI", "X-Ray", "Ultrasound"]
+        }
+      }
+    },
       "arbitrary_association_strings": [], 
       "valid_parents": [],
       "file_type": "",
