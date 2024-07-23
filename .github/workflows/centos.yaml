@@ -45,7 +45,7 @@ jobs:
           cat <<'EOF' >setup_bloom.sh
           #!/bin/bash
           cd /home/bloom
-          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          wget https://repo.anaconda.com/miniconda/Miniconda3-py312_24.5.0-0-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p /home/bloom/miniconda
           export PATH="/home/bloom/miniconda/bin:$PATH"
           conda init
