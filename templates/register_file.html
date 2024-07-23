@@ -68,37 +68,29 @@
     const controlledProperties = {{ controlled_properties | tojson | safe }};
 
     function updateDependentFields() {
-        $('#variable').change(function() {
-            const selectedVariable = $(this).val();
-            const subVariableOptions = controlledProperties.sub_variable.enum[selectedVariable] || [];
-            const subVariableSelect = $('#sub_variable');
-
-            subVariableSelect.empty();
-            subVariableOptions.forEach(function(option) {
-                subVariableSelect.append(new Option(option, option));
+        function populateSelectField(selectFieldId, options) {
+            const selectField = $(`#${selectFieldId}`);
+            selectField.empty();
+            options.forEach(function(option) {
+                selectField.append(new Option(option, option));
             });
-        });
+            selectField.trigger('change');
+        }
 
-        $('#category').change(function() {
-            const selectedCategory = $(this).val();
-            const subCategoryOptions = controlledProperties.sub_category.enum[selectedCategory] || [];
-            const subCategorySelect = $('#sub_category');
-
-            subCategorySelect.empty();
-            subCategoryOptions.forEach(function(option) {
-                subCategorySelect.append(new Option(option, option));
+        function handleFieldChange(field, dependentField, enumObj) {
+            $(`#${field}`).change(function() {
+                const selectedValue = $(this).val();
+                const dependentOptions = enumObj[selectedValue] || [];
+                populateSelectField(dependentField, dependentOptions);
             });
-        });
+        }
 
-        $('#sub_category').change(function() {
-            const selectedSubCategory = $(this).val();
-            const subCategory2Options = controlledProperties.sub_category_2.enum[selectedSubCategory] || [];
-            const subCategory2Select = $('#sub_category_2');
-
-            subCategory2Select.empty();
-            subCategory2Options.forEach(function(option) {
-                subCategory2Select.append(new Option(option, option));
-            });
+        Object.keys(controlledProperties).forEach(function(prop) {
+            if (controlledProperties[prop].type === "dependent string") {
+                const dependentField = controlledProperties[prop].on;
+                const enumObj = controlledProperties[prop].enum;
+                handleFieldChange(dependentField, prop, enumObj);
+            }
         });
     }
 

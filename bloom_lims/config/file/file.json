@@ -26,83 +26,83 @@
         "outcome_comment": "",
         "upload_group_key": "",
         "purpose":"",
+        "purpose_subtype":"",
         "variable":"",
         "sub_variable":"",
         "category":"",
         "sub_category":"",
         "sub_category_2":""        
       },
-      "ui_form_properties" : [ {"property_key":"patient_id","form_label":"Patient ID"}, {"property_key":"clinician_id","form_label":"Clinician ID"}, {"property_key":"relevant_datetime","form_label":"Relevant Date/Time"}, {"property_key":"lab_code","form_label":"Lab Code"}, {"property_key":"purpose","form_label":"Purpose"}, {"property_key":"category","form_label":"Category"}, {"property_key":"sub_category","form_label":"Sub Category"}, {"property_key":"sub_category_2","form_label":"Sub Category 2"}, {"property_key":"variable","form_label":"Variable"}, {"property_key":"sub_variable","form_label":"Sub Variable"}, {"property_key":"study_id","form_label":"Study ID"}, {"property_key":"comments","form_label":"Comments"} ],  
+      "ui_form_properties" : [ 
+        {"property_key":"patient_id","form_label":"Patient ID"}, 
+        {"property_key":"clinician_id","form_label":"Clinician ID"}, 
+        {"property_key":"relevant_datetime","form_label":"Relevant Date/Time"}, 
+        {"property_key":"lab_code","form_label":"Lab Code"}, 
+        {"property_key":"purpose","form_label":"Purpose"}, 
+        {"property_key": "purpose_subtype", "form_label": "Purpose Subtype"},
+        {"property_key":"category","form_label":"Category"}, 
+        {"property_key":"sub_category","form_label":"Sub Category"}, 
+        {"property_key":"sub_category_2","form_label":"Sub Category 2"}, 
+        {"property_key":"study_id","form_label":"Study ID"}, 
+        {"property_key":"comments","form_label":"Comments"}
+      ],  
       "controlled_properties": { 
         "purpose": {
           "type": "string",
-          "enum": ["Clinical", "Research", "Other"]
+          "enum": ["","Clinical", "Research", "Other"]
         },
-        "variable": {
+        "purpose_subtype": {
           "type": "string",
-          "enum": ["Diagnosis", "Staging", "Procedure", "Treatments", "Testing", "Imaging", "Hospitalization", "Biospecimen collection", "Disease status", "Other"]
-        },
-        "sub_variable": {
-          "type": "dependent string",
-          "on": "variable",
-          "enum": {
-            "Staging": ["", "Stage", "Metastases"],
-            "Procedure": ["", "Surgery", "Biopsy"],
-            "Treatments": ["", "Anti-cancer medication", "Supportive medication", "Vaccine", "Radiation therapy", "Clinical Trial"],
-            "Testing": ["", "Pathology testing", "Genetic testing", "ctDNA monitoring", "Cancer markers", "Blood panels", "ELISPOT etc?"],
-            "Imaging": ["", "Chest, abdomen, pelvis", "Chest", "Abdomen", "Pelvis"],
-            "Biospecimen collection": ["", "Blood"],
-            "Disease status": ["", "Progression"]
-          }
+          "enum": [ 
+            "",
+            "Institution record", 
+            "xCures record", 
+            "Summary document",
+            "Data file", 
+            "Summary document", 
+            "Literature", 
+            "Other"
+          ]
         },
         "category": {
-          "type": "string",
-          "enum": ["Diagnosis", "Staging", "Procedure", "Anti-cancer medication", "Supportive medication", "Vaccine", "Radiation therapy", "Clinical Trial", "Adverse effects", "Test", "Imaging", "Biospecimen collection", "Disease Status", "Other"]
+          "type": "dependent string", 
+          "on": "purpose",
+          "enum":
+          {
+            "":[""],
+            "Clinical": ["","Diagnosis","Staging","Procedure","Treatments","Testing","Imaging","Hospitalization","Biospecimen collection","Disease status","Other"],
+            "Research": ["","Test results summary","Sequencing file","Other"],
+            "Other": [""]
+          }
         },
         "sub_category": {
           "type": "dependent string", 
           "on": "category",
           "enum": {
-            "Diagnosis": ["", "Sarcoma", "Metastasis"],
-            "Staging": ["", "Stage", "Metastasis"],
-            "Procedure": ["", "Surgery", "Biopsy"],
-            "Anti-cancer medication": ["Combined therapy"],
-            "Supportive medication": ["", "Bone support"],
-            "Vaccine": ["", "JLF"],
-            "Radiation therapy": ["", "Gamma knife"],
-            "Clinical Trial": ["", "Medication"],
-            "Adverse effects": ["", "Atrial fibrillation"],
-            "Test": ["", "Pathology", "Genetic", "ctDNA monitoring", "Blood"],
-            "Imaging": ["", "CT"],
-            "Biospecimen collection": ["", "PBMC"],
-            "Disease Status": ["", "Progression"]
+            "":[""],
+            "Diagnosis" : [""],
+            "Staging" : [""],
+            "Procedure" : [""],
+            "Treatments" : [""],
+            "Testing" : ["","Blood", "Cancer marker", "ctDNA monitoring", "Genetics",  "Pathology"],
+            "Imaging" : ["","Abdomen", "Abdomen, pelvis", "Brain", "Chest",  "Chest, abdomen","Chest, abdomen, pelvis", "Other"],
+            "Hospitalization" : [""],
+            "Biospecimen collection" : [""],
+            "Disease status" : [""],
+            "Other" : [""],
+            "Test results summary" : [""],
+            "Sequencing file" : [""]
           }
         },
         "sub_category_2": {
           "type": "dependent string",
-          "on": "sub_category",
+          "on": "category",
           "enum": {
-            "Sarcoma": ["", "Ewing sarcoma"],
-            "Stage": ["", "Clinical"],
-            "Metastasis": ["", "Brain"],
-            "Surgery": ["", "Tumor debulking"],
-            "Biopsy": ["", "FNA"],
-            "Combined therapy": ["", "PD-L1 inhibitor"],
-            "Bone support": [""],
-            "JLF": [""],
-            "Gamma knife": [""],
-            "Medication": ["", "Immunotherapy"],
-            "Atrial fibrillation": [""],
-            "Pathology": [""],
-            "Genetic": ["", "BostonGene Tumor Profile (whole exome sequencing)"],
-            "ctDNA monitoring": ["", "Signatera"],
-            "Blood": ["", "Cancer marker", "CBC w/ diff"],
-            "CT": [""],
-            "PBMC": [""],
-            "Progression": [""]
-          }
+            "":[""],
+          "Imaging" : ["", "CT", "PET CT", "MRI", "X-Ray", "Ultrasound"]
         }
-      },
+      }
+    },
       "arbitrary_association_strings": [], 
       "valid_parents": [],
       "file_type": "",

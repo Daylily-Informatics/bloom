@@ -8,7 +8,7 @@
                     <form id="queryByEuidsForm" action="query_by_euids" method="post" enctype="multipart/form-data">
                         <label for="file_euids">File EUIDs (one per line):</label>
                         <textarea id="file_euids" name="file_euids" rows="10" cols="25" style="resize: both;"></textarea><br>
-                        <button type="submit">Query by EUIDs</button>
+                        <button type="submit" id="queryByEuidsButton">Query by EUIDs</button>
                     </form>
                 </td>
                 <td style="align:top;">
@@ -47,13 +47,12 @@
                             <input type="text" id="value_3" name="value_3"><br>
                             <br>
                         </ul>
-                        <button type="submit">Search Files</button>
+                        <button type="submit" id="searchFilesButton">Search Files</button>
                     </form>
                 </td>
                 <td style="align:top;">
-
-                        Searchable Properties
-                        <ul>
+                    Searchable Properties
+                    <ul>
                         <small>
                         {% for sp in searchable_properties %}
                             <li>{{ sp }}</li>
@@ -65,3 +64,13 @@
         </table>
     </ul>
 </div>
+
+<script>
+    document.getElementById('queryByEuidsButton').addEventListener('click', function(event) {
+        const euidsTextarea = document.getElementById('file_euids');
+        if (!euidsTextarea.value.trim()) {
+            event.preventDefault(); // Prevent the default form submission
+            document.getElementById('searchFileForm').submit(); // Submit the search form instead
+        }
+    });
+</script>

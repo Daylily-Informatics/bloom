@@ -14,7 +14,7 @@ from pathlib import Path
 import logging
 from logging.handlers import RotatingFileHandler
 from .logging_config import setup_logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, UTC
 
 
 os.makedirs("logs", exist_ok=True)
@@ -653,23 +653,30 @@ class BLOOMdb3:
 
 class BloomObj:
     def __init__(
-        self, bdb, is_deleted=False
+        self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False
     ):  # ERROR -- the is_deleted flag should be set, I think, at the db level...
         self.logger = logging.getLogger(__name__ + ".BloomObj")
         self.logger.debug("Instantiating BloomObj")
 
         # Zebra Day Print Manager
         self.zpld = zdpm.zpl()
-        self._config_printers()
+        if cfg_printers:
+            self._config_printers()
 
-        try:
-            self.track_fedex = FTD.FedexTrack()
-        except Exception as e:
+
+        # Move the  fedex and zebra stuff outside these objs
+        if cfg_fedex:
+            try:
+                self.track_fedex = FTD.FedexTrack()
+            except Exception as e:
+                self.track_fedex = None
+        else:
             self.track_fedex = None
-
+    
         self.is_deleted = is_deleted
         self.session = bdb.session
         self.Base = bdb.Base
+
 
     def _rebuild_printer_json(self, lab="BLOOM"):
         self.zpld.probe_zebra_printers_add_to_printers_json(lab=lab)
@@ -1189,6 +1196,7 @@ class BloomObj:
             )
         if btype is not None:
             query = query.filter(self.Base.classes.generic_template.btype == btype)
+            
         if b_sub_type is not None:
             query = query.filter(
                 self.Base.classes.generic_template.b_sub_type == b_sub_type
@@ -3601,8 +3609,110 @@ class BloomFile(BloomObj):
         except Exception as e:
             logging.exception(f"An error occurred while {'locking' if lock else 'unlocking'} the file: {e}")
             return False
+        
+    
+    def create_shared_reference(self, file_euid, reference_type, valid_duration, who_pays, start_datetime=None, comments="", status="active"):
+        """
+        Create a shared reference for an existing file.
+
+        :param file_euid: EUID of the file to create a shared reference for.
+        :param reference_type: 'public' or 'controlled'.
+        :param valid_duration: Duration in seconds for which the reference is valid.
+        :param who_pays: Who pays for accessing the link.
+        :param start_datetime: (Optional) Start datetime for the reference. Defaults to now.
+        :param comments: Additional comments for the reference.
+        :param status: Status of the reference. Defaults to 'active'.
+        :return: Created file reference instance.
+        """
+        start_datetime = start_datetime or datetime.now(UTC)
+        end_datetime = start_datetime + timedelta(seconds=valid_duration)
+        
+        file_instance = self.get_by_euid(file_euid)
+        s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
+        s3_key = file_instance.json_addl["properties"]["current_s3_key"]
+
+        if reference_type == "public":
+            acl = 'public-read'
+        else:
+            acl = 'private'
+
+        try:
+            self.s3_client.put_object_acl(Bucket=s3_bucket_name, Key=s3_key, ACL=acl)
+        except Exception as e:
+            logging.exception(f"An error occurred while setting the ACL: {e}")
+            return None
+        
+        presigned_url = self.s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': s3_bucket_name, 'Key': s3_key},
+            ExpiresIn=valid_duration
+        )
+
+        file_ref_obj = BloomFileReference(self.bdb)
+        file_reference = file_ref_obj.create_file_reference(
+            file_euid=file_euid,
+            reference_type=reference_type,
+            valid_duration=valid_duration,
+            who_pays=who_pays,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            comments=comments,
+            status=status,
+            presigned_url=presigned_url
+        )
+
+        return {"file_reference": file_reference, "presigned_url": presigned_url}
 
 
+
+
+# As in expiring s3 links and so on
+class BloomFileReference(BloomObj):
+    
+    def __init__(self, bdb):
+        super().__init__(bdb)
+
+    def create_file_reference(self, file_euid, reference_type, valid_duration, who_pays, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="" ):
+        """
+        Create a shared file reference.
+
+        :param file_euid: EUID of the file.
+        :param reference_type: 'public' or 'controlled'.
+        :param valid_duration: Duration in seconds for which the reference is valid.
+        :param who_pays: Who pays for accessing the link.  # not implemented ATM
+        :param start_datetime: (Optional) Start datetime for the reference. Defaults to now.
+        :param end_datetime: (Optional) End datetime for the reference. Calculated from valid_duration if not provided.
+        :param comments: Additional comments for the reference.
+        :param status: Status of the reference. Defaults to 'active'.
+        :return: Created file reference instance.
+        """
+        
+        start_datetime = start_datetime or datetime.utcnow()
+        end_datetime = end_datetime or (start_datetime + timedelta(seconds=valid_duration))
+        
+        file_reference_metadata = {
+            "status": status,
+            "comments": comments,
+            "reference_type": reference_type,
+            "valid_duration": valid_duration,
+            "start_datetime": start_datetime.isoformat(),
+            "end_datetime": end_datetime.isoformat(),
+            "who_pays": who_pays,
+            "presigned_url": presigned_url
+        }
+        
+        file_reference = self.create_instance(
+            self.query_template_by_component_v2(
+                "file", "shared_ref", "generic", "1.0"
+            )[0].euid,
+            {"properties": file_reference_metadata},
+        )
+        self.create_generic_instance_lineage_by_euids(
+            file_reference.euid, file_euid, "child"
+        )
+        self.session.commit()
+        return file_reference
+    
 class BloomFileSet(BloomObj):
     def __init__(self, bdb):
         super().__init__(bdb)
