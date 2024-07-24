@@ -77,6 +77,7 @@ _see build test badges above for all supported platforms_
   * be sure `wget` is available to you.
     
   *linux*
+_a pinned version: https://repo.anaconda.com/miniconda/Miniconda3-py312_24.5.0-0-Linux-x86_64.sh_
 
   >  x86_64: `wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
   
