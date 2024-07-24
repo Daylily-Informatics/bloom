@@ -24,10 +24,22 @@ jobs:
       - name: Build and run CentOS 9 compatible container
         run: |
           docker run --name rocky9-container -d rockylinux:9 sleep infinity
-          docker exec rocky9-container yum install -y python3 python3-pip
+          docker exec rocky9-container yum install -y python3 python3-pip wget
           docker exec rocky9-container python3 -m pip install --upgrade pip
+          
+          # Install Miniconda
+          docker exec rocky9-container wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+          docker exec rocky9-container bash /tmp/miniconda.sh -b -p /opt/miniconda
+          docker exec rocky9-container /opt/miniconda/bin/conda init
+          
+          # Source the conda script and create conda environment
+          docker exec rocky9-container /bin/bash -c "source /opt/miniconda/etc/profile.d/conda.sh && conda create -n BLOOM python=3.12.0 -y"
+
+          # Copy repository content to container
           docker cp . rocky9-container:/workspace
-          docker exec rocky9-container /bin/bash -c "cd /workspace  && source bloom_lims/env/install_postgres.sh  && pytest"
+
+          # Run the setup script and tests
+          docker exec rocky9-container /bin/bash -c "cd /workspace && source /opt/miniconda/etc/profile.d/conda.sh && conda activate BLOOM && pip install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6 && source bloom_lims/env/install_postgres.sh skip && pytest"
           
       - name: Clean up Docker container
-        run: docker rm -f roc
+        run: docker rm -f rocky9-container
