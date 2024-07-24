@@ -3241,7 +3241,7 @@ class BloomFile(BloomObj):
 
         sanitized_value = urllib.parse.quote(value, safe='_.:/=+-@ ')
         # Trim the string to the maximum allowed length (256 characters for tag values)
-        sanitized_value = sanitized_value[:256]
+        sanitized_value = sanitized_value[:255]
 
         return sanitized_value  # sanitized_value if sanitized_value != value else value
 
