@@ -27,19 +27,24 @@ jobs:
           docker exec rocky9-container yum install -y python3 python3-pip wget
           docker exec rocky9-container python3 -m pip install --upgrade pip
           
-          # Install Miniconda
-          docker exec rocky9-container wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
-          docker exec rocky9-container bash /tmp/miniconda.sh -b -p /opt/miniconda
-          docker exec rocky9-container /opt/miniconda/bin/conda init
+          # Create a user named 'bloom' and switch to this user
+          docker exec rocky9-container useradd -m bloom
+          
+          # Install Miniconda for user 'bloom'
+          docker exec rocky9-container su - bloom -c "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh"
+          docker exec rocky9-container su - bloom -c "bash /tmp/miniconda.sh -b -p /home/bloom/miniconda"
+          docker exec rocky9-container su - bloom -c "echo 'export PATH=/home/bloom/miniconda/bin:$PATH' >> /home/bloom/.bashrc"
+          docker exec rocky9-container su - bloom -c "/home/bloom/miniconda/bin/conda init"
           
           # Source the conda script and create conda environment
-          docker exec rocky9-container /bin/bash -c "source /opt/miniconda/etc/profile.d/conda.sh && conda create -n BLOOM python=3.12.0 -y"
+          docker exec rocky9-container su - bloom -c "source /home/bloom/.bashrc && conda create -n BLOOM python=3.12.0 -y"
 
           # Copy repository content to container
-          docker cp . rocky9-container:/workspace
+          docker cp . rocky9-container:/home/bloom/workspace
+          docker exec rocky9-container chown -R bloom:bloom /home/bloom/workspace
 
           # Run the setup script and tests
-          docker exec rocky9-container /bin/bash -c "cd /workspace && source /opt/miniconda/etc/profile.d/conda.sh && conda activate BLOOM && pip install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6 && source bloom_lims/env/install_postgres.sh skip && pytest"
+          docker exec rocky9-container su - bloom -c "cd /home/bloom/workspace && source /home/bloom/.bashrc && conda activate BLOOM && pip install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6 && source bloom_lims/env/install_postgres.sh skip && pytest"
           
       - name: Clean up Docker container
         run: docker rm -f rocky9-container
