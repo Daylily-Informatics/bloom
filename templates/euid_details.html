@@ -178,7 +178,13 @@
                     </tr>
                     <tr>
                         <td>Template EUID</td>
-                        <td><a href=euid_details?euid={{ object.parent_template_euid }} >{{ object.parent_template_euid }}</a></td>
+                        <td>
+                            {% if object.parent_template_euid %}
+                                <a href="euid_details?euid={{ object.parent_template_euid }}">{{ object.parent_template_euid }}</a>
+                            {% else %}
+                                <a href="/admin_template?euid={{ object.euid }}">admin edit template</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     <!-- Add other fields as necessary -->
                 </table>

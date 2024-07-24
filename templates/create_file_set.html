@@ -16,6 +16,14 @@
     
             <label for="file_euids">File EUIDs :</label>
             <textarea id="file_euids" name="file_euids" required></textarea>
+
+            <br><br>
+            <label for="create_presigned_urls"> Create Presigned URLs: </label>
+            <input type="checkbox" id="create_presigned_urls" name="create_presigned_urls">
+            <br>
+            <label for="presigned_url_duration"> Presigned URL Duration (days, float acceptable): </label>
+            <input  id="presigned_url_duration" name="presigned_url_duration" value="1" >
+  
             <br><br>
             <button type="submit">Create File Set</button>
         </form>

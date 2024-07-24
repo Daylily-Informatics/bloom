@@ -10,6 +10,7 @@ import string
 import yaml
 
 from pathlib import Path
+import urllib.parse
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -673,6 +674,7 @@ class BloomObj:
         else:
             self.track_fedex = None
     
+        self._bdb = bdb
         self.is_deleted = is_deleted
         self.session = bdb.session
         self.Base = bdb.Base
@@ -1650,8 +1652,6 @@ class BloomObj:
             save_path="./tmp/",
             save_pattern=action_ds["captured_data"]["download_type"],
         )
-        # from IPython import embed
-        # embed()
         return dl_file
 
     def do_stamp_plates_into_plate(self, euid, action_ds):
@@ -3237,14 +3237,12 @@ class BloomFile(BloomObj):
 
     def sanitize_tag(self, value):
         """Sanitize the tag value to conform to AWS tag requirements."""
-        # Remove any invalid characters
-        sanitized_value = re.sub(r"[^a-zA-Z0-9\s\+\=._\-]", "", value)
-        # Replace spaces with underscores
-        sanitized_value = sanitized_value.replace(" ", "_")
-        # Trim the string to the maximum allowed length (256 characters for tag values)
-        sanitized_value = "SAN:" + sanitized_value[:252]
 
-        return value  # sanitized_value if sanitized_value != value else value
+        sanitized_value = urllib.parse.quote(value, safe='_.:/=+-@ ')
+        # Trim the string to the maximum allowed length (256 characters for tag values)
+        sanitized_value = sanitized_value[:256]
+
+        return sanitized_value  # sanitized_value if sanitized_value != value else value
 
     def add_file_data(
         self,
@@ -3297,7 +3295,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={euid}",
+                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}",
                 )
                 odirectory, ofilename = os.path.split(file_name)
 
@@ -3322,7 +3320,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=response.content,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(url_info)}&original_url={self.sanitize_tag(url)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={euid}",
+                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(url_info)}&original_url={self.sanitize_tag(url)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3351,7 +3349,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(local_path_info.name)}&original_file_path={self.sanitize_tag(full_path_to_file)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={euid}",
+                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(local_path_info.name)}&original_file_path={self.sanitize_tag(full_path_to_file)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3408,7 +3406,7 @@ class BloomFile(BloomObj):
                     Bucket=source_bucket,
                     Key=marker_key,
                     Body=b"",
-                    Tagging=f"euid={euid}&original_s3_uri={s3_uri}",
+                    Tagging=f"euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}",
                 )
 
             else:
@@ -3611,54 +3609,47 @@ class BloomFile(BloomObj):
             return False
         
     
-    def create_shared_reference(self, file_euid, reference_type, valid_duration, who_pays, start_datetime=None, comments="", status="active"):
+    def create_presigned_url(self, 
+                             file_euid,  
+                             valid_duration=3600, 
+                             comments="", status="active", 
+                             file_set_euid=None):
         """
-        Create a shared reference for an existing file.
+        Create a presigned url and create a shared reference to track this.
 
         :param file_euid: EUID of the file to create a shared reference for.
-        :param reference_type: 'public' or 'controlled'.
         :param valid_duration: Duration in seconds for which the reference is valid.
-        :param who_pays: Who pays for accessing the link.
-        :param start_datetime: (Optional) Start datetime for the reference. Defaults to now.
         :param comments: Additional comments for the reference.
         :param status: Status of the reference. Defaults to 'active'.
         :return: Created file reference instance.
         """
-        start_datetime = start_datetime or datetime.now(UTC)
+        
+        # change to allow setting the start_datetime in the future.
+        start_datetime = datetime.now(UTC)
         end_datetime = start_datetime + timedelta(seconds=valid_duration)
         
         file_instance = self.get_by_euid(file_euid)
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
         s3_key = file_instance.json_addl["properties"]["current_s3_key"]
 
-        if reference_type == "public":
-            acl = 'public-read'
-        else:
-            acl = 'private'
-
-        try:
-            self.s3_client.put_object_acl(Bucket=s3_bucket_name, Key=s3_key, ACL=acl)
-        except Exception as e:
-            logging.exception(f"An error occurred while setting the ACL: {e}")
-            return None
-        
         presigned_url = self.s3_client.generate_presigned_url(
             'get_object',
             Params={'Bucket': s3_bucket_name, 'Key': s3_key},
             ExpiresIn=valid_duration
         )
 
-        file_ref_obj = BloomFileReference(self.bdb)
+        file_ref_obj = BloomFileReference(self._bdb)
         file_reference = file_ref_obj.create_file_reference(
             file_euid=file_euid,
-            reference_type=reference_type,
+            reference_type="presigned",
             valid_duration=valid_duration,
-            who_pays=who_pays,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             comments=comments,
             status=status,
-            presigned_url=presigned_url
+            presigned_url=presigned_url,
+            file_set_euid=file_set_euid, 
+            visibility=None
         )
 
         return {"file_reference": file_reference, "presigned_url": presigned_url}
@@ -3666,20 +3657,20 @@ class BloomFile(BloomObj):
 
 
 
-# As in expiring s3 links and so on
+# As in expiring s3 links and so on. Potentially allow sharing of files with hosting protocols like SFTP, etc...
 class BloomFileReference(BloomObj):
     
     def __init__(self, bdb):
         super().__init__(bdb)
 
-    def create_file_reference(self, file_euid, reference_type, valid_duration, who_pays, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="" ):
+    def create_file_reference(self, file_euid, reference_type, visibility, valid_duration, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="", file_set_euid=None):
         """
         Create a shared file reference.
 
         :param file_euid: EUID of the file.
-        :param reference_type: 'public' or 'controlled'.
+        :param reference_type: Type of reference. 'presigned'.
+        :param visibility: 'public' or 'controlled'.
         :param valid_duration: Duration in seconds for which the reference is valid.
-        :param who_pays: Who pays for accessing the link.  # not implemented ATM
         :param start_datetime: (Optional) Start datetime for the reference. Defaults to now.
         :param end_datetime: (Optional) End datetime for the reference. Calculated from valid_duration if not provided.
         :param comments: Additional comments for the reference.
@@ -3693,11 +3684,11 @@ class BloomFileReference(BloomObj):
         file_reference_metadata = {
             "status": status,
             "comments": comments,
+            "visibility": visibility,
             "reference_type": reference_type,
             "valid_duration": valid_duration,
             "start_datetime": start_datetime.isoformat(),
             "end_datetime": end_datetime.isoformat(),
-            "who_pays": who_pays,
             "presigned_url": presigned_url
         }
         
@@ -3708,8 +3699,12 @@ class BloomFileReference(BloomObj):
             {"properties": file_reference_metadata},
         )
         self.create_generic_instance_lineage_by_euids(
-            file_reference.euid, file_euid, "child"
+            file_euid, file_reference.euid, reference_type
         )
+        if file_set_euid not in [None]:
+            self.create_generic_instance_lineage_by_euids(
+                file_set_euid, file_reference.euid, "from_set"
+            )
         self.session.commit()
         return file_reference
     

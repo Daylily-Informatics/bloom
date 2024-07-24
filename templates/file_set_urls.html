@@ -2,64 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    {% set page_title = 'File Search Results' %}
-    <title>{{ page_title }}</title>
-    {% set bloom_mod = 'dewey' %}
-
+    <title>{{ file_set.name }} - Presigned URLs</title>
     <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
     <link rel="stylesheet" type="text/css" href="static/style.css">
 </head>
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>Search Results</h1>
-
-    <table id="results-table" border="1">
+    <h1>{{ file_set.euid }} - Presigned URLs</h1>
+    <small>{{ file_set.json_addl.get('properties','').get('name','') }}</small>
+        <hr>
+    <table id="urls-table" border="1">
         <thead>
             <tr>
-                <th>Link</th> <!-- New column header for the link -->
-                {% for column in columns %}
-                <th onclick="sortTable({{ loop.index0 }})">{{ column }}</th>
-                {% endfor %}
+                <th onclick="sortTable(0)">File EUID</th>
+                <th onclick="sortTable(1)">Original File Name</th>
+                <th onclick="sortTable(2)">File Reference EUID</th>
+                <th onclick="sortTable(3)">Presigned URL</th>
+                <th onclick="sortTable(4)">Valid Start Datetime</th>
+                <th onclick="sortTable(5)">Valid End Datetime</th>
             </tr>
         </thead>
         <tbody>
-            {% for row in table_data %}
+            {% for ref in shared_refs %}
             <tr>
-                <td>
-                    <a href="/file_set_urls?fs_euid={{ row['EUID'] }}" target="_blank">View Presigned URLSs</a>
-                </td> <!-- New cell with the link -->
-                {% for column in columns %}
-                <td>
-                    {% if column == 'EUID' %}
-                    <a target="_blank" href="euid_details?euid={{ row[column] }}">{{ row[column] }}</a>
-                    {% else %}
-                    {{ row[column] }}
-                    {% endif %}
-                </td>
-                {% endfor %}
+                <td><a target=euid href=/euid_details?euid={{ ref.orig_file.euid }} >{{ ref.orig_file.euid }} </a></td>
+                <td>{{ ref.orig_file.json_addl.get('properties','').get('original_file_name') }} </td>
+                <td><a target=euid href=/euid_details?euid={{ ref.euid }}>{{ ref.euid }} </a></td>
+                <td><a href="{{ ref.url }}" target="_blank">{{ ref.url }}</a></td>
+                <td>{{ ref.start_datetime }}</td>
+                <td>{{ ref.end_datetime }}</td>
+
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <a href="/dewey">Go Back</a>
-
     <button class="floating-button" onclick="downloadTableAsTSV()">⬇️ Download TSV</button>
 
     <script>
-        let sortDirections = Array({{ columns | length }}).fill(true); // Track sort direction for each column
+        let sortDirections = Array(8).fill(true); // Track sort direction for each column
 
         function sortTable(columnIndex) {
-            const table = document.getElementById('results-table');
+            const table = document.getElementById('urls-table');
             const tbody = table.tBodies[0];
             const rows = Array.from(tbody.rows);
 
             const direction = sortDirections[columnIndex] ? 1 : -1;
 
             const sortedRows = rows.sort((a, b) => {
-                const cellA = a.cells[columnIndex + 1].innerText.toLowerCase(); // +1 because of new first column
-                const cellB = b.cells[columnIndex + 1].innerText.toLowerCase();
+                const cellA = a.cells[columnIndex].innerText.toLowerCase();
+                const cellB = b.cells[columnIndex].innerText.toLowerCase();
 
                 if (cellA < cellB) return -1 * direction;
                 if (cellA > cellB) return 1 * direction;
@@ -71,7 +64,7 @@
         }
 
         function downloadTableAsTSV() {
-            const table = document.getElementById('results-table');
+            const table = document.getElementById('urls-table');
             const rows = Array.from(table.rows);
             const tsv = rows.map(row => {
                 const cells = Array.from(row.cells);
@@ -82,7 +75,7 @@
             const downloadLink = document.createElement('a');
             const now = new Date();
             const timestamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
-            downloadLink.download = `dewey_file_set_${timestamp}.tsv`;
+            downloadLink.download = `file_set_urls_${timestamp}.tsv`;
             downloadLink.href = URL.createObjectURL(tsvFile);
             document.body.appendChild(downloadLink);
             downloadLink.click();
@@ -99,17 +92,4 @@
             background-color: #008CBA; /* Blue background */
             color: white; /* White text */
             border: none;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 50%;
-        }
-
-        th {
-            cursor: pointer;
-        }
-    </style>
-</body>
-</html>
+           
