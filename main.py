@@ -2332,8 +2332,16 @@ async def create_file_set(
     file_set_tag: str = Form(...),
     comments: str = Form(None),
     file_euids: str = Form(...),
+    create_presigned_urls: str = Form("no"),
+    presigned_url_duration: float = Form(0)
 ):
+    if create_presigned_urls == "on":
+        create_presigned_urls = True
+    else:
+        create_presigned_urls = False
+        
     try:
+        bf = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
 
         file_set_metadata = {
@@ -2341,6 +2349,8 @@ async def create_file_set(
             "description": file_set_description,
             "tag": file_set_tag,
             "comments": comments,
+            "create_presigned_urls": create_presigned_urls,
+            "presigned_url_duration": presigned_url_duration
         }
 
         # Create the file set
@@ -2351,6 +2361,15 @@ async def create_file_set(
         bfs.add_files_to_file_set(
             file_set_euid=new_file_set.euid, file_euids=file_euids_list
         )
+        
+        if create_presigned_urls:
+            for f_euid in file_euids_list:
+                # where presugned_url_duration is in days
+                presigned_url_duration_sec = presigned_url_duration * 24 * 60 * 60
+            
+                bf.create_presigned_url(file_euid=f_euid, file_set_euid=new_file_set.euid, 
+                                         valid_duration=presigned_url_duration_sec
+                                         )
 
         return RedirectResponse(
             url=f"/euid_details?euid={new_file_set.euid}", status_code=303
@@ -2624,3 +2643,92 @@ async def create_instance(request: Request):
     return RedirectResponse(
         url=f"/euid_details?euid={ni.euid}", status_code=303
     )
+
+@app.get("/file_set_urls", response_class=HTMLResponse)
+async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_auth)):
+    try:
+        bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bf = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+
+        file_set = bfs.get_by_euid(fs_euid)
+        if not file_set:
+            raise HTTPException(status_code=404, detail="File set not found.")
+
+        # Fetch all shared references where the file set is a parent
+        shared_refs = []
+        for lineage in file_set.parent_of_lineages:
+            if lineage.child_instance.btype == 'shared_ref':
+ 
+                orig_file = None
+                for x in lineage.child_instance.child_of_lineages.all():
+                    if x.parent_instance.btype == 'file':
+                        orig_file = x.parent_instance                
+                        
+                shared_refs.append({
+                    "euid": lineage.child_instance.euid,
+                    "url": lineage.child_instance.json_addl['properties'].get("presigned_url", "N/A"),
+                    "start_datetime": lineage.child_instance.json_addl['properties'].get("start_datetime", "N/A"),
+                    "end_datetime": lineage.child_instance.json_addl['properties'].get("end_datetime", "N/A"),
+                    "orig_file": orig_file
+                })
+
+        # Render the HTML template
+        user_data = request.session.get("user_data", {})
+        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        context = {
+            "request": request,
+            "file_set": file_set,
+            "shared_refs": shared_refs,
+            "style": style,
+            "udat": user_data,
+        }
+        content = templates.get_template("file_set_urls.html").render(context)
+        return HTMLResponse(content=content)
+
+    except Exception as e:
+        logging.error(f"Error fetching file set URLs: {e}")
+        return JSONResponse(
+            content={"error": "An error occurred while fetching file set URLs."},
+            status_code=500
+        )
+
+
+@app.get("/admin_template", response_class=HTMLResponse)
+async def get_admin_template(request: Request, euid: str = Query(...)):
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    obj = bobdb.get_by_euid(euid)
+    
+    if not obj:
+        raise HTTPException(status_code=404, detail="Object not found")
+
+    controlled_properties = obj.json_addl.get("controlled_properties", {})
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    
+    template = templates.get_template("admin_template.html")
+    context = {
+        "request": request,
+        "euid": euid,
+        "controlled_properties": json.dumps(controlled_properties, indent=4),
+        "udat":  user_data,
+        "style":style
+    }
+
+    return HTMLResponse(content=template.render(context))
+
+@app.post("/admin_template", response_class=HTMLResponse)
+async def post_admin_template(request: Request, euid: str = Form(...), controlled_properties: str = Form(...)):
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    obj = bobdb.get_by_euid(euid)
+
+    if not obj:
+        raise HTTPException(status_code=404, detail="Object not found")
+
+    try:
+        obj.json_addl['controlled_properties'] = json.loads(controlled_properties)
+        flag_modified(obj, "json_addl")
+        bobdb.session.commit()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return RedirectResponse(url=f"/admin_template?euid={euid}", status_code=303)

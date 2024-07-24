@@ -199,7 +199,7 @@
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>Search Results</h1>
+    <h1>File Search Results</h1>
     <form id="fileSetForm" action="/create_file_set" method="post">
         <div style="display: flex;">
             <div class="form-section" style="background-color: rgba(255, 204, 204, 0.1);">
@@ -233,7 +233,16 @@
                     <input type="text" id="file_set_tag" name="file_set_tag" required>
                     <label for="comments"> Comments: </label>
                     <input type="text" id="comments" name="comments" value="">
+
                 </div>
+                <div class="form-group">
+                        <label for="create_presigned_urls"> Create Presigned URLs: </label>
+                        <input type="checkbox" id="create_presigned_urls" name="create_presigned_urls">
+                        <label for="presigned_url_duration"> Presigned URL Duration (days, float acceptable): </label>
+                        <input type="number" id="presigned_url_duration" name="presigned_url_duration" value="1" min="1">
+                </div>
+
+               
                 <input type="hidden" id="file_euids" name="file_euids">
             </div>
         </div>

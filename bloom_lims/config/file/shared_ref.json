@@ -7,6 +7,7 @@
         "status": "",
         "comments": "",
         "reference_type": "",
+        "visibility": "",
         "valid_duration": "",
         "start_datetime": "",
         "end_datetime": "",
@@ -16,6 +17,7 @@
       },
       "ui_form_properties" : [ 
         {"property_key":"reference_type","form_label":"Reference Type"},
+        {"property_key":"visibility", "form_label":"Visibility"},
         {"property_key": "status", "form_label":"Reference Status"},
         {"property_key":"valid_duration","form_label":"Duration"},
         {"property_key":"start_datetime","form_label":"Start Datetime"},
