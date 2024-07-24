@@ -21,6 +21,7 @@ if [[ "$1" == "" ]]; then
     else
         echo "Conda environment BLOOM created successfully."
     fi
+    mkdir -p ~/.config/rclone/ && touch ~/.config/rclone/rclone.conf && cat bloom_lims/env/rclone.conf >> ~/.config/rclone/rclone.conf 
     
     conda activate BLOOM
     if [[ $? -ne 0 ]]; then

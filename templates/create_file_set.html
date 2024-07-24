@@ -18,14 +18,52 @@
             <textarea id="file_euids" name="file_euids" required></textarea>
 
             <br><br>
-            <label for="create_presigned_urls"> Create Presigned URLs: </label>
-            <input type="checkbox" id="create_presigned_urls" name="create_presigned_urls">
+            <label for="ref_type">Share Files In Set? </label>
+            <select id="ref_type" name="ref_type" onchange="toggleRcloneOptions()">
+                <option value="na">Just Create File Set</option>
+                <option value="presigned_url">Create Presigned S3 URLS Per File</option>
+                <option value="rclone serve http">Share File Set Via HTTP</option>
+                <option value="rclone serve ftp">Share File Set Via FTP </option>
+                <option value="rclone serve sftp">Share File Set Via SFTP</option>
+                <option value="rclone serve webdav">Share File Set Via WEBDAV</option>
+                <option value="rclone serve restic">Share File Set Via RESTIC</option>
+                <option value="ne rclone nfs">Share File Set Via NFS (not enabled)</option>
+                <option value="ne rclone s3">Share File Set Via S3 (not enabled)</option>        
+                <option value="ne rclone dlna">Share File Set Via DLNA (not enabled)</option>
+                <option value="ne rclone docker">Share File Set Via DOCKER (not enabled)</option>
+            </select><br>
+            <div id="rclone-options" style="display: none;">
+                <small><a href=https://rclone.org/commands/rclone_serve/>rclone serve</a> is magic & free</small>
+                <br><br>
+                bucket:<input type="text" name="bucket" value="{{ s3_bucket_prefix }}"> //
+                host:<input type="text" name="host" value="0.0.0.0"> // port:<input type="text" name="port" value="8080"> // 
+                user:<input type="text" name="user" value="user"> // pass:<input type="text" name="passwd" value="passwd">         
+            </div>
+
             <br>
-            <label for="presigned_url_duration"> Presigned URL Duration (days, float acceptable): </label>
-            <input  id="presigned_url_duration" name="presigned_url_duration" value="1" >
+            <label for="duration"> Share Duration (days, float acceptable): </label>
+            <input  id="duration" name="duration" value="1" >
   
             <br><br>
             <button type="submit">Create File Set</button>
         </form>
     </ul>
 </div>
+
+<script>
+    function toggleRcloneOptions() {
+        var refType = document.getElementById("ref_type").value;
+        var rcloneOptions = document.getElementById("rclone-options");
+        
+        if (refType.startsWith("rclone")) {
+            rcloneOptions.style.display = "block";
+        } else {
+            rcloneOptions.style.display = "none";
+        }
+    }
+
+    // Call the function on page load to set the correct state
+    document.addEventListener("DOMContentLoaded", function() {
+        toggleRcloneOptions();
+    });
+</script>

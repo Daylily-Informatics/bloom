@@ -101,6 +101,7 @@ from bloom_lims.bdb import (
     BloomWorkflowStep,
     BloomFile,
     BloomFileSet,
+    BloomFileReference
 )
 
 from bloom_lims.bvars import BloomVars
@@ -1884,7 +1885,9 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
         ui_fields=ui_form_fields,
         controlled_properties=f_template.json_addl.get("controlled_properties", {}),
         has_ui_form_properties=bool(ui_form_properties),
-        searchable_properties=sorted(f_template.json_addl['properties'].keys()),
+        searchable_properties=sorted(f_template.json_addl['properties'].keys()),   
+        s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
+
     )
 
     return HTMLResponse(content=content)
@@ -2287,7 +2290,7 @@ async def search_files(
             columns=columns,
             table_data=table_data,
             style=style,
-            udat=user_data,
+            udat=user_data,s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
         )
         return HTMLResponse(content=content)
 
@@ -2332,25 +2335,34 @@ async def create_file_set(
     file_set_tag: str = Form(...),
     comments: str = Form(None),
     file_euids: str = Form(...),
-    create_presigned_urls: str = Form("no"),
-    presigned_url_duration: float = Form(0)
-):
-    if create_presigned_urls == "on":
-        create_presigned_urls = True
-    else:
-        create_presigned_urls = False
-        
+    ref_type: str = Form("na"),
+    duration: float = Form(0),
+    bucket: str = Form(""),
+    host: str = Form(""),
+    port: int = Form(0),
+    user: str = Form(""),
+    passwd: str = Form("") 
+):        
+    rclone_config = {
+                "bucket": bucket,
+                "host": host,
+                "port": port,
+                "user": user,
+                "passwd": passwd
+            }
     try:
         bf = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-
+        bfr = BloomFileReference(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        
         file_set_metadata = {
             "name": file_set_name,
             "description": file_set_description,
             "tag": file_set_tag,
             "comments": comments,
-            "create_presigned_urls": create_presigned_urls,
-            "presigned_url_duration": presigned_url_duration
+            "ref_type": ref_type,
+            "duration": duration,
+            "rclone_config": rclone_config
         }
 
         # Create the file set
@@ -2362,14 +2374,21 @@ async def create_file_set(
             file_set_euid=new_file_set.euid, file_euids=file_euids_list
         )
         
-        if create_presigned_urls:
-            for f_euid in file_euids_list:
-                # where presugned_url_duration is in days
-                presigned_url_duration_sec = presigned_url_duration * 24 * 60 * 60
-            
+        # where in duration is days
+        duration_sec = duration * 24 * 60 * 60
+        
+        if ref_type == "presigned_url":
+            for f_euid in file_euids_list:            
                 bf.create_presigned_url(file_euid=f_euid, file_set_euid=new_file_set.euid, 
-                                         valid_duration=presigned_url_duration_sec
+                                         valid_duration=duration_sec
                                          )
+        elif ref_type.startswith('rclone'):
+            bfr.create_file_reference(reference_type=ref_type,valid_duration=duration_sec,file_set_euid=new_file_set.euid, rclone_config=rclone_config)
+        elif ref_type.startswith("na"):
+            pass
+        else:
+            raise ValueError(f"UNSUPPORTED ref_type: {ref_type}")
+        
 
         return RedirectResponse(
             url=f"/euid_details?euid={new_file_set.euid}", status_code=303

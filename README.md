@@ -68,6 +68,7 @@ _bloom natively will support arbitrarily defined labware, a 96w plate is just on
 ### Hardware Supported
 _see build test badges above for all supported platforms_
 * Mac (14+) 
+  * `brew install coreutils` is required for the `gtimeout` command for some rclone functionality. run `alias timeout=gtimeout` to use the gtimeout w/zsh.
 * Ubuntu 22+
 * Centos 9
 
