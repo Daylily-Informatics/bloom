@@ -24,10 +24,10 @@ jobs:
       - name: Build and run CentOS 9 compatible container
         run: |
           docker run --name rocky9-container -d rockylinux:9 sleep infinity
-          docker exec -it rocky9-container yum install -y python3 python3-pip
-          docker exec -it rocky9-container python3 -m pip install --upgrade pip
+          docker exec rocky9-container yum install -y python3 python3-pip
+          docker exec rocky9-container python3 -m pip install --upgrade pip
           docker cp . rocky9-container:/workspace
-          docker exec -it rocky9-container /bin/bash -c "cd /workspace && pip3 install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6 && source bloom_lims/env/install_postgres.sh skip && pytest"
+          docker exec rocky9-container /bin/bash -c "cd /workspace && pip3 install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6 && source bloom_lims/env/install_postgres.sh skip && pytest"
           
       - name: Clean up Docker container
-        run: docker rm -f rocky9-container
+        run: docker rm -f roc
