@@ -37,14 +37,14 @@ jobs:
           docker exec rocky9-container su - bloom -c "/home/bloom/miniconda/bin/conda init"
           
           # Source the conda script and create conda environment
-          docker exec rocky9-container su - bloom -c "source /home/bloom/.bashrc && conda create -n BLOOM python=3.12.0 -y"
+          docker exec rocky9-container su - bloom -c "source /home/bloom/.bashrc && conda create -n BLOOM2 python=3.12.0 pip -y"
 
           # Copy repository content to container
           docker cp . rocky9-container:/home/bloom/workspace
           docker exec rocky9-container chown -R bloom:bloom /home/bloom/workspace
 
           # Run the setup script and tests
-          docker exec rocky9-container su - bloom -c "cd /home/bloom/workspace && source /home/bloom/.bashrc && conda activate BLOOM && pip install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6 && source bloom_lims/env/install_postgres.sh skip && pytest"
+          docker exec rocky9-container su - bloom -c "cd /home/bloom/workspace && source /home/bloom/.bashrc && source bloom_lims/env/install_postgres.sh && pytest"
           
       - name: Clean up Docker container
         run: docker rm -f rocky9-container
