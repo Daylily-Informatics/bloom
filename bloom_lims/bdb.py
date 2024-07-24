@@ -3,6 +3,7 @@ import ast
 import json
 import sys
 import re
+import subprocess
 
 import random
 import string
@@ -3663,22 +3664,25 @@ class BloomFileReference(BloomObj):
     def __init__(self, bdb):
         super().__init__(bdb)
 
-    def create_file_reference(self, file_euid, reference_type, visibility, valid_duration, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="", file_set_euid=None):
+
+
+    def create_file_reference(self, file_euid=None, reference_type='presigned', visibility='public', valid_duration=0, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="", file_set_euid=None, rclone_config={}):
         """
         Create a shared file reference.
 
         :param file_euid: EUID of the file.
-        :param reference_type: Type of reference. 'presigned'.
+        :param reference_type: Type of reference. 'presigned' or 'rclone http'.
         :param visibility: 'public' or 'controlled'.
         :param valid_duration: Duration in seconds for which the reference is valid.
         :param start_datetime: (Optional) Start datetime for the reference. Defaults to now.
         :param end_datetime: (Optional) End datetime for the reference. Calculated from valid_duration if not provided.
         :param comments: Additional comments for the reference.
         :param status: Status of the reference. Defaults to 'active'.
+        :param rclone_config: Configuration for rclone http serve {'port': 8080, 'host': '0.0.0.0', 'user': 'user', 'passwd': 'passwd', 'bucket':'xxx-dewey-0'}.
         :return: Created file reference instance.
         """
         
-        start_datetime = start_datetime or datetime.utcnow()
+        start_datetime = start_datetime or datetime.now(UTC)
         end_datetime = end_datetime or (start_datetime + timedelta(seconds=valid_duration))
         
         file_reference_metadata = {
@@ -3689,7 +3693,8 @@ class BloomFileReference(BloomObj):
             "valid_duration": valid_duration,
             "start_datetime": start_datetime.isoformat(),
             "end_datetime": end_datetime.isoformat(),
-            "presigned_url": presigned_url
+            "presigned_url": presigned_url,
+            "rclone_config": rclone_config
         }
         
         file_reference = self.create_instance(
@@ -3698,13 +3703,79 @@ class BloomFileReference(BloomObj):
             )[0].euid,
             {"properties": file_reference_metadata},
         )
-        self.create_generic_instance_lineage_by_euids(
-            file_euid, file_reference.euid, reference_type
-        )
+        
+        if reference_type.startswith('rclone'):
+            # Start the rclone http serve
+
+            filter_fn = f"logs/{file_reference.euid}_filter.txt"
+            fh = open(filter_fn, "w")
+
+            fs = self.get_by_euid(file_set_euid)
+            for x in fs.parent_of_lineages:
+                print(x.child_instance.euid)
+                fh.write(f"+ {x.child_instance.json_addl['properties']['current_s3_key']}\n")
+            fh.write('- *\n')
+            fh.close()
+
+
+            cmd = f"timeout {valid_duration} {reference_type} blms3:{rclone_config['bucket']} --filter-from logs/{file_reference.euid}_filter.txt --addr {rclone_config['host']}:{rclone_config['port']} --user {rclone_config['user']} --pass {rclone_config['passwd']} 2>&1 > logs/{file_reference.euid}_rclone.log &"
+            logging.info(f"Starting rclone http serve with command: {cmd}")
+            
+            file_reference.json_addl['properties']['rclone_cmd'] = cmd
+            flag_modified(file_reference, "json_addl")
+            
+            try:
+                # Start the command in the background
+                process = subprocess.Popen(
+                    cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+
+                # Log that the process has started
+                logging.info(f"rclone command started with PID: {process.pid}")
+
+                # Optionally, you can wait a moment and then check if the process is still running
+                process.communicate(timeout=5)
+                if process.poll() is None:
+                    logging.info(f"rclone is running successfully in the background.")
+                    file_reference.json_addl['properties']['rclone_pid'] = process.pid
+                    file_reference.json_addl['properties']['rclone_status'] = 'running'
+                    flag_modified(file_reference, "json_addl")
+                else:
+                    file_reference.json_addl['properties']['rclone_status'] = 'error'
+                    flag_modified(file_reference, "json_addl")
+                    logging.error(f"rclone command failed to start properly. Error: {process.stderr.read().decode().strip()}")
+
+            except subprocess.TimeoutExpired:
+                logging.info(f"rclone command started and is running in the background.")
+                file_reference.json_addl['properties']['rclone_pid'] = process.pid
+                file_reference.json_addl['properties']['rclone_status'] = 'running bkgrnd'
+                flag_modified(file_reference, "json_addl")
+            except Exception as e:
+                logging.error(f"An error occurred while starting rclone: {str(e)}")
+                file_reference.json_addl['properties']['rclone_status'] = 'error'
+                flag_modified(file_reference, "json_addl")
+
+            self.session.commit()
+            logging.info(f"{cmd} was executed... see logs")
+
+            
+
+            
+        if file_euid not in [None]:
+            self.create_generic_instance_lineage_by_euids(
+                file_euid, file_reference.euid, reference_type
+            )
+            
         if file_set_euid not in [None]:
             self.create_generic_instance_lineage_by_euids(
                 file_set_euid, file_reference.euid, "from_set"
             )
+
+
+
         self.session.commit()
         return file_reference
     
