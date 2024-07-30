@@ -1,6 +1,7 @@
 import pytest
-from bloom_lims.bdb import BLOOMdb3
-from bloom_lims.bdb import BloomWorkflow, BloomWorkflowStep, BloomObj, BloomReagent
+
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.bobjs import BloomWorkflow, BloomWorkflowStep, BloomObj, BloomReagent
 import sys
 import os
 

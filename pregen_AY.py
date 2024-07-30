@@ -1,6 +1,6 @@
 import json
-from bloom_lims.bdb import BLOOMdb3
-from bloom_lims.bdb import BloomObj
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.bobjs import BloomObj
 import sys
 import os
 from sqlalchemy.orm.attributes import flag_modified

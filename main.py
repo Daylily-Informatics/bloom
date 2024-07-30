@@ -94,8 +94,8 @@ from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from bloom_lims.bdb import BLOOMdb3
-from bloom_lims.bdb import (
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.bobjs import (
     BloomObj,
     BloomWorkflow,
     BloomWorkflowStep,

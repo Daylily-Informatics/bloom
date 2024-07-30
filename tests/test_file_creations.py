@@ -7,8 +7,8 @@ from moto import mock_aws
 from pathlib import Path
 from sqlalchemy.orm import sessionmaker
 
-from bloom_lims.bdb import BLOOMdb3
-from bloom_lims.bdb import BloomWorkflow, BloomFile
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.bobjs import BloomWorkflow, BloomFile
 
 from io import BytesIO
 
