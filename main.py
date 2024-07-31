@@ -1221,9 +1221,9 @@ async def euid_details(
             for column in obj.__table__.columns
             if hasattr(obj, column.key)
         }
-        obj_dict["parent_template_euid"] = (
-            obj.parent_template.euid if hasattr(obj, "parent_template") else ""
-        )
+        from IPython import embed   
+        
+        obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""  
         audit_logs = bobdb.query_audit_log_by_euid(euid)
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
@@ -1976,6 +1976,8 @@ async def create_file(
         }
 
         results = []
+        
+        addl_tags = {"patient_id": patient_id, "study_id": study_id, "clinician_id": clinician_id}
 
         if file_data:
             for file in file_data:
@@ -1985,6 +1987,7 @@ async def create_file(
                             file_metadata=file_metadata,
                             file_data=file.file,
                             file_name=file.filename,
+                            addl_tags=addl_tags,
                         )
                         results.append(
                             {
@@ -2026,6 +2029,7 @@ async def create_file(
                             file_metadata=file_metadata,
                             file_data=file.file,
                             file_name=file.filename,
+                            addl_tags=addl_tags,
                         )
                         results.append(
                             {
@@ -2055,7 +2059,7 @@ async def create_file(
                 if url.strip():
                     try:
                         new_file = bfi.create_file(
-                            file_metadata=file_metadata, url=url.strip()
+                            file_metadata=file_metadata, url=url.strip(),addl_tags=addl_tags,
                         )
                         results.append(
                             {
@@ -2080,7 +2084,7 @@ async def create_file(
                 if s3_uri.strip():
                     try:
                         new_file = bfi.create_file(
-                            file_metadata=file_metadata, s3_uri=s3_uri.strip()
+                            file_metadata=file_metadata, s3_uri=s3_uri.strip(), addl_tags=addl_tags,
                         )
                         results.append(
                             {
