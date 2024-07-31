@@ -1865,6 +1865,14 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
 
     # Fetch template data for dynamic fields    
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    
+    patient_opts = {}
+    for patient in bobdb.query_instance_by_component_v2(super_type="actor",btype="generic",b_sub_type="patient"):
+        euid = patient.euid
+        external_uid = patient.json_addl.get('properties',{}).get('patient_id','n/a')
+        patient_opts[euid] = external_uid
+        
+    
     f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
     # these should only be 1
     if len(f_templates) > 1:
@@ -1873,7 +1881,7 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     f_template = f_templates[0]
     form_fields = generate_form_fields(f_template.json_addl)
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
-    ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}))
+    ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}), patient_opts)
 
     content = templates.get_template("dewey.html").render(
         request=request,
@@ -2619,7 +2627,9 @@ def generate_form_fields(template_data: Dict) -> List[FormField]:
 
     return form_fields
 
-def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict) -> List[FormField]:
+
+
+def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict, patient_opts: Dict = {}) -> List[FormField]:
     form_fields = []
 
     for prop in ui_form_properties:
@@ -2642,6 +2652,16 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
                     label=form_label,
                     options=cp.get("enum", [])
                 ))
+        elif property_key == "patient_id":
+            
+            sorted_patient_opts = sorted(patient_opts.items(), key=lambda x: x[1] if x[1] else x[0])
+            # Create the options with value as patient_id and display as 'euid: patient_id'
+            form_fields.append(FormField(
+                name=property_key,
+                type="select",
+                label=form_label,
+                options=[""] + [f'{patient_id}' for euid, patient_id in sorted_patient_opts]
+            ))
         else:
             form_fields.append(FormField(
                 name=property_key,

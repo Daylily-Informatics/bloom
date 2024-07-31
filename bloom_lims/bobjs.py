@@ -2663,7 +2663,6 @@ class BloomFile(BloomObj):
         # Special handling for patient_id
         if (
             "patient_id" in file_metadata
-            and len(file_metadata["patient_id"]) > 0
         ):
             patient_id = file_metadata["patient_id"]
             search_criteria = {"properties": {"patient_id": patient_id}}
