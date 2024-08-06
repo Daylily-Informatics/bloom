@@ -2648,6 +2648,7 @@ class BloomFile(BloomObj):
         full_path_to_file=None,
         s3_uri=None,
         create_locked=True,
+        addl_tags={},
     ):
         file_properties = {"properties": file_metadata}
 
@@ -2662,7 +2663,6 @@ class BloomFile(BloomObj):
         # Special handling for patient_id
         if (
             "patient_id" in file_metadata
-            and len(file_metadata["patient_id"]) > 0
         ):
             patient_id = file_metadata["patient_id"]
             search_criteria = {"properties": {"patient_id": patient_id}}
@@ -2671,7 +2671,7 @@ class BloomFile(BloomObj):
                 True,
                 super_type="actor",
                 btype="generic",
-                b_sub_type="patient",
+                b_sub_type="patient"
             )
 
             if existing_euids:
@@ -2699,7 +2699,7 @@ class BloomFile(BloomObj):
 
         if file_data or url or full_path_to_file or s3_uri:
             new_file = self.add_file_data(
-                new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri
+                new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri, addl_tags=addl_tags
             )
         else:
             logging.warning(f"No data provided for file creation: {file_data, url}")
@@ -2709,42 +2709,6 @@ class BloomFile(BloomObj):
 
         return new_file
 
-    def create_filex(
-        self,
-        file_metadata={},
-        file_data=None,
-        file_name=None,
-        url=None,
-        full_path_to_file=None,
-        create_locked=False,
-    ):
-        file_properties = {"properties": file_metadata}
-
-        new_file = self.create_instance(
-            self.query_template_by_component_v2("file", "file", "generic", "1.0")[
-                0
-            ].euid,
-            file_properties,
-        )
-        self.session.commit()
-
-        new_file.json_addl["properties"]["current_s3_bucket_name"] = (
-            self._derive_bucket_name(new_file.euid)
-        )
-        flag_modified(new_file, "json_addl")
-        self.session.commit()
-
-        if file_data or url or full_path_to_file:
-            new_file = self.add_file_data(
-                new_file.euid, file_data, file_name, url, full_path_to_file
-            )
-        else:
-            logging.warning(f"No data provided for file creation: {file_data, url}")
-
-        if create_locked:
-            self.lock_file(new_file.euid)
-
-        return new_file
 
     def sanitize_tag(self, value):
         """Sanitize the tag value to conform to AWS tag requirements."""
@@ -2755,6 +2719,20 @@ class BloomFile(BloomObj):
 
         return sanitized_value  # sanitized_value if sanitized_value != value else value
 
+    def format_addl_tags(self, add_tags):
+        if not isinstance(add_tags, dict):
+            raise ValueError("Input must be a dictionary.")
+
+        formatted_tags = []
+        for key, value in add_tags.items():
+            if not isinstance(value, str):
+                raise ValueError(f"Value for key '{key}' must be a string.")
+            formatted_tags.append(
+                f"{self.sanitize_tag(key)}={self.sanitize_tag(value)}"
+            )
+
+        return "&".join(formatted_tags)
+    
     def add_file_data(
         self,
         euid,
@@ -2763,11 +2741,16 @@ class BloomFile(BloomObj):
         url=None,
         full_path_to_file=None,
         s3_uri=None,
+        addl_tags={},
     ):
         file_instance = self.get_by_euid(euid)
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
         file_properties = {}
 
+        addl_tag_string = self.format_addl_tags(addl_tags)
+        if len(addl_tag_string) > 0:
+            addl_tag_string = f"&{addl_tag_string}"
+        
         if file_name is None:
             if url:
                 file_name = url.split("/")[-1]
@@ -2806,7 +2789,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}",
+                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}"
                 )
                 odirectory, ofilename = os.path.split(file_name)
 
@@ -2831,7 +2814,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=response.content,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(url_info)}&original_url={self.sanitize_tag(url)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}",
+                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(url_info)}&original_url={self.sanitize_tag(url)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -2860,7 +2843,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(local_path_info.name)}&original_file_path={self.sanitize_tag(full_path_to_file)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}",
+                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(local_path_info.name)}&original_file_path={self.sanitize_tag(full_path_to_file)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -2917,7 +2900,7 @@ class BloomFile(BloomObj):
                     Bucket=source_bucket,
                     Key=marker_key,
                     Body=b"",
-                    Tagging=f"euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}",
+                    Tagging=f"euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
                 )
 
             else:

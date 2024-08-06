@@ -41,6 +41,9 @@ etc/udat.json
 pip-log.txt
 pip-delete-this-directory.txt
 
+# logs
+logs/
+
 # Unit test / coverage reports
 htmlcov/
 .tox/

@@ -37,14 +37,22 @@
                                 <div>
                                     <label for="{{ field.name }}">{{ field.label }}</label>
                                     {% if field.type == "select" %}
-                                        <select name="{{ field.name }}" id="{{ field.name }}">
-                                            {% for option in field.options %}
-                                                <option value="{{ option }}">{{ option }}</option>
-                                            {% endfor %}
+                                        <select name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
+                                            {% if field.name == "patient_idx" %}
+                                                <option value="" selected></option> <!-- Placeholder for blank state -->
+                                                {% for option in field.options %}
+                                                    <option value="{{ option }}">{{ option }}</option>
+                                                {% endfor %}
+                                            {% else %}
+                                                {% for option in field.options %}
+                                                    <option value="{{ option }}">{{ option }}</option>
+                                                {% endfor %}
+                                            {% endif %}
                                         </select>
+                                        
                                     {% else %}
                                         {% if field.name.endswith('_datetime') %}
-                                            <input type="datetime-local" name="{{ field.name }}" id="{{ field.name }}" />
+                                            <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
                                         {% else %}
                                             <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
                                         {% endif %}
@@ -94,7 +102,47 @@
         });
     }
 
+    function filterOptions(event) {
+        const input = event.target.value.toLowerCase();
+        const selectField = event.target;
+        const options = selectField.options;
+
+        for (let i = 0; i < options.length; i++) {
+            const optionText = options[i].text.toLowerCase();
+            if (optionText.includes(input) || options[i].value === "") {
+                options[i].style.display = "";
+            } else {
+                options[i].style.display = "none";
+            }
+        }
+    }
+
     $(document).ready(function() {
         updateDependentFields();
+
+        // Attach the filter function to the patient_id select field
+        $('#patient_id').on('keyup change', filterOptions);
     });
 </script>
+<script>
+    $(document).ready(function() {
+        // Initialize Selectize on the patient_id field
+        $('#patient_id').selectize({
+            create: true, // Allows the user to create a new item if no match is found
+            sortField: [
+                {
+                    field: 'value', // Sort by the value attribute of the option
+                    direction: 'asc'
+                }
+            ],
+            placeholder: 'Select or type to add...',
+            persist: false,
+            render: {
+                option_create: function(data, escape) {
+                    return '<div class="create">Create: <strong>' + escape(data.input) + '</strong>&hellip;</div>';
+                }
+            }
+        });
+    });
+    </script>
+    
