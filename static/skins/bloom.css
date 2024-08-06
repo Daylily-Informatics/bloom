@@ -4,6 +4,8 @@
 /* CSS Variables for Easy Theme Management */
 :root {
     --primary-color: #e74c3c;
+    --button-bg-color: #54c9cd;
+    --button-border-color: #4d1ee7;
     --primary-hover-color: #7e2916;
     --actionsubmit-bg-color: rgb(204,11,139);
     --actionsubmit-color: #ffffff;

@@ -1,6 +1,6 @@
 <div class="accordion-content">
     <ul>
-        <form id="createFileForm" action="create_file" method="post" enctype="multipart/form-data">
+        <form id="createFileForm" data-form="register" action="create_file" method="post" enctype="multipart/form-data">
             <input type="hidden" name="upload_group_key" value="{{ upload_group_key }}">
             <table>
                 <tr>
@@ -35,22 +35,22 @@
 
                             {% for field in ui_fields %}
                                 <div>
-                                    <label for="{{ field.name }}">{{ field.label }}</label>
                                     {% if field.type == "select" %}
+                                        {% if field.name == "creating_user" %}
+                                          
+                                        {% else %}
+                                        <label for="{{ field.name }}">{{ field.label }}</label>
+
                                         <select name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
-                                            {% if field.name == "patient_idx" %}
-                                                <option value="" selected></option> <!-- Placeholder for blank state -->
-                                                {% for option in field.options %}
-                                                    <option value="{{ option }}">{{ option }}</option>
-                                                {% endfor %}
-                                            {% else %}
-                                                {% for option in field.options %}
-                                                    <option value="{{ option }}">{{ option }}</option>
-                                                {% endfor %}
-                                            {% endif %}
+                                            <option value="" selected></option> <!-- Placeholder for blank state -->
+                                            {% for option in field.options %}
+                                                <option value="{{ option }}">{{ option }}</option>
+                                            {% endfor %}
                                         </select>
-                                        
+                                        {% endif %}
                                     {% else %}
+                                    <label for="{{ field.name }}">{{ field.label }}</label>
+
                                         {% if field.name.endswith('_datetime') %}
                                             <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
                                         {% else %}
@@ -71,78 +71,3 @@
         </form>
     </ul>
 </div>
-
-<script>
-    const controlledProperties = {{ controlled_properties | tojson | safe }};
-
-    function updateDependentFields() {
-        function populateSelectField(selectFieldId, options) {
-            const selectField = $(`#${selectFieldId}`);
-            selectField.empty();
-            options.forEach(function(option) {
-                selectField.append(new Option(option, option));
-            });
-            selectField.trigger('change');
-        }
-
-        function handleFieldChange(field, dependentField, enumObj) {
-            $(`#${field}`).change(function() {
-                const selectedValue = $(this).val();
-                const dependentOptions = enumObj[selectedValue] || [];
-                populateSelectField(dependentField, dependentOptions);
-            });
-        }
-
-        Object.keys(controlledProperties).forEach(function(prop) {
-            if (controlledProperties[prop].type === "dependent string") {
-                const dependentField = controlledProperties[prop].on;
-                const enumObj = controlledProperties[prop].enum;
-                handleFieldChange(dependentField, prop, enumObj);
-            }
-        });
-    }
-
-    function filterOptions(event) {
-        const input = event.target.value.toLowerCase();
-        const selectField = event.target;
-        const options = selectField.options;
-
-        for (let i = 0; i < options.length; i++) {
-            const optionText = options[i].text.toLowerCase();
-            if (optionText.includes(input) || options[i].value === "") {
-                options[i].style.display = "";
-            } else {
-                options[i].style.display = "none";
-            }
-        }
-    }
-
-    $(document).ready(function() {
-        updateDependentFields();
-
-        // Attach the filter function to the patient_id select field
-        $('#patient_id').on('keyup change', filterOptions);
-    });
-</script>
-<script>
-    $(document).ready(function() {
-        // Initialize Selectize on the patient_id field
-        $('#patient_id').selectize({
-            create: true, // Allows the user to create a new item if no match is found
-            sortField: [
-                {
-                    field: 'value', // Sort by the value attribute of the option
-                    direction: 'asc'
-                }
-            ],
-            placeholder: 'Select or type to add...',
-            persist: false,
-            render: {
-                option_create: function(data, escape) {
-                    return '<div class="create">Create: <strong>' + escape(data.input) + '</strong>&hellip;</div>';
-                }
-            }
-        });
-    });
-    </script>
-    

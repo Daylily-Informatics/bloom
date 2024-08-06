@@ -13,7 +13,7 @@
                 </td>
                 <td style="align:top;">
                     <!-- Existing search form -->
-                    <form id="searchFileForm" action="search_files" method="post" enctype="multipart/form-data">
+                    <form id="searchFileForm" data-form="search" action="search_files" method="post" enctype="multipart/form-data">
                         <input type="hidden" value="" id="euid" name="euid"><br>
 
                         <label for="is_greedy">Greedy Search: </label>
@@ -21,44 +21,63 @@
                             <option value="yes" selected>yes</option>
                             <option value="no">no</option>
                         </select>
-                        <br><br>
-                        <label for="key">Specify search KEY and VALUE: </label>
-                        <ul>
-                            <small>
-                                Manually set key and key value to search, up to 3 pairs<br> (this is a limitation of my simple ui, not the db,<br> which can use arbitrary numbers of search terms).
-                            </small><br>
-                            <br>
-                            <label for="key_1">Key 1: </label>
-                            <input type="text" id="key_1" name="key_1"><br>
+                           
+                        <!-- Additional search fields from metadata form -->
 
-                            <label for="value_1">Value 1: </label>
-                            <input type="text" id="value_1" name="value_1"><br><br>
+                        <br>
+                        <hr>
+                        {% for field in ui_fields %}
+                        <div>
+                            {% if field.type == "select" and field.multiple %}
+                            <label for="{{ field.name }}">{{ field.label }}</label>          
+                            <div class="option-buttons" data-select-id="{{ field.name }}">
+                                <select class="no-selectize" name="{{ field.name }}" id="{{ field.name }}" multiple style="display: none;">
+                                    <option value="" selected></option> <!-- Placeholder for blank state -->
+                                    <option value=".na">isnull</option>
+                                    {% for option in field.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% elif field.type == "select" %}
+                            <label for="{{ field.name }}">{{ field.label }}</label>          
+                              <select class="no-selectize" name="{{ field.name }}" id="{{ field.name }}">
+                                    <option value="" selected></option> <!-- Placeholder for blank state -->
+                                    <option value=".na">isnull</option>
+                                    {% for option in field.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                {% if not field.name.endswith('_datetime') %}
+                                <label for="{{ field.name }}">{{ field.label }}</label>
+                                <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        <hr>
+                        <br>
 
-                            <label for="key_2">Key 2: </label>
-                            <input type="text" id="key_2" name="key_2"><br>
+                        <label for="relevant_datetime_start">Relevant Date Start: </label>
+                        <input type="date" name="relevant_datetime_start" id="relevant_datetime_start"><br><br>
 
-                            <label for="value_2">Value 2: </label>
-                            <input type="text" id="value_2" name="value_2"><br><br>
+                        <label for="relevant_datetime_end">Relevant Date End: </label>
+                        <input type="date" name="relevant_datetime_end" id="relevant_datetime_end"><br><br>
 
-                            <label for="key_3">Key 3: </label>
-                            <input type="text" id="key_3" name="key_3"><br>
+                        <hr>
 
-                            <label for="value_3">Value 3: </label>
-                            <input type="text" id="value_3" name="value_3"><br>
-                            <br>
-                        </ul>
+                        <label for="created_datetime_start">Dewey Created Date Start: </label>
+                        <input type="date" name="created_datetime_start" id="created_datetime_start"><br><br>
+
+                        <label for="created_datetime_end">Dewey Created Date End: </label>
+                        <input type="date" name="created_datetime_end" id="created_datetime_end"><br><br>
+
                         <button type="submit" id="searchFilesButton">Search Files</button>
                     </form>
                 </td>
                 <td style="align:top;">
-                    Searchable Properties
-                    <ul>
-                        <small>
-                        {% for sp in searchable_properties %}
-                            <li>{{ sp }}</li>
-                        {% endfor %}
-                        </small>
-                    </ul>
+                  
                 </td>
             </tr>
         </table>
