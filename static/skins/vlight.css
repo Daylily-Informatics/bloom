@@ -4,6 +4,8 @@
 :root {
     --primary-color: #6db3f2; /* Light blue */
     --primary-hover-color: #5d9ec9; /* Slightly darker blue */
+    --button-bg-color: #6db3f2;
+    --button-border-color: #1003f2;
     --secondary-color: #f6b26b; /* Soft orange */
     --secondary-hover-color: #f4a460; /* Slightly darker orange */
     --accent-color: #a2d5c6; /* Mint green */

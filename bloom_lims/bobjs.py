@@ -83,7 +83,9 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     or_,
-    and_,
+    cast,
+    func,
+    select
 )
 
 from sqlalchemy.ext.automap import automap_base
@@ -98,7 +100,7 @@ from sqlalchemy.orm import (
     backref,
 )
 
-from sqlalchemy.sql import func
+from sqlalchemy.sql import alias
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm.attributes import flag_modified
@@ -696,6 +698,25 @@ class BloomObj:
 
         # Execute the query
         return query.all()
+    
+    
+    # should abstract to not assume properties key
+    def get_unique_property_values(self, property_key):
+        json_path = property_key.split("->")
+        query = self.session.query(
+            func.distinct(
+                func.jsonb_extract_path_text(
+                    self.Base.classes.generic_instance.json_addl['properties'], *json_path
+                )
+            )
+        ).filter(
+            func.jsonb_extract_path_text(
+                self.Base.classes.generic_instance.json_addl['properties'], *json_path
+            ).isnot(None)
+        ).all()
+        
+        unique_values = [value[0] for value in query if value[0] is not None]
+        return unique_values
 
     def query_template_by_component_v2(
         self, super_type=None, btype=None, b_sub_type=None, version=None
@@ -1626,6 +1647,7 @@ class BloomObj:
         else:
             return 0
 
+
     def search_objs_by_addl_metadata(
         self,
         file_search_criteria,
@@ -1635,6 +1657,70 @@ class BloomObj:
         super_type=None,
     ):
         query = self.session.query(self.Base.classes.generic_instance)
+        
+        def create_datetime_filter(key, value, conditions):
+            start_datetime = value.get('start')
+            end_datetime = value.get('end', start_datetime)
+            if start_datetime > end_datetime:
+                self.logger.exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
+                raise Exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
+            
+            if start_datetime and end_datetime:
+                json_path = key.split("->")
+                
+                non_empty_condition = and_(
+                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path) != '',
+                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path).isnot(None)
+                )
+                
+                datetime_condition = cast(
+                    func.jsonb_extract_path_text(
+                        self.Base.classes.generic_instance.json_addl, *json_path
+                    ), 
+                    DateTime
+                ).between(start_datetime, end_datetime)
+                
+                combined_condition = and_(non_empty_condition, datetime_condition)
+                
+                conditions.append(combined_condition)
+        
+        def handle_jsonb_filter(key, value, conditions):
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    if sub_key.endswith('_datetime') and isinstance(sub_value, dict):
+                        create_datetime_filter(f"{key}->{sub_key}", sub_value, conditions)
+                    else:
+                        if isinstance(sub_value, list):
+                            for item in sub_value:
+                                jsonb_filter = {key: {sub_key: item}}
+                                conditions.append(
+                                    self.Base.classes.generic_instance.json_addl.op("@>")(
+                                        json.dumps(jsonb_filter, default=str)
+                                    )
+                                )
+                        else:
+                            jsonb_filter = {key: {sub_key: sub_value}}
+                            conditions.append(
+                                self.Base.classes.generic_instance.json_addl.op("@>")(
+                                    json.dumps(jsonb_filter, default=str)
+                                )
+                            )
+            else:
+                if isinstance(value, list):
+                    for item in value:
+                        jsonb_filter = {key: item}
+                        conditions.append(
+                            self.Base.classes.generic_instance.json_addl.op("@>")(
+                                json.dumps(jsonb_filter, default=str)
+                            )
+                        )
+                else:
+                    jsonb_filter = {key: value}
+                    conditions.append(
+                        self.Base.classes.generic_instance.json_addl.op("@>")(
+                            json.dumps(jsonb_filter, default=str)
+                        )
+                    )
 
         if search_greedy:
             # Greedy search: matching any of the provided search keys
@@ -1645,24 +1731,7 @@ class BloomObj:
                     logging.warning(
                         "The key 'file_metadata' is being treated as 'properties'."
                     )
-
-                # Create conditions for JSONB key-value pairs
-                if isinstance(value, dict):
-                    for sub_key, sub_value in value.items():
-                        jsonb_filter = {key: {sub_key: sub_value}}
-                        or_conditions.append(
-                            self.Base.classes.generic_instance.json_addl.op("@>")(
-                                jsonb_filter
-                            )
-                        )
-                else:
-                    jsonb_filter = {key: value}
-                    or_conditions.append(
-                        self.Base.classes.generic_instance.json_addl.op("@>")(
-                            jsonb_filter
-                        )
-                    )
-
+                handle_jsonb_filter(key, value, or_conditions)
             if or_conditions:
                 query = query.filter(or_(*or_conditions))
         else:
@@ -1674,23 +1743,7 @@ class BloomObj:
                     logging.warning(
                         "The key 'file_metadata' is being treated as 'properties'."
                     )
-
-                if isinstance(value, dict):
-                    for sub_key, sub_value in value.items():
-                        jsonb_filter = {key: {sub_key: sub_value}}
-                        and_conditions.append(
-                            self.Base.classes.generic_instance.json_addl.op("@>")(
-                                jsonb_filter
-                            )
-                        )
-                else:
-                    jsonb_filter = {key: value}
-                    and_conditions.append(
-                        self.Base.classes.generic_instance.json_addl.op("@>")(
-                            jsonb_filter
-                        )
-                    )
-
+                handle_jsonb_filter(key, value, and_conditions)
             if and_conditions:
                 query = query.filter(and_(*and_conditions))
 
@@ -1712,6 +1765,104 @@ class BloomObj:
         results = query.all()
         return [result.euid for result in results]
 
+    def search_objs_by_addl_metadataOG(
+        self,
+        file_search_criteria,
+        search_greedy=True,
+        btype=None,
+        b_sub_type=None,
+        super_type=None,
+    ):
+        query = self.session.query(self.Base.classes.generic_instance)
+        
+        def create_datetime_filter(key, value, conditions):
+            start_datetime = value.get('start')
+            end_datetime = value.get('end', start_datetime )
+            if start_datetime > end_datetime:
+                self.logger.exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
+                raise Exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
+            
+            if start_datetime and end_datetime:
+                json_path = key.split("->")
+                
+                non_empty_condition = and_(
+                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path) != '',
+                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path).isnot(None)
+                )
+                
+                datetime_condition = cast(
+                    func.jsonb_extract_path_text(
+                        self.Base.classes.generic_instance.json_addl, *json_path
+                    ), 
+                    DateTime
+                ).between(start_datetime, end_datetime)
+                
+                combined_condition = and_(non_empty_condition, datetime_condition)
+                
+                conditions.append(combined_condition)
+            
+        def handle_jsonb_filter(key, value, conditions):
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    if sub_key.endswith('_datetime') and isinstance(sub_value, dict):
+                        create_datetime_filter(f"{key}->{sub_key}", sub_value, conditions)
+                    else:
+                        jsonb_filter = {key: {sub_key: sub_value}}
+                        conditions.append(
+                            self.Base.classes.generic_instance.json_addl.op("@>")(
+                                json.dumps(jsonb_filter, default=str)
+                            )
+                        )
+            else:
+                jsonb_filter = {key: value}
+                conditions.append(
+                    self.Base.classes.generic_instance.json_addl.op("@>")(
+                        json.dumps(jsonb_filter, default=str)
+                    )
+                )
+
+        if search_greedy:
+            # Greedy search: matching any of the provided search keys
+            or_conditions = []
+            for key, value in file_search_criteria.items():
+                if key == "file_metadata":
+                    key = "properties"
+                    logging.warning(
+                        "The key 'file_metadata' is being treated as 'properties'."
+                    )
+                handle_jsonb_filter(key, value, or_conditions)
+            if or_conditions:
+                query = query.filter(or_(*or_conditions))
+        else:
+            # Non-greedy search: matching all specified search terms
+            and_conditions = []
+            for key, value in file_search_criteria.items():
+                if key == "file_metadata":
+                    key = "properties"
+                    logging.warning(
+                        "The key 'file_metadata' is being treated as 'properties'."
+                    )
+                handle_jsonb_filter(key, value, and_conditions)
+            if and_conditions:
+                query = query.filter(and_(*and_conditions))
+
+        if btype is not None:
+            query = query.filter(self.Base.classes.generic_instance.btype == btype)
+
+        if b_sub_type is not None:
+            query = query.filter(
+                self.Base.classes.generic_instance.b_sub_type == b_sub_type
+            )
+
+        if super_type is not None:
+            query = query.filter(
+                self.Base.classes.generic_instance.super_type == super_type
+            )
+
+        logging.info(f"Generated SQL: {str(query.statement)}")
+
+        results = query.all()
+        return [result.euid for result in results]
 
 class BloomContainer(BloomObj):
     def __init__(self, bdb):
@@ -2698,11 +2849,21 @@ class BloomFile(BloomObj):
         self.session.commit()
 
         if file_data or url or full_path_to_file or s3_uri:
-            new_file = self.add_file_data(
-                new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri, addl_tags=addl_tags
-            )
+            try:
+                new_file = self.add_file_data(
+                    new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri, addl_tags=addl_tags
+                )
+            except Exception as e:
+                logging.exception(f"Error adding file data: {e}")
+                new_file.bstatus = "error adding file data"
+                flag_modified(new_file, "json_addl")
+                self.session.commit()
+                raise Exception(e)
         else:
             logging.warning(f"No data provided for file creation: {file_data, url}")
+            new_file.bstatus = "no file data provided"
+            flag_modified(new_file, "json_addl")
+            self.session.commit()
 
         if create_locked:
             self.lock_file(new_file.euid)

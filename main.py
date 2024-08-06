@@ -1221,7 +1221,6 @@ async def euid_details(
             for column in obj.__table__.columns
             if hasattr(obj, column.key)
         }
-        from IPython import embed   
         
         obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""  
         audit_logs = bobdb.query_audit_log_by_euid(euid)
@@ -1866,22 +1865,14 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     # Fetch template data for dynamic fields    
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     
-    patient_opts = {}
-    for patient in bobdb.query_instance_by_component_v2(super_type="actor",btype="generic",b_sub_type="patient"):
-        euid = patient.euid
-        external_uid = patient.json_addl.get('properties',{}).get('patient_id','n/a')
-        patient_opts[euid] = external_uid
-        
-    
     f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
     # these should only be 1
     if len(f_templates) > 1:
         logging.error(f"Multiple file templates found for file/file/generic/1.0")
         raise HTTPException(status_code=500, detail="Multiple file templates found for file/file/generic/1.0")
     f_template = f_templates[0]
-    form_fields = generate_form_fields(f_template.json_addl)
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
-    ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}), patient_opts)
+    ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
 
     content = templates.get_template("dewey.html").render(
         request=request,
@@ -1889,7 +1880,6 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
         style=style,
         upload_group_key=upload_group_key,
         udat=user_data,
-        fields=form_fields,
         ui_fields=ui_form_fields,
         controlled_properties=f_template.json_addl.get("controlled_properties", {}),
         has_ui_form_properties=bool(ui_form_properties),
@@ -1972,7 +1962,7 @@ async def create_file(
             "health_event_id": health_event_id,
             "relevant_datetime": relevant_datetime,
             "patient_id": patient_id,
-            "upload_ui_user": request.session["user_data"]["email"],
+            "creating_user": request.session["user_data"]["email"],
             "upload_group_key": upload_group_key,
             "study_id": study_id,
             "purpose": purpose,
@@ -1980,7 +1970,7 @@ async def create_file(
             "sub_category": sub_category,
             "sub_category_2": sub_category_2,
             "variable": variable,
-            "sub_variable": sub_variable,
+            "sub_variable": sub_variable
         }
 
         results = []
@@ -2238,41 +2228,115 @@ async def delete_temp_file(
         background_tasks.add_task(delete_file, file_path_yaml)
     return RedirectResponse(url="/dewey", status_code=303)
 
-
 @app.post("/search_files", response_class=HTMLResponse)
 async def search_files(
     request: Request,
     euid: str = Form(None),
     is_greedy: str = Form(...),
-    key_1: str = Form(None),
-    value_1: str = Form(None),
-    key_2: str = Form(None),
-    value_2: str = Form(None),
-    key_3: str = Form(None),
-    value_3: str = Form(None),
+    patient_id: List[str] = Form(None),
+    clinician_id: List[str] = Form(None),
+    relevant_datetime_start: str = Form(None),
+    relevant_datetime_end: str = Form(None),
+    lab_code: List[str] = Form(None),
+    purpose: str = Form(None),
+    purpose_subtype: str = Form(None),
+    category: str = Form(None),
+    sub_category: str = Form(None),
+    sub_category_2: str = Form(None),
+    study_id: List[str] = Form(None),
+    comments: str = Form(None),
+    created_datetime_start: str = Form(None),
+    created_datetime_end: str = Form(None),
+    creating_user: List[str] = Form(None),
 ):
     search_criteria = {}
 
-    greedy = True
-    if is_greedy != "yes":
-        greedy = False
+    if euid:
+        search_criteria["euid"] = euid
 
-    properties = {}
-    if key_1 and value_1:
-        properties[key_1] = value_1
-    if key_2 and value_2:
-        properties[key_2] = value_2
-    if key_3 and value_3:
-        properties[key_3] = value_3
+    if patient_id:
+        if len(patient_id) == 1 and patient_id[0] == ".na":
+            patient_id = ""        
+        elif len(patient_id) == 1 and patient_id[0] == "":
+            patient_id = None
+        search_criteria["patient_id"] = patient_id
 
-    if properties:
-        search_criteria["properties"] = properties
+    if clinician_id:   
+        if len(clinician_id) == 1 and clinician_id[0] == ".na": 
+            clinician_id = ""
+        elif len(clinician_id) == 1 and clinician_id[0] == "":
+            clinician_id = None
+        search_criteria["clinician_id"] = clinician_id
+    if relevant_datetime_start or relevant_datetime_end:
+        search_criteria["relevant_datetime"] = {
+            "start": relevant_datetime_start,
+            "end": relevant_datetime_end
+        }
+    if lab_code:
+        if len(lab_code) == 1 and lab_code[0] == ".na":
+            lab_code = ""
+        elif len(lab_code) == 1 and lab_code[0] == "":
+            lab_code = None
+            
+        search_criteria["lab_code"] = lab_code
+    if purpose:
+        search_criteria["purpose"] = purpose
+    if purpose_subtype:
+        search_criteria["purpose_subtype"] = purpose_subtype
+    if category:
+        search_criteria["category"] = category
+    if sub_category:
+        search_criteria["sub_category"] = sub_category
+    if sub_category_2:
+        search_criteria["sub_category_2"] = sub_category_2
+    if study_id:
+        if len(study_id) == 1 and study_id[0] == ".na":
+            study_id = ""
+        elif len(study_id) == 1 and study_id[0] == "":
+            study_id = None
+        search_criteria["study_id"] = study_id
+    if comments:
+        search_criteria["comments"] = comments
+    if creating_user:
+        if len(creating_user) == 1 and creating_user[0] == ".na":
+            creating_user = ""
+        elif len(creating_user) == 1 and creating_user[0] == "":
+            creating_user = None    
+        search_criteria["creating_user"] = creating_user
+
+    greedy = is_greedy == "yes"
 
     try:
         bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+
+        # Prepare additional filters for created_datetime and relevant_datetime
+        query = bfi.session.query(bfi.Base.classes.generic_instance)
+
+        if created_datetime_start:
+            query = query.filter(
+                bfi.Base.classes.generic_instance.created_dt >= datetime.strptime(created_datetime_start, "%Y-%m-%d")
+            )
+        if created_datetime_end:
+            query = query.filter(
+                bfi.Base.classes.generic_instance.created_dt <= datetime.strptime(created_datetime_end, "%Y-%m-%d")
+            )
+
+        if relevant_datetime_start or relevant_datetime_end:
+            relevant_datetime_filter = {}
+            if relevant_datetime_start:
+                relevant_datetime_filter["start"] = datetime.strptime(relevant_datetime_start, "%Y-%m-%d")
+            if relevant_datetime_end:
+                relevant_datetime_filter["end"] = datetime.strptime(relevant_datetime_end, "%Y-%m-%d")
+            search_criteria["relevant_datetime"] = relevant_datetime_filter
+
         euid_results = bfi.search_objs_by_addl_metadata(
-            search_criteria, greedy, "file", super_type="file"
+            {'properties':search_criteria}, greedy, "file", super_type="file"
         )
+
+        if created_datetime_start or created_datetime_end:
+            euid_results = [result.euid for result in query.filter(
+                bfi.Base.classes.generic_instance.euid.in_(euid_results)
+            ).all()]
 
         # Fetch details for each EUID
         detailed_results = [bfi.get_by_euid(euid) for euid in euid_results]
@@ -2302,7 +2366,7 @@ async def search_files(
             columns=columns,
             table_data=table_data,
             style=style,
-            udat=user_data,s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
+            udat=user_data,
         )
         return HTMLResponse(content=content)
 
@@ -2559,6 +2623,8 @@ class FormField(BaseModel):
     name: str
     type: str
     label: str
+    required: bool = False
+    multiple: bool = False
     options: List[str] = []
 
 @app.get("/create_instance/{template_euid}", response_class=HTMLResponse)
@@ -2629,12 +2695,14 @@ def generate_form_fields(template_data: Dict) -> List[FormField]:
 
 
 
-def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict, patient_opts: Dict = {}) -> List[FormField]:
+def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict,  form_type: str = 'create',  bobject=None) -> List[FormField]:
     form_fields = []
 
     for prop in ui_form_properties:
         property_key = prop["property_key"]
         form_label = prop["form_label"]
+        required=prop.get("required", False)
+        value_type = prop.get("value_type", "string")
 
         if property_key in controlled_properties:
             cp = controlled_properties[property_key]
@@ -2643,31 +2711,51 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
                     name=property_key,
                     type="select",
                     label=form_label,
-                    options=[]
+                    options=[], 
+                    required=required
                 ))
             else:
                 form_fields.append(FormField(
                     name=property_key,
                     type="select",
                     label=form_label,
-                    options=cp.get("enum", [])
+                    options=cp.get("enum", []),
+                    required=required
                 ))
-        elif property_key == "patient_id":
-            
-            sorted_patient_opts = sorted(patient_opts.items(), key=lambda x: x[1] if x[1] else x[0])
-            # Create the options with value as patient_id and display as 'euid: patient_id'
+        elif value_type == "uid-interactive":
+            unique_values = sorted(bobject.get_unique_property_values(property_key))
+            if '' not in unique_values:
+                unique_values.insert(0, '')
+    
             form_fields.append(FormField(
                 name=property_key,
                 type="select",
                 label=form_label,
-                options=[""] + [f'{patient_id}' for euid, patient_id in sorted_patient_opts]
+                options=unique_values,
+                multiple=True,
+                required=required
             ))
+        elif value_type == "uid-static":
+            unique_values = sorted(bobject.get_unique_property_values(property_key))
+            if '' not in unique_values:
+                unique_values.insert(0, '')
+                
+            form_fields.append(FormField(
+                        name=property_key,
+                        type="select",
+                        label=form_label,
+                        options=unique_values,
+                        multiple=True,
+                        required=required
+                    ))
         else:
             form_fields.append(FormField(
                 name=property_key,
                 type="text",
-                label=form_label
+                label=form_label,
+                required=required
             ))
+            
 
     return form_fields
 

@@ -17,6 +17,7 @@
         "current_s3_key": "",
         "current_s3_bucket_name": "",
         "current_s3_uri": "",
+        "creating_user": "",
         "patient_id": "",
         "clinician_id": "",
         "relevant_datetime": "",
@@ -34,17 +35,18 @@
         "sub_category_2":""        
       },
       "ui_form_properties" : [ 
-        {"property_key":"patient_id","form_label":"Patient ID"}, 
-        {"property_key":"clinician_id","form_label":"Clinician ID"}, 
-        {"property_key":"relevant_datetime","form_label":"Relevant Date/Time"}, 
-        {"property_key":"lab_code","form_label":"Lab Code"}, 
-        {"property_key":"purpose","form_label":"Purpose"}, 
-        {"property_key": "purpose_subtype", "form_label": "Purpose Subtype"},
-        {"property_key":"category","form_label":"Category"}, 
-        {"property_key":"sub_category","form_label":"Sub Category"}, 
-        {"property_key":"sub_category_2","form_label":"Sub Category 2"}, 
-        {"property_key":"study_id","form_label":"Study ID"}, 
-        {"property_key":"comments","form_label":"Comments"}
+        {"property_key":"patient_id","form_label":"Patient ID", "required": false, "value_type": "uid-interactive"}, 
+        {"property_key":"clinician_id","form_label":"Clinician ID", "required": false, "value_type":"uid-static"}, 
+        {"property_key":"relevant_datetime","form_label":"Relevant Date", "required": false, "value_type":"date"}, 
+        {"property_key":"lab_code","form_label":"Lab Code", "required": false, "value_type":"uid-static"}, 
+        {"property_key":"purpose","form_label":"Purpose", "required": false, "value_type":"controlled"}, 
+        {"property_key": "purpose_subtype", "form_label": "Purpose Subtype", "required": false, "value_type":"controlled"},
+        {"property_key":"category","form_label":"Category", "required": false, "value_type":"controlled"}, 
+        {"property_key":"sub_category","form_label":"Sub Category", "required": false, "value_type":"controlled"}, 
+        {"property_key":"sub_category_2","form_label":"Sub Category 2", "required": false, "value_type":"controlled"}, 
+        {"property_key":"study_id","form_label":"Study ID", "required": false, "value_type":"uid-static"}, 
+        {"property_key":"comments","form_label":"Comments", "required": false, "value_type":"string"},
+        {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"}
       ],  
       "controlled_properties": { 
         "purpose": {

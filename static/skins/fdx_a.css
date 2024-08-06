@@ -4,6 +4,8 @@
 :root {
     --primary-color: #ff3856; /* updated to the vivid red */
     --primary-hover-color: #61fe39; /* updated to a bright green for contrast */
+    --button-bg-color: #ff3856;
+    --button-border-color: #61fe39;
     --secondary-color: #3a47ff; /* updated to the strong blue */
     --secondary-hover-color: #36525c; /* updated to the deep blue-gray */
     --accent-color:#151bb1;/* updated to the soft violet */
