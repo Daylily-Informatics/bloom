@@ -1165,6 +1165,38 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     )
     return HTMLResponse(content=content)
 
+@app.post("/save_json_addl_key")
+async def save_json_addl_key(request: Request):
+    try:
+        # Extract JSON data from the request
+        data = await request.json()
+        euid = data.get("euid")
+        json_addl_key = data.get('json_addl_key')        
+        json_data = data.get("json_data")
+
+        if not euid or not json_addl_key or not json_data:
+            logging.error("EUID, JSON key, or JSON data missing")
+            raise HTTPException(status_code=400, detail="EUID, JSON key, or JSON data missing")
+
+
+        bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        obj = bobdb.get_by_euid(euid)
+
+        if not obj:
+            raise HTTPException(status_code=404, detail="Object not found")
+
+        # Update the json_addl['properties']
+        obj.json_addl[json_addl_key] = json_data
+        flag_modified(obj, "json_addl")
+        bobdb.session.commit()
+
+        # Redirect to euid_details page
+        return RedirectResponse(url=f"/euid_details?euid={euid}", status_code=303)
+
+    except Exception as e:
+        logging.error(f"Error saving JSON properties: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while saving JSON properties")
+
 
 @app.get("/object_templates_summary", response_class=HTMLResponse)
 async def object_templates_summary(request: Request, _auth=Depends(require_auth)):
@@ -1208,9 +1240,10 @@ async def euid_details(
     )
 
     try:
+    
         # Fetch the object using euid
         obj = bobdb.get_by_euid(euid)
-        relationship_data = await get_relationship_data(obj) if obj else {}
+        relationship_data =  get_relationship_data(obj) if obj else {}
 
         if not obj:
             raise HTTPException(status_code=404, detail="Object not found")
@@ -1221,7 +1254,6 @@ async def euid_details(
             for column in obj.__table__.columns
             if hasattr(obj, column.key)
         }
-        
         obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""  
         audit_logs = bobdb.query_audit_log_by_euid(euid)
         user_data = request.session.get("user_data", {})
@@ -1230,6 +1262,8 @@ async def euid_details(
         content = templates.get_template("euid_details.html").render(
             request=request,
             object=obj_dict,
+            jaddl_prop=obj.json_addl.get("properties", {}),
+            jaddl_controlled_prop=obj.json_addl.get("controlled_properties", {}),
             style=style,
             relationships=relationship_data,
             audit_logs=audit_logs,
@@ -1239,18 +1273,17 @@ async def euid_details(
         return HTMLResponse(content=content)
 
     except Exception as e:
-        if not is_deleted:
-            # Retry with is_deleted set to True
-            return await euid_details(
-                request=request,
-                euid=euid,
-                _uuid=_uuid,
-                is_deleted=True,
-                _auth=_auth,
-            )
-        else:
-            # Re-raise the exception if already tried with is_deleted = True
-            raise e
+        #if not is_deleted:
+        #    # Retry with is_deleted set to True
+        #    return await euid_details(
+        #        request=request,
+        #        euid=euid,
+        #        _uuid=_uuid,
+        #        is_deleted=True,
+        #        _auth=_auth,
+        #    )
+        #else:
+        raise e
 
 
 @app.get("/un_delete_by_uuid")
@@ -1603,7 +1636,7 @@ async def user_home(request: Request):
     fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()  
     zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()  
 
-
+    # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
     content = templates.get_template("user_home.html").render(
         request=request,
         user_data=user_data,
@@ -1612,7 +1645,7 @@ async def user_home(request: Request):
         style=style,
         dest_section=dest_section,
         whitelisted_domains=" , ".join(os.environ.get("SUPABASE_WHITELIST_DOMAINS", "all").split(",")), 
-        s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!"),
+        s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
         supabase_url=os.environ.get("SUPABASE_URL", "NEEDS TO BE SET!"),
         printer_info=printer_info,
         github_tag=github_tag,
@@ -1866,13 +1899,27 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     
     f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
+    fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
+ 
     # these should only be 1
     if len(f_templates) > 1:
         logging.error(f"Multiple file templates found for file/file/generic/1.0")
         raise HTTPException(status_code=500, detail="Multiple file templates found for file/file/generic/1.0")
+    if len(fset_templates) > 1:
+        logging.error(f"Multiple file set templates found for file/file_set/generic/1.0")
+        raise HTTPException(status_code=500, detail="Multiple file set templates found for file/file_set/generic/1.0")
+    
     f_template = f_templates[0]
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
     ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+    ui_form_fields_query = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file", version=None)
+
+    
+    fset_template = fset_templates[0]
+    ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
+    ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+    ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
+
 
     content = templates.get_template("dewey.html").render(
         request=request,
@@ -1881,11 +1928,13 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
         upload_group_key=upload_group_key,
         udat=user_data,
         ui_fields=ui_form_fields,
+        ui_search_fields=ui_form_fields_query,
         controlled_properties=f_template.json_addl.get("controlled_properties", {}),
         has_ui_form_properties=bool(ui_form_properties),
         searchable_properties=sorted(f_template.json_addl['properties'].keys()),   
         s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
-
+        ui_fields_fset=ui_form_fields_fset,
+        ui_search_fields_fset=ui_form_fields_query_fset,
     )
 
     return HTMLResponse(content=content)
@@ -2232,7 +2281,7 @@ async def delete_temp_file(
 async def search_files(
     request: Request,
     euid: str = Form(None),
-    is_greedy: str = Form(...),
+    is_greedy: str = Form("yes"),
     patient_id: List[str] = Form(None),
     clinician_id: List[str] = Form(None),
     relevant_datetime_start: str = Form(None),
@@ -2257,28 +2306,35 @@ async def search_files(
     if patient_id:
         if len(patient_id) == 1 and patient_id[0] == ".na":
             patient_id = ""        
-        elif len(patient_id) == 1 and patient_id[0] == "":
-            patient_id = None
-        search_criteria["patient_id"] = patient_id
+        
+        if len(patient_id) == 1 and patient_id[0] == "":
+            pass
+        else:   
+            search_criteria["patient_id"] = patient_id
 
     if clinician_id:   
         if len(clinician_id) == 1 and clinician_id[0] == ".na": 
             clinician_id = ""
-        elif len(clinician_id) == 1 and clinician_id[0] == "":
-            clinician_id = None
-        search_criteria["clinician_id"] = clinician_id
+        if len(clinician_id) == 1 and clinician_id[0] == "":
+            pass
+        else:
+            search_criteria["clinician_id"] = clinician_id
+    
     if relevant_datetime_start or relevant_datetime_end:
         search_criteria["relevant_datetime"] = {
             "start": relevant_datetime_start,
             "end": relevant_datetime_end
         }
+    
     if lab_code:
         if len(lab_code) == 1 and lab_code[0] == ".na":
             lab_code = ""
-        elif len(lab_code) == 1 and lab_code[0] == "":
-            lab_code = None
-            
-        search_criteria["lab_code"] = lab_code
+        
+        if len(lab_code) == 1 and lab_code[0] == "":
+            pass
+        else:
+            search_criteria["lab_code"] = lab_code
+    
     if purpose:
         search_criteria["purpose"] = purpose
     if purpose_subtype:
@@ -2292,22 +2348,29 @@ async def search_files(
     if study_id:
         if len(study_id) == 1 and study_id[0] == ".na":
             study_id = ""
-        elif len(study_id) == 1 and study_id[0] == "":
-            study_id = None
-        search_criteria["study_id"] = study_id
+        
+        if len(study_id) == 1 and study_id[0] == "":
+            pass
+        else:   
+            search_criteria["study_id"] = study_id
+    
     if comments:
         search_criteria["comments"] = comments
+    
     if creating_user:
         if len(creating_user) == 1 and creating_user[0] == ".na":
             creating_user = ""
-        elif len(creating_user) == 1 and creating_user[0] == "":
-            creating_user = None    
-        search_criteria["creating_user"] = creating_user
+        
+        if len(creating_user) == 1 and creating_user[0] == "":
+            pass
+        else:
+            search_criteria["creating_user"] = creating_user
 
     greedy = is_greedy == "yes"
 
     try:
         bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
 
         # Prepare additional filters for created_datetime and relevant_datetime
         query = bfi.session.query(bfi.Base.classes.generic_instance)
@@ -2360,13 +2423,23 @@ async def search_files(
 
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
+  
+        fset_template = fset_templates[0]
+        ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
+        ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+        ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
 
         content = templates.get_template("search_results.html").render(
             request=request,
             columns=columns,
             table_data=table_data,
+            n_results=len(table_data),
+            s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
             style=style,
             udat=user_data,
+            ui_fields_fset=ui_form_fields_fset,
+            ui_search_fields_fset=ui_form_fields_query_fset,
         )
         return HTMLResponse(content=content)
 
@@ -2406,9 +2479,9 @@ async def get_node_property(request: Request, euid: str, key: str):
 @app.post("/create_file_set")
 async def create_file_set(
     request: Request,
-    file_set_name: str = Form(...),
-    file_set_description: str = Form(...),
-    file_set_tag: str = Form(...),
+    name: str = Form(...),
+    description: str = Form(...),
+    tag: str = Form(...),
     comments: str = Form(None),
     file_euids: str = Form(...),
     ref_type: str = Form("na"),
@@ -2432,9 +2505,9 @@ async def create_file_set(
         bfr = BloomFileReference(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         
         file_set_metadata = {
-            "name": file_set_name,
-            "description": file_set_description,
-            "tag": file_set_tag,
+            "name": name,
+            "description": description,
+            "tag": tag,
             "comments": comments,
             "ref_type": ref_type,
             "duration": duration,
@@ -2477,21 +2550,22 @@ async def create_file_set(
 @app.post("/search_file_sets", response_class=HTMLResponse)
 async def search_file_sets(
     request: Request,
-    file_set_name: str = Form(None),
-    file_set_description: str = Form(None),
-    file_set_tag: str = Form(None),
+    name: str = Form(None),
+    description: str = Form(None),
+    tag: str = Form(None),
     comments: str = Form(None),
     file_euids: str = Form(None),
     is_greedy: str = Form("yes"),
+    ref_type: str = Form(None),
 ):
     search_criteria = {}
 
-    if file_set_name:
-        search_criteria["name"] = file_set_name
-    if file_set_description:
-        search_criteria["description"] = file_set_description
-    if file_set_tag:
-        search_criteria["tag"] = file_set_tag
+    if name:
+        search_criteria["name"] = name
+    if description:
+        search_criteria["description"] = description
+    if tag:
+        search_criteria["tag"] = tag
     if comments:
         search_criteria["comments"] = comments
 
@@ -2695,7 +2769,7 @@ def generate_form_fields(template_data: Dict) -> List[FormField]:
 
 
 
-def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict,  form_type: str = 'create',  bobject=None) -> List[FormField]:
+def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict,  form_type: str = 'create',  bobject=None, super_type: str = None, btype: str = None, b_type: str = None, b_sub_type: str = None, version: str = None  ) -> List[FormField]:
     form_fields = []
 
     for prop in ui_form_properties:
@@ -2705,21 +2779,36 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
         value_type = prop.get("value_type", "string")
 
         if property_key in controlled_properties:
-            cp = controlled_properties[property_key]
-            if cp["type"] == "dependent string":
-                form_fields.append(FormField(
-                    name=property_key,
-                    type="select",
-                    label=form_label,
-                    options=[], 
-                    required=required
-                ))
+            if form_type == 'create':
+                cp = controlled_properties[property_key]
+                if cp["type"] == "dependent string":
+                    form_fields.append(FormField(
+                        name=property_key,
+                        type="select",
+                        label=form_label,
+                        options=[], 
+                        required=required
+                    ))
+                else:
+                    form_fields.append(FormField(
+                        name=property_key,
+                        type="select",
+                        label=form_label,
+                        options=cp.get("enum", []),
+                        required=required
+                    ))
             else:
+                #from IPython import embed; embed()
+                unique_values = sorted(bobject.get_unique_property_values(property_key, super_type=super_type, btype=btype, b_sub_type=b_sub_type, version=version))
+                if '' not in unique_values:
+                    unique_values.insert(0, '')
+        
                 form_fields.append(FormField(
                     name=property_key,
                     type="select",
                     label=form_label,
-                    options=cp.get("enum", []),
+                    options=unique_values,
+                    multiple=True,
                     required=required
                 ))
         elif value_type == "uid-interactive":

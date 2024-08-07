@@ -26,7 +26,7 @@
 
                         <br>
                         <hr>
-                        {% for field in ui_fields %}
+                        {% for field in ui_search_fields %}
                         <div>
                             {% if field.type == "select" and field.multiple %}
                             <label for="{{ field.name }}">{{ field.label }}</label>          

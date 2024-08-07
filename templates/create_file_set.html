@@ -1,19 +1,40 @@
 <div class="accordion-content">
     <ul>
         <h3>Create A File Set</h3>
-        <form action="/create_file_set" method="post">
-            <label for="file_set_name">File Set Name:</label>
-            <input type="text" id="file_set_name" name="file_set_name" required><br><br>
-    
-            <label for="file_set_description">File Set Description:</label>
-            <input type="text" id="file_set_description" name="file_set_description" required><br><br>
-    
-            <label for="file_set_tag">File Set Tag:</label>
-            <input type="text" id="file_set_tag" name="file_set_tag" required><br><br>
-    
-            <label for="comments">Comments:</label>
-            <input type="text" id="comments" name="comments"><br><br>
-    
+        <form action="/create_file_set" data-form="create-fs" method="post">
+
+            {% for field in ui_fields_fset %}
+            <div>
+                {% if field.name == "creating_user" %}
+
+                {% elif field.name == "ref_type" %}
+
+                {% elif field.name == "tags" %}
+
+                {% elif field.type == "select" %}
+                    
+                      
+                    <label for="{{ field.name }}">{{ field.label }}</label>
+
+                    <select name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
+                        <option value="" selected></option> <!-- Placeholder for blank state -->
+                        {% for option in field.options %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+
+                {% else %}
+                <label for="{{ field.name }}">{{ field.label }}</label>
+
+                    {% if field.name.endswith('_datetime') %}
+                        <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
+                    {% else %}
+                        <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+           
             <label for="file_euids">File EUIDs :</label>
             <textarea id="file_euids" name="file_euids" required></textarea>
 

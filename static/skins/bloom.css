@@ -37,7 +37,7 @@
     --property-button-color: #898989;
     --form-container-input-color: #ccc;
     --info-box-border-color: rgb(22, 191, 191);
-    --hilight-color: yellow;
+    --hilight-color: rgb(2, 130, 147);
     --a: rgb(109, 241, 241);
     --a-visited: rgb(193, 33, 221);
     --a-hover: rgb(246, 11, 254); /* Change to your preferred color */
@@ -51,3 +51,6 @@
     --accordion-prefix: lightgray;
     --disabled-action-btn: #acb6b7;
 }
+
+
+

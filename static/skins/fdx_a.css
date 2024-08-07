@@ -32,7 +32,7 @@
     --property-button-color: #ff3856; /* updated to the vivid red */
     --form-container-input-color: #36525c; /* updated to the deep blue-gray */
     --info-box-border-color: #3a47ff; /* updated to the strong blue */
-    --hilight-color: yellow; /* unchanged */
+    --hilight-color: rgb(182, 232, 234); /* unchanged */
     --a: #3a47ff; /* updated to match the strong blue */
     --a-visited: #8c96ee; /* updated to the soft violet */
     --a-hover: #ff3856; /* updated to the vivid red */
@@ -46,3 +46,4 @@
     --accordion-prefix: #8c96ee; /* updated to the soft violet */
     --disabled-action-btn: #acb6b7; /* unchanged */
 }
+

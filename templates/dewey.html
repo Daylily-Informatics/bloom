@@ -97,6 +97,19 @@
                 }
             });
 
+            updateDependentFields('create-fs');
+            $('[data-form=create-fs] #tag').on('keyup change', filterOptions);
+            $('[data-form=create-fs] #tag').selectize({
+                create: true,
+                sortField: [{ field: 'value', direction: 'asc' }],
+                placeholder: 'Select or type to add...',
+                persist: false,
+                render: {
+                    option_create: function(data, escape) {
+                        return '<div class="create">Create: <strong>' + escape(data.input) + '</strong>&hellip;</div>';
+                    }
+                }
+            });
             // Apply to search form with 'search' context
             updateDependentFields('search');
             $('[data-form=search] #patient_id, [data-form=search] #clinician_id, [data-form=search] #lab_code, [data-form=search] #study_id').on('keyup change', filterOptions);

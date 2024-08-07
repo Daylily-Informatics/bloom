@@ -1,312 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-
-        {% set page_title = 'Object Details' %}
-        <title>{{ page_title }}</title>
-
-        {% set bloom_mod = 'index' %}
-
-        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
-        <link rel="stylesheet" type="text/css" href="static/style.css">
-        <script src="static/action_buttons.js"></script>
-        <script>
-    function highlightText() {
-        var input = document.getElementById('searchInput').value;
-        if (input) {
-            var content2 = document.getElementById('content2');
-            var innerHTML = content2.innerHTML;
-
-            var regExp = new RegExp(input, "gi");
-            var matches = [...innerHTML.matchAll(regExp)];
-
-            for (let match of matches) {
-                innerHTML = innerHTML.replace(match[0], "<span class='highlight'>" + match[0] + "</span>");
-            }
-
-            content2.innerHTML = innerHTML;
+<head>
+    <meta charset="UTF-8">
+    <title>{{ page_title }}</title>
+    {% set bloom_mod = 'index' %}
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+    <link rel="stylesheet" type="text/css" href="static/style.css">
+    <script src="static/action_buttons.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.js"></script>
+    <style>
+        .floating-button { /* styles */ }
+        .form-section { /* styles */ }
+        .form-group { /* styles */ }
+        .glow { /* styles */ }
+        th { /* styles */ }
+        .option-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            margin-left: 10px;
         }
-    }
-    var currentSortColumn = null;
-    var sortAscending = true;
-
-    function sortTable(columnIndex) {
-        var table, rows, switching, i, x, y, shouldSwitch;
-        table = document.getElementById("auditLogTable");
-        switching = true;
-
-        if (columnIndex === currentSortColumn) {
-            sortAscending = !sortAscending; // Toggle the sorting direction
-        } else {
-            currentSortColumn = columnIndex;
-            sortAscending = true; // Default to ascending sort for a new column
+        .option-button {
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
         }
-
-        while (switching) {
-            switching = false;
-            rows = table.rows;
-
-            for (i = 1; i < (rows.length - 1); i++) {
-                shouldSwitch = false;
-                x = rows[i].getElementsByTagName("TD")[columnIndex];
-                y = rows[i + 1].getElementsByTagName("TD")[columnIndex];
-
-                if (sortAscending) {
-                    if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                } else {
-                    if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                }
-            }
-
-            if (shouldSwitch) {
-                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                switching = true;
-            }
+        .option-button.selected {
+            background-color: #007BFF;
+            color: white;
+            border-color: #007BFF;
         }
-    }
-        
-        
-    
-        </script>
-    </head>
-    <body id="content2">
-        {% include 'bloom_header.html' %}
+        .nested-json {
+            margin-left: 20px;
+        }
+        .form-container input {
+            margin-bottom: 5px;
+        }
+        .highlight {
+            background-color: magenta;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="static/skins/json_editor.css">
 
-        <small> <a href=dindex2?globalStartNodeEUID={{ object.euid }}>( graph )</a> </small>
-        {% macro render_json_value(value, key) %}
-            {% if value is mapping %}
-                <div class="nested-json">
-                    {% for sub_key, sub_value in value.items() %}
-                        <p>
-                            <span class="json-key">{{ sub_key }}:</span> {{ render_json_value(sub_value, sub_key) }}
-                        </p>
-                    {% endfor %}
-                </div>
-            {% elif value is iterable and value is not string %}
-                <ul>
-                    {% for item in value %}<li>{{ render_json_value(item, key) }}</li>{% endfor %}
-                </ul>
-            {% elif '_euid' in key %}
-                <a class="reference-link" href=euid_details?euid={{ value }}>{{ value }}</a>
-            {% else %}
-                {{ value }}
-            {% endif %}
-        {% endmacro %}
-        {% if  object.btype  == 'plate' %}
-            <h1>
-                Object Details : {{ object.euid }} : : <a href=/plate_visualization?plate_euid={{ object.euid }}>plate view</a>
-            </h1>
-        {% elif  object.super_type  == 'workflow' and object.btype != 'assay' %}
-            <h1>
-                Object Details : {{ object.euid }} : : <a href=workflow_details?workflow_euid={{ object.euid }}>workflow view</a>
-            </h1>
+</head>
+<body id="content2">
+    {% include 'bloom_header.html' %}
+
+    <small><a href=dindex2?globalStartNodeEUID={{ object.euid }}>( graph )</a></small>
+
+    <h1>Object Details : {{ object.euid }}</h1>
+
+    <table width="100%">
+        <tr width="100%">
+            <td width="50%"></td>
+            <td width="50%" align="right"></td>
+        </tr>
+    </table>
+
+    <table>
+        <tr>
+            <td>EUID</td>
+            <td><a class="reference-link" href="euid_details?euid={{ object.euid }}">{{ object.euid }}</a></td>
+        </tr>
+        <tr>
+            <td>UUID</td>
+            <td><a class="reference-link" href="uuid_details?uuid={{ object.uuid }}">{{ object.uuid }}</a></td>
+        </tr>
+        <tr>
+            <td>DB Name<ul>Given Name<br>Lab Code</ul></td>
+            <td>{{ object.name }}<ul>{{ object.json_addl['properties']['name'] }}<br>{{ object.json_addl['properties']['lab_code'] }}</ul></td>
+        </tr>
+        <tr>
+            <td>Polymorphic Discriminator</td>
+            <td>{{ object.polymorphic_discriminator }}</td>
+        </tr>
+        <tr>
+            <td>Super Type</td>
+            <td>{{ object.super_type }}</td>
+        </tr>
+        <tr>
+            <td>Type</td>
+            <td>{{ object.btype }}</td>
+        </tr>
+        <tr>
+            <td>Sub Type</td>
+            <td>{{ object.b_sub_type }}</td>
+        </tr>
+        <tr>
+            <td>Version</td>
+            <td>{{ object.version }}</td>
+        </tr>
+        <tr>
+            <td>Status</td>
+            <td>{{ object.bstatus }}</td>
+        </tr>
+        <tr>
+            <td>Created Date</td>
+            <td>{{ object.created_dt }}</td>
+        </tr>
+        <tr>
+            <td>Is Deleted?</td>
+            <td>{{ object.is_deleted }}</td>
+        </tr>
+        <tr>
+            <td>Template EUID</td>
+            <td>
+                {% if object.parent_template_euid %}
+                    <a href="euid_details?euid={{ object.parent_template_euid }}">{{ object.parent_template_euid }}</a>
+                {% else %}
+                    This is a TEMPLATE Object: <a href="/admin_template?euid={{ object.euid }}">admin edit</a>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <hr>
+
+    <div class="collapsible-buttons">
+        <button type="button" class="collapsiblex" data-target="relationshipsContent">Relationships</button>
+        <button type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
+        <button type="button" class="collapsiblex" data-target="actionGroupsContent">Action Groups</button>
+        <button type="button" class="collapsiblex" data-target="auditLogContent">Audit Log</button>
+        <button type="button" class="collapsiblex" data-target="fullEditContent">Edit Obj Properties (admin)</button>
+        {% if object.parent_template_euid %}
+            ...
         {% else %}
-            <h1>Object Details : {{ object.euid }}</h1>
+            <button type="button" class="collapsiblex" data-target="fullEditContentTemplate">Edit Template Form Properties (super admin)</button>
         {% endif %}
-        {% if object %}
-            <table width=100%>
-                <tr width=100%>
-                    <td width=50%>.</td>
-                    <td width=50% align=right>
-                        <input type="text" id="searchInput" placeholder="Search text...">
-                        <button onclick="highlightText()">Search</button>
-                    </td>
-                </tr>
-            </table>
-            <table>
-                <!-- ... Static fields table ... -->
-                <table>
-                    <tr>
-                        <td>EUID</td>
-                        <td>
-                            <a class="reference-link" href="euid_details?euid={{ object.euid }}">{{ object.euid }}</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>UUID</td>
-                        <td>
-                            <a class="reference-link" href="uuid_details?uuid={{ object.uuid }}">{{ object.uuid }}</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>DB Name<ul>Given Name<br>Lab Code</ul></td>
-                        <td>
-                            {{ object.name }}<ul>
-                            {{ object.json_addl['properties']['name'] }}<br>
-                            {{ object.json_addl['properties']['lab_code'] }}</ul>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Polymorphic Discriminator</td>
-                        <td>{{ object.polymorphic_discriminator }}</td>
-                    </tr>
-                    <tr>
-                        <td>Super Type</td>
-                        <td>{{ object.super_type }}</td>
-                    </tr>
-                    <tr>
-                        <td>Type</td>
-                        <td>{{ object.btype }}</td>
-                    </tr>
-                    <tr>
-                        <td>Sub Type</td>
-                        <td>{{ object.b_sub_type }}</td>
-                    </tr>
-                    <tr>
-                        <td>Version</td>
-                        <td>{{ object.version }}</td>
-                    </tr>
-                    <tr>
-                        <td>Status</td>
-                        <td>{{ object.bstatus }}</td>
-                    </tr>
-                   
-                    <tr>
-                        <td>Created Date</td>
-                        <td>{{ object.created_dt }}</td>
-                    </tr>
-                    <tr>
-                        <td>Is Deleted?</td>
-                        <td>{{ object.is_deleted }}</td>
-                    </tr>
-                    <tr>
-                        <td>Template EUID</td>
-                        <td>
-                            {% if object.parent_template_euid %}
-                                <a href="euid_details?euid={{ object.parent_template_euid }}">{{ object.parent_template_euid }}</a>
-                            {% else %}
-                                This is a TEMPLATE Object: <a href="/admin_template?euid={{ object.euid }}">admin edit</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <!-- Add other fields as necessary -->
-                </table>
-            </table>
-            <hr>
-            <!-- Collapsible Buttons Container -->
-            <div class="collapsible-buttons">
-                <button type="button" class="collapsiblex" data-target="relationshipsContent">Relationships</button>
-                <button type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
-                <button type="button" class="collapsiblex" data-target="actionGroupsContent">Action Groups</button>
-                <button type="button" class="collapsiblex" data-target="auditLogContent">Audit Log</button>
-                <button type="button"
-                        class="collapsiblex"
-                        style="background-color:lightgray"
-                        data-target="jsonAddlContent">Edit json_addl (admin)</button>
-            </div>
-            <hr>
-            <div id="relationshipsContent" class="content" style="display:none;">
-                <h2>Relationships</h2>
-                <!-- Child of Lineages Table -->
-                <h3>Child Of Lineages</h3>
-                <table class="searchable">
-                    <tr>
-                        <th>Lineage EUID</th>
-                        <th>Relationship Type</th>
-                        <th>Parent Instance EUID</th>
-                        <th>Parent Type</th>
-                        <th>Parent Sub Type</th>
-                        <th>Parent Version</th>
-                        <th>Child Instance EUID</th>
-                        <th>Child Type</th>
-                        <th>Child Sub Type</th>
-                        <th>Child Version</th>
-                    </tr>
-                    {% for lineage in oobj.child_of_lineages %}
-                        <tr>
-                            <td>
-                                <a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a>
-                            </td>
-                            <td>{{ lineage.relationship_type }}</td>
-                            <td>
-                                <a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a>
-                            </td>
-                            <td>{{ lineage.parent_instance.btype }}</td>
-                            <td>{{ lineage.parent_instance.b_sub_type }}</td>
-                            <td>{{ lineage.parent_instance.version }}</td>
-                            <td>
-                                <a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a>
-                            </td>
-                            <td>{{ lineage.child_instance.btype }}</td>
-                            <td>{{ lineage.child_instance.b_sub_type }}</td>
-                            <td>{{ lineage.child_instance.version }}</td>
-                        </tr>
-                    {% endfor %}
-                </table>
-                <!-- Parent of Lineages Table -->
-                <h3>Parent Of Lineages</h3>
-                <table class="searchable">
-                    <tr>
-                        <th>Lineage EUID</th>
-                        <th>Relationship Type</th>
-                        <th>Parent Instance EUID</th>
-                        <th>Parent Type</th>
-                        <th>Parent Sub Type</th>
-                        <th>Parent Version</th>
-                        <th>Child Instance EUID</th>
-                        <th>Child Type</th>
-                        <th>Child Sub Type</th>
-                        <th>Child Version</th>
-                    </tr>
-                    {% for lineage in oobj.parent_of_lineages %}
-                        <tr>
-                            <td>
-                                <a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a>
-                            </td>
-                            <td>
-                                {{ lineage.relationship_type }}
-                            </td>
-                            <td>
-                                <a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a>
-                            </td>
-                            <td>{{ lineage.parent_instance.btype }}</td>
-                            <td>{{ lineage.parent_instance.b_sub_type }}</td>
-                            <td>{{ lineage.parent_instance.version }}</td>
-                            <td>
-                                <a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a>
-                            </td>
-                            <td>{{ lineage.child_instance.btype }}</td>
-                            <td>{{ lineage.child_instance.b_sub_type }}</td>
-                            <td>{{ lineage.child_instance.version }}</td>
-                        </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </div>
     </div>
+
+    <hr>
+
+    <div id="relationshipsContent" class="content" style="display:none;">
+        <h2>Relationships</h2>
+        <h3>Child Of Lineages</h3>
+        <table class="searchable">
+            <tr>
+                <th>Lineage EUID</th>
+                <th>Relationship Type</th>
+                <th>Parent Instance EUID</th>
+                <th>Parent Type</th>
+                <th>Parent Sub Type</th>
+                <th>Parent Version</th>
+                <th>Child Instance EUID</th>
+                <th>Child Type</th>
+                <th>Child Sub Type</th>
+                <th>Child Version</th>
+            </tr>
+            {% for lineage in oobj.child_of_lineages %}
+                <tr>
+                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
+                    <td>{{ lineage.relationship_type }}</td>
+                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+                    <td>{{ lineage.parent_instance.btype }}</td>
+                    <td>{{ lineage.parent_instance.b_sub_type }}</td>
+                    <td>{{ lineage.parent_instance.version }}</td>
+                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+                    <td>{{ lineage.child_instance.btype }}</td>
+                    <td>{{ lineage.child_instance.b_sub_type }}</td>
+                    <td>{{ lineage.child_instance.version }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+        <h3>Parent Of Lineages</h3>
+        <table class="searchable">
+            <tr>
+                <th>Lineage EUID</th>
+                <th>Relationship Type</th>
+                <th>Parent Instance EUID</th>
+                <th>Parent Type</th>
+                <th>Parent Sub Type</th>
+                <th>Parent Version</th>
+                <th>Child Instance EUID</th>
+                <th>Child Type</th>
+                <th>Child Sub Type</th>
+                <th>Child Version</th>
+            </tr>
+            {% for lineage in oobj.parent_of_lineages %}
+                <tr>
+                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
+                    <td>{{ lineage.relationship_type }}</td>
+                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+                    <td>{{ lineage.parent_instance.btype }}</td>
+                    <td>{{ lineage.parent_instance.b_sub_type }}</td>
+                    <td>{{ lineage.parent_instance.version }}</td>
+                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+                    <td>{{ lineage.child_instance.btype }}</td>
+                    <td>{{ lineage.child_instance.b_sub_type }}</td>
+                    <td>{{ lineage.child_instance.version }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+
     <div id="dynamicFieldsContent" class="content" style="display:none;">
         <div class="dynamic-fields">
-            <!-- ... Dynamic Fields content ... -->
             <h2>Dynamic Fields</h2>
-            <div class="dynamic-fields">
-                <table>
-                    {% for key, value in object|dictsort %}
-                        {% if key not in static_fields and not key.endswith('_uuid') %}
-                            <tr>
-                                <td>{{ key|capitalize }}</td>
-                                <td>{{ value }}</td>
-                            </tr>
-                        {% elif key.endswith('_uuid') %}
-                            <tr>
-                                <td>{{ key|capitalize }}</td>
-                                <td>
-                                    <a class="reference-link" href="uuid_details?uuid={{ value }}">{{ value }}</a>
-                                </td>
-                            </tr>
-                        {% endif %}
-                    {% endfor %}
-                </table>
-            </div>
+            <table>
+                {% for key, value in object|dictsort %}
+                    {% if key not in static_fields and not key.endswith('_uuid') %}
+                        <tr>
+                            <td>{{ key|capitalize }}</td>
+                            <td>{{ value }}</td>
+                        </tr>
+                    {% elif key.endswith('_uuid') %}
+                        <tr>
+                            <td>{{ key|capitalize }}</td>
+                            <td><a class="reference-link" href="uuid_details?uuid={{ value }}">{{ value }}</a></td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </table>
         </div>
     </div>
-    <!-- Action Groups Section -->
+
     <div id="actionGroupsContent" class="content" style="display:none;">
         {% if object.json_addl and 'action_groups' in object.json_addl %}
             <div class="action-group-group">
@@ -325,89 +235,66 @@
             </div>
         {% endif %}
     </div>
+
     <div id="auditLogContent" class="content" style="display:none;">
-        <div class="audit-log-fields">
-            <!-- Add Audit Log Section -->
-            <h2>Audit Log</h2>
-            <div class="audit-log">
-                {% if audit_logs %}
-                    <table id="auditLogTable">
-                        <thead>
-                            <tr>
-                                <th onclick="sortTable(0)">Column Name</th>
-                                <th onclick="sortTable(1)">Old Value</th>
-                                <th onclick="sortTable(2)">New Value</th>
-                                <th onclick="sortTable(3)">Changed By</th>
-                                <th onclick="sortTable(4)">Changed At</th>
-                                <th onclick="sortTable(5)">Operation Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for log in audit_logs %}
-                                <tr>
-                                    <td>{{ log.column_name }}</td>
-                                    {% if log.column_name == 'json_addl' %}
-                                        <td>
-                                            <button id="jsonToggleButton-{{ loop.index }}"
-                                                    onclick="toggleJSONDisplay({{ loop.index }})">Show JSON</button>
-                                            <div id="jsonOldContent-{{ loop.index }}" style="display:none;">{{ log.old_value }}</div>
-                                        </td>
-                                        <td>
-                                            <div id="jsonNewContent-{{ loop.index }}" style="display:none;">{{ log.new_value }}</div>
-                                        </td>
-                                    {% else %}
-                                        <td>{{ log.old_value }}</td>
-                                        <td>{{ log.new_value }}</td>
-                                    {% endif %}
-                                    <td>{{ log.changed_by }}</td>
-                                    <td>{{ log.changed_at }}</td>
-                                    <td>{{ log.operation_type }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <p>No audit log entries found.</p>
-                {% endif %}
-            </div>
-        </div>
+        <h2>Audit Log</h2>
+        {% if audit_logs %}
+            <table id="auditLogTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">Column Name</th>
+                        <th onclick="sortTable(1)">Old Value</th>
+                        <th onclick="sortTable(2)">New Value</th>
+                        <th onclick="sortTable(3)">Changed By</th>
+                        <th onclick="sortTable(4)">Changed At</th>
+                        <th onclick="sortTable(5)">Operation Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in audit_logs %}
+                        <tr>
+                            <td>{{ log.column_name }}</td>
+                            {% if log.column_name == 'json_addl' %}
+                                <td>
+                                    <button id="jsonToggleButton-{{ loop.index }}" onclick="toggleJSONDisplay({{ loop.index }})">Show JSON</button>
+                                    <div id="jsonOldContent-{{ loop.index }}" style="display:none;">{{ log.old_value }}</div>
+                                </td>
+                                <td><div id="jsonNewContent-{{ loop.index }}" style="display:none;">{{ log.new_value }}</div></td>
+                            {% else %}
+                                <td>{{ log.old_value }}</td>
+                                <td>{{ log.new_value }}</td>
+                            {% endif %}
+                            <td>{{ log.changed_by }}</td>
+                            <td>{{ log.changed_at }}</td>
+                            <td>{{ log.operation_type }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No audit log entries found.</p>
+        {% endif %}
     </div>
-    <!-- Json Addl Editing Form -->
+
     <div id="jsonAddlContent" class="content" style="display:none;">
-        <form id="prop-{{ object.euid }}"
-              style="padding: 0px"
-              method="post"
-              action="/update_obj_json_addl_properties"
-              class="form-container">
+        <h2>Edit json_addl</h2>
+        <form id="prop-{{ object.euid }}" method="post" action="/update_obj_json_addl_properties" class="form-container">
             <input type="hidden" name="obj_euid" value="{{ object.euid }}">
             {% for key, value in object.json_addl['properties'].items() %}
                 <div>
                     <label for="{{ object.euid }}">{{ key }}:</label>
                     {% if value is string %}
-                        <input type="text"
-                               id="{{ object.euid }}"
-                               name="{{ key }}"
-                               value="{{ value }}">
+                        <input type="text" id="{{ object.euid }}" name="{{ key }}" value="{{ value }}">
                     {% elif value is iterable %}
                         <div id="list-{{ object.euid }}-{{ key }}">
                             {% for item in value %}
-                                <input id="{{ object.euid }}"
-                                       type="text"
-                                       name="{{ key }}[]"
-                                       value="{{ item }}">
+                                <input id="{{ object.euid }}" type="text" name="{{ key }}[]" value="{{ item }}">
                             {% endfor %}
                         </div>
-                        <button class="form-button"
-                                type="button"
-                                onclick="addListItem('{{ object.euid }}', '{{ key }}')">Add</button>
-                        <button class="form-button"
-                                type="button"
-                                onclick="removeListItem('{{ object.euid }}', '{{ key }}')">Remove</button>
+                        <button class="form-button" type="button" onclick="addListItem('{{ object.euid }}', '{{ key }}')">Add</button>
+                        <button class="form-button" type="button" onclick="removeListItem('{{ object.euid }}', '{{ key }}')">Remove</button>
                     {% else %}
-                        <input type="text"
-                               id="{{ object.euid }}"
-                               name="{{ key }}"
-                               value="{{ value }}">
+                        <input type="text" id="{{ object.euid }}" name="{{ key }}" value="{{ value }}">
                     {% endif %}
                 </div>
             {% endfor %}
@@ -416,71 +303,160 @@
             </div>
         </form>
     </div>
-{% else %}
-    <p>No object found for the provided EUID.</p>
-{% endif %}
-<script>
-    var coll = document.getElementsByClassName("collapsible");
-    var i;
 
-    for (i = 0; i < coll.length; i++) {
-        coll[i].addEventListener("click", function() {
-            this.classList.toggle("active");
-            var content = this.nextElementSibling;
-            if (content.style.display === "block") {
-                content.style.display = "none";
-            } else {
-                content.style.display = "block";
-            }
-        });
-    }
+    <div id="fullEditContent" class="content" style="display:none;">
+        <h2>Edit Object 'properties'</h2>
+        <form id="full-edit-form">
+            <div id="json-editor"></div>
+            <input type="hidden" id="object_json_key" name="object_json_key" value="properties">
+            <button type="button" onclick="saveFullEdit()">Save</button>
+        </form>
+    </div>
 
-    document.querySelectorAll('.collapsiblex').forEach(button => {
-        button.addEventListener('click', function() {
-            var contentId = this.getAttribute('data-target');
-            var contentDiv = document.getElementById(contentId);
-            
-            if (contentDiv.style.display === "block") {
-                contentDiv.style.display = "none";
-            } else {
-                contentDiv.style.display = "block";
-            }
-        });
-    });
+    <div id="fullEditContentTemplate" class="content" style="display:none;">
+        <h2>Edit Template Form Controlled Dict</h2>
+        <form id="full-edit-form-template">
+            <div id="json-editor-template"></div>
+            <input type="hidden" id="object_json_key_template" name="object_json_key_template" value="controlled_properties">
+            <button type="button" onclick="saveFullEditTemplate()">Save</button>
+        </form>
+    </div>
 
+    <script>
+        var coll = document.getElementsByClassName("collapsiblex");
+        var i;
 
-$(document).ready(function() {
-    populateSelectList();
-});
-
-function populateSelectList() {
-    $.ajax({
-        url: 'get_print_labs', // Replace with your AJAX endpoint
-        method: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            var select = $('#mySelect');
-            select.empty(); // Clear the existing options
-            data.forEach(function(item) {
-                select.append($('<option>', { 
-                    value: item.value,
-                    text : item.text 
-                }));
+        for (i = 0; i < coll.length; i++) {
+            coll[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                var content = document.getElementById(this.getAttribute('data-target'));
+                if (content.style.display === "block") {
+                    content.style.display = "none";
+                } else {
+                    content.style.display = "block";
+                }
             });
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.log('Error: ' + textStatus + ' - ' + errorThrown);
         }
-    });
-}
 
-    
-</script>
-<br>
-<br>
-<br>
-<br>
-<br>
-<small><a href=delete_by_euid?euid={{ object.euid }}>SOFTdelete object</a> - -- or -- - <a href=un_delete_by_uuid?uuid={{ object.uuid }}&euid={{ object.euid }}>unSOFTdelete object</a></small>
+        function sortTable(columnIndex) {
+            var table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementById("auditLogTable");
+            switching = true;
+
+            if (columnIndex === currentSortColumn) {
+                sortAscending = !sortAscending; // Toggle the sorting direction
+            } else {
+                currentSortColumn = columnIndex;
+                sortAscending = true; // Default to ascending sort for a new column
+            }
+
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[columnIndex];
+                    y = rows[i + 1].getElementsByTagName("TD")[columnIndex];
+
+                    if (sortAscending) {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+
+        function addListItem(euid, key) {
+            var listContainer = document.getElementById('list-' + euid + '-' + key);
+            var newItem = document.createElement('input');
+            newItem.setAttribute('type', 'text');
+            newItem.setAttribute('name', key + '[]');
+            listContainer.appendChild(newItem);
+        }
+
+        function removeListItem(euid, key) {
+            var listContainer = document.getElementById('list-' + euid + '-' + key);
+            if (listContainer.children.length > 0) {
+                listContainer.removeChild(listContainer.lastChild);
+            }
+        }
+
+        function saveFullEdit() {
+            var editorContent = JSON.stringify(editor.get(), null, 4);
+            try {
+                var parsedJson = JSON.parse(editorContent);
+                $.ajax({
+                    url: '/save_json_addl_key',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ 
+                        euid: '{{ object.euid }}', 
+                        json_data: parsedJson,
+                        json_addl_key: document.getElementById('object_json_key').value
+                    }),
+                    success: function(response) {
+                        window.location.href = "euid_details?euid={{ object.euid }}";
+                    },
+                    error: function(error) {
+                        alert('Error saving JSON: ' + error.responseText);
+                    }
+                });
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+
+        function saveFullEditTemplate() {
+            var editorContentTemplate = JSON.stringify(editorTemplate.get(), null, 4);
+            try {
+                var parsedJsonTemplate = JSON.parse(editorContentTemplate);
+                $.ajax({
+                    url: '/save_json_addl_key',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ 
+                        euid: '{{ object.euid }}', 
+                        json_data: parsedJsonTemplate,
+                        json_addl_key: document.getElementById('object_json_key_template').value
+                    }),
+                    success: function(response) {
+                        window.location.href = "euid_details?euid={{ object.euid }}";
+                    },
+                    error: function(error) {
+                        alert('Error saving JSON: ' + error.responseText);
+                    }
+                });
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+
+        var editor, editorTemplate;
+        $(document).ready(function() {
+            var container = document.getElementById('json-editor');
+            var options = {};
+            editor = new JSONEditor(container, options);
+            editor.set({{ jaddl_prop|tojson }});
+
+            var containerTemplate = document.getElementById('json-editor-template');
+            editorTemplate = new JSONEditor(containerTemplate, options);
+            editorTemplate.set({{ jaddl_controlled_prop|tojson }});
+        });
+    </script>
+
+    <small><a href=delete_by_euid?euid={{ object.euid }}>SOFTdelete object</a> - -- or -- - <a href=un_delete_by_uuid?uuid={{ object.uuid }}&euid={{ object.euid }}>unSOFTdelete object</a></small>
 </body>
 </html>
