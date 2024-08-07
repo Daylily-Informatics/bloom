@@ -2440,11 +2440,11 @@ async def get_node_property(request: Request, euid: str, key: str):
 @app.post("/create_file_set")
 async def create_file_set(
     request: Request,
-    name: str = Form(...),
-    description: str = Form(...),
-    tag: str = Form(...),
+    name: str = Form(None),
+    description: str = Form(None),
+    tag: str = Form(None),
     comments: str = Form(None),
-    file_euids: str = Form(...),
+    file_euids: str = Form(None),
     ref_type: str = Form("na"),
     duration: float = Form(0),
     bucket: str = Form(""),
