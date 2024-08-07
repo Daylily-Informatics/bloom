@@ -11,6 +11,10 @@
     <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
     <link rel="stylesheet" type="text/css" href="static/style.css">
     <script src="static/action_buttons.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
     <script>
         function toggleSelectAll(checkboxClass, masterCheckboxId) {
             const checkboxes = document.querySelectorAll(checkboxClass);
@@ -119,6 +123,67 @@
             header.classList.toggle('descending', isAscending);
         }
     </script>
+
+
+    <script>
+        
+        function updateDependentFields(formContext) {
+            function populateSelectField(selectFieldId, options) {
+                const selectField = $(`[data-form=${formContext}] #${selectFieldId}`);
+                selectField.empty();
+                options.forEach(function(option) {
+                    selectField.append(new Option(option, option));
+                });
+                selectField.trigger('change');
+            }
+
+            function handleFieldChange(field, dependentField, enumObj, formContext) {
+                $(`[data-form=${formContext}] #${field}`).change(function() {
+                    const selectedValue = $(this).val();
+                    const dependentOptions = enumObj[selectedValue] || [];
+                    populateSelectField(dependentField, dependentOptions, formContext);
+                });
+            }
+
+            Object.keys(controlledProperties).forEach(function(prop) {
+                if (controlledProperties[prop].type === "dependent string") {
+                    const dependentField = controlledProperties[prop].on;
+                    const enumObj = controlledProperties[prop].enum;
+                    handleFieldChange(dependentField, prop, enumObj, formContext);
+                }
+            });
+        }
+
+        function filterOptions(event) {
+            const input = event.target.value.toLowerCase();
+            const selectField = event.target;
+            const options = selectField.options;
+
+            for (let i = 0; i < options.length; i++) {
+                const optionText = options[i].text.toLowerCase();
+                if (optionText.includes(input) || options[i].value === "") {
+                    options[i].style.display = "";
+                } else {
+                    options[i].style.display = "none";
+                }
+            }
+        }
+
+        $(document).ready(function() {
+            $('#tag').selectize({
+                create: true,
+                sortField: [{ field: 'value', direction: 'asc' }],
+                placeholder: 'Select or type to add...',
+                persist: false,
+                render: {
+                    option_create: function(data, escape) {
+                        return '<div class="create">Create: <strong>' + escape(data.input) + '</strong>&hellip;</div>';
+                    }
+                }
+            });
+        });
+
+    </script>
     <style>
         .floating-button {
             position: fixed;
@@ -194,13 +259,27 @@
         th.descending::after {
             content: ' \25BC'; /* Down arrow */
         }
+
+        .div.selectize-input {
+            padding: inherit;
+            border: inherit;
+            margin: inherit;
+            position: inherit;
+        }
+        .selectize-input {
+            padding: inherit;
+            border: inherit;
+            margin: inherit;
+            position: inherit;
+            background-color: var(--form-in-bg-color);
+        }
     </style>
 </head>
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>File Search Results</h1>
-    <form id="fileSetForm" action="/create_file_set" method="post">
+    <h1>{{ n_results }} File Search Results</h1>
+    <form id="fileSetForm" action="/create_file_set" method="post"  >
         <div style="display: flex;">
             <div class="form-section" style="background-color: rgba(255, 204, 204, 0.1);">
                 <div class="form-group">
@@ -223,16 +302,37 @@
             <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
                 File Set Details
                 <div class="form-group">
-                    <label for="file_set_name"> Name: </label>
-                    <input type="text" id="file_set_name" name="file_set_name" required>
-                    <label for="file_set_description" value="" > Description: </label>
-                    <input type="text" id="file_set_description" name="file_set_description" required>
-                </div>
-                <div class="form-group">
-                    <label for="file_set_tag" value=""> Tag: </label>
-                    <input type="text" id="file_set_tag" name="file_set_tag" required>
-                    <label for="comments"> Comments: </label>
-                    <input type="text" id="comments" name="comments" value="">
+                    {% for field in ui_fields_fset %}
+                    <div>
+                        {% if field.name == "creating_user" %}
+        
+                        {% elif field.name == "ref_type" %}
+        
+                        {% elif field.name == "tags" %}
+        
+                        {% elif field.type == "select" %}
+                            
+                              
+                            <label for="{{ field.name }}">{{ field.label }}</label>
+                            
+                            <select data-form="create-fs" name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
+                                <option value="" selected></option> <!-- Placeholder for blank state -->
+                                {% for option in field.options %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                {% endfor %}
+                            </select>
+        
+                        {% else %}
+                        <label for="{{ field.name }}">{{ field.label }}</label>
+        
+                            {% if field.name.endswith('_datetime') %}
+                                <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
+                            {% else %}
+                                <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
 
                 </div>
                 <div class="form-group">
@@ -425,5 +525,6 @@
     });
 </script>
 
+    {% include 'pre_body_close.html' %}
 </body>
 </html>

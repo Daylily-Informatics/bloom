@@ -32,7 +32,7 @@
     --property-button-color: #898989; /* Medium grey */
     --form-container-input-color: #cccccc; /* Soft grey */
     --info-box-border-color: #b2d8d8; /* Soft teal */
-    --hilight-color: #ffff99; /* Light yellow */
+    --hilight-color: #f9de75; /* Light yellow */
     --a: #6db3f2; /* Light blue */
     --a-visited: #b4a7d6; /* Soft purple */
     --a-hover: #f4cccc; /* Soft pink */
@@ -46,3 +46,4 @@
     --accordion-prefix: #d0e0e3; /* Very light teal */
     --disabled-action-btn: #d9d9d9; /* Light grey */
 }
+

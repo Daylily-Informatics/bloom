@@ -12,7 +12,7 @@
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>Search Results</h1>
+    <h1>{{ num_results }} Results</h1>
 
     <table id="results-table" border="1">
         <thead>
@@ -27,7 +27,9 @@
             {% for row in table_data %}
             <tr>
                 <td>
+                    {% if row['ref_type'] == 'presigned_url' %}
                     <a href="/file_set_urls?fs_euid={{ row['EUID'] }}" target="_blank">View Presigned URLSs</a>
+                    {% endif %}
                 </td> <!-- New cell with the link -->
                 {% for column in columns %}
                 <td>

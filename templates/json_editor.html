@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON Editor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.js"> </script>
+    <style>
+        #jsoneditor {
+            width: 100%;
+            height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <h1>JSON Editor</h1>
+    <div id="jsoneditor"></div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Create a JSONEditor instance
+            var container = document.getElementById('jsoneditor');
+            var options = {};
+            var editor = new JSONEditor(container, options);
+
+            // Set JSON data
+            var json = {{ jaddl_prop | tojson }};
+            editor.set(json);
+
+            // Get JSON data on change
+            editor.on('change', function() {
+                console.log(editor.get());
+            });
+        });
+    </script>
+</body>
+</html>

@@ -701,9 +701,27 @@ class BloomObj:
     
     
     # should abstract to not assume properties key
-    def get_unique_property_values(self, property_key):
+    def get_unique_property_values(self, property_key, super_type=None, btype=None, b_sub_type=None, version=None):
+               
         json_path = property_key.split("->")
+
+        # Start building the query with the base table
         query = self.session.query(
+            self.Base.classes.generic_instance
+        )
+
+        # Add filters based on the provided arguments
+        if super_type:
+            query = query.filter(self.Base.classes.generic_instance.super_type == super_type)
+        if btype:
+            query = query.filter(self.Base.classes.generic_instance.btype == btype)
+        if b_sub_type:
+            query = query.filter(self.Base.classes.generic_instance.b_sub_type == b_sub_type)
+        if version:
+            query = query.filter(self.Base.classes.generic_instance.version == version)
+
+        # Add the JSON path extraction and distinct filtering after the base filters
+        query = query.with_entities(
             func.distinct(
                 func.jsonb_extract_path_text(
                     self.Base.classes.generic_instance.json_addl['properties'], *json_path
@@ -713,10 +731,16 @@ class BloomObj:
             func.jsonb_extract_path_text(
                 self.Base.classes.generic_instance.json_addl['properties'], *json_path
             ).isnot(None)
-        ).all()
+        )
+
+        # Execute the query and get the results
+        results = query.all()
+
+        # Extract unique values from the query results
+        unique_values = [value[0] for value in results if value[0] is not None]
         
-        unique_values = [value[0] for value in query if value[0] is not None]
         return unique_values
+
 
     def query_template_by_component_v2(
         self, super_type=None, btype=None, b_sub_type=None, version=None
@@ -2862,7 +2886,7 @@ class BloomFile(BloomObj):
         else:
             logging.warning(f"No data provided for file creation: {file_data, url}")
             new_file.bstatus = "no file data provided"
-            self.session.commit()
+            self.session.commit() 
 
         if create_locked:
             self.lock_file(new_file.euid)
