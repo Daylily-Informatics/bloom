@@ -53,4 +53,26 @@
 }
 
 
+input[type="date" i] {
+    font-family: inherit;
+    padding-inline-start: 1px;
+    cursor: default;
+    padding: inherit;
+    border: inherit;
+    overflow: hidden;
+}
 
+input[type="file" i] {
+    font-family: inherit;
+    appearance: none;
+    background-color: inherit;
+    cursor: default;
+    align-items: baseline;
+    color: inherit;
+    text-overflow: ellipsis;
+    text-align: start !important;
+    padding: initial;
+    border: inherit;
+    white-space: pre;
+    overflow: hidden !important;
+}

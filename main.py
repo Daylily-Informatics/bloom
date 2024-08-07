@@ -2298,73 +2298,34 @@ async def search_files(
     created_datetime_end: str = Form(None),
     creating_user: List[str] = Form(None),
 ):
-    search_criteria = {}
-
-    if euid:
-        search_criteria["euid"] = euid
-
-    if patient_id:
-        if len(patient_id) == 1 and patient_id[0] == ".na":
-            patient_id = ""        
-        
-        if len(patient_id) == 1 and patient_id[0] == "":
-            pass
-        else:   
-            search_criteria["patient_id"] = patient_id
-
-    if clinician_id:   
-        if len(clinician_id) == 1 and clinician_id[0] == ".na": 
-            clinician_id = ""
-        if len(clinician_id) == 1 and clinician_id[0] == "":
-            pass
-        else:
-            search_criteria["clinician_id"] = clinician_id
     
+    form_data = {
+    "euid": euid,
+    "patient_id": patient_id,
+    "clinician_id": clinician_id,
+    "lab_code": lab_code,
+    "purpose": purpose,
+    "purpose_subtype": purpose_subtype,
+    "category": category,
+    "sub_category": sub_category,
+    "sub_category_2": sub_category_2,
+    "study_id": study_id,
+    "comments": comments,
+    "creating_user": creating_user,
+    }
+    
+    search_fields = [
+        "euid", "patient_id", "clinician_id", "lab_code", "purpose", "purpose_subtype", 
+        "category", "sub_category", "sub_category_2", "study_id", "comments", "creating_user"
+    ]
+    
+    search_criteria = create_search_criteria(form_data, search_fields)
+        
     if relevant_datetime_start or relevant_datetime_end:
         search_criteria["relevant_datetime"] = {
             "start": relevant_datetime_start,
             "end": relevant_datetime_end
         }
-    
-    if lab_code:
-        if len(lab_code) == 1 and lab_code[0] == ".na":
-            lab_code = ""
-        
-        if len(lab_code) == 1 and lab_code[0] == "":
-            pass
-        else:
-            search_criteria["lab_code"] = lab_code
-    
-    if purpose:
-        search_criteria["purpose"] = purpose
-    if purpose_subtype:
-        search_criteria["purpose_subtype"] = purpose_subtype
-    if category:
-        search_criteria["category"] = category
-    if sub_category:
-        search_criteria["sub_category"] = sub_category
-    if sub_category_2:
-        search_criteria["sub_category_2"] = sub_category_2
-    if study_id:
-        if len(study_id) == 1 and study_id[0] == ".na":
-            study_id = ""
-        
-        if len(study_id) == 1 and study_id[0] == "":
-            pass
-        else:   
-            search_criteria["study_id"] = study_id
-    
-    if comments:
-        search_criteria["comments"] = comments
-    
-    if creating_user:
-        if len(creating_user) == 1 and creating_user[0] == ".na":
-            creating_user = ""
-        
-        if len(creating_user) == 1 and creating_user[0] == "":
-            pass
-        else:
-            search_criteria["creating_user"] = creating_user
 
     greedy = is_greedy == "yes"
 
@@ -2511,7 +2472,8 @@ async def create_file_set(
             "comments": comments,
             "ref_type": ref_type,
             "duration": duration,
-            "rclone_config": rclone_config
+            "rclone_config": rclone_config,
+            "creating_user": request.session["user_data"]["email"],
         }
 
         # Create the file set
@@ -2545,6 +2507,27 @@ async def create_file_set(
 
     except Exception as e:
         raise (e)
+    
+    
+def create_search_criteria(form_data, fields):
+    search_criteria = {}
+    for field in fields:
+        field_value = form_data.get(field)
+        if field_value:
+            if isinstance(field_value, list):
+                if len(field_value) == 1 and field_value[0] in [".na"]:
+                    field_value = ""
+                if len(field_value) == 1 and field_value[0] in [""]:
+                    continue
+                search_criteria[field] = field_value
+            else:
+                if field_value in [".na"]:
+                    field_value = ""
+                if field_value in [""]:
+                    continue
+                search_criteria[field] = field_value
+    return search_criteria
+
 
 # The following is very redundant to the file_search and <s>probably</s> should be refactored
 @app.post("/search_file_sets", response_class=HTMLResponse)
@@ -2552,31 +2535,33 @@ async def search_file_sets(
     request: Request,
     name: str = Form(None),
     description: str = Form(None),
-    tag: str = Form(None),
+    tag: List[str] = Form(None),
     comments: str = Form(None),
     file_euids: str = Form(None),
     is_greedy: str = Form("yes"),
-    ref_type: str = Form(None),
+    ref_type: List[str] = Form(None),
+    creating_user: List[str] = Form(None),
 ):
-    search_criteria = {}
 
-    if name:
-        search_criteria["name"] = name
-    if description:
-        search_criteria["description"] = description
-    if tag:
-        search_criteria["tag"] = tag
-    if comments:
-        search_criteria["comments"] = comments
+    form_data = {
+            "name": name,
+            "description": description,
+            "tag": tag,
+            "comments": comments,
+            "file_euids": file_euids,
+            "ref_type": ref_type,
+            "creating_user": creating_user,
+        }
 
-    q_ds = {"properties": search_criteria}
+    search_fields = ["name", "description", "tag", "comments", "ref_type", "creating_user"]
+    search_criteria = create_search_criteria(form_data, search_fields)
 
     greedy = is_greedy == "yes"
 
     try:
         bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         file_sets = bfs.search_objs_by_addl_metadata(
-            q_ds, greedy, "file_set", super_type="file"
+            {'properties':search_criteria}, greedy, "file_set", super_type="file"
         )
 
         # Fetch details for each EUID
@@ -2609,12 +2594,14 @@ async def search_file_sets(
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
+        num_results = len(table_data)
         content = templates.get_template("file_set_search_results.html").render(
             request=request,
             table_data=table_data,
             columns=columns,
             style=style,
             udat=user_data,
+            num_results=num_results,
         )
         return HTMLResponse(content=content)
 
@@ -2798,7 +2785,6 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
                         required=required
                     ))
             else:
-                #from IPython import embed; embed()
                 unique_values = sorted(bobject.get_unique_property_values(property_key, super_type=super_type, btype=btype, b_sub_type=b_sub_type, version=version))
                 if '' not in unique_values:
                     unique_values.insert(0, '')

@@ -2,20 +2,47 @@
     <ul>
         <h3>Search File Sets By</h3>
         <form id="searchFileSetForm" action="search_file_sets" method="post" enctype="multipart/form-data">
-            <label for="file_set_name">Name: </label>
-            <input type="text" id="file_set_name" name="file_set_name" value=""><br><br>
 
-            <label for="file_set_description">Description: </label>
-            <input type="text" id="file_set_description" name="file_set_description" value=""><br><br>
 
-            <label for="file_set_tag">Tag: </label>
-            <input type="text" id="file_set_tag" name="file_set_tag" value=""><br><br>
 
-            <label for="comments">Comments: </label>
-            <input type="text" id="comments" name="comments" value=""><br><br>
+            {% for field in ui_search_fields_fset %}
+            <div>
+                {% if field.name in ["tags",  "xxx"] %}
 
-            <label for="file_euids">File EUIDs (not working presently): </label>
-            <input type="text" id="file_euids" name="file_euids" value=""><br><br>
+                {% else %}
+                
+                  {% if field.type == "select" and field.multiple %}
+                    
+                    <label for="{{ field.name }}">{{ field.label }}</label>          
+                    <div class="option-buttons" data-select-id="{{ field.name }}">
+                        <select class="no-selectize" name="{{ field.name }}" id="{{ field.name }}" multiple style="display: none;">
+                            <option value="" selected></option> <!-- Placeholder for blank state -->
+                            <option value=".na">isnull</option>
+                            {% for option in field.options %}
+                                <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% elif field.type == "select" %}
+                    <label for="{{ field.name }}">{{ field.label }}</label>          
+                    <select class="no-selectize" name="{{ field.name }}" id="{{ field.name }}">
+                            <option value="" selected></option> <!-- Placeholder for blank state -->
+                            <option value=".na">isnull</option>
+                            {% for option in field.options %}
+                                <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    {% else %}
+                        {% if not field.name.endswith('_datetime') %}
+                        <label for="{{ field.name }}">{{ field.label }}</label>
+                        <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
+                        {% endif %}
+                    {% endif %}
+            {% endif %}
+            </div>
+
+            {% endfor %}
+
 
             <label for="is_greedy">Greedy Search: </label>
             <select name="is_greedy">

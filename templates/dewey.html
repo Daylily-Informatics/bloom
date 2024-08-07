@@ -35,6 +35,20 @@
             color: var(--text-color);
             border-color: var(--button-border-color);
         }
+
+        .div.selectize-input {
+            padding: inherit;
+            border: inherit;
+            margin: inherit;
+            position: inherit;
+        }
+        .selectize-input {
+            padding: inherit;
+            border: inherit;
+            margin: inherit;
+            position: inherit;
+            background-color: var(--form-in-bg-color);
+        }
     </style>
     <script>
         const controlledProperties = {{ controlled_properties | tojson | safe }};
