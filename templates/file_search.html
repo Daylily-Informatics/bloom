@@ -1,12 +1,17 @@
 <div class="accordion-content">
     <ul>
         <h3>Search Files</h3>
+        <form id="queryAll" action="query_by_euids" method="post" enctype="multipart/form-data">
+            <input type=hidden id="file_euids" name="file_euids" >
+            <button type="submit" id="queryByEuidsButton">return all records</button>
+        </form> ... or SEARCH 
+        <hr>
         <table>
             <tr style="vertical-align: top;">
                 <td style="align:top; width:22%;">
                     <!-- New form for querying by EUIDs -->
                     <form id="queryByEuidsForm" action="query_by_euids" method="post" enctype="multipart/form-data">
-                        <label for="file_euids">File EUIDs (one per line):</label>
+                        <label for="file_euids">by EUIDs (one per line):</label>
                         <textarea id="file_euids" name="file_euids" rows="10" cols="25" style="resize: both;"></textarea><br>
                         <button type="submit" id="queryByEuidsButton">Query by EUIDs</button>
                     </form>
@@ -14,6 +19,8 @@
                 <td style="align:top;">
                     <!-- Existing search form -->
                     <form id="searchFileForm" data-form="search" action="search_files" method="post" enctype="multipart/form-data">
+                        <label for="file_euids">by METADATA</label>
+<br>
                         <input type="hidden" value="" id="euid" name="euid"><br>
 
                         <label for="is_greedy">Greedy Search: </label>
