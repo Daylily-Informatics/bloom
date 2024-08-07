@@ -2862,7 +2862,6 @@ class BloomFile(BloomObj):
         else:
             logging.warning(f"No data provided for file creation: {file_data, url}")
             new_file.bstatus = "no file data provided"
-            flag_modified(new_file, "json_addl")
             self.session.commit()
 
         if create_locked:
