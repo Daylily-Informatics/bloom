@@ -1889,8 +1889,8 @@ class BloomObj:
         return [result.euid for result in results]
 
 class BloomContainer(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_empty_container(self, template_euid):
         return self.create_instances(template_euid)
@@ -1909,8 +1909,8 @@ class BloomContainer(BloomObj):
 
 
 class BloomContainerPlate(BloomContainer):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_empty_plate(self, template_euid):
         return self.create_instances(template_euid)
@@ -1969,8 +1969,8 @@ class BloomContainerPlate(BloomContainer):
 
 
 class BloomContent(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_empty_content(self, template_euid):
         """_summary_
@@ -1986,8 +1986,8 @@ class BloomContent(BloomObj):
 
 
 class BloomWorkflow(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     # This can be made more widely useful now that i've detangled the wf-wfs special relationship
     def get_sorted_uuid(self, workflow_id):
@@ -2098,8 +2098,8 @@ class BloomWorkflow(BloomObj):
 
 
 class BloomWorkflowStep(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_empty_workflow_step(self, template_euid):
         return self.create_instances(template_euid)
@@ -2660,8 +2660,8 @@ class BloomWorkflowStep(BloomObj):
 
 
 class BloomReagent(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_rgnt_24w_plate_TEST(self, rg_code="idt-probes-rare-mendelian"):
         # I am taking a short cut and not taking time to think about making this generic.
@@ -2700,26 +2700,26 @@ class BloomReagent(BloomObj):
 
 
 class BloomEquipment(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_empty_equipment(self, template_euid):
         return self.create_instances(template_euid)
 
 
 class BloomObjectSet(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
-
+# TODO -- is this used at all, and if so, is it used correctly?
 class AuditLog(BloomObj):
     def __init__(self, session, base):
         super().__init__(session, base)
 
 
 class BloomHealthEvent(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_event(self):
 
@@ -2734,9 +2734,10 @@ class BloomHealthEvent(BloomObj):
 
 
 class BloomFile(BloomObj):
-    def __init__(self, bdb, bucket_prefix=None):
-        super().__init__(bdb)
-
+    
+    def __init__(self, bdb, bucket_prefix=None, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
+    
         if bucket_prefix is None:
             bucket_prefix = os.environ.get(
                 "BLOOM_DEWEY_S3_BUCKET_PREFIX", "set-a-bucket-prefix-in-the-dotenv-file"
@@ -3338,9 +3339,8 @@ class BloomFile(BloomObj):
 # As in expiring s3 links and so on. Potentially allow sharing of files with hosting protocols like SFTP, etc...
 class BloomFileReference(BloomObj):
     
-    def __init__(self, bdb):
-        super().__init__(bdb)
-
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
 
     def create_file_reference(self, file_euid=None, reference_type='presigned', visibility='public', valid_duration=0, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="", file_set_euid=None, rclone_config={}):
@@ -3457,8 +3457,8 @@ class BloomFileReference(BloomObj):
         return file_reference
     
 class BloomFileSet(BloomObj):
-    def __init__(self, bdb):
-        super().__init__(bdb)
+    def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
+        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     def create_file_set(self, file_uids=[], file_set_metadata={}):
         file_set = self.create_instance(

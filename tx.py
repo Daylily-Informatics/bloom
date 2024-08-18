@@ -5,18 +5,18 @@ from bloom_lims.bobjs import BloomWorkflow, BloomWorkflowStep, BloomObj, BloomRe
 import sys
 import os
 
-bob_wf = BloomWorkflow(BLOOMdb3())
+bob_wf = BloomWorkflow(BLOOMdb3(),cfg_fedex=True)
 
-bob_wfs = BloomWorkflowStep(BLOOMdb3())
+bob_wfs = BloomWorkflowStep(BLOOMdb3(), cfg_fedex=True)
 
-bob_rg = BloomReagent(BLOOMdb3())
+bob_rg = BloomReagent(BLOOMdb3(), cfg_fedex=True)
 
 idt_plate_euid = bob_rg.create_rgnt_24w_plate_TEST('idt-probes-rare-mendelian')
 naoh_plate_euid = bob_rg.create_rgnt_24w_plate_TEST('naoh')
 
 from random import randint
 
-ASSAY = "workflow/assay/hla-typing/1.2" if randint(0,9) > 99 else "workflow/assay/carrier-screen/3.9"
+ASSAY = "workflow/assay/hla-typing/1.2" if int(sys.argv[2]) > 0 else "workflow/assay/carrier-screen/3.9"
 
 giab_cx, giab_mx = bob_wf.create_container_with_content(
         ("container", "tube", "tube-generic-10ml", "1.0"),
