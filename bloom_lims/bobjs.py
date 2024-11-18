@@ -17,6 +17,8 @@ from logging.handlers import RotatingFileHandler
 from .logging_config import setup_logging
 from datetime import datetime, timedelta, date, UTC
 
+from bloom_lims.db import BLOOMdb3
+
 
 os.makedirs("logs", exist_ok=True)
 
@@ -671,7 +673,7 @@ class BloomObj:
         else:
             return combined_result[0]
 
-    # This is the mechanism for finding the database object(s) which math the template reference pattern
+    # This is the mechanism for finding the database object(s) which match the template reference pattern
     # V2... why?
     def query_instance_by_component_v2(
         self, super_type=None, btype=None, b_sub_type=None, version=None
@@ -2828,6 +2830,8 @@ class BloomFile(BloomObj):
     ):
         file_properties = {"properties": file_metadata}
 
+        import_or_remote = file_metadata['import_or_remote']
+
         new_file = self.create_instance(
             self.query_template_by_component_v2("file", "file", "generic", "1.0")[
                 0
@@ -2876,7 +2880,7 @@ class BloomFile(BloomObj):
         if file_data or url or full_path_to_file or s3_uri:
             try:
                 new_file = self.add_file_data(
-                    new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri, addl_tags=addl_tags
+                    new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri, addl_tags=addl_tags, import_or_remote=import_or_remote
                 )
             except Exception as e:
                 logging.exception(f"Error adding file data: {e}")
@@ -2885,8 +2889,8 @@ class BloomFile(BloomObj):
                 self.session.commit()
                 raise Exception(e)
         else:
-            logging.warning(f"No data provided for file creation: {file_data, url}")
-            new_file.bstatus = "no file data provided"
+            logging.warning(f"No data provided for file creation, or import skipped ({import_or_remote}): {file_data, url}")
+            new_file.bstatus = f"no file data provided or {import_or_remote} is not 'import'"
             self.session.commit() 
 
         if create_locked:
@@ -2895,14 +2899,32 @@ class BloomFile(BloomObj):
         return new_file
 
 
-    def sanitize_tag(self, value):
-        """Sanitize the tag value to conform to AWS tag requirements."""
+    def sanitize_tag(self, value, is_key=False):
+        """
+        Sanitize the tag key or value to conform to AWS tag requirements by replacing disallowed characters.
 
-        sanitized_value = urllib.parse.quote(value, safe='_.:/=+-@ ')
-        # Trim the string to the maximum allowed length (256 characters for tag values)
-        sanitized_value = sanitized_value[:255]
+        Parameters:
+        - value (str): The tag key or value to sanitize.
+        - is_key (bool): If True, sanitize as a tag key (128-character limit). 
+                        If False, sanitize as a tag value (256-character limit).
 
-        return sanitized_value  # sanitized_value if sanitized_value != value else value
+        Returns:
+        - str: Sanitized tag key or value.
+        """
+        # AWS tag key or value allowed characters
+        allowed_characters_regex = r'[^a-zA-Z0-9 _\.:/=+\-@]'
+        
+        # Replace disallowed characters with '_'
+        sanitized_value = re.sub(allowed_characters_regex, '_', value)
+        
+        # Trim leading and trailing spaces (not allowed by AWS)
+        sanitized_value = sanitized_value.strip()
+        
+        # Enforce maximum length
+        max_length = 128 if is_key else 256
+        sanitized_value = sanitized_value[:max_length]
+        
+        return sanitized_value
 
     def format_addl_tags(self, add_tags):
         if not isinstance(add_tags, dict):
@@ -2927,10 +2949,14 @@ class BloomFile(BloomObj):
         full_path_to_file=None,
         s3_uri=None,
         addl_tags={},
+        import_or_remote=None
     ):
         file_instance = self.get_by_euid(euid)
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
         file_properties = {}
+
+        if import_or_remote in ["Remote", "remote"] and (file_data is not None or url is not None or full_path_to_file is not None):
+            raise ValueError("Remote file management is only supported with internal S3 URI.")
 
         addl_tag_string = self.format_addl_tags(addl_tags)
         if len(addl_tag_string) > 0:
@@ -2954,6 +2980,8 @@ class BloomFile(BloomObj):
         # Check if a file with the same EUID already exists in the bucket
         s3_key_path = "/".join(s3_key.split("/")[:-1])
         s3_key_path = s3_key_path + "/" if len(s3_key_path) > 0 else ""
+
+
         existing_files = self.s3_client.list_objects_v2(
             Bucket=s3_bucket_name, Prefix=f"{s3_key_path}{euid}."
         )
@@ -2965,17 +2993,52 @@ class BloomFile(BloomObj):
                 f"A file with EUID {euid} already exists in bucket {s3_bucket_name} {s3_key_path}."
             )
 
+        if import_or_remote in ["Remote", "remote"] and s3_uri is not None:
+            # Check if a remote file with the same metadata already exists
+
+            search_criteria = {"properties": {"current_s3_uri": s3_uri}}
+            existing_euids = self.search_objs_by_addl_metadata(search_criteria,True,super_type="file", btype="file",b_sub_type="generic")
+            
+            if len(existing_euids) > 0:
+                raise Exception(f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}.")
+
+            # Store metadata for the remote file
+            file_properties = {
+                "remote_s3_uri": s3_uri,
+                "original_file_name": file_name,
+                "name": file_name,
+                "original_file_size_bytes": None,  # Size is unknown for remote files
+                "original_file_suffix": file_suffix,
+                "original_file_data_type": "remote",
+                "file_type": file_suffix,
+                "current_s3_uri": s3_uri,
+                "original_s3_uri": s3_uri,  
+                "current_s3_key": "/".join(s3_uri.split("/")[3:]),
+                "current_s3_bucket_name": s3_uri.split("/")[2],
+            }
+
+            _update_recursive(file_instance.json_addl["properties"], file_properties)
+            flag_modified(file_instance, "json_addl")
+            self.session.commit()
+            return file_instance
+
         try:
             if file_data:
                 file_data.seek(0)  # Ensure the file pointer is at the beginning
                 file_size = len(file_data.read())
                 file_data.seek(0)  # Reset the file pointer after reading
-                self.s3_client.put_object(
-                    Bucket=s3_bucket_name,
-                    Key=s3_key,
-                    Body=file_data,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}"
-                )
+                
+                try:
+                    self.s3_client.put_object(
+                        Bucket=s3_bucket_name,
+                        Key=s3_key,
+                        Body=file_data,
+                        Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}"
+                    )
+
+                except Exception as e:
+                    self.logger.exception(f"Error uploading file data: {e}. Possibly tag related: {self.sanitize_tag(file_name)}, {self.sanitize_tag(str(file_size))}, {self.sanitize_tag(file_suffix)}, {self.sanitize_tag(euid)} ") 
+                    raise Exception(e)
                 odirectory, ofilename = os.path.split(file_name)
 
                 file_properties = {
@@ -3079,14 +3142,17 @@ class BloomFile(BloomObj):
                 }
 
                 # Delete the old file and create a marker file
-                self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
-                marker_key = f"{source_key}.dewey.moved"
+                marker_key = f"{source_key}.dewey.{euid}.moved"
+                if len(marker_key)  >= 1024:
+                    raise Exception(f"Marker key length is too long, >1024chrar : {len(marker_key)},not deleting original file: {source_key}")
                 self.s3_client.put_object(
                     Bucket=source_bucket,
                     Key=marker_key,
                     Body=b"",
                     Tagging=f"euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
                 )
+                self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
+
 
             else:
                 self.logger.exception("No file data provided.")
@@ -3125,7 +3191,7 @@ class BloomFile(BloomObj):
         euid,
         save_pattern="dewey",
         include_metadata=False,
-        save_path=".",
+        save_path="./tmp/",
         delete_if_exists=False,
     ):
         """
@@ -3137,7 +3203,11 @@ class BloomFile(BloomObj):
         :param save_path: Directory where the file will be saved. Defaults to ./tmp/, which will be created if not present.
         :return: Path of the saved file.
         """
-
+        import random
+        random.randint(1,99999999)
+        save_path = os.path.join(save_path, str(random.randint(1,99999999)))
+        os.system(f"mkdir -p {save_path}")
+        
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         else:
@@ -3172,7 +3242,7 @@ class BloomFile(BloomObj):
 
         # Save metadata as a YAML file if requested
         if include_metadata:
-            metadata_file_path = f"{local_file_path}.dewey.yaml"
+            metadata_file_path = f"{local_file_path}.{euid}.dewey.yaml"
             if os.path.exists(metadata_file_path):
                 self.logger.exception(
                     f"Metadata file already exists: {metadata_file_path}"
@@ -3197,6 +3267,7 @@ class BloomFile(BloomObj):
         except Exception as e:
             raise Exception(f"An error occurred while downloading the file: {e}")
 
+        os.system(f"(sleep 2000 && rm -rf {save_path}) &")
         return local_file_path
 
     def get_s3_uris(self, euids, include_metadata=False):

@@ -1980,6 +1980,8 @@ async def create_file(
     sub_category_2: str = Form(""),
     variable: str = Form(""),
     sub_variable: str = Form(""),
+    file_tags: str = Form(""),
+    import_or_remote: str = Form("import_or_remote"),
 ):
 
     if directory and len(directory) > 1000:
@@ -2019,7 +2021,9 @@ async def create_file(
             "sub_category": sub_category,
             "sub_category_2": sub_category_2,
             "variable": variable,
-            "sub_variable": sub_variable
+            "sub_variable": sub_variable,
+            "file_tags": file_tags,
+            "import_or_remote": import_or_remote,
         }
 
         results = []
@@ -2210,7 +2214,7 @@ async def download_file(
 
         metadata_yaml_path = None
         if create_metadata_file == "yes":
-            metadata_yaml_path = downloaded_file_path + ".dewey.yaml"
+            metadata_yaml_path = downloaded_file_path + "." + euid + ".dewey.yaml"
             if not os.path.exists(metadata_yaml_path):
                 return HTMLResponse(
                     f"Metadata file for EUID {euid} not found.", status_code=404

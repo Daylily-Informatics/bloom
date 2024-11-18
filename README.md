@@ -288,7 +288,7 @@ Similar to `pytest`, but more extensive. Largely useful in development work.  Th
 - `python tx.py 2 `.
 
 ### Run the bloom UI
-- `source source run_bloomui.sh`
+- `source run_bloomui.sh`
  
 ### Run the pgadmin UI
 - `source bloom_lims/env/install_pgadmin.sh`

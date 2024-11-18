@@ -32,7 +32,9 @@
         "sub_variable":"",
         "category":"",
         "sub_category":"",
-        "sub_category_2":""        
+        "sub_category_2":"",
+        "file_tags": [],
+        "import_or_remote": ""       
       },
       "ui_form_properties" : [ 
         {"property_key":"patient_id","form_label":"Patient ID", "required": false, "value_type": "uid-interactive"}, 
@@ -46,12 +48,18 @@
         {"property_key":"sub_category_2","form_label":"Sub Category 2", "required": false, "value_type":"controlled"}, 
         {"property_key":"study_id","form_label":"Study ID", "required": false, "value_type":"uid-static"}, 
         {"property_key":"comments","form_label":"Comments", "required": false, "value_type":"string"},
-        {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"}
+        {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"},
+        {"property_key": "file_tags", "form_label":"File Tags", "required":false, "value_type":"list"},
+        {"property_key": "import_or_remote", "form_label":"Import or Leave Remote", "required":false, "value_type":"controlled"}
       ],  
       "controlled_properties": { 
         "purpose": {
           "type": "string",
           "enum": ["","Clinical", "Research", "Other"]
+        },
+        "import_or_remote": {
+          "type": "string",
+          "enum": ["Import", "Remote"]
         },
         "purpose_subtype": {
           "type": "string",
