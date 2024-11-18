@@ -76,8 +76,8 @@ elif [[ "$mode" == "prod" ]]; then
     --log-level trace \
     --timeout 303 \
     --bind $host:$port \
-    --ssl-certfile ./certs/fullchain.pem \
-    --ssl-keyfile ./certs/privkey.pem
+    --certfile ./certs/fullchain.pem \
+    --keyfile ./certs/privkey.pem
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."
