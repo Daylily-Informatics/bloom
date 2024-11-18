@@ -32,7 +32,8 @@ def bloom_file_instance(db_session, s3_bucket):
     return BloomFile(db_session, bucket_prefix="daylily-dewey-")
 
 def test_create_file_no_data(bloom_file_instance):
-    new_file = bloom_file_instance.create_file(file_metadata={"description": "No data test"})
+    new_file = bloom_file_instance.create_file(file_metadata={"description": "No data test"},
+        import_or_remote="import")
     assert new_file is not None
     assert new_file.json_addl['properties']['description'] == "No data test"
     assert new_file.json_addl['properties']['current_s3_bucket_name'] == "daylily-dewey-0"
@@ -46,7 +47,8 @@ def test_create_file_with_data(bloom_file_instance):
     new_file = bloom_file_instance.create_file(
         file_metadata={"description": "Data test"},
         file_data=file_data,
-        file_name=file_name
+        file_name=file_name,
+        import_or_remote="import"
     )
 
     assert new_file is not None
@@ -56,7 +58,8 @@ def test_create_file_with_data(bloom_file_instance):
 def test_create_file_with_local_path(bloom_file_instance):
     fn = "tests/test_png.png"
     data_path = Path(fn)
-    new_file = bloom_file_instance.create_file(file_metadata={"description": "Local path test"}, full_path_to_file=fn)
+    new_file = bloom_file_instance.create_file(file_metadata={"description": "Local path test"}, full_path_to_file=fn,
+        import_or_remote="import")
     assert new_file is not None
     assert new_file.json_addl['properties']['description'] == "Local path test"
     assert new_file.json_addl['properties']['original_file_size_bytes'] == os.path.getsize(fn)
@@ -66,7 +69,8 @@ def test_create_file_with_url(bloom_file_instance):
     url = "https://github.com/Daylily-Informatics/bloom/blob/20240603b/tests/test_png.png"
     with requests_mock.Mocker() as m:
         m.get(url, content=b"test content")
-        new_file = bloom_file_instance.create_file(file_metadata={"description": "URL test"}, url=url)
+        new_file = bloom_file_instance.create_file(file_metadata={"description": "URL test"}, url=url,
+        import_or_remote="import")
         assert new_file is not None
         assert new_file.json_addl['properties']['description'] == "URL test"
         assert new_file.json_addl['properties']['original_file_size_bytes'] == len(b"test content")
