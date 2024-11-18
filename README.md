@@ -12,7 +12,7 @@ _bloom early peeks_
 
 ## Oauth2 Authentication w/All Major Social Providers
 _and flexible whitelisting, etc..._
-* [Bloom supabase config](documents/supabase.md).
+* [Bloom supabase config](bloom_lims/docs/supabase.md).
 
 ## Graph Object View (add, remove, edit, take actions, explore)
 
@@ -97,7 +97,7 @@ _a pinned version: https://repo.anaconda.com/miniconda/Miniconda3-py312_24.5.0-0
 bash  # newly created shells should not auto load the conda (base) env.
 ```
 ### Supabase
-* [Please follow the supabase configuration instructions here](documents/supabase.md).
+* [Please follow the supabase configuration instructions here](bloom_lims/docs/supabase.md).
 
 
 ## Very Quickest Start
@@ -325,6 +325,7 @@ TEST
 
 #### Bloom UUIDs and EUIDs Are Safe As File Names
 A widely adopted UUID spec (and used by postgres), [rfc4122](https://datatracker.ietf.org/doc/html/rfc4122), treates uc and lc as the same character. Bloom EUIDs only contain uc characters in a prefix followed by integers.
+ 
  
  
  
