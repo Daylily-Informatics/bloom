@@ -2942,3 +2942,83 @@ async def post_admin_template(request: Request, euid: str = Form(...), controlle
         raise HTTPException(status_code=400, detail=str(e))
 
     return RedirectResponse(url=f"/admin_template?euid={euid}", status_code=303)
+
+
+
+@app.get("/serve_endpoint/{file_path:path}", response_class=HTMLResponse)
+async def serve_files(file_path: str, request: Request, auth=Depends(require_auth)):
+    print('YYYYYYYYY',file_path)
+    
+    #file_path = "/"+ file_path.replace('//','/').lstrip('/').rstrip('/').lstrip('/') 
+    #if file_path == "" or file_path =="//":
+    #    file_path="/"
+
+    if file_path.startswith('/'):
+        file_path = file_path.lstrip('/')
+
+    if  file_path in [None,"","/"]:
+        file_path = ""
+    print('RRRRR',file_path)
+
+        
+    requested_path = BASE_DIR / file_path
+    print('xxxxxx', BASE_DIR, file_path, requested_path)
+    logging.info(f"Requested path: {requested_path}")
+    
+    if not requested_path.exists():
+        logging.error(f"File or directory not found: {requested_path}")
+        raise HTTPException(status_code=404, detail="File or directory not found")
+
+    full_path = requested_path.resolve()
+
+    if full_path.is_dir():
+        return directory_listing(full_path, file_path)
+    elif full_path.is_file():
+        if full_path.suffix == '.html':
+            with open(full_path, 'r') as f:
+                content = f.read()
+            return HTMLResponse(content=content)
+        return FileResponse(full_path, media_type="application/octet-stream", filename=full_path.name)
+
+    raise HTTPException(status_code=404, detail="File or directory not found")
+
+
+def directory_listing(directory: Path, file_path: str) -> HTMLResponse:
+    """
+    Generate an HTML response listing the contents of a directory with alphabetical ordering.
+    """
+
+    parent_path = file_path + "/../.."
+    
+    # Alphabetical sort for directories and files
+    items = sorted(directory.iterdir(), key=lambda x: x.name.lower())
+
+    files = []
+    for item in items:
+        if item.is_dir():
+            files.append(
+                f'<li><a href="/serve_endpoint/{file_path.lstrip('/')}/{item.name}/">{item.name}/</a></li>'
+            )
+        else:
+            files.append(
+                f'<li><a href="/serve_endpoint/{file_path.lstrip('/')}/{item.name}">{item.name}</a></li>'
+            )
+    print('PPPPPP', str(parent_path))
+    html_content = f"""
+    <h2>Directory listing for: {directory.name}</h2>
+    <ul>
+        <li><a href="/serve_endpoint/{parent_path.lstrip('/')}">.. (parent directory)</a></li>
+        {''.join(files)}
+    </ul>
+    """
+    return HTMLResponse(content=html_content)
+
+# Middleware for checking authentication
+@app.get("/protected_content", response_class=HTMLResponse)
+async def protected_content(request: Request, auth=Depends(require_auth)):
+    """
+    Example of an endpoint requiring authentication.
+    Once authenticated, users can access protected resources.
+    """
+    content = "You are authenticated and can access protected resources."
+    return HTMLResponse(content=content)
