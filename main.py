@@ -449,7 +449,7 @@ async def login(request: Request, response: Response, email: str = Form(...)):
     "/logout"
 )  # Using a GET request for simplicity, but POST is more secure for logout operations
 async def logout(request: Request, response: Response):
-
+    
     try:
         logging.warning(f"Logging out user: Clearing session data:  {request.session}")
 
@@ -458,7 +458,6 @@ async def logout(request: Request, response: Response):
 
         # Get the user's access token
         access_token = request.session.get("user_data", {}).get("access_token")
-
         if access_token:
             # Call the Supabase sign-out endpoint
             headers = {"Authorization": f"Bearer {access_token}"}

@@ -14,6 +14,8 @@ def create_supabase_client() -> Client:
     if not url or not key:
         raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY in environment variables.")
 
+    #from IPython import embed
+    #embed()
     # Create and return the Supabase client
     supabase_client = create_client(url, key)
     return supabase_client

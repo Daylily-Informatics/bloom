@@ -29,9 +29,11 @@ dependencies:
     - black
     - uvicorn==0.28.0
     - fastapi==0.110.0
-    - supabase==2.3.4
+    - supabase==2.10.0
+    - supafunc==0.7.0
+    - gotrue==2.10.0
     - python-dotenv==1.0.0
-    - httpx==0.25.2
+    - httpx==0.27.2
     - itsdangerous==2.1.2
     - pyjwt==2.8.0
     - python-multipart==0.0.9
