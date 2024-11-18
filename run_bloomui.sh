@@ -81,8 +81,8 @@ elif [[ "$mode" == "prod" ]]; then
     --log-level trace \
     --timeout 303 \
     --bind $host:$port \
-    --ssl-certfile /etc/letsencrypt/live/daylilifx.duckdns.org/fullchain.pem \
-    --ssl-keyfile /etc/letsencrypt/live/daylilifx.duckdns.org/privkey.pem
+    --ssl-certfile ./certs/fullchain.pem \
+    --ssl-keyfile ./certs/daylilifx.duckdns.org/privkey.pem
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."
@@ -93,3 +93,14 @@ fi
 # sudo apt install certbot
 # sudo mkdir -p /var/www/html/.well-known/acme-challenge
 # sudo certbot certonly --webroot -w /var/www/html -d daylilyifx.duckdns.org
+# sudo chmod 600 /etc/letsencrypt/live/daylilifx.duckdns.org/privkey.pem
+# sudo chmod 644 /etc/letsencrypt/live/daylilifx.duckdns.org/fullchain.pem
+
+  #  mkdir certs
+  #  sudo cp /etc/letsencrypt/live/daylilifx.duckdns.org/fullchain.pem certs/
+  #  sudo cp /etc/letsencrypt/live/daylilifx.duckdns.org/privkey.pem certs/
+  #  sudo chown ubuntu certs/*
+  #  sudo chown ubuntu:ubuntu certs/*  
+  #  chmod 600 certs/privkey.pem
+  #  chmod 644 certs/fullchain.pem
+  
