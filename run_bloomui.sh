@@ -64,8 +64,8 @@ if [[ "$mode" == "dev" ]]; then
     --port $port \
     --timeout-keep-alive 303 \
     --host $host \
-    --ssl-certfile /etc/letsencrypt/live/daylilifx.duckdns.org/fullchain.pem \
-    --ssl-keyfile /etc/letsencrypt/live/daylilifx.duckdns.org/privkey.pem
+    --ssl-certfile ./certs/fullchain.pem \
+    --ssl-keyfile ./certs/privkey.pem
 elif [[ "$mode" == "prod" ]]; then
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
