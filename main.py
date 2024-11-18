@@ -107,6 +107,7 @@ from bloom_lims.bobjs import (
 from bloom_lims.bvars import BloomVars
 
 BVARS = BloomVars()
+BASE_DIR = Path("./served_data").resolve()  # Base directory for serving files
 
 from auth.supabase.connection import create_supabase_client
 
