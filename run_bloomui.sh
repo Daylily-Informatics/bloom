@@ -51,6 +51,14 @@ fi
 # Calculate the number of workers (2 * number of cores) - 1
 num_workers=$(( (num_cores * 2) - 1 ))
 
+
+# if selfsigned.crt and selfsigned.key do not exist, create them
+if [ ! -f "selfsigned.crt" ] || [ ! -f "selfsigned.key" ]; then
+  echo "Creating self-signed SSL certificate..."
+  ./bloom_lims/bin/create_ssl.sh
+fi
+
+
 # Run Uvicorn for development or Gunicorn for production
 if [[ "$mode" == "dev" ]]; then
   echo "Running in development mode on $host:$port"
@@ -60,7 +68,9 @@ if [[ "$mode" == "dev" ]]; then
     --log-level trace \
     --port $port \
     --timeout-keep-alive 303 \
-    --host $host
+    --host $host \
+    --ssl-certfile="selfsigned.crt" \
+    --ssl-keyfile="selfsigned.key"
 elif [[ "$mode" == "prod" ]]; then
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
@@ -70,7 +80,9 @@ elif [[ "$mode" == "prod" ]]; then
     -k uvicorn.workers.UvicornWorker \
     --log-level trace \
     --timeout 303 \
-    --bind $host:$port
+    --bind $host:$port \
+    --ssl-certfile="selfsigned.crt" \
+    --ssl-keyfile="selfsigned.key"
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."
