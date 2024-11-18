@@ -52,11 +52,6 @@ fi
 num_workers=$(( (num_cores * 2) - 1 ))
 
 
-# if selfsigned.crt and selfsigned.key do not exist, create them
-if [ ! -f "selfsigned.crt" ] || [ ! -f "selfsigned.key" ]; then
-  echo "Creating self-signed SSL certificate..."
-  ./bloom_lims/bin/create_ssl.sh
-fi
 
 
 # Run Uvicorn for development or Gunicorn for production
