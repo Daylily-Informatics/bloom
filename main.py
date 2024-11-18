@@ -316,11 +316,25 @@ async def auth_exception_handler(_request: Request, _exc: RequireAuthException):
 #
 
 
+
+@app.get("/index2", response_class=HTMLResponse)
+async def index2(request: Request, _=Depends(require_auth)):
+    count = request.session.get("count", 0)
+    count += 1
+    request.session["count"] = count
+
+    template = templates.get_template("index2.html")
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    context = {"request": request, "style": style, "udat": user_data}
+
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(
     request: Request,
 ):
-
     count = request.session.get("count", 0)
     count += 1
     request.session["count"] = count
