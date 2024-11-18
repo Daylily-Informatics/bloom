@@ -361,21 +361,21 @@ async def oauth_callback(request: Request):
         primary_email = None
 
     # Fetch user email from GitHub if not present in decoded token
-    if not primary_email:
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {access_token}"}
-            response = await client.get(
-                "https://api.github.com/user/emails", headers=headers
-            )
-            if response.status_code == 200:
-                emails = response.json()
-                primary_email = next(
-                    (email["email"] for email in emails if email.get("primary")), None
-                )
-            else:
-                raise HTTPException(
-                    status_code=400, detail="Failed to retrieve user email from GitHub"
-                )
+    #if not primary_email:
+    #    async with httpx.AsyncClient() as client:
+    #        headers = {"Authorization": f"Bearer {access_token}"}
+    #        response = await client.get(
+    #            "https://api.github.com/user/emails", headers=headers
+    #        )
+    #        if response.status_code == 200:
+    #            emails = response.json()
+    #            primary_email = next(
+    #                (email["email"] for email in emails if email.get("primary")), None
+    #            )
+    #        else:
+    #            raise HTTPException(
+    #                status_code=400, detail="Failed to retrieve user email from GitHub"
+    #            )
 
     # Check if the email domain is allowed
     whitelist_domains = os.getenv("SUPABASE_WHITELIST_DOMAINS", "all")
@@ -462,8 +462,10 @@ async def logout(request: Request, response: Response):
         if access_token:
             # Call the Supabase sign-out endpoint
             headers = {"Authorization": f"Bearer {access_token}"}
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
                 logging.debug(f"Logging out user: Calling Supabase logout endpoint")
+                logging.debug(f"Supabase URL: {os.environ.get('SUPABASE_URL')}")
+
                 response = await client.post(
                     os.environ.get("SUPABASE_URL", "NA") + "/auth/v1/logout",
                     headers=headers,
@@ -475,12 +477,12 @@ async def logout(request: Request, response: Response):
         # Clear the session data
         request.session.clear()
 
+        response.delete_cookie("session", path="/")
+        logging.info("User session cleared.")
+        
         # Debug the session to ensure it's cleared
         logging.warning(f"Session after clearing: {request.session}")
 
-        # Optionally, clear the session cookie.
-        # Note: This might not be necessary if your session middleware automatically handles it upon session.clear().
-        response.delete_cookie(key="session", path="/")
 
     except Exception as e:
         logging.error(f"Error during logout: {e}")

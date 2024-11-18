@@ -5,6 +5,9 @@ host="0.0.0.0"
 port=8911
 mode="dev"
 
+unset HTTP_PROXY
+unset HTTPS_PROXY
+
 # Parse arguments with nicer flags
 while [[ $# -gt 0 ]]; do
   case $1 in
