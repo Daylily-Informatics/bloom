@@ -3020,6 +3020,23 @@ class BloomFile(BloomObj):
                 "current_s3_bucket_name": s3uri_bucket,
                 "import_or_remote": 'remote',
             }
+                        # Check if the object has the 'dewey_euid' tag
+            try:
+                existing_tags = self.s3_client.get_object_tagging(
+                    Bucket=s3uri_bucket,
+                    Key=s3uri_key
+                )
+
+                # Check if 'dewey_euid' is already present in the tags
+                for tag in existing_tags.get("TagSet", []):
+                    if tag["Key"] == "dewey_euid":
+                        raise Exception(f"Object {s3_uri} already has a 'dewey_euid' tag with value {tag['Value']}.")
+            except self.s3_client.exceptions.NoSuchKey:
+                raise Exception(f"S3 object {s3_uri} does not exist.")
+            except Exception as e:
+                self.logger.exception(f"Error checking tags for S3 object {s3_uri}: {e}")
+                raise Exception(f"Failed to check tags for S3 object: {e}")
+            
                     
             # Construct the tags
             tagging = {
