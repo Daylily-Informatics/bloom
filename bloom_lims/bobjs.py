@@ -3018,19 +3018,19 @@ class BloomFile(BloomObj):
                 "original_s3_uri": s3_uri,  
                 "current_s3_key": s3uri_key,
                 "current_s3_bucket_name": s3uri_bucket,
-                "import_or_remote": import_or_remote,
+                "import_or_remote": 'remote',
             }
                     
             # Construct the tags
             tagging = {
                 'TagSet': [
-                    {'Key': 'creating_service', 'Value': 'dewey'},
-                    {'Key': 'original_file_name', 'Value': self.sanitize_tag(file_name)},
-                    {'Key': 'original_file_path', 'Value': 'N/A'},
-                    {'Key': 'original_file_size_bytes', 'Value': self.sanitize_tag(str(file_properties.get("original_file_size_bytes", "unknown")))},
-                    {'Key': 'original_file_suffix', 'Value': self.sanitize_tag(file_suffix)},
-                    {'Key': 'euid', 'Value': self.sanitize_tag(euid)},
-                    {'Key': 'import_or_remote', 'Value': self.sanitize_tag(import_or_remote)}
+                    {'Key': 'dewey_creating_service', 'Value': 'dewey'},
+                    {'Key': 'dewey_original_file_name', 'Value': self.sanitize_tag(file_name)},
+                    {'Key': 'dewey_original_file_path', 'Value': 'N/A'},
+                    {'Key': 'dewey_original_file_size_bytes', 'Value': self.sanitize_tag(str(file_properties.get("original_file_size_bytes", "unknown")))},
+                    {'Key': 'dewey_original_file_suffix', 'Value': self.sanitize_tag(file_suffix)},
+                    {'Key': 'dewey_euid', 'Value': self.sanitize_tag(euid)},
+                    {'Key': 'dewey_import_or_remote', 'Value': self.sanitize_tag('remote')}
                 ]
             }
                     
@@ -3062,7 +3062,7 @@ class BloomFile(BloomObj):
                         Bucket=s3_bucket_name,
                         Key=s3_key,
                         Body=file_data,
-                        Tagging=f"import_or_remote={import_or_remote}&creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}"
+                        Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}"
                     )
 
                 except Exception as e:
@@ -3092,7 +3092,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=response.content,
-                    Tagging=f"import_or_remote={import_or_remote}&creating_service=dewey&original_file_name={self.sanitize_tag(url_info)}&original_url={self.sanitize_tag(url)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(url_info)}&dewey_original_url={self.sanitize_tag(url)}&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3122,7 +3122,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"import_or_remote={import_or_remote}&creating_service=dewey&original_file_name={self.sanitize_tag(local_path_info.name)}&original_file_path={self.sanitize_tag(full_path_to_file)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(local_path_info.name)}&dewey_original_file_path={self.sanitize_tag(full_path_to_file)}&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3184,7 +3184,7 @@ class BloomFile(BloomObj):
                     Bucket=source_bucket,
                     Key=marker_key,
                     Body=b"",
-                    Tagging=f"import_or_remote={import_or_remote}&euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
+                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_euid={euid}&dewey_original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
                 )
                 #self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
 
