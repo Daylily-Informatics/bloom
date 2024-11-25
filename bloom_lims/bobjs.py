@@ -3186,7 +3186,7 @@ class BloomFile(BloomObj):
                     Body=b"",
                     Tagging=f"import_or_remote={import_or_remote}&euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
                 )
-                self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
+                #self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
 
 
             else:
