@@ -63,16 +63,10 @@ if [[ "$mode" == "dev" ]]; then
     --log-level trace \
     --port $port \
     --timeout-keep-alive 303 \
-<<<<<<< HEAD
-    --host $host
-    #\
-    #  --ssl-certfile ./certs/fullchain.pem \
-    #  --ssl-keyfile ./certs/privkey.pem
-=======
     --host $host 
     #--ssl-certfile ./certs/fullchain.pem \
     #--ssl-keyfile ./certs/privkey.pem
->>>>>>> 94eea66c30af663cec31aec35b63ec330dd30aeb
+
 elif [[ "$mode" == "prod" ]]; then
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
@@ -83,13 +77,8 @@ elif [[ "$mode" == "prod" ]]; then
     --log-level trace \
     --timeout 303 \
     --bind $host:$port 
-<<<<<<< HEAD
-    # --certfile ./certs/fullchain.pem \
-    # --keyfile ./certs/privkey.pem
-=======
     #--certfile ./certs/fullchain.pem \
     #--keyfile ./certs/privkey.pem
->>>>>>> 94eea66c30af663cec31aec35b63ec330dd30aeb
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."
