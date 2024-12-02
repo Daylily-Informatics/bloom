@@ -12,8 +12,7 @@ export PGDBNAME=${PGDBNAME:-bloom}
 
 # github action $1 = ghmac
 if [[ "$1" == "" ]]; then
-    #conda create -n BLOOM -y -c conda-forge postgresql python pip ipython pytest psycopg2 sqlalchemy pytz networkx matplotlib cherrypy parallel jinja2   jq && conda activate BLOOM && pip install zebra_day==0.3.0.4 fedex_tracking_day==0.2.6
-    conda env create -f bloom_env.yaml
+    conda env create -n BLOOM -f bloom_env.yaml
     if [[ $? -ne 0 ]]; then
         echo "\n\n\n\n\n\tERROR\n\t\t Failed to create conda environment. Please check the error message above and try again.\n"
         sleep 3

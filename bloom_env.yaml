@@ -1,7 +1,5 @@
-name: BLOOM
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - cherrypy=18.8.0
   - ipython=8.18.1
@@ -44,4 +42,4 @@ dependencies:
     - moto
     - pandas
     - matplotlib
-prefix: /Users/daylily/miniconda/envs/BLOOM
+
