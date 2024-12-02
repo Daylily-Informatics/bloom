@@ -63,9 +63,10 @@ if [[ "$mode" == "dev" ]]; then
     --log-level trace \
     --port $port \
     --timeout-keep-alive 303 \
-    --host $host \
-    --ssl-certfile ./certs/fullchain.pem \
-    --ssl-keyfile ./certs/privkey.pem
+    --host $host
+    #\
+    #  --ssl-certfile ./certs/fullchain.pem \
+    #  --ssl-keyfile ./certs/privkey.pem
 elif [[ "$mode" == "prod" ]]; then
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
@@ -75,9 +76,9 @@ elif [[ "$mode" == "prod" ]]; then
     -k uvicorn.workers.UvicornWorker \
     --log-level trace \
     --timeout 303 \
-    --bind $host:$port \
-    --certfile ./certs/fullchain.pem \
-    --keyfile ./certs/privkey.pem
+    --bind $host:$port 
+    # --certfile ./certs/fullchain.pem \
+    # --keyfile ./certs/privkey.pem
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."
