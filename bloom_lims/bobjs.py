@@ -2993,7 +2993,8 @@ class BloomFile(BloomObj):
                 f"A file with EUID {euid} already exists in bucket {s3_bucket_name} {s3_key_path}."
             )
 
-        if import_or_remote in ["Remote", "remote"] and s3_uri is not None:
+        if s3_uri:
+            # Was just doing this for only remote s3 uris, but am going to leave them be for now
             # Check if a remote file with the same metadata already exists
 
             search_criteria = {"properties": {"current_s3_uri": s3_uri}}
@@ -3002,6 +3003,8 @@ class BloomFile(BloomObj):
             if len(existing_euids) > 0:
                 raise Exception(f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}.")
 
+            s3uri_bucket=s3_uri.split("/")[2]
+            s3uri_key="/".join(s3_uri.split("/")[3:])
             # Store metadata for the remote file
             file_properties = {
                 "remote_s3_uri": s3_uri,
@@ -3009,13 +3012,56 @@ class BloomFile(BloomObj):
                 "name": file_name,
                 "original_file_size_bytes": None,  # Size is unknown for remote files
                 "original_file_suffix": file_suffix,
-                "original_file_data_type": "remote",
+                "original_file_data_type": "s3uri",
                 "file_type": file_suffix,
                 "current_s3_uri": s3_uri,
                 "original_s3_uri": s3_uri,  
-                "current_s3_key": "/".join(s3_uri.split("/")[3:]),
-                "current_s3_bucket_name": s3_uri.split("/")[2],
+                "current_s3_key": s3uri_key,
+                "current_s3_bucket_name": s3uri_bucket,
+                "import_or_remote": 'remote',
             }
+                        # Check if the object has the 'dewey_euid' tag
+            try:
+                existing_tags = self.s3_client.get_object_tagging(
+                    Bucket=s3uri_bucket,
+                    Key=s3uri_key
+                )
+
+                # Check if 'dewey_euid' is already present in the tags
+                for tag in existing_tags.get("TagSet", []):
+                    if tag["Key"] == "dewey_euid":
+                        raise Exception(f"Object {s3_uri} already has a 'dewey_euid' tag with value {tag['Value']}.")
+            except self.s3_client.exceptions.NoSuchKey:
+                raise Exception(f"S3 object {s3_uri} does not exist.")
+            except Exception as e:
+                self.logger.exception(f"Error checking tags for S3 object {s3_uri}: {e}")
+                raise Exception(f"Failed to check tags for S3 object: {e}")
+            
+                    
+            # Construct the tags
+            tagging = {
+                'TagSet': [
+                    {'Key': 'dewey_creating_service', 'Value': 'dewey'},
+                    {'Key': 'dewey_original_file_name', 'Value': self.sanitize_tag(file_name)},
+                    {'Key': 'dewey_original_file_path', 'Value': 'N/A'},
+                    {'Key': 'dewey_original_file_size_bytes', 'Value': self.sanitize_tag(str(file_properties.get("original_file_size_bytes", "unknown")))},
+                    {'Key': 'dewey_original_file_suffix', 'Value': self.sanitize_tag(file_suffix)},
+                    {'Key': 'dewey_euid', 'Value': self.sanitize_tag(euid)},
+                    {'Key': 'dewey_import_or_remote', 'Value': self.sanitize_tag('remote')}
+                ]
+            }
+                    
+            # Apply the tags to the existing object
+            try:
+                self.s3_client.put_object_tagging(
+                    Bucket=s3uri_bucket,
+                    Key=s3uri_key,
+                    Tagging=tagging
+                )
+                self.logger.info(f"Tags successfully applied to S3 object {s3_uri}")
+            except Exception as e:
+                self.logger.exception(f"Error tagging existing S3 object {s3_uri}: {e}\n\n{tagging}")
+                raise Exception(f"Failed to tag S3 object: {e}\n{tagging}")
 
             _update_recursive(file_instance.json_addl["properties"], file_properties)
             flag_modified(file_instance, "json_addl")
@@ -3033,7 +3079,7 @@ class BloomFile(BloomObj):
                         Bucket=s3_bucket_name,
                         Key=s3_key,
                         Body=file_data,
-                        Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(file_name)}&original_file_path=N/A&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}"
+                        Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}"
                     )
 
                 except Exception as e:
@@ -3051,6 +3097,7 @@ class BloomFile(BloomObj):
                     "original_file_data_type": "raw data",
                     "file_type": file_suffix,
                     "current_s3_uri": f"s3://{s3_bucket_name}/{s3_key}",
+                    "import_or_remote": import_or_remote,
                 }
 
             elif url:
@@ -3062,7 +3109,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=response.content,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(url_info)}&original_url={self.sanitize_tag(url)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(url_info)}&dewey_original_url={self.sanitize_tag(url)}&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3074,6 +3121,7 @@ class BloomFile(BloomObj):
                     "original_file_data_type": "url",
                     "file_type": file_suffix,
                     "current_s3_uri": f"s3://{s3_bucket_name}/{s3_key}",
+                    "import_or_remote": import_or_remote,
                 }
 
             elif full_path_to_file:
@@ -3091,7 +3139,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"creating_service=dewey&original_file_name={self.sanitize_tag(local_path_info.name)}&original_file_path={self.sanitize_tag(full_path_to_file)}&original_file_size_bytes={self.sanitize_tag(str(file_size))}&original_file_suffix={self.sanitize_tag(file_suffix)}&euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(local_path_info.name)}&dewey_original_file_path={self.sanitize_tag(full_path_to_file)}&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3105,9 +3153,12 @@ class BloomFile(BloomObj):
                     "original_file_data_type": "local file",
                     "file_type": file_suffix,
                     "current_s3_uri": f"s3://{s3_bucket_name}/{s3_key}",
+                    "import_or_remote": import_or_remote,
                 }
 
-            elif s3_uri:
+            elif s3_uri in ["deprecate this"]:
+                # I do not want to be in the business of moving files around here
+                #elif s3_uri:
                 # Validate and move the file from the provided s3_uri
                 s3_parsed_uri = re.match(r"s3://([^/]+)/(.+)", s3_uri)
                 if not s3_parsed_uri:
@@ -3139,6 +3190,7 @@ class BloomFile(BloomObj):
                     "original_file_data_type": "s3_uri",
                     "file_type": file_suffix,
                     "current_s3_uri": f"s3://{s3_bucket_name}/{s3_key}",
+                    "import_or_remote": import_or_remote,
                 }
 
                 # Delete the old file and create a marker file
@@ -3149,9 +3201,9 @@ class BloomFile(BloomObj):
                     Bucket=source_bucket,
                     Key=marker_key,
                     Body=b"",
-                    Tagging=f"euid={euid}&original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
+                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_euid={euid}&dewey_original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
                 )
-                self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
+                #self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
 
 
             else:

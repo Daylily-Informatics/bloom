@@ -2399,7 +2399,10 @@ async def search_files(
                 "Status": result.bstatus,
             }
             for key in columns[3:]:
-                row[key] = result.json_addl["properties"].get(key, "N/A")
+                try:
+                    row[key] = result.json_addl["properties"].get(key, "N/A")
+                except Exception as e:
+                    pass
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
