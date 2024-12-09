@@ -75,7 +75,11 @@
         </tr>
         <tr>
             <td>DB Name<ul>Given Name<br>Lab Code</ul></td>
-            <td>{{ object.name }}<ul>{{ object.json_addl['properties']['name'] }}<br>{{ object.json_addl['properties']['lab_code'] }}</ul></td>
+            <td>{{ object.name }}<ul>{%if  object.json_addl['properties']['name']  == "signed urls" %}<a href="file_set_urls?fs_euid={{ object.euid }}">{{ object.json_addl['properties']['name'] }}</a>
+													     {% else %}
+													     <b>{{ object.json_addl['properties']['name'] }}</b>
+													     {% endif %}
+													     <br>{{ object.json_addl['properties']['lab_code'] }}</ul></td>
         </tr>
         <tr>
             <td>Polymorphic Discriminator</td>
