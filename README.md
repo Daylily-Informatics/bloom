@@ -1,5 +1,5 @@
 # Bloom : Templated Abstract Polymorphic (and opinionated) LIMS 
-_a conceptual gambit in collaboration with chatGPT4_  /// _POC v0.10.11_
+_a conceptual gambit in collaboration with chatGPT4_  /// _POC v0.10.12_
 
 
 [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml) [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml) _ARM hardware is not supported_

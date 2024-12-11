@@ -253,7 +253,7 @@
     <b>{{ n_results }} File Search Results</b>
     <form id="fileSetForm" action="/create_file_set" method="post"  >
         <div style="display: flex; flex:none;">
-            <div class="form-section" style="background-color: rgba(255, 204, 204, 0.1); flex:none;">
+            <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1); flex:none;">
                 <h4>Download Selected Files</h4>
 
                 <div class="form-group">
@@ -340,6 +340,14 @@
                 <input type="hidden" id="file_euids" name="file_euids">
 
             </div>
+            
+            <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
+                <small>
+                d/l<br>table<br>as<br>TSV<br>
+                </small>
+                <button type="submit" class="download-tsv" onclick="downloadTableAsTSV()">⬇️</button>
+            </div>
+
         </div>
     </form>
     <table border="1">
@@ -381,7 +389,6 @@
 
     <a href="/dewey">Go Back</a>
 
-    <button type="submit" class="floating-button download-tsv" onclick="downloadTableAsTSV()">⬇️</button>
 
 
     <script>

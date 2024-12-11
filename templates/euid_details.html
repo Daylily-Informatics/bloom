@@ -67,20 +67,24 @@
         </tr>
         <tr>
             <td>EUID</td>
-            <td><a class="reference-link" href="euid_details?euid={{ object.euid }}">{{ object.euid }}</a></td>
+            <td><a class="reference-link" href="euid_details?euid={{ object.euid }}">{{ object.euid }}</a>
+            
+                {%if  object.json_addl.properties.ref_type and object.json_addl['properties']['ref_type']  == "presigned_url" %}
+                -- ( <a href="file_set_urls?fs_euid={{ object.euid }}">presigned urls</a> )
+		     {% else %}
+        	
+		    {% endif %}
+
+
+            </td>
         </tr>
+
         <tr>
-            <td>UUID</td>
-            <td><a class="reference-link" href="uuid_details?uuid={{ object.uuid }}">{{ object.uuid }}</a></td>
+            <td>Given Name</td>
+            <td>{{ object.json_addl['properties']['name'] }}</td>
         </tr>
-        <tr>
-            <td>DB Name<ul>Given Name<br>Lab Code</ul></td>
-            <td>{{ object.name }}<ul>{%if  object.json_addl['properties']['name']  == "signed urls" %}<a href="file_set_urls?fs_euid={{ object.euid }}">{{ object.json_addl['properties']['name'] }}</a>
-													     {% else %}
-													     <b>{{ object.json_addl['properties']['name'] }}</b>
-													     {% endif %}
-													     <br>{{ object.json_addl['properties']['lab_code'] }}</ul></td>
-        </tr>
+       
+      
         <tr>
             <td>Polymorphic Discriminator</td>
             <td>{{ object.polymorphic_discriminator }}</td>
@@ -122,6 +126,10 @@
                     This is a TEMPLATE Object: <a href="/admin_template?euid={{ object.euid }}">admin edit</a>
                 {% endif %}
             </td>
+        </tr>
+        <tr>
+            <td>UUID</td>
+            <td><a class="reference-link" href="uuid_details?uuid={{ object.uuid }}">{{ object.uuid }}</a></td>
         </tr>
     </table>
 
