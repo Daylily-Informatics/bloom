@@ -20,7 +20,8 @@
         "creating_user": "",
         "patient_id": "",
         "clinician_id": "",
-        "relevant_datetime": "",
+        "record_datetime": "",
+        "record_datetime_end": "",
         "health_event_id": "",
         "external_ids": [],
         "study_id": "",
@@ -37,20 +38,37 @@
         "import_or_remote": ""       
       },
       "ui_form_properties" : [ 
+        {"property_key":"record_datetime","form_label":"Record Start (datetime)", "required": false, "value_type":"datetime"}, 
+        {"property_key":"record_datetime_end","form_label":"Record End (datetime)", "required": false, "value_type":"datetime"}, 
+
+        {"property_key":"1_break","form_label":"", "required": false, "value_type":"break"}, 
+
+
         {"property_key":"patient_id","form_label":"Patient ID", "required": false, "value_type": "uid-interactive"}, 
         {"property_key":"clinician_id","form_label":"Clinician ID", "required": false, "value_type":"uid-static"}, 
-        {"property_key":"relevant_datetime","form_label":"Relevant Date", "required": false, "value_type":"date"}, 
         {"property_key":"lab_code","form_label":"Lab Code", "required": false, "value_type":"uid-static"}, 
+
+        {"property_key":"2_break","form_label":"", "required": false, "value_type":"break"}, 
+
+
+        {"property_key":"study_id","form_label":"Study ID", "required": false, "value_type":"uid-static"}, 
+
+        {"property_key":"3_break","form_label":"", "required": false, "value_type":"break"}, 
+
         {"property_key":"purpose","form_label":"Purpose", "required": false, "value_type":"controlled"}, 
         {"property_key": "purpose_subtype", "form_label": "Purpose Subtype", "required": false, "value_type":"controlled"},
+
+        {"property_key":"4_break","form_label":"", "required": false, "value_type":"break"}, 
+
         {"property_key":"category","form_label":"Category", "required": false, "value_type":"controlled"}, 
         {"property_key":"sub_category","form_label":"Sub Category", "required": false, "value_type":"controlled"}, 
         {"property_key":"sub_category_2","form_label":"Sub Category 2", "required": false, "value_type":"controlled"}, 
-        {"property_key":"study_id","form_label":"Study ID", "required": false, "value_type":"uid-static"}, 
-        {"property_key":"comments","form_label":"Comments", "required": false, "value_type":"string"},
+
+        {"property_key":"5_break","form_label":"", "required": false, "value_type":"break"}, 
+
         {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"},
         {"property_key": "file_tags", "form_label":"File Tags", "required":false, "value_type":"list"},
-        {"property_key": "import_or_remote", "form_label":"Import or Leave Remote", "required":false, "value_type":"controlled"}
+        {"property_key":"comments","form_label":"Comments", "required": false, "value_type":"string"}
       ],  
       "controlled_properties": { 
         "purpose": {

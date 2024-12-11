@@ -290,7 +290,12 @@ async def authentication_required_exception_handler(
 
 
 async def require_auth(request: Request):
+    
 
+    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
+        request.session["user_data"] = {"email": "john@daylilyinformatics.com", "dag_fnv2": ""}
+        return request
+    
     if (
         os.environ.get("SUPABASE_URL", "NA") == "NA"
         and os.environ.get("SUPABASE_KEY", "NA") == "NA"
@@ -1987,9 +1992,10 @@ async def create_file(
     study_id: str = Form(""),
     clinician_id: str = Form(""),
     health_event_id: str = Form(""),
-    relevant_datetime: str = Form(""),
+    record_datetime: str = Form(""),
     patient_id: str = Form(""),
     upload_group_key: str = Form(""),
+    upload_group_key_ifnone: str = Form(""),    
     purpose: str = Form(""),
     category: str = Form(""),   
     sub_category: str = Form(""),
@@ -1999,6 +2005,8 @@ async def create_file(
     file_tags: str = Form(""),
     import_or_remote: str = Form("import_or_remote"),
 ):
+    
+    file_set_name = upload_group_key_ifnone if upload_group_key in [None,'None',""] else upload_group_key 
 
     if directory and len(directory) > 1000:
         return JSONResponse(
@@ -2012,7 +2020,7 @@ async def create_file(
         # Creating a file set to tag all the files uploaded in the same batch together.
         bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         file_set_metadata = {
-            "name": upload_group_key,
+            "name": file_set_name,
             "description": "File set created by Dewey file manager",
             "tag": "on-create",
             "comments": "",
@@ -2027,10 +2035,10 @@ async def create_file(
             "lab_code": lab_code,
             "clinician_id": clinician_id,
             "health_event_id": health_event_id,
-            "relevant_datetime": relevant_datetime,
+            "record_datetime": record_datetime,
             "patient_id": patient_id,
             "creating_user": request.session["user_data"]["email"],
-            "upload_group_key": upload_group_key,
+            "upload_group_key": file_set_name,
             "study_id": study_id,
             "purpose": purpose,
             "category": category,
@@ -2153,19 +2161,36 @@ async def create_file(
                         new_file = bfi.create_file(
                             file_metadata=file_metadata, s3_uri=s3_uri.strip(), addl_tags=addl_tags,
                         )
-                        results.append(
-                            {
-                                "identifier": new_file.euid,
-                                "status": "Success",
-                                "original": s3_uri,
-                                "current_s3_uri": new_file.json_addl["properties"][
-                                    "current_s3_uri"
-                                ],
-                            }
-                        )
-                        bfs.add_files_to_file_set(
-                            file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
-                        )  
+
+                        if type(new_file) == type([]):
+                            for nf in new_file:
+                                results.append(
+                                    {
+                                        "identifier": nf.euid,
+                                        "status": "Success",
+                                        "original": s3_uri,
+                                        "current_s3_uri": nf.json_addl["properties"][
+                                            "current_s3_uri"
+                                        ],
+                                    }
+                                )
+                                bfs.add_files_to_file_set(
+                                    file_set_euid=new_file_set.euid, file_euids=[nf.euid]
+                                )
+                        else:
+                            results.append(
+                                {
+                                    "identifier": new_file.euid,
+                                    "status": "Success",
+                                    "original": s3_uri,
+                                    "current_s3_uri": new_file.json_addl["properties"][
+                                        "current_s3_uri"
+                                    ],
+                                }
+                            )
+                            bfs.add_files_to_file_set(
+                                file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
+                            )  
                     except Exception as e:
                         results.append(
                             {
@@ -2304,8 +2329,8 @@ async def search_files(
     is_greedy: str = Form("yes"),
     patient_id: List[str] = Form(None),
     clinician_id: List[str] = Form(None),
-    relevant_datetime_start: str = Form(None),
-    relevant_datetime_end: str = Form(None),
+    record_datetime_start: str = Form(None),
+    record_datetime_end: str = Form(None),
     lab_code: List[str] = Form(None),
     purpose: str = Form(None),
     purpose_subtype: str = Form(None),
@@ -2341,10 +2366,10 @@ async def search_files(
     
     search_criteria = create_search_criteria(form_data, search_fields)
         
-    if relevant_datetime_start or relevant_datetime_end:
-        search_criteria["relevant_datetime"] = {
-            "start": relevant_datetime_start,
-            "end": relevant_datetime_end
+    if record_datetime_start or record_datetime_end:
+        search_criteria["record_datetime"] = {
+            "start": record_datetime_start,
+            "end": record_datetime_end
         }
 
     greedy = is_greedy == "yes"
@@ -2353,7 +2378,7 @@ async def search_files(
         bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
 
-        # Prepare additional filters for created_datetime and relevant_datetime
+        # Prepare additional filters for created_datetime and record_datetime
         query = bfi.session.query(bfi.Base.classes.generic_instance)
 
         if created_datetime_start:
@@ -2365,13 +2390,13 @@ async def search_files(
                 bfi.Base.classes.generic_instance.created_dt <= datetime.strptime(created_datetime_end, "%Y-%m-%d")
             )
 
-        if relevant_datetime_start or relevant_datetime_end:
-            relevant_datetime_filter = {}
-            if relevant_datetime_start:
-                relevant_datetime_filter["start"] = datetime.strptime(relevant_datetime_start, "%Y-%m-%d")
-            if relevant_datetime_end:
-                relevant_datetime_filter["end"] = datetime.strptime(relevant_datetime_end, "%Y-%m-%d")
-            search_criteria["relevant_datetime"] = relevant_datetime_filter
+        if record_datetime_start or record_datetime_end:
+            record_datetime_filter = {}
+            if record_datetime_start:
+                record_datetime_filter["start"] = datetime.strptime(record_datetime_start, "%Y-%m-%d")
+            if record_datetime_end:
+                record_datetime_filter["end"] = datetime.strptime(record_datetime_end, "%Y-%m-%d")
+            search_criteria["record_datetime"] = record_datetime_filter
 
         euid_results = bfi.search_objs_by_addl_metadata(
             {'properties':search_criteria}, greedy, "file", super_type="file"

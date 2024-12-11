@@ -129,12 +129,12 @@
 
     <div class="collapsible-buttons">
         <button type="button" class="collapsiblex" data-target="relationshipsContent">Relationships</button>
-        <button type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
+        <button style="display:none;" type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
         <button type="button" class="collapsiblex" data-target="actionGroupsContent">Action Groups</button>
         <button type="button" class="collapsiblex" data-target="auditLogContent">Audit Log</button>
         <button type="button" class="collapsiblex" data-target="fullEditContent">Edit Obj Properties (admin)</button>
         {% if object.parent_template_euid %}
-            ...
+            
         {% else %}
             <button type="button" class="collapsiblex" data-target="fullEditContentTemplate">Edit Template Form Properties (super admin)</button>
         {% endif %}
@@ -147,58 +147,84 @@
         <h3>Child Of Lineages</h3>
         <table class="searchable">
             <tr>
-                <th>Lineage EUID</th>
-                <th>Relationship Type</th>
-                <th>Parent Instance EUID</th>
+                <th>Parent</th>
+
                 <th>Parent Type</th>
                 <th>Parent Sub Type</th>
                 <th>Parent Version</th>
-                <th>Child Instance EUID</th>
+                <th>Parent Instance EUID</th>
+
+                <th>Child</th>
                 <th>Child Type</th>
                 <th>Child Sub Type</th>
                 <th>Child Version</th>
+                <th>Child Instance EUID</th>
+  
+
+                <th>Relationship Type</th>
+                <th>Lineage EUID</th>
+
+
             </tr>
             {% for lineage in oobj.child_of_lineages %}
                 <tr>
-                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
-                    <td>{{ lineage.relationship_type }}</td>
-                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+                    <td>{{ lineage.parent_instance.super_type }}</td>
+
                     <td>{{ lineage.parent_instance.btype }}</td>
                     <td>{{ lineage.parent_instance.b_sub_type }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
-                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+
+                    <td>{{ lineage.child_instance.super_type }}</td>
                     <td>{{ lineage.child_instance.btype }}</td>
                     <td>{{ lineage.child_instance.b_sub_type }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
+                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+
+
+                    <td>{{ lineage.relationship_type }}</td>
+                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
+
                 </tr>
             {% endfor %}
         </table>
         <h3>Parent Of Lineages</h3>
         <table class="searchable">
             <tr>
-                <th>Lineage EUID</th>
-                <th>Relationship Type</th>
-                <th>Parent Instance EUID</th>
+
+                <th>Parent</th>
                 <th>Parent Type</th>
                 <th>Parent Sub Type</th>
                 <th>Parent Version</th>
-                <th>Child Instance EUID</th>
+                <th>Parent Instance EUID</th>
+
+                <th>Child</th>
                 <th>Child Type</th>
                 <th>Child Sub Type</th>
                 <th>Child Version</th>
+                <th>Child Instance EUID</th>
+
+                <th>Relationship Type</th>
+                <th>Lineage EUID</th>
+
             </tr>
             {% for lineage in oobj.parent_of_lineages %}
                 <tr>
-                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
-                    <td>{{ lineage.relationship_type }}</td>
-                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+                    <td>{{ lineage.parent_instance.super_type }}</td>
+  
                     <td>{{ lineage.parent_instance.btype }}</td>
                     <td>{{ lineage.parent_instance.b_sub_type }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
-                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+
+                    <td>{{ lineage.child_instance.super_type }}</td> 
                     <td>{{ lineage.child_instance.btype }}</td>
                     <td>{{ lineage.child_instance.b_sub_type }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
+                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+
+                    <td>{{ lineage.relationship_type }}</td>
+                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
                 </tr>
             {% endfor %}
         </table>
@@ -465,6 +491,5 @@
         });
     </script>
 
-    <small><a href=delete_by_euid?euid={{ object.euid }}>SOFTdelete object</a> - -- or -- - <a href=un_delete_by_uuid?uuid={{ object.uuid }}&euid={{ object.euid }}>unSOFTdelete object</a></small>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
 
-    {% set page_title = 'Search Results' %}
+    {% set page_title = 'File Search Results' %}
     <title>{{ page_title }}</title>
 
     {% set bloom_mod = 'dewey' %}
@@ -22,7 +22,7 @@
             checkboxes.forEach(checkbox => checkbox.checked = selectAll);
             updateColumnGlow(checkboxClass);
         }
-
+        
         function checkConflict(currentCheckbox, checkboxClass) {
             const otherCheckboxes = document.querySelectorAll(checkboxClass);
             if (currentCheckbox.checked) {
@@ -37,6 +37,7 @@
             updateColumnGlow('.file-checkbox');
             updateColumnGlow('.file-set-checkbox');
         }
+        
 
         function updateColumnGlow(checkboxClass) {
             const checkboxes = document.querySelectorAll(checkboxClass);
@@ -54,14 +55,22 @@
         }
 
         function createFileSet(event) {
-            event.preventDefault();
-
+            event.preventDefault(); // Prevent the default form submission
+        
             const checkboxes = document.querySelectorAll('.file-set-checkbox:checked');
             const euids = Array.from(checkboxes).map(cb => cb.value).join("\n");
+        
+            if (!euids) {
+                alert("Please select files to create a file set.");
+                return;
+            }
+        
             document.getElementById('file_euids').value = euids;
-
-            document.getElementById('fileSetForm').submit();
+        
+            console.log('Creating file set with EUIDs:', euids);
+            document.getElementById('fileSetForm').submit(); // Submit the form for file set creation
         }
+        
 
         function downloadTableAsTSV() {
             const table = document.querySelector('table');
@@ -185,40 +194,7 @@
 
     </script>
     <style>
-        .floating-button {
-            position: fixed;
-            padding: 10px;
-            z-index: 1000;
-            background-color: var(--primary-color);
-            color: white; /* White text */
-            border: none;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 50%;
-        }
 
-        .floating-button.download-tsv {
-            top: 20px;
-            right: 20px;
-        }
-
-        .floating-button.create-set {
-            bottom: 10px;
-            right: 10px;
-        }
-
-        .floating-button.download {
-            bottom: 10px;
-            left: 10px;
-        }
-
-        .floating-button.search {
-            bottom: 20px;
-            right: 20px;
-        }
 
         .form-section {
             display: inline-block;
@@ -229,8 +205,6 @@
         }
 
         .form-section label, .form-section input, .form-section select, .form-section textarea {
-            margin: 5px 0;
-            vertical-align: middle;
         }
 
         .form-group {
@@ -239,12 +213,10 @@
         }
 
         .form-group label {
-            width: 100px; /* Adjust as needed */
-            margin-right: 10px;
         }
 
         .form-group input, .form-group select, .form-group textarea {
-            flex: 1;
+            
         }
 
         .glow {
@@ -278,15 +250,18 @@
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>{{ n_results }} File Search Results</h1>
+    <b>{{ n_results }} File Search Results</b>
     <form id="fileSetForm" action="/create_file_set" method="post"  >
-        <div style="display: flex;">
-            <div class="form-section" style="background-color: rgba(255, 204, 204, 0.1);">
+        <div style="display: flex; flex:none;">
+            <div class="form-section" style="background-color: rgba(255, 204, 204, 0.1); flex:none;">
+                <h4>Download Selected Files</h4>
+
                 <div class="form-group">
-                    <label for="download-type"> Download Type: </label>
+                    
+                    <label for="download-type"> Type: </label>
                     <select id="download-type">
-                        <option value="dewey" selected>dewey</option>
-                        <option value="hybrid">hybrid</option>
+                        <option value="dewey" >dewey</option>
+                        <option selected value="hybrid">hybrid</option>
                         <option value="orig">orig</option>
                     </select>
                 </div>
@@ -295,12 +270,14 @@
                     <select id="create-metadata">
                         <option value="yes" selected>yes</option>
                         <option value="no">no</option>
-                    </select>
+                    </select><br>
+                    <button type="button" onclick="downloadSelectedFiles()">Download Files</button>
+
                 </div>
             </div>
 
             <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
-                File Set Details
+                Create File Set (from selected)<br>
                 <div class="form-group">
                     {% for field in ui_fields_fset %}
                     <div>
@@ -333,24 +310,17 @@
                         {% endif %}
                     </div>
                 {% endfor %}
-
                 </div>
                 <div class="form-group">
                   
             <br><br>
             <label for="ref_type">Share Files In Set? </label>
-            <select id="ref_type" name="ref_type" onchange="toggleRcloneOptions()">
-                <option value="na">Just Create File Set</option>
+            <select id="ref_type" name="ref_type" onchange="toggleRcloneOptions()" >
+                <option value="na">Database File Set Only</option>
                 <option value="presigned_url">Create Presigned S3 URLS Per File</option>
                 <option value="rclone serve http">Share File Set Via HTTP</option>
-                <option value="rclone serve ftp">Share File Set Via FTP </option>
                 <option value="rclone serve sftp">Share File Set Via SFTP</option>
-                <option value="rclone serve webdav">Share File Set Via WEBDAV</option>
-                <option value="rclone serve restic">Share File Set Via RESTIC</option>
-                <option value="ne rclone nfs">Share File Set Via NFS (not enabled)</option>
-                <option value="ne rclone s3">Share File Set Via S3 (not enabled)</option> 
-                <option value="ne rclone dlna">Share File Set Via DLNA (not enabled)</option>
-                <option value="ne rclone docker">Share File Set Via DOCKER (not enabled)</option>
+
             </select><br>
             <div id="rclone-options" style="display: none;">
                 <small><a href=https://rclone.org/commands/rclone_serve/>rclone serve</a> is magic & free</small>
@@ -361,11 +331,14 @@
             </div>
 
                         <label for="duration"> Share Duration (days, float acceptable): </label>
-                        <input type="text" id="duration" name="duration" value="1" >
+                        <input type="text" id="duration" name="duration" value="1" style="width:30px;" >
+                        <button onclick="createFileSet(event)">Create File Set</button>
+
                 </div>
 
                
                 <input type="hidden" id="file_euids" name="file_euids">
+
             </div>
         </div>
     </form>
@@ -408,15 +381,7 @@
 
     <a href="/dewey">Go Back</a>
 
-    <button class="floating-button download-tsv" onclick="downloadTableAsTSV()">⬇️</button>
-
-    <div class="floating-button create-set">
-        <button onclick="createFileSet(event)">Create File Set</button>
-    </div>
-
-    <div class="floating-button download">
-        <button onclick="downloadSelectedFiles()">Download Files</button>
-    </div>
+    <button type="submit" class="floating-button download-tsv" onclick="downloadTableAsTSV()">⬇️</button>
 
 
     <script>
@@ -470,16 +435,21 @@
         async function downloadSelectedFiles() {
             const checkboxes = document.querySelectorAll('.file-checkbox:checked');
             const euids = Array.from(checkboxes).map(cb => cb.value);
-
+        
             const downloadType = document.getElementById('download-type').value;
             const createMetadataFile = document.getElementById('create-metadata').value;
-
+        
+            if (euids.length === 0) {
+                alert("Please select files to download.");
+                return;
+            }
+        
             console.log('Selected EUIDs:', euids);
-
+        
             for (const euid of euids) {
                 await downloadFile(euid, downloadType, createMetadataFile);
             }
-        }
+        } 
 
         function sortTable(columnIndex) {
             const table = document.querySelector('table');

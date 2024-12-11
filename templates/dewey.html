@@ -195,6 +195,74 @@
     <hr><hr>
 
     <script>
+
+        <script>
+            async function triggerDownload(url) {
+                return new Promise((resolve) => {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = '';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    resolve();
+                });
+            }
+    
+            async function downloadFile(euid, downloadType, createMetadataFile) {
+                console.log(`Downloading file for EUID: ${euid}`);
+    
+                const formData = new URLSearchParams();
+                formData.append('euid', euid);
+                formData.append('download_type', downloadType);
+                formData.append('create_metadata_file', createMetadataFile);
+                formData.append('ret_json', 'True');
+    
+                const response = await fetch(`/download_file`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData.toString()
+                });
+    
+                if (response.ok) {
+                    const jsonResponse = await response.json();
+                    const fileDownloadPath = jsonResponse.file_download_path;
+                    const metadataDownloadPath = jsonResponse.metadata_download_path;
+    
+                    console.log('fileDownloadPath:', fileDownloadPath);
+                    console.log('metadataDownloadPath:', metadataDownloadPath);
+    
+                    // Trigger downloads
+                    await triggerDownload(fileDownloadPath);
+                    if (metadataDownloadPath) {
+                        await triggerDownload(metadataDownloadPath);
+                    }
+                } else {
+                    console.error(`Failed to download file for EUID: ${euid}`);
+                }
+            }
+    
+            async function downloadSelectedFiles() {
+                const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+                const euids = Array.from(checkboxes).map(cb => cb.value);
+            
+                const downloadType = document.getElementById('download-type').value;
+                const createMetadataFile = document.getElementById('create-metadata').value;
+            
+                if (euids.length === 0) {
+                    alert("Please select files to download.");
+                    return;
+                }
+            
+                console.log('Selected EUIDs:', euids);
+            
+                for (const euid of euids) {
+                    await downloadFile(euid, downloadType, createMetadataFile);
+                }
+            } 
+
         function resetForms() {
             document.getElementById('createFileForm').reset();
             document.getElementById('downloadFileForm').reset();

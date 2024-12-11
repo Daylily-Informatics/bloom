@@ -2816,8 +2816,119 @@ class BloomFile(BloomObj):
     def link_file_to_parent(self, child_euid, parent_euid):
         self.create_generic_instance_lineage_by_euids(child_euid, parent_euid)
         self.session.commit()
-
+        
     def create_file(
+        self,
+        file_metadata={},
+        file_data=None,
+        file_name=None,
+        url=None,
+        full_path_to_file=None,
+        s3_uri=None,
+        create_locked=False,
+        addl_tags={},
+    ):
+        """
+        Create a file or import files from an S3 directory.
+
+        :param file_metadata: Metadata to associate with the file(s).
+        :param file_data: File data to upload (binary data).
+        :param file_name: Name of the file.
+        :param url: URL to fetch the file data.
+        :param full_path_to_file: Local path to the file.
+        :param s3_uri: S3 URI of the file or directory.
+        :param create_locked: Whether to lock the file(s) after creation. Defaults to True.
+        :param addl_tags: Additional tags for the file(s).
+        :return: Created file object or list of file objects.
+        """
+        if s3_uri:
+            # Detect if S3 URI is a directory
+            s3_parsed_uri = re.match(r"s3://([^/]+)/(.+)", s3_uri)
+            if not s3_parsed_uri:
+                raise ValueError("Invalid s3_uri format. Expected format: s3://bucket_name/prefix")
+            
+            bucket_name, prefix = s3_parsed_uri.groups()
+
+            try:
+                response = self.s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, Delimiter='/')
+                files = response.get('Contents', [])
+                
+                # If more than one object or the URI ends with '/', treat it as a directory
+                if len(files) > 1 or s3_uri.endswith('/'):
+                    created_files = []
+                    for file in files:
+                        file_key = file['Key']
+                        
+                        # Skip directories
+                        if file_key.endswith('/'):
+                            continue
+                        
+                        file_name = file_key.split('/')[-1]
+                        current_s3_uri = f"s3://{bucket_name}/{file_key}"
+                        
+                        # Create individual files for each item in the directory
+                        created_file = self.create_file(
+                            file_metadata=file_metadata,
+                            s3_uri=current_s3_uri,
+                            create_locked=create_locked,
+                            addl_tags=addl_tags,
+                        )
+                        created_files.append(created_file)
+                    
+                    return created_files
+                
+                # Otherwise, process as a single file
+                s3_uri = f"s3://{bucket_name}/{files[0]['Key']}" if files else s3_uri
+            
+            except Exception as e:
+                raise Exception(f"Error detecting file or directory for S3 URI {s3_uri}: {e}")
+
+        # Existing logic for processing a single file
+        file_properties = {"properties": file_metadata}
+        import_or_remote = file_metadata.get('import_or_remote', 'import')
+
+        new_file = self.create_instance(
+            self.query_template_by_component_v2("file", "file", "generic", "1.0")[0].euid,
+            file_properties,
+        )
+        self.session.commit()
+
+        new_file.json_addl["properties"]["current_s3_bucket_name"] = (
+            self._derive_bucket_name(new_file.euid)
+        )
+        flag_modified(new_file, "json_addl")
+        self.session.commit()
+
+        if file_data or url or full_path_to_file or s3_uri:
+            try:
+                new_file = self.add_file_data(
+                    new_file.euid,
+                    file_data,
+                    file_name,
+                    url,
+                    full_path_to_file,
+                    s3_uri,
+                    addl_tags=addl_tags,
+                    import_or_remote=import_or_remote,
+                )
+            except Exception as e:
+                logging.exception(f"Error adding file data: {e}")
+                new_file.bstatus = "error adding file data"
+                flag_modified(new_file, "json_addl")
+                self.session.commit()
+                raise Exception(e)
+        else:
+            logging.warning(f"No data provided for file creation or import skipped: {file_data, url}")
+            new_file.bstatus = f"no file data provided or {import_or_remote} is not 'import'"
+            self.session.commit()
+
+        if create_locked:
+            self.lock_file(new_file.euid)
+
+        return new_file
+
+
+    def create_file_old(
         self,
         file_metadata={},
         file_data=None,
@@ -3041,13 +3152,10 @@ class BloomFile(BloomObj):
             # Construct the tags
             tagging = {
                 'TagSet': [
-                    {'Key': 'dewey_creating_service', 'Value': 'dewey'},
                     {'Key': 'dewey_original_file_name', 'Value': self.sanitize_tag(file_name)},
                     {'Key': 'dewey_original_file_path', 'Value': 'N/A'},
-                    {'Key': 'dewey_original_file_size_bytes', 'Value': self.sanitize_tag(str(file_properties.get("original_file_size_bytes", "unknown")))},
                     {'Key': 'dewey_original_file_suffix', 'Value': self.sanitize_tag(file_suffix)},
                     {'Key': 'dewey_euid', 'Value': self.sanitize_tag(euid)},
-                    {'Key': 'dewey_import_or_remote', 'Value': self.sanitize_tag('remote')}
                 ]
             }
                     
@@ -3079,7 +3187,7 @@ class BloomFile(BloomObj):
                         Bucket=s3_bucket_name,
                         Key=s3_key,
                         Body=file_data,
-                        Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}"
+                        Tagging=f"dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}"
                     )
 
                 except Exception as e:
@@ -3109,7 +3217,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=response.content,
-                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(url_info)}&dewey_original_url={self.sanitize_tag(url)}&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=f"dewey_original_file_name={self.sanitize_tag(url_info)}&dewey_original_url={self.sanitize_tag(url)}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3139,7 +3247,7 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_creating_service=dewey&dewey_original_file_name={self.sanitize_tag(local_path_info.name)}&dewey_original_file_path={self.sanitize_tag(full_path_to_file)}&dewey_original_file_size_bytes={self.sanitize_tag(str(file_size))}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=f"dewey_original_file_name={self.sanitize_tag(local_path_info.name)}&dewey_original_file_path={self.sanitize_tag(full_path_to_file)}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3455,6 +3563,58 @@ class BloomFile(BloomObj):
         )
 
         return {"file_reference": file_reference, "presigned_url": presigned_url}
+
+
+    def import_files_from_s3_directory(self, s3_uri, file_metadata={}, create_locked=True):
+        """
+        Import all files from a specified S3 directory (not recursively).
+        
+        :param s3_uri: The S3 URI of the directory (e.g., s3://bucket_name/folder/).
+        :param file_metadata: Metadata to associate with each imported file.
+        :param create_locked: Whether to lock the files upon creation. Defaults to True.
+        :return: List of created file objects.
+        """
+        # Parse S3 URI
+        s3_parsed_uri = re.match(r"s3://([^/]+)/(.+)", s3_uri)
+        if not s3_parsed_uri:
+            raise ValueError("Invalid s3_uri format. Expected format: s3://bucket_name/folder/")
+        
+        bucket_name, prefix = s3_parsed_uri.groups()
+        
+        # List objects in the directory
+        try:
+            response = self.s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, Delimiter='/')
+            files = response.get('Contents', [])
+        except Exception as e:
+            raise Exception(f"Error listing S3 directory {s3_uri}: {e}")
+        
+        created_files = []
+        for file in files:
+            file_key = file['Key']
+            
+            # Skip directories
+            if file_key.endswith('/'):
+                continue
+            
+            file_name = file_key.split('/')[-1]
+            current_s3_uri = f"s3://{bucket_name}/{file_key}"
+            
+            # Add metadata specific to the file
+            individual_file_metadata = file_metadata.copy()
+            individual_file_metadata['file_name'] = file_name
+            
+            try:
+                # Create and add the file
+                created_file = self.create_file(
+                    file_metadata=individual_file_metadata,
+                    s3_uri=current_s3_uri,
+                    create_locked=create_locked
+                )
+                created_files.append(created_file)
+            except Exception as e:
+                logging.error(f"Error importing file {current_s3_uri}: {e}")
+        
+        return created_files
 
 
 

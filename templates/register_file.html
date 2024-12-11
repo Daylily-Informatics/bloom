@@ -1,10 +1,10 @@
 <div class="accordion-content">
     <ul>
         <form id="createFileForm" data-form="register" action="create_file" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="upload_group_key" value="{{ upload_group_key }}">
+            <input type="hidden" name="upload_group_key_ifnone" value="{{ upload_group_key }}">
             <table>
                 <tr>
-                    <td>
+                    <td style="align-content: flex-start;" >
                         <input type="hidden" value="na" id="name" name="name">
 
                         <h3>Specify Files</h3>
@@ -27,11 +27,15 @@
                             <br><br>
                         </ul>
                     </td>
-                    <td>
-                        <h3>Add Metadata</h3>
+                    <td style="align-content: flex-start;">
                         <ul>
-                            <small>upload group key: <code>{{ upload_group_key }}</code></small>
                             <br><br>
+                            <h4>Add Metadata</h4>
+
+                            <label for="upload_group_key" >File Set Name: </label>
+                            <input type=text name="upload_group_key">{{ upload_group_key }}</input>
+                            
+                            <ul>
 
                             {% for field in ui_fields %}
                                 <div>
@@ -51,8 +55,12 @@
                                     {% else %}
                                     <label for="{{ field.name }}">{{ field.label }}</label>
 
-                                        {% if field.name.endswith('_datetime') %}
+                                        {% if field.name.endswith('_datetime') or field.name.endswith('_datetime_end') %}
+                                            <input type="datetime-local" name="{{ field.name }}" id="{{ field.name }}" />
+                                        {% elif field.name.endswith('_date') %}
                                             <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
+                                        {% elif field.name.endswith('_break') %}
+                                    </ul><hr><ul>
                                         {% else %}
                                             <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
                                         {% endif %}
@@ -60,6 +68,7 @@
                                 </div>
                             {% endfor %}
                         </ul>
+                    </ul>
                     </td>
                 </tr>
                 <tr>
