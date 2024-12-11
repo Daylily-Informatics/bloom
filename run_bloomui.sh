@@ -2,7 +2,7 @@
 
 # Default values
 host="0.0.0.0"
-port=8914
+port=8911
 mode="dev"
 
 unset HTTP_PROXY
@@ -62,6 +62,7 @@ if [[ "$mode" == "dev" ]]; then
     --reload \
     --log-level trace \
     --port $port \
+    --workers 3 \
     --timeout-keep-alive 15 \
     --host $host #  \
 #    --ssl-certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
