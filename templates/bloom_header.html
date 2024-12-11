@@ -1,18 +1,17 @@
 <div class="header-container" style="display: flex; align-items: flex-end;">
-    <h1 style="margin: 0 0px; line-height: 1.2;"><a href="/index2" >bloom</a></h1> 
-    <small style="margin: 0 0px;"><a href="dindex2" >(g)</a></small>
+    <h1 style="margin: 0 0px; line-height: 1.2;"><a href="/index2" >home</a></h1> 
     <span style="margin: 0 5px;"> /// </span>
     <small style="margin: 0 5px;">
         {% if bloom_mod == 'admin' %}
             <a href="/admin">admin</a>
         {% elif bloom_mod == 'index' %}
-            
+            <a href="dewey">dewey</a>
         {% elif bloom_mod == 'lims' %}
             <a href="/lims">lims</a>
         {% elif bloom_mod == 'dewey' %}
             <a href="/dewey">dewey</a>
         {% else %}
-            n/a
+                       <a href="dewey">dewey</a>
         {% endif %}
     </small>
     <span style="margin: 0 5px;"> /// </span>
@@ -24,7 +23,7 @@
                 {{ page_title }}
             {% endif %}
         {% else %}
-            ...
+                <small style="margin: 0 0px;"><a href="dindex2" >(g)</a></small>
         {% endif %}
     </small>
     <span style="margin: 0 5px;"> /// </span>
