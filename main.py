@@ -2046,10 +2046,10 @@ async def create_file(
     name: str = Form(...),
     comments: str = Form(""),
     lab_code: str = Form(""),
-    file_data: List[UploadFile] = File(None),
-    directory: List[UploadFile] = File(None),
-    urls: str = Form(None),
-    s3_uris: str = Form(None),
+    file_data: List[UploadFile] = File(""),
+    directory: List[UploadFile] = File(""),
+    urls: str = Form(""),
+    s3_uris: str = Form(""),
     study_id: str = Form(""),
     clinician_id: str = Form(""),
     health_event_id: str = Form(""),
@@ -2066,9 +2066,11 @@ async def create_file(
     sub_variable: str = Form(""),
     file_tags: str = Form(""),
     import_or_remote: str = Form("import_or_remote"),
-    further_metadata: str = Form(None),
+    further_metadata: str = Form(""),
 ):
-    
+    user_data = request.session.get("user_data", {})
+    controlled_properties = {}  # Or fetch from relevant source
+
     file_set_name = upload_group_key_ifnone if upload_group_key in [None,'None',""] else upload_group_key 
 
     if directory and len(directory) > 1000:
@@ -2081,7 +2083,7 @@ async def create_file(
     try:
      
         # Creating a file set to tag all the files uploaded in the same batch together.
-        bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bfs = BloomFileSet(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
         file_set_metadata = {
             "name": file_set_name,
             "description": "File set created by Dewey file manager",
@@ -2091,7 +2093,7 @@ async def create_file(
         # Create the file set
         new_file_set = bfs.create_file_set(file_set_metadata=file_set_metadata)
         
-        bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bfi = BloomFile(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
         file_metadata = {
             "name": name,
             "comments": comments,
@@ -2101,7 +2103,7 @@ async def create_file(
             "record_datetime": record_datetime,
             "record_datetime_end": record_datetime_end,
             "patient_id": patient_id,
-            "creating_user": request.session["user_data"]["email"],
+            "creating_user": request.session.get("user_data",{}).get("email","na"),
             "upload_group_key": file_set_name,
             "study_id": study_id,
             "purpose": purpose,
@@ -2292,6 +2294,7 @@ async def create_file(
             error=f"An error occurred: {e}",
             accordion_states=accordion_states,
             style=style,
+            controlled_properties=controlled_properties,
             udat=user_data,
         )
 
@@ -3161,13 +3164,14 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
             "name", "comments", "lab_code", "urls", "s3_uris", "study_id",
             "clinician_id", "record_datetime", "record_datetime_end", "patient_id",
             "purpose", "category", "sub_category", "sub_category_2", "variable",
-            "sub_variable", "file_tags", "further_metadata"
+            "sub_variable", "file_tags", "upload_key"
         ]
 
         for column in required_columns:
             if column not in rows[0]:
                 return {"status": "error", "message": f"Missing required column: {column}"}
-
+        
+        
         logging.info("Pre-checks passed. Processing the TSV...")
     except Exception as e:
         return {"status": "error", "message": f"Failed to process TSV: {e}"}
@@ -3187,10 +3191,10 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
 
         try:
             # Simulate a POST request to create_file
-            from IPython import embed; embed()
+            #from IPython import embed; embed()
             response = client.post("/create_file", data=row)
-
-            if response.status_code == 200:
+            logging.info(f"Row {i + 1}: {response.json()} ... {response.status_code}")
+            if response.status_code in [200,307]:
                 num_success += 1
                 messages.append("File created successfully.")
             else:
@@ -3212,6 +3216,7 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
 
     # Append results to TSV and save as .fin.tsv
     fin_tsv_path = tsv_path.with_suffix(".fin.tsv")
+    
     with open(fin_tsv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) + [ "row",
             "num_files_to_create", "num_success", "num_failed", "create_message", "datetime_finished"
