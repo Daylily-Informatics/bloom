@@ -49,6 +49,8 @@
             position: inherit;
             background-color: var(--form-in-bg-color);
         }
+
+
     </style>
     <script>
         const controlledProperties = {{ controlled_properties | tojson | safe }};
@@ -194,8 +196,6 @@
     </div>
     <hr><hr>
 
-    <script>
-
         <script>
             async function triggerDownload(url) {
                 return new Promise((resolve) => {
@@ -278,6 +278,28 @@
                 resetForms();
             }
         });
+    </script>
+
+    <script>
+        const directory = "templates/scripts/theseareloaded"; // Update this path accordingly
+
+        // Fetch the list of scripts
+        fetch(`/list-scripts?directory=${encodeURIComponent(directory)}`)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then((data) => {
+                data.scripts.forEach((file) => {
+                    const script = document.createElement('script');
+                    script.src = file; // The file path returned by the API
+                    document.body.appendChild(script);
+                });
+            })
+            .catch((error) => console.error('Error loading scripts:', error));
+
     </script>
     {% include 'pre_body_close.html' %}
 </body>

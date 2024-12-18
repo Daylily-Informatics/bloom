@@ -63,9 +63,9 @@ if [[ "$mode" == "dev" ]]; then
     --log-level trace \
     --port $port \
     --timeout-keep-alive 15 \
-    --host $host  \
-    --ssl-certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
-    --ssl-keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
+    --host $host  #\
+#    --ssl-certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
+#    --ssl-keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
 
 elif [[ "$mode" == "prod" ]]; then
   num_workers=3
@@ -77,9 +77,9 @@ elif [[ "$mode" == "prod" ]]; then
     -k uvicorn.workers.UvicornWorker \
     --log-level trace \
     --timeout 15 \
-    --bind $host:$port \
-    --certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
-    --keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
+    --bind $host:$port #\
+#    --certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
+#    --keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."

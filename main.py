@@ -146,6 +146,36 @@ cookie_scheme = APIKeyCookie(name="session")
 SKIP_AUTH = False if len(sys.argv) < 3 else True
 
 
+
+@app.get("/list-scripts", response_class=JSONResponse)
+async def list_scripts(directory: str = Query(..., description="Directory to search for .js files")):
+    """
+    List all .js files in the specified directory.
+
+    Args:
+        directory (str): The directory to search for .js files.
+
+    Returns:
+        JSONResponse: A list of .js file paths.
+    """
+    try:
+        # Resolve the directory path and ensure it exists
+        dir_path = Path(directory)
+        if not dir_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"Invalid directory: {directory}")
+
+        # Ensure the directory has a trailing slash
+        normalized_directory = str(dir_path) + "/"
+
+        # Search for .js files and construct file paths with the normalized directory
+        js_files = [str(file) for file in dir_path.rglob("*.js")]
+
+        logging.info(f"Found {str(js_files)} .js files in {directory}")
+        return JSONResponse(content={"scripts": js_files}, status_code=200)
+    except Exception as e:
+        logging.error(f"Error listing scripts: {e}")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
+
 class AuthenticationRequiredException(HTTPException):
     def __init__(self, detail: str = "Authentication required"):
         super().__init__(status_code=401, detail=detail)
@@ -1993,6 +2023,7 @@ async def create_file(
     clinician_id: str = Form(""),
     health_event_id: str = Form(""),
     record_datetime: str = Form(""),
+    record_datetime_end: str = Form(""),
     patient_id: str = Form(""),
     upload_group_key: str = Form(""),
     upload_group_key_ifnone: str = Form(""),    
@@ -2036,6 +2067,7 @@ async def create_file(
             "clinician_id": clinician_id,
             "health_event_id": health_event_id,
             "record_datetime": record_datetime,
+            "record_datetime_end": record_datetime_end,
             "patient_id": patient_id,
             "creating_user": request.session["user_data"]["email"],
             "upload_group_key": file_set_name,
