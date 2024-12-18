@@ -92,6 +92,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyCookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.testclient import TestClient
 
 from starlette.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -3133,11 +3134,10 @@ async def protected_content(request: Request, auth=Depends(require_auth)):
     content = "You are authenticated and can access protected resources."
     return HTMLResponse(content=content)
 
+client = TestClient(app)  # Create a test client for programmatic requests
+
 @app.post("/bulk_create_files_from_tsv")
 async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(...)):
-    """
-    Accepts a TSV file and processes it row by row to hit the create_file endpoint.
-    """
     temp_dir = Path("temp_bulk_create")
     temp_dir.mkdir(exist_ok=True)
 
@@ -3158,7 +3158,7 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
 
         # Validate required columns
         required_columns = [
-            "comments", "lab_code", "urls", "s3_uris", "study_id",
+            "name", "comments", "lab_code", "urls", "s3_uris", "study_id",
             "clinician_id", "record_datetime", "record_datetime_end", "patient_id",
             "purpose", "category", "sub_category", "sub_category_2", "variable",
             "sub_variable", "file_tags", "further_metadata"
@@ -3168,86 +3168,56 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
             if column not in rows[0]:
                 return {"status": "error", "message": f"Missing required column: {column}"}
 
-        # Perform pre-checks
-        for i, row in enumerate(rows):
-            # Check URLs are reachable
-            if row.get("urls"):
-                urls = row["urls"].split(",")
-                for url in urls:
-                    try:
-                        response = requests.head(url.strip(), timeout=5)
-                        if response.status_code != 200:
-                            return {"status": "error", "message": f"URL {url} not reachable at row {i + 1}"}
-                    except Exception as e:
-                        return {"status": "error", "message": f"URL {url} validation failed: {e}"}
-
-            # Check S3 URIs (mock check, replace with real validation if needed)
-            if row.get("s3_uris"):
-                s3_uris = row["s3_uris"].split(",")
-                for s3_uri in s3_uris:
-                    if not s3_uri.startswith("s3://"):
-                        return {"status": "error", "message": f"Invalid S3 URI {s3_uri} at row {i + 1}"}
-
-        # If all checks pass
-        return {"status": "success", "message": "Pre-checks passed. Processing the TSV..."}
-
+        logging.info("Pre-checks passed. Processing the TSV...")
     except Exception as e:
         return {"status": "error", "message": f"Failed to process TSV: {e}"}
 
     # Process rows and hit create_file
     results = []
     for i, row in enumerate(rows):
+        num_files = 0
+        num_success = 0
+        num_failed = 0
+        messages = []
+
+        # Determine the number of files to create
+        urls = row.get("urls", "").split(",") if row.get("urls") else []
+        s3_uris = row.get("s3_uris", "").split(",") if row.get("s3_uris") else []
+        num_files = len(urls) + len(s3_uris)
+
         try:
-            response = await create_file(
-                request=request,
-                name=row.get("name",""),
-                comments=row.get("comments", ""),
-                lab_code=row.get("lab_code", ""),
-                file_data=None,
-                directory=None,
-                urls=row.get("urls"),
-                s3_uris=row.get("s3_uris"),
-                study_id=row.get("study_id", ""),
-                clinician_id=row.get("clinician_id", ""),
-                health_event_id="",
-                record_datetime=row.get("record_datetime", ""),
-                record_datetime_end=row.get("record_datetime_end", ""),
-                patient_id=row.get("patient_id", ""),
-                upload_group_key=f"{os.path.basename(tsv_path)}_{i}",
-                upload_group_key_ifnone="",
-                purpose=row.get("purpose", ""),
-                category=row.get("category", ""),
-                sub_category=row.get("sub_category", ""),
-                sub_category_2=row.get("sub_category_2", ""),
-                variable=row.get("variable", ""),
-                sub_variable=row.get("sub_variable", ""),
-                file_tags=row.get("file_tags", ""),
-                import_or_remote="import_or_remote",
-                further_metadata=row.get("further_metadata")
-            )
-            results.append({
-                "row": i + 1,
-                "create_success": "success",
-                "create_message": response.get("message", ""),
-                "datetime_finished": datetime.datetime.now().isoformat()
-            })
+            # Simulate a POST request to create_file
+            from IPython import embed; embed()
+            response = client.post("/create_file", data=row)
+
+            if response.status_code == 200:
+                num_success += 1
+                messages.append("File created successfully.")
+            else:
+                num_failed += 1
+                messages.append(response.json().get("detail", "Unknown error"))
         except Exception as e:
-            results.append({
-                "row": i + 1,
-                "create_success": "fail",
-                "create_message": str(e),
-                "datetime_finished": datetime.datetime.now().isoformat()
-            })
+            num_failed += 1
+            messages.append(str(e))
+
+        # Append the result
+        results.append({
+            "row": i + 1,
+            "num_files_to_create": num_files,
+            "num_success": num_success,
+            "num_failed": num_failed,
+            "create_message": "; ".join(messages),
+            "datetime_finished": datetime.now().isoformat()
+        })
 
     # Append results to TSV and save as .fin.tsv
     fin_tsv_path = tsv_path.with_suffix(".fin.tsv")
     with open(fin_tsv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) + [
-            "create_success", "create_message", "datetime_finished"
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) + [ "row",
+            "num_files_to_create", "num_success", "num_failed", "create_message", "datetime_finished"
         ], delimiter="\t")
         writer.writeheader()
         for row, result in zip(rows, results):
             writer.writerow({**row, **result})
 
     return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
-
