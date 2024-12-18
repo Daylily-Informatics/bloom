@@ -4,11 +4,20 @@ import httpx
 import os
 import json
 import subprocess
-import shutil
 from typing import List
 from pathlib import Path
 import random
- 
+
+import csv
+import os
+import datetime
+import json
+import logging
+import requests
+import shutil
+
+import pandas 
+
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -1990,7 +1999,28 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
 
     return HTMLResponse(content=content)
 
-@app.get("/dewey0", response_class=HTMLResponse)
+
+
+@app.get("/bulk_create_files", response_class=HTMLResponse)
+async def bulk_create_files(request: Request, _auth=Depends(require_auth)):
+    request.session.pop("form_data", None)
+
+    accordion_states = dict(request.session)
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+
+    content = templates.get_template("bulk_create_files.html").render(
+        request=request,
+        accordion_states=accordion_states,
+        style=style,
+        udat=user_data,
+        page_title="Bulk Create Files",
+    )
+
+    return HTMLResponse(content=content)
+
+
+@app.get("/dewey0_DELETEME", response_class=HTMLResponse)
 async def dewey0(request: Request, _auth=Depends(require_auth)):
     request.session.pop("form_data", None)
 
@@ -2035,6 +2065,7 @@ async def create_file(
     sub_variable: str = Form(""),
     file_tags: str = Form(""),
     import_or_remote: str = Form("import_or_remote"),
+    further_metadata: str = Form(None),
 ):
     
     file_set_name = upload_group_key_ifnone if upload_group_key in [None,'None',""] else upload_group_key 
@@ -2081,6 +2112,9 @@ async def create_file(
             "file_tags": file_tags,
             "import_or_remote": import_or_remote,
         }
+
+        if further_metadata:
+            file_metadata.update(json.loads(further_metadata))
 
         results = []
         
@@ -3098,3 +3132,122 @@ async def protected_content(request: Request, auth=Depends(require_auth)):
     """
     content = "You are authenticated and can access protected resources."
     return HTMLResponse(content=content)
+
+@app.post("/bulk_create_files_from_tsv")
+async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(...)):
+    """
+    Accepts a TSV file and processes it row by row to hit the create_file endpoint.
+    """
+    temp_dir = Path("temp_bulk_create")
+    temp_dir.mkdir(exist_ok=True)
+
+    # Save uploaded TSV locally
+    tsv_path = temp_dir / file.filename
+    with open(tsv_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # Read and validate the TSV
+    rows = []
+    try:
+        with open(tsv_path, "r") as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            rows = list(reader)
+
+        if not rows:
+            return {"status": "error", "message": "The TSV file is empty."}
+
+        # Validate required columns
+        required_columns = [
+            "comments", "lab_code", "urls", "s3_uris", "study_id",
+            "clinician_id", "record_datetime", "record_datetime_end", "patient_id",
+            "purpose", "category", "sub_category", "sub_category_2", "variable",
+            "sub_variable", "file_tags", "further_metadata"
+        ]
+
+        for column in required_columns:
+            if column not in rows[0]:
+                return {"status": "error", "message": f"Missing required column: {column}"}
+
+        # Perform pre-checks
+        for i, row in enumerate(rows):
+            # Check URLs are reachable
+            if row.get("urls"):
+                urls = row["urls"].split(",")
+                for url in urls:
+                    try:
+                        response = requests.head(url.strip(), timeout=5)
+                        if response.status_code != 200:
+                            return {"status": "error", "message": f"URL {url} not reachable at row {i + 1}"}
+                    except Exception as e:
+                        return {"status": "error", "message": f"URL {url} validation failed: {e}"}
+
+            # Check S3 URIs (mock check, replace with real validation if needed)
+            if row.get("s3_uris"):
+                s3_uris = row["s3_uris"].split(",")
+                for s3_uri in s3_uris:
+                    if not s3_uri.startswith("s3://"):
+                        return {"status": "error", "message": f"Invalid S3 URI {s3_uri} at row {i + 1}"}
+
+        # If all checks pass
+        return {"status": "success", "message": "Pre-checks passed. Processing the TSV..."}
+
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to process TSV: {e}"}
+
+    # Process rows and hit create_file
+    results = []
+    for i, row in enumerate(rows):
+        try:
+            response = await create_file(
+                request=request,
+                name=row.get("name",""),
+                comments=row.get("comments", ""),
+                lab_code=row.get("lab_code", ""),
+                file_data=None,
+                directory=None,
+                urls=row.get("urls"),
+                s3_uris=row.get("s3_uris"),
+                study_id=row.get("study_id", ""),
+                clinician_id=row.get("clinician_id", ""),
+                health_event_id="",
+                record_datetime=row.get("record_datetime", ""),
+                record_datetime_end=row.get("record_datetime_end", ""),
+                patient_id=row.get("patient_id", ""),
+                upload_group_key=f"{os.path.basename(tsv_path)}_{i}",
+                upload_group_key_ifnone="",
+                purpose=row.get("purpose", ""),
+                category=row.get("category", ""),
+                sub_category=row.get("sub_category", ""),
+                sub_category_2=row.get("sub_category_2", ""),
+                variable=row.get("variable", ""),
+                sub_variable=row.get("sub_variable", ""),
+                file_tags=row.get("file_tags", ""),
+                import_or_remote="import_or_remote",
+                further_metadata=row.get("further_metadata")
+            )
+            results.append({
+                "row": i + 1,
+                "create_success": "success",
+                "create_message": response.get("message", ""),
+                "datetime_finished": datetime.datetime.now().isoformat()
+            })
+        except Exception as e:
+            results.append({
+                "row": i + 1,
+                "create_success": "fail",
+                "create_message": str(e),
+                "datetime_finished": datetime.datetime.now().isoformat()
+            })
+
+    # Append results to TSV and save as .fin.tsv
+    fin_tsv_path = tsv_path.with_suffix(".fin.tsv")
+    with open(fin_tsv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) + [
+            "create_success", "create_message", "datetime_finished"
+        ], delimiter="\t")
+        writer.writeheader()
+        for row, result in zip(rows, results):
+            writer.writerow({**row, **result})
+
+    return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
+

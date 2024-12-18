@@ -63,7 +63,7 @@
     <table>
         <tr>
             <td>S3 URI</td>
-            <td>{{  object.json_addl['properties']['current_s3_uri'] }}</td>
+            <td>{{  object.json_addl['properties']['current_s3_uri'] }} -- <small><a href="https://us-east-1.console.aws.amazon.com/s3/buckets/{{ object.json_addl.properties.current_s3_bucket_name }}?region=us-east-1&bucketType=general&prefix={{ object.json_addl.properties.current_s3_key }}" target=rlink>redirect aws linkout</a></small></td>
         </tr>
         <tr>
             <td>EUID</td>
