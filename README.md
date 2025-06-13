@@ -26,7 +26,7 @@ _and flexible whitelisting, etc..._
 ## Nested Assay / Queue / Workset
 <img width="1165" alt="bloom-lims-trad-view" src="bloom_lims/docs/imgs/bloom_assays.png" >
 
-## Intantiate Objects From Available Templates
+## Instantiate Objects From Available Templates
 <img width="1200" alt="bloom-lims-instantiated-abstracts" src="bloom_lims/docs/imgs/bloom_nested.png">
 
 ## Object Detail
