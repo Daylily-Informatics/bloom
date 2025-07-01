@@ -356,7 +356,7 @@ async def get_login_page(request: Request):
     # Ensure you have this function defined, and it returns the expected style information
     template = templates.get_template("login.html")
     # Pass the 'style' variable in the context
-    context = {"request": request, "style": style, "udat": user_data, "supabase_url": os.getenv("SUPABASE_URL", "SUPABASE-URL-NOT-SET") } 
+    context = {"request": request, "style": style, "udat": user_data, "supabase_url": os.getenv("SUPABASE_URL", "SUPABASE-URL-NOT-SET"), "supabase_redirect_url": os.getenv("SUPABASE_REDIRECT_URL","notset") } 
     return HTMLResponse(content=template.render(context))
 
 

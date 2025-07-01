@@ -2,7 +2,7 @@
 
 # Default values
 host="0.0.0.0"
-port=8911
+port=8913
 mode="dev"
 
 unset HTTP_PROXY
@@ -53,7 +53,7 @@ num_workers=$(( (num_cores * 2) - 1 ))
 
 
 
-
+num_workers=1
 # Run Uvicorn for development or Gunicorn for production
 if [[ "$mode" == "dev" ]]; then
   echo "Running in development mode on $host:$port"
@@ -64,11 +64,11 @@ if [[ "$mode" == "dev" ]]; then
     --port $port \
     --timeout-keep-alive 15 \
     --host $host  \
-    --ssl-certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
-    --ssl-keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
+    --ssl-certfile /etc/letsencrypt/live/lsmc.bio/fullchain.pem \
+    --ssl-keyfile  /etc/letsencrypt/live/lsmc.bio/privkey.pem
 
 elif [[ "$mode" == "prod" ]]; then
-  num_workers=4
+  num_workers=3
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
   sleep 4
@@ -78,8 +78,8 @@ elif [[ "$mode" == "prod" ]]; then
     --log-level trace \
     --timeout 15 \
     --bind $host:$port \
-    --certfile /etc/letsencrypt/live/dewey.rcrf-dev.org/fullchain.pem \
-    --keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
+    --certfile /etc/letsencrypt/live/lsmc.bio/fullchain.pem \
+    --keyfile  /etc/letsencrypt/live/lsmc.bio/privkey.pem
 else
   echo "Invalid mode: $mode"
   echo "Use --mode <dev|prod> to specify the run mode."
