@@ -1,5 +1,5 @@
 # Bloom : Templated Abstract Polymorphic (and opinionated) LIMS 
-_a conceptual gambit in collaboration with chatGPT4_  /// _POC v0.10.11_
+_a conceptual gambit in collaboration with chatGPT4_  /// _POC v0.10.12_
 
 
 [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml) [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml) _ARM hardware is not supported_
@@ -26,7 +26,7 @@ _and flexible whitelisting, etc..._
 ## Nested Assay / Queue / Workset
 <img width="1165" alt="bloom-lims-trad-view" src="bloom_lims/docs/imgs/bloom_assays.png" >
 
-## Intantiate Objects From Available Templates
+## Instantiate Objects From Available Templates
 <img width="1200" alt="bloom-lims-instantiated-abstracts" src="bloom_lims/docs/imgs/bloom_nested.png">
 
 ## Object Detail

@@ -21,7 +21,7 @@
         {"property_key":"tags","form_label":"Tags", "required": false, "value_type":"list"},
         {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"},
         {"property_key": "ref_type", "form_label":"Ref Type", "required":false, "value_type":"uid-static"},
-        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "string"}       
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "hidden"}       
       ],
       "controlled_properties": { },
       "expected_inputs": [],

@@ -136,12 +136,11 @@ table {
 }
 
 .form-label {
-    flex: 0 0 20%;
     text-align: right;
 }
 
 .form-input {
-    flex: 1;
+    
 }
 
 .list-input-container {
@@ -151,7 +150,6 @@ table {
 }
 
 .list-input-item {
-    flex: 1;
     min-width: 150px;
 }
 

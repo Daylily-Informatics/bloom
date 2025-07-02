@@ -1,5 +1,5 @@
 # Problem Statement
-* In my experience, laboratory information systems (LIS or LIMS) do not satisfactorily meet the needs of any of the end users ( lab staff, operations, informatics ), are expensive and time consuming to build/maintain/extend, and this has been the case for so long that these are the expected characteristics of LIS. LIS do offer sigificant value, but in my experience also must be worked around in order for the processes the LIS is intended to support can function. Why?
+* In my experience, laboratory information systems (LIS or LIMS) do not satisfactorily meet the needs of most of the end users ( lab staff, operations, informatics ), are expensive and time consuming to build/maintain/extend, and often are built to a narrow scope when these systems usually need to be broad in scope. This has been the case for so long that these are the expected characteristics of LIS. Current LIS, as irritating as they are, do offer sigificant value and modern labs simply can not operate w/out one. In my experience, these sytems invariably also end up at best a moderate inconvenience to work with/around, or are actually business killing. Why?
 
 # Why?
 ## preamble

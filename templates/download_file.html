@@ -1,12 +1,13 @@
 <div class="accordion-content">
     <ul>
-        <form id="downloadFileForm" onsubmit="downloadSelectedFiles(event);" method="post" enctype="multipart/form-data">            <label for="euid">File EUID: </label>
+            <form action="download_file" method="post">
+                <label for="euid">File EUID: </label>
         <input type="text" id="euid" name="euid"><br><br>
         
         <label for="download-type">File Creation Mode:</label> 
         <select id="download-type" name="download_type">
             <option value="dewey" selected>dewey</option>
-            <option value="hybrid">hybrid</option>
+            <option selected value="hybrid">hybrid</option>
             <option value="orig">orig</option>
         </select>
         <ul>File(s) downloaded will be named as follows:

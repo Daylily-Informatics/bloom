@@ -1,10 +1,15 @@
 <div class="accordion-content">
     <ul>
+
+
+            <h3><a href=/bulk_create_files class="button">Bulk File Creation</a></h3>
+            <br>
+            <hr>        
         <form id="createFileForm" data-form="register" action="create_file" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="upload_group_key" value="{{ upload_group_key }}">
+            <input type="hidden" name="upload_group_key_ifnone" value="{{ upload_group_key }}">
             <table>
                 <tr>
-                    <td>
+                    <td style="align-content: flex-start;" >
                         <input type="hidden" value="na" id="name" name="name">
 
                         <h3>Specify Files</h3>
@@ -22,16 +27,20 @@
                             <textarea id="urls" name="urls" rows="5" cols="25"></textarea>
                             <br><br>
 
-                            <label for="s3_uris">S3 URIs (accessible to dewey):</label>
+                            <label for="s3_uris">S3 URIs (file or directory uris):</label>
                             <textarea id="s3_uris" name="s3_uris" rows="5" cols="28"></textarea>
                             <br><br>
                         </ul>
                     </td>
-                    <td>
-                        <h3>Add Metadata</h3>
+                    <td style="align-content: flex-start;">
                         <ul>
-                            <small>upload group key: <code>{{ upload_group_key }}</code></small>
                             <br><br>
+                            <h4>Add Metadata</h4>
+
+                            <label for="upload_group_key" >File Set Name: </label>
+                            <input type=text name="upload_group_key"></input>
+                            
+                            <ul>
 
                             {% for field in ui_fields %}
                                 <div>
@@ -51,24 +60,107 @@
                                     {% else %}
                                     <label for="{{ field.name }}">{{ field.label }}</label>
 
-                                        {% if field.name.endswith('_datetime') %}
+                                        {% if field.name.endswith('record_datetime')  %}
+                                                
+                                                <!-- Date and Time Selectors -->
+                                                <input type="date" id="custom-date-start" name="custom-date-start" pattern="\d{2}-\d{2}-\d{4}" placeholder="MM-DD-YYYY">
+                                                <label for="custom-date-start"> time:</label>
+                                                                                        
+                                                <input type="time" id="custom-time-start" name="custom-time-start"  placeholder="--:--:--">
+                                                
+
+                                                <!-- Hidden Merged Field -->
+                                                <input type="hidden" id="record_datetime" name="record_datetime">
+
+                                        {% elif field.name.endswith('record_datetime_end')  %}
+                                                <!-- Date and Time Selectors -->
+                                                <input type="date" id="custom-date-end" name="custom-date-end" pattern="\d{2}-\d{2}-\d{4}" placeholder="MM-DD-YYYY">
+                                                <label for="custom-time-end"> time:</label>
+                                                
+                                                <input type="time" id="custom-time-end" name="custom-time-end" placeholder="--:--:--">
+
+    
+                                                <!-- Hidden Merged Field -->
+                                                <input type="hidden" id="record_datetime_end" name="record_datetime_end">
+
+                                        {% elif field.name.endswith('_date') %}
                                             <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
+                                        {% elif field.name.endswith('_break') %}
+                                    </ul><hr><ul>
                                         {% else %}
                                             <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
                                         {% endif %}
                                     {% endif %}
                                 </div>
-                            {% endfor %}
+                            {% endfor %} 
                         </ul>
+                    </ul>
                     </td>
                 </tr>
                 <tr>
                     <td colspan="2">
+
+
                         <button type="submit">Create</button>
                     </td>
                 </tr>
             </table>
         </form>
     </ul>
-</div>
- 
+
+</div>    
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.getElementById('custom-date-start');
+        const timeInput = document.getElementById('custom-time-start');
+        const mergedField = document.getElementById('record_datetime');
+    
+        const dateInpute = document.getElementById('custom-date-end');
+        const timeInpute = document.getElementById('custom-time-end');
+        const mergedFielde = document.getElementById('record_datetime_end');
+    
+        const updateMergedField = () => {
+            const dateValue = dateInput.value || '';
+            const timeValue = timeInput.value || '';
+            mergedField.value = dateValue && timeValue ? `${dateValue}T${timeValue}` : dateValue;
+        };
+    
+        const updateMergedFielde = () => {
+            const dateValuee = dateInpute.value || '';
+            const timeValuee = timeInpute.value || '';
+            mergedFielde.value = dateValuee && timeValuee ? `${dateValuee}T${timeValuee}` : dateValuee;
+        };
+    
+        const toggleTimeInput = () => {
+            timeInput.disabled = !dateInput.value;
+        };
+    
+        const toggleTimeInputEnd = () => {
+            timeInpute.disabled = !dateInpute.value;
+        };
+    
+        // Attach event listeners
+        dateInput.addEventListener('change', () => {
+            toggleTimeInput();
+            updateMergedField();
+        });
+    
+        timeInput.addEventListener('change', updateMergedField);
+    
+        dateInpute.addEventListener('change', () => {
+            toggleTimeInputEnd();
+            updateMergedFielde();
+        });
+    
+        timeInpute.addEventListener('change', updateMergedFielde);
+    
+        // Initialize the state on page load
+        toggleTimeInput();
+        toggleTimeInputEnd();
+        updateMergedField();
+        updateMergedFielde();
+    });
+    
+</script>    
+

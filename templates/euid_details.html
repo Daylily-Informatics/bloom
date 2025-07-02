@@ -63,24 +63,28 @@
     <table>
         <tr>
             <td>S3 URI</td>
-            <td>{{  object.json_addl['properties']['current_s3_uri'] }}</td>
+            <td>{{  object.json_addl['properties']['current_s3_uri'] }} -- <small><a href="https://us-east-1.console.aws.amazon.com/s3/buckets/{{ object.json_addl.properties.current_s3_bucket_name }}?region=us-east-1&bucketType=general&prefix={{ object.json_addl.properties.current_s3_key }}" target=rlink>redirect aws linkout</a></small></td>
         </tr>
         <tr>
             <td>EUID</td>
-            <td><a class="reference-link" href="euid_details?euid={{ object.euid }}">{{ object.euid }}</a></td>
+            <td><a class="reference-link" href="euid_details?euid={{ object.euid }}">{{ object.euid }}</a>
+            
+                {%if  object.json_addl.properties.ref_type and object.json_addl['properties']['ref_type']  == "presigned_url" %}
+                -- ( <a href="file_set_urls?fs_euid={{ object.euid }}">presigned urls</a> )
+		     {% else %}
+        	
+		    {% endif %}
+
+
+            </td>
         </tr>
+
         <tr>
-            <td>UUID</td>
-            <td><a class="reference-link" href="uuid_details?uuid={{ object.uuid }}">{{ object.uuid }}</a></td>
+            <td>Given Name</td>
+            <td>{{ object.json_addl['properties']['name'] }}</td>
         </tr>
-        <tr>
-            <td>DB Name<ul>Given Name<br>Lab Code</ul></td>
-            <td>{{ object.name }}<ul>{%if  object.json_addl['properties']['name']  == "signed urls" %}<a href="file_set_urls?fs_euid={{ object.euid }}">{{ object.json_addl['properties']['name'] }}</a>
-													     {% else %}
-													     <b>{{ object.json_addl['properties']['name'] }}</b>
-													     {% endif %}
-													     <br>{{ object.json_addl['properties']['lab_code'] }}</ul></td>
-        </tr>
+       
+      
         <tr>
             <td>Polymorphic Discriminator</td>
             <td>{{ object.polymorphic_discriminator }}</td>
@@ -123,18 +127,22 @@
                 {% endif %}
             </td>
         </tr>
+        <tr>
+            <td>UUID</td>
+            <td><a class="reference-link" href="uuid_details?uuid={{ object.uuid }}">{{ object.uuid }}</a></td>
+        </tr>
     </table>
 
     <hr>
 
     <div class="collapsible-buttons">
         <button type="button" class="collapsiblex" data-target="relationshipsContent">Relationships</button>
-        <button type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
+        <button style="display:none;" type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
         <button type="button" class="collapsiblex" data-target="actionGroupsContent">Action Groups</button>
         <button type="button" class="collapsiblex" data-target="auditLogContent">Audit Log</button>
         <button type="button" class="collapsiblex" data-target="fullEditContent">Edit Obj Properties (admin)</button>
         {% if object.parent_template_euid %}
-            ...
+            
         {% else %}
             <button type="button" class="collapsiblex" data-target="fullEditContentTemplate">Edit Template Form Properties (super admin)</button>
         {% endif %}
@@ -147,58 +155,84 @@
         <h3>Child Of Lineages</h3>
         <table class="searchable">
             <tr>
-                <th>Lineage EUID</th>
-                <th>Relationship Type</th>
-                <th>Parent Instance EUID</th>
+                <th>Parent</th>
+
                 <th>Parent Type</th>
                 <th>Parent Sub Type</th>
                 <th>Parent Version</th>
-                <th>Child Instance EUID</th>
+                <th>Parent Instance EUID</th>
+
+                <th>Child</th>
                 <th>Child Type</th>
                 <th>Child Sub Type</th>
                 <th>Child Version</th>
+                <th>Child Instance EUID</th>
+  
+
+                <th>Relationship Type</th>
+                <th>Lineage EUID</th>
+
+
             </tr>
             {% for lineage in oobj.child_of_lineages %}
                 <tr>
-                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
-                    <td>{{ lineage.relationship_type }}</td>
-                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+                    <td>{{ lineage.parent_instance.super_type }}</td>
+
                     <td>{{ lineage.parent_instance.btype }}</td>
                     <td>{{ lineage.parent_instance.b_sub_type }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
-                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+
+                    <td>{{ lineage.child_instance.super_type }}</td>
                     <td>{{ lineage.child_instance.btype }}</td>
                     <td>{{ lineage.child_instance.b_sub_type }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
+                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+
+
+                    <td>{{ lineage.relationship_type }}</td>
+                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
+
                 </tr>
             {% endfor %}
         </table>
         <h3>Parent Of Lineages</h3>
         <table class="searchable">
             <tr>
-                <th>Lineage EUID</th>
-                <th>Relationship Type</th>
-                <th>Parent Instance EUID</th>
+
+                <th>Parent</th>
                 <th>Parent Type</th>
                 <th>Parent Sub Type</th>
                 <th>Parent Version</th>
-                <th>Child Instance EUID</th>
+                <th>Parent Instance EUID</th>
+
+                <th>Child</th>
                 <th>Child Type</th>
                 <th>Child Sub Type</th>
                 <th>Child Version</th>
+                <th>Child Instance EUID</th>
+
+                <th>Relationship Type</th>
+                <th>Lineage EUID</th>
+
             </tr>
             {% for lineage in oobj.parent_of_lineages %}
                 <tr>
-                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
-                    <td>{{ lineage.relationship_type }}</td>
-                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+                    <td>{{ lineage.parent_instance.super_type }}</td>
+  
                     <td>{{ lineage.parent_instance.btype }}</td>
                     <td>{{ lineage.parent_instance.b_sub_type }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
-                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+                    <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
+
+                    <td>{{ lineage.child_instance.super_type }}</td> 
                     <td>{{ lineage.child_instance.btype }}</td>
                     <td>{{ lineage.child_instance.b_sub_type }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
+                    <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
+
+                    <td>{{ lineage.relationship_type }}</td>
+                    <td><a href="euid_details?euid={{ lineage.euid }}">{{ lineage.euid }}</a></td>
                 </tr>
             {% endfor %}
         </table>
@@ -465,6 +499,5 @@
         });
     </script>
 
-    <small><a href=delete_by_euid?euid={{ object.euid }}>SOFTdelete object</a> - -- or -- - <a href=un_delete_by_uuid?uuid={{ object.uuid }}&euid={{ object.euid }}>unSOFTdelete object</a></small>
 </body>
 </html>

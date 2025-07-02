@@ -68,7 +68,7 @@ if [[ "$mode" == "dev" ]]; then
     --ssl-keyfile  /etc/letsencrypt/live/dewey.rcrf-dev.org/privkey.pem
 
 elif [[ "$mode" == "prod" ]]; then
-  num_workers=4
+  num_workers=3
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
   sleep 4

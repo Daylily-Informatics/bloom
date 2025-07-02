@@ -4,11 +4,20 @@ import httpx
 import os
 import json
 import subprocess
-import shutil
 from typing import List
 from pathlib import Path
 import random
- 
+
+import csv
+import os
+import datetime
+import json
+import logging
+import requests
+import shutil
+
+import pandas 
+
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -83,6 +92,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyCookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.testclient import TestClient
 
 from starlette.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -145,6 +155,36 @@ app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
 cookie_scheme = APIKeyCookie(name="session")
 SKIP_AUTH = False if len(sys.argv) < 3 else True
 
+
+
+@app.get("/list-scripts", response_class=JSONResponse)
+async def list_scripts(directory: str = Query(..., description="Directory to search for .js files")):
+    """
+    List all .js files in the specified directory.
+
+    Args:
+        directory (str): The directory to search for .js files.
+
+    Returns:
+        JSONResponse: A list of .js file paths.
+    """
+    try:
+        # Resolve the directory path and ensure it exists
+        dir_path = Path(directory)
+        if not dir_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"Invalid directory: {directory}")
+
+        # Ensure the directory has a trailing slash
+        normalized_directory = str(dir_path) + "/"
+
+        # Search for .js files and construct file paths with the normalized directory
+        js_files = [str(file) for file in dir_path.rglob("*.js")]
+
+        logging.info(f"Found {str(js_files)} .js files in {directory}")
+        return JSONResponse(content={"scripts": js_files}, status_code=200)
+    except Exception as e:
+        logging.error(f"Error listing scripts: {e}")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
 
 class AuthenticationRequiredException(HTTPException):
     def __init__(self, detail: str = "Authentication required"):
@@ -290,7 +330,12 @@ async def authentication_required_exception_handler(
 
 
 async def require_auth(request: Request):
+    
 
+    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
+        request.session["user_data"] = {"email": "john@daylilyinformatics.com", "dag_fnv2": ""}
+        return request
+    
     if (
         os.environ.get("SUPABASE_URL", "NA") == "NA"
         and os.environ.get("SUPABASE_KEY", "NA") == "NA"
@@ -1955,7 +2000,28 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
 
     return HTMLResponse(content=content)
 
-@app.get("/dewey0", response_class=HTMLResponse)
+
+
+@app.get("/bulk_create_files", response_class=HTMLResponse)
+async def bulk_create_files(request: Request, _auth=Depends(require_auth)):
+    request.session.pop("form_data", None)
+
+    accordion_states = dict(request.session)
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+
+    content = templates.get_template("bulk_create_files.html").render(
+        request=request,
+        accordion_states=accordion_states,
+        style=style,
+        udat=user_data,
+        page_title="Bulk Create Files",
+    )
+
+    return HTMLResponse(content=content)
+
+
+@app.get("/dewey0_DELETEME", response_class=HTMLResponse)
 async def dewey0(request: Request, _auth=Depends(require_auth)):
     request.session.pop("form_data", None)
 
@@ -1980,16 +2046,18 @@ async def create_file(
     name: str = Form(...),
     comments: str = Form(""),
     lab_code: str = Form(""),
-    file_data: List[UploadFile] = File(None),
-    directory: List[UploadFile] = File(None),
-    urls: str = Form(None),
-    s3_uris: str = Form(None),
+    file_data: List[UploadFile] = File(""),
+    directory: List[UploadFile] = File(""),
+    urls: str = Form(""),
+    s3_uris: str = Form(""),
     study_id: str = Form(""),
     clinician_id: str = Form(""),
     health_event_id: str = Form(""),
-    relevant_datetime: str = Form(""),
+    record_datetime: str = Form(""),
+    record_datetime_end: str = Form(""),
     patient_id: str = Form(""),
     upload_group_key: str = Form(""),
+    upload_group_key_ifnone: str = Form(""),    
     purpose: str = Form(""),
     category: str = Form(""),   
     sub_category: str = Form(""),
@@ -1998,7 +2066,12 @@ async def create_file(
     sub_variable: str = Form(""),
     file_tags: str = Form(""),
     import_or_remote: str = Form("import_or_remote"),
+    further_metadata: str = Form(""),
 ):
+    user_data = request.session.get("user_data", {})
+    controlled_properties = {}  # Or fetch from relevant source
+
+    file_set_name = upload_group_key_ifnone if upload_group_key in [None,'None',""] else upload_group_key 
 
     if directory and len(directory) > 1000:
         return JSONResponse(
@@ -2010,9 +2083,9 @@ async def create_file(
     try:
      
         # Creating a file set to tag all the files uploaded in the same batch together.
-        bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bfs = BloomFileSet(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
         file_set_metadata = {
-            "name": upload_group_key,
+            "name": file_set_name,
             "description": "File set created by Dewey file manager",
             "tag": "on-create",
             "comments": "",
@@ -2020,17 +2093,18 @@ async def create_file(
         # Create the file set
         new_file_set = bfs.create_file_set(file_set_metadata=file_set_metadata)
         
-        bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bfi = BloomFile(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
         file_metadata = {
             "name": name,
             "comments": comments,
             "lab_code": lab_code,
             "clinician_id": clinician_id,
             "health_event_id": health_event_id,
-            "relevant_datetime": relevant_datetime,
+            "record_datetime": record_datetime,
+            "record_datetime_end": record_datetime_end,
             "patient_id": patient_id,
-            "creating_user": request.session["user_data"]["email"],
-            "upload_group_key": upload_group_key,
+            "creating_user": request.session.get("user_data",{}).get("email","na"),
+            "upload_group_key": file_set_name,
             "study_id": study_id,
             "purpose": purpose,
             "category": category,
@@ -2041,6 +2115,9 @@ async def create_file(
             "file_tags": file_tags,
             "import_or_remote": import_or_remote,
         }
+
+        if further_metadata:
+            file_metadata.update(json.loads(further_metadata))
 
         results = []
         
@@ -2153,19 +2230,36 @@ async def create_file(
                         new_file = bfi.create_file(
                             file_metadata=file_metadata, s3_uri=s3_uri.strip(), addl_tags=addl_tags,
                         )
-                        results.append(
-                            {
-                                "identifier": new_file.euid,
-                                "status": "Success",
-                                "original": s3_uri,
-                                "current_s3_uri": new_file.json_addl["properties"][
-                                    "current_s3_uri"
-                                ],
-                            }
-                        )
-                        bfs.add_files_to_file_set(
-                            file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
-                        )  
+
+                        if type(new_file) == type([]):
+                            for nf in new_file:
+                                results.append(
+                                    {
+                                        "identifier": nf.euid,
+                                        "status": "Success",
+                                        "original": s3_uri,
+                                        "current_s3_uri": nf.json_addl["properties"][
+                                            "current_s3_uri"
+                                        ],
+                                    }
+                                )
+                                bfs.add_files_to_file_set(
+                                    file_set_euid=new_file_set.euid, file_euids=[nf.euid]
+                                )
+                        else:
+                            results.append(
+                                {
+                                    "identifier": new_file.euid,
+                                    "status": "Success",
+                                    "original": s3_uri,
+                                    "current_s3_uri": new_file.json_addl["properties"][
+                                        "current_s3_uri"
+                                    ],
+                                }
+                            )
+                            bfs.add_files_to_file_set(
+                                file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
+                            )  
                     except Exception as e:
                         results.append(
                             {
@@ -2200,6 +2294,7 @@ async def create_file(
             error=f"An error occurred: {e}",
             accordion_states=accordion_states,
             style=style,
+            controlled_properties=controlled_properties,
             udat=user_data,
         )
 
@@ -2304,8 +2399,8 @@ async def search_files(
     is_greedy: str = Form("yes"),
     patient_id: List[str] = Form(None),
     clinician_id: List[str] = Form(None),
-    relevant_datetime_start: str = Form(None),
-    relevant_datetime_end: str = Form(None),
+    record_datetime_start: str = Form(None),
+    record_datetime_end: str = Form(None),
     lab_code: List[str] = Form(None),
     purpose: str = Form(None),
     purpose_subtype: str = Form(None),
@@ -2341,10 +2436,10 @@ async def search_files(
     
     search_criteria = create_search_criteria(form_data, search_fields)
         
-    if relevant_datetime_start or relevant_datetime_end:
-        search_criteria["relevant_datetime"] = {
-            "start": relevant_datetime_start,
-            "end": relevant_datetime_end
+    if record_datetime_start or record_datetime_end:
+        search_criteria["record_datetime"] = {
+            "start": record_datetime_start,
+            "end": record_datetime_end
         }
 
     greedy = is_greedy == "yes"
@@ -2353,7 +2448,7 @@ async def search_files(
         bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
 
-        # Prepare additional filters for created_datetime and relevant_datetime
+        # Prepare additional filters for created_datetime and record_datetime
         query = bfi.session.query(bfi.Base.classes.generic_instance)
 
         if created_datetime_start:
@@ -2365,13 +2460,13 @@ async def search_files(
                 bfi.Base.classes.generic_instance.created_dt <= datetime.strptime(created_datetime_end, "%Y-%m-%d")
             )
 
-        if relevant_datetime_start or relevant_datetime_end:
-            relevant_datetime_filter = {}
-            if relevant_datetime_start:
-                relevant_datetime_filter["start"] = datetime.strptime(relevant_datetime_start, "%Y-%m-%d")
-            if relevant_datetime_end:
-                relevant_datetime_filter["end"] = datetime.strptime(relevant_datetime_end, "%Y-%m-%d")
-            search_criteria["relevant_datetime"] = relevant_datetime_filter
+        if record_datetime_start or record_datetime_end:
+            record_datetime_filter = {}
+            if record_datetime_start:
+                record_datetime_filter["start"] = datetime.strptime(record_datetime_start, "%Y-%m-%d")
+            if record_datetime_end:
+                record_datetime_filter["end"] = datetime.strptime(record_datetime_end, "%Y-%m-%d")
+            search_criteria["record_datetime"] = record_datetime_filter
 
         euid_results = bfi.search_objs_by_addl_metadata(
             {'properties':search_criteria}, greedy, "file", super_type="file"
@@ -3041,3 +3136,93 @@ async def protected_content(request: Request, auth=Depends(require_auth)):
     """
     content = "You are authenticated and can access protected resources."
     return HTMLResponse(content=content)
+
+client = TestClient(app)  # Create a test client for programmatic requests
+
+@app.post("/bulk_create_files_from_tsv")
+async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(...)):
+    temp_dir = Path("temp_bulk_create")
+    temp_dir.mkdir(exist_ok=True)
+
+    # Save uploaded TSV locally
+    tsv_path = temp_dir / file.filename
+    with open(tsv_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # Read and validate the TSV
+    rows = []
+    try:
+        with open(tsv_path, "r") as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            rows = list(reader)
+
+        if not rows:
+            return {"status": "error", "message": "The TSV file is empty."}
+
+        # Validate required columns
+        required_columns = [
+            "name", "comments", "lab_code", "urls", "s3_uris", "study_id",
+            "clinician_id", "record_datetime", "record_datetime_end", "patient_id",
+            "purpose", "category", "sub_category", "sub_category_2", "variable",
+            "sub_variable", "file_tags", "upload_key"
+        ]
+
+        for column in required_columns:
+            if column not in rows[0]:
+                return {"status": "error", "message": f"Missing required column: {column}"}
+        
+        
+        logging.info("Pre-checks passed. Processing the TSV...")
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to process TSV: {e}"}
+
+    # Process rows and hit create_file
+    results = []
+    for i, row in enumerate(rows):
+        num_files = 0
+        num_success = 0
+        num_failed = 0
+        messages = []
+
+        # Determine the number of files to create
+        urls = row.get("urls", "").split(",") if row.get("urls") else []
+        s3_uris = row.get("s3_uris", "").split(",") if row.get("s3_uris") else []
+        num_files = len(urls) + len(s3_uris)
+
+        try:
+            # Simulate a POST request to create_file
+            #from IPython import embed; embed()
+            response = client.post("/create_file", data=row)
+            logging.info(f"Row {i + 1}: {response.json()} ... {response.status_code}")
+            if response.status_code in [200,307]:
+                num_success += 1
+                messages.append("File created successfully.")
+            else:
+                num_failed += 1
+                messages.append(response.json().get("detail", "Unknown error"))
+        except Exception as e:
+            num_failed += 1
+            messages.append(str(e))
+
+        # Append the result
+        results.append({
+            "row": i + 1,
+            "num_files_to_create": num_files,
+            "num_success": num_success,
+            "num_failed": num_failed,
+            "create_message": "; ".join(messages),
+            "datetime_finished": datetime.now().isoformat()
+        })
+
+    # Append results to TSV and save as .fin.tsv
+    fin_tsv_path = tsv_path.with_suffix(".fin.tsv")
+    
+    with open(fin_tsv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) + [ "row",
+            "num_files_to_create", "num_success", "num_failed", "create_message", "datetime_finished"
+        ], delimiter="\t")
+        writer.writeheader()
+        for row, result in zip(rows, results):
+            writer.writerow({**row, **result})
+
+    return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
