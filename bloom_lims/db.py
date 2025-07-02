@@ -651,3 +651,4 @@ class BLOOMdb3:
         self.session.close()
         self.engine.dispose()
 
+ 
