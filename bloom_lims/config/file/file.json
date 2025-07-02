@@ -69,7 +69,7 @@
         {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"},
         {"property_key": "file_tags", "form_label":"File Tags", "required":false, "value_type":"list"},
         {"property_key":"comments","form_label":"Comments", "required": false, "value_type":"string"},
-        {"property_key":"import_or_remote","form_label":"S3 URI: Leave Remote / Import", "required": false, "value_type":"controlled"} 
+        {"property_key":"import_or_remote","form_label":"Public URLs & S3 URIs: Leave Remote / Import", "required": false, "value_type":"controlled"} 
 
       ],  
       "controlled_properties": { 
