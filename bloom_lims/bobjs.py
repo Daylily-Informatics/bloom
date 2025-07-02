@@ -3849,3 +3849,4 @@ class BloomFileSet(BloomObj):
 
         results = query.all()
         return [result.euid for result in results]
+ 
