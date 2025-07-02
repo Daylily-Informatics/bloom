@@ -43,10 +43,21 @@
                             <ul>
 
                             {% for field in ui_fields %}
+                                {% if field.name == 'import_or_remote' %}
+                                <div id="import_or_remote_container" style="display:none;">
+                                    <label for="{{ field.name }}">{{ field.label }}</label>
+                                    <select name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
+                                        <option value="" selected></option>
+                                        {% for option in field.options %}
+                                            <option value="{{ option }}">{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% else %}
                                 <div>
                                     {% if field.type == "select" %}
                                         {% if field.name == "creating_user" %}
-                                          
+
                                         {% else %}
                                         <label for="{{ field.name }}">{{ field.label }}</label>
 
@@ -92,7 +103,8 @@
                                         {% endif %}
                                     {% endif %}
                                 </div>
-                            {% endfor %} 
+                                {% endif %}
+                            {% endfor %}
                         </ul>
                     </ul>
                     </td>
@@ -115,6 +127,11 @@
         const dateInput = document.getElementById('custom-date-start');
         const timeInput = document.getElementById('custom-time-start');
         const mergedField = document.getElementById('record_datetime');
+
+        const importContainer = document.getElementById('import_or_remote_container');
+        const importSelect = document.getElementById('import_or_remote');
+        const urlsField = document.getElementById('urls');
+        const s3Field = document.getElementById('s3_uris');
     
         const dateInpute = document.getElementById('custom-date-end');
         const timeInpute = document.getElementById('custom-time-end');
@@ -139,6 +156,19 @@
         const toggleTimeInputEnd = () => {
             timeInpute.disabled = !dateInpute.value;
         };
+
+        const toggleImportOrRemote = () => {
+            const hasRemote = urlsField.value.trim() !== '' || s3Field.value.trim() !== '';
+            if (hasRemote) {
+                if (importContainer.style.display === 'none') {
+                    importSelect.value = 'Remote';
+                }
+                importContainer.style.display = 'block';
+            } else {
+                importContainer.style.display = 'none';
+                importSelect.value = '';
+            }
+        };
     
         // Attach event listeners
         dateInput.addEventListener('change', () => {
@@ -154,12 +184,16 @@
         });
     
         timeInpute.addEventListener('change', updateMergedFielde);
+
+        urlsField.addEventListener('input', toggleImportOrRemote);
+        s3Field.addEventListener('input', toggleImportOrRemote);
     
         // Initialize the state on page load
         toggleTimeInput();
         toggleTimeInputEnd();
         updateMergedField();
         updateMergedFielde();
+        toggleImportOrRemote();
     });
     
 </script>    

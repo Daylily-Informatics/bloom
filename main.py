@@ -2127,8 +2127,10 @@ async def create_file(
             for file in file_data:
                 if file.filename:  # Ensure that there is a valid filename
                     try:
+                        local_meta = dict(file_metadata)
+                        local_meta["import_or_remote"] = "Import"
                         new_file = bfi.create_file(
-                            file_metadata=file_metadata,
+                            file_metadata=local_meta,
                             file_data=file.file,
                             file_name=file.filename,
                             addl_tags=addl_tags,
@@ -2169,8 +2171,10 @@ async def create_file(
                     and len(file.filename.lstrip(".").lstrip("/").split("/")) < 3
                 ):
                     try:
+                        local_meta = dict(file_metadata)
+                        local_meta["import_or_remote"] = "Import"
                         new_file = bfi.create_file(
-                            file_metadata=file_metadata,
+                            file_metadata=local_meta,
                             file_data=file.file,
                             file_name=file.filename,
                             addl_tags=addl_tags,
