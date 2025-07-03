@@ -1875,7 +1875,11 @@ def generate_dag_json_from_all_objects_v2(
         return
 
     request.session["schema_mod_dt"] = last_schema_edit_dt.changed_at.isoformat()
-    request.session["user_data"]["dag_fnv2"] = output_file
+
+    # Update nested session data safely
+    user_data = request.session.get("user_data", {})
+    user_data["dag_fnv2"] = output_file
+    request.session["user_data"] = user_data
 
     colors = {
         "container": "#8B00FF",  # Electric Purple
