@@ -100,13 +100,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let resizeInfo = null;
     const edgeSize = 8;
 
-    document.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
-        link.addEventListener('mouseenter', event => {
-            currentLink = event.currentTarget;
-            showPreview(event);
+    function attachPreviewLinks(root=document) {
+        root.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
+            link.addEventListener('mouseenter', event => {
+                currentLink = event.currentTarget;
+                showPreview(event);
+            });
+            link.addEventListener('mousemove', movePreview);
         });
-        link.addEventListener('mousemove', movePreview);
-    });
+    }
+
+    window.initializePreviewLinks = () => attachPreviewLinks(document);
+
+    attachPreviewLinks(document);
 
     // hide the preview when clicking outside of it and the originating link
     document.addEventListener('click', event => {

@@ -31,18 +31,47 @@
         Sort:
         <a href="?patient_id={{ patient_id }}&sort_by=created">by db creation</a> |
         <a href="?patient_id={{ patient_id }}&sort_by=record">by record start</a>
+        <button id="toggle-view-btn" style="float:right;">Timeline View</button>
     </div>
+    <div id="patient-table-view">
     <table>
-        <tr><th>EUID</th><th>Created</th><th>Record Start</th><th>Purpose</th></tr>
+        <tr>
+            <th>EUID</th>
+            <th>Original Name</th>
+            <th>Clinician ID</th>
+            <th>Study ID</th>
+            <th>Lab Code</th>
+            <th>Tags</th>
+            <th>Created</th>
+            <th>Record Start</th>
+            <th>Purpose + Subtype</th>
+            <th>Category + SubCat1 + SubCat2</th>
+        </tr>
         {% for file in files %}
         <tr style="background-color: {{ color_map.get(file.euid, '#222') }};">
             <td><a href="euid_details?euid={{ file.euid }}">{{ file.euid }}</a></td>
+            <td>{{ file.json_addl['properties'].get('original_file_name','') }}</td>
+            <td>{{ file.json_addl['properties'].get('clinician_id','') }}</td>
+            <td>{{ file.json_addl['properties'].get('study_id','') }}</td>
+            <td>{{ file.json_addl['properties'].get('lab_code','') }}</td>
+            <td>{{ (file.json_addl['properties'].get('file_tags') or []) | join(', ') }}</td>
             <td>{{ file.created_dt.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ file.json_addl['properties'].get('record_datetime','') }}</td>
-            <td>{{ file.json_addl['properties'].get('purpose','') }}</td>
+            <td>{{ file.json_addl['properties'].get('purpose','') }} {{ file.json_addl['properties'].get('purpose_subtype','') }}</td>
+            <td>{{ file.json_addl['properties'].get('category','') }} {{ file.json_addl['properties'].get('sub_category','') }} {{ file.json_addl['properties'].get('sub_category_2','') }}</td>
         </tr>
         {% endfor %}
     </table>
+    </div>
+    <div id="timeline-view" style="display:none;">
+        <div id="timeline-controls"></div>
+        <div id="timeline" style="overflow-x:auto; white-space:nowrap; padding-top:20px;"></div>
+    </div>
+    <script>
+        window.patientFilesData = {{ files_data | tojson | safe }};
+        window.patientColorMap = {{ color_map | tojson | safe }};
+    </script>
+    <script src="static/patient_timeline.js"></script>
     {% endif %}
 </body>
 </html>

@@ -1524,6 +1524,25 @@ async def patient_views(request: Request, patient_id: str = None, sort_by: str =
 
     color_map = {f.euid: purpose_color(f.json_addl.get("properties", {}).get("purpose")) for f in files}
 
+    files_data = []
+    for f in files:
+        props = f.json_addl.get("properties", {})
+        files_data.append({
+            "euid": f.euid,
+            "created": f.created_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            "record_datetime": props.get("record_datetime", ""),
+            "purpose": props.get("purpose", ""),
+            "purpose_subtype": props.get("purpose_subtype", ""),
+            "category": props.get("category", ""),
+            "sub_category": props.get("sub_category", ""),
+            "sub_category_2": props.get("sub_category_2", ""),
+            "original_file_name": props.get("original_file_name", ""),
+            "clinician_id": props.get("clinician_id", ""),
+            "study_id": props.get("study_id", ""),
+            "lab_code": props.get("lab_code", ""),
+            "tags": props.get("file_tags", []),
+        })
+
     user_data = request.session.get("user_data", {})
     style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
@@ -1534,7 +1553,8 @@ async def patient_views(request: Request, patient_id: str = None, sort_by: str =
         patient_ids=patient_ids,
         patient_id=patient_id,
         files=files,
-        color_map=color_map
+        color_map=color_map,
+        files_data=files_data
     )
     return HTMLResponse(content=content)
 
