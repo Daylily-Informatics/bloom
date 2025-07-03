@@ -14,9 +14,32 @@
 
     <h1>{{ num_results }} Results</h1>
 
+    <form id="shareFileSetForm" action="/share_file_set" method="post">
+        <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
+            <label for="ref_type">Share Files In Set?</label>
+            <select id="ref_type" name="ref_type" onchange="toggleRcloneOptions()">
+                <option value="presigned_url">Create Presigned S3 URLS Per File</option>
+                <option value="rclone serve http">Share File Set Via HTTP</option>
+                <option value="rclone serve sftp">Share File Set Via SFTP</option>
+            </select><br>
+            <div id="rclone-options" style="display:none;">
+                <small><a href=https://rclone.org/commands/rclone_serve/>rclone serve</a> is magic & free</small>
+                <br><br>
+                bucket:<input type="text" name="bucket" value="{{ s3_bucket_prefix }}"> //
+                host:<input type="text" name="host" value="0.0.0.0"> // port:<input type="text" name="port" value="8080"> <br>
+                user:<input type="text" name="user" value="user"> // pass:<input type="text" name="passwd" value="passwd">
+            </div>
+            <label for="duration"> Share Duration (days, float acceptable): </label>
+            <input type="text" id="duration" name="duration" value="1" style="width:30px;">
+            <input type="hidden" id="selected_fs_euid" name="fs_euid">
+            <button onclick="shareFileSet(event)">Share File Set</button>
+        </div>
+    </form>
+
     <table id="results-table" border="1">
         <thead>
             <tr>
+                <th>Select</th>
                 <th>Link</th> <!-- New column header for the link -->
                 {% for column in columns %}
                 <th onclick="sortTable({{ loop.index0 }})">{{ column }}</th>
@@ -26,6 +49,7 @@
         <tbody>
             {% for row in table_data %}
             <tr>
+                <td><input type="radio" name="fs_select" value="{{ row['EUID'] }}"></td>
                 <td>
                     {% if row['ref_type'] == 'presigned_url' %}
                     <a href="/file_set_urls?fs_euid={{ row['EUID'] }}" target="_blank">View Presigned URLSs</a>
@@ -90,6 +114,30 @@
             downloadLink.click();
             document.body.removeChild(downloadLink);
         }
+    </script>
+
+    <script>
+        function shareFileSet(event) {
+            event.preventDefault();
+            const selected = document.querySelector('input[name="fs_select"]:checked');
+            if (!selected) { alert('Please select a file set.'); return; }
+            document.getElementById('selected_fs_euid').value = selected.value;
+            document.getElementById('shareFileSetForm').submit();
+        }
+
+        function toggleRcloneOptions() {
+            var refType = document.getElementById("ref_type").value;
+            var rcloneOptions = document.getElementById("rclone-options");
+            if (refType.startsWith("rclone")) {
+                rcloneOptions.style.display = "block";
+            } else {
+                rcloneOptions.style.display = "none";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            toggleRcloneOptions();
+        });
     </script>
 
     <style>

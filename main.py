@@ -2621,7 +2621,7 @@ async def create_file_set(
             pass
         else:
             raise ValueError(f"UNSUPPORTED ref_type: {ref_type}")
-        
+
 
         return RedirectResponse(
             url=f"/euid_details?euid={new_file_set.euid}", status_code=303
@@ -2629,6 +2629,67 @@ async def create_file_set(
 
     except Exception as e:
         raise (e)
+
+
+@app.post("/share_file_set")
+async def share_file_set(
+    request: Request,
+    fs_euid: str = Form(...),
+    ref_type: str = Form("presigned_url"),
+    duration: float = Form(0),
+    bucket: str = Form(""),
+    host: str = Form(""),
+    port: int = Form(0),
+    user: str = Form(""),
+    passwd: str = Form("")
+):
+    rclone_config = {
+                "bucket": bucket,
+                "host": host,
+                "port": port,
+                "user": user,
+                "passwd": passwd
+            }
+    try:
+        bf = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        bfr = BloomFileReference(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+
+        file_set = bfs.get_by_euid(fs_euid)
+
+        if not file_set:
+            raise HTTPException(status_code=404, detail="File set not found")
+
+        file_euids_list = [
+            lineage.child_instance.euid
+            for lineage in file_set.parent_of_lineages
+            if lineage.child_instance.btype == 'file'
+        ]
+
+        duration_sec = duration * 24 * 60 * 60
+
+        if ref_type == "presigned_url":
+            for f_euid in file_euids_list:
+                bf.create_presigned_url(file_euid=f_euid, file_set_euid=fs_euid,
+                                         valid_duration=duration_sec
+                                         )
+        elif ref_type.startswith('rclone'):
+            bfr.create_file_reference(reference_type=ref_type,
+                                     valid_duration=duration_sec,
+                                     file_set_euid=fs_euid,
+                                     rclone_config=rclone_config)
+        elif ref_type.startswith("na"):
+            pass
+        else:
+            raise ValueError(f"UNSUPPORTED ref_type: {ref_type}")
+
+        return RedirectResponse(
+            url=f"/euid_details?euid={fs_euid}", status_code=303
+        )
+
+    except Exception as e:
+        logging.error(f"Error sharing file set: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     
     
 def create_search_criteria(form_data, fields):
@@ -2724,6 +2785,7 @@ async def search_file_sets(
             style=style,
             udat=user_data,
             num_results=num_results,
+            s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
         )
         return HTMLResponse(content=content)
 
