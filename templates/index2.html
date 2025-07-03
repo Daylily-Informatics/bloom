@@ -8,24 +8,27 @@
 {% endblock %}
 
 {% block content %}
-<div style="padding:0; margin-top:20px; text-align:center;">
-    <a class="idx_button" href="/dewey" style="font-size:24px; padding:20px 40px;">DEWEY</a>
-    <div style="margin-top:10px;">
+<div class="idx_section dewey-section">
+    <a class="idx_button dewey-button main-button" href="/dewey">DEWEY</a>
+    <div class="idx_subbuttons">
         <a class="idx_button" href="/dewey#register-files">Register Files</a>
         <a class="idx_button" href="/dewey#query-files">Query Files</a>
-        <a class="idx_button" href="/dewey?all_files=1#query-files">All Files</a>
+        <form style="display:inline;" action="/query_by_euids" method="post">
+            <input type="hidden" name="file_euids" value="">
+            <button class="idx_button" type="submit">All Files</button>
+        </form>
         <a class="idx_button" href="/dewey#query-file-sets">Query File Sets</a>
         <a class="idx_button" href="/dewey?all_file_sets=1#query-file-sets">All File Sets</a>
     </div>
-    <div id="dewey-stats" style="margin-top:10px;font-size:14px;color:var(--text-color);"></div>
+    <div id="dewey-stats" class="idx_stats"></div>
 </div>
 <hr>
-<div style="text-align:center; margin-top:20px;">
-    <a class="idx_button" href="/serve_endpoint" style="font-size:24px; padding:20px 40px;">Navigate Data Directories</a>
+<div class="idx_section navigate-section">
+    <a class="idx_button navigate-button main-button" href="/serve_endpoint">Navigate Data Directories</a>
 </div>
 <hr>
-<div style="text-align:center; margin-top:20px;">
-    <a class="idx_button" href="/admin" style="font-size:24px; padding:20px 40px;">ADMIN</a>
+<div class="idx_section admin-section">
+    <a class="idx_button admin-button main-button" href="/admin">ADMIN</a>
     <a href="/lims" style="display:none"></a>
 </div>
 <script>

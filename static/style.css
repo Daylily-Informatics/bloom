@@ -90,6 +90,36 @@ button:hover {
     margin: 1px;
     transition: background-color var(--transition-speed);
 }
+.idx_button:visited {
+    color: var(--text-color);
+}
+
+.main-button {
+    padding: 12px 40px;
+    display: inline-block;
+}
+
+.idx_section {
+    text-align: center;
+    padding-bottom: 20px;
+}
+
+.idx_subbuttons {
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+.dewey-button {
+    background-color: var(--primary-color);
+}
+
+.navigate-button {
+    background-color: var(--secondary-color);
+}
+
+.admin-button {
+    background-color: var(--accent-color);
+}
     
 form {
     padding: 0px;
