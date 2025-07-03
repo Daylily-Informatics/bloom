@@ -95,11 +95,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
+    let currentLink = null;
 
-        link.addEventListener('mouseenter', showPreview);
-        link.addEventListener('mouseleave', hidePreview);
+    document.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
+        link.addEventListener('mouseenter', event => {
+            currentLink = event.currentTarget;
+            showPreview(event);
+        });
         link.addEventListener('mousemove', movePreview);
     });
+
+    // hide the preview when clicking outside of it and the originating link
+    document.addEventListener('click', event => {
+        if (previewBox.style.display === 'block') {
+            if (!previewBox.contains(event.target) && (!currentLink || !currentLink.contains(event.target))) {
+                hidePreview();
+                currentLink = null;
+            }
+        }
+    });
+
+    // prevent clicks inside the preview from bubbling up and closing it
+    previewBox.addEventListener('click', event => event.stopPropagation());
 });
 
