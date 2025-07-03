@@ -260,14 +260,6 @@ def highlight_json_changes(old_json_str, new_json_str):
     return '\n'.join(old_json_highlighted), '\n'.join(new_json_highlighted)
 
 
-def apply_column_order(columns, order_pref):
-    """Reorder columns based on user preference."""
-    if isinstance(order_pref, list):
-        ordered = [c for c in order_pref if c in columns]
-        remaining = [c for c in columns if c not in ordered]
-        return ordered + remaining
-    return columns
-
 async def get_relationship_data(obj):
     relationship_data = {}
     for relationship in obj.__mapper__.relationships:
@@ -790,8 +782,6 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
-        order_pref = user_data.get("search_columns_order")
-        columns = apply_column_order(columns, order_pref)
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
         content = templates.get_template("search_results.html").render(
@@ -2613,8 +2603,6 @@ async def search_files(
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
-        order_pref = user_data.get("search_columns_order")
-        columns = apply_column_order(columns, order_pref)
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
         fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
   
@@ -2885,8 +2873,6 @@ async def search_file_sets(
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
-        order_pref = user_data.get("file_set_search_columns_order")
-        columns = apply_column_order(columns, order_pref)
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
         num_results = len(table_data)

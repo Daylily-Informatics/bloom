@@ -13,8 +13,6 @@
     <script src="static/action_buttons.js"></script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
     <script>
@@ -253,11 +251,6 @@
     {% include 'bloom_header.html' %}
 
     <b>{{ n_results }} File Search Results</b>
-    <button onclick="openColumnModal()" type="button">Edit Column Order</button>
-    <div id="column-modal" title="Column Order" style="display:none;">
-        <ul id="column-list">{% for col in columns %}<li class="ui-state-default" data-col="{{ col }}">{{ col }}</li>{% endfor %}</ul>
-        <button onclick="saveColumnOrder()" type="button">Save</button>
-    </div>
     <form id="fileSetForm" action="/create_file_set" method="post"  >
         <div style="display: flex; flex:none;">
             <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1); flex:none;">
@@ -509,19 +502,6 @@
     });
 </script>
 
-<script>
-    $(function(){
-        $("#column-list").sortable();
-        $("#column-modal").dialog({ autoOpen: false, modal: true });
-    });
-    function openColumnModal(){
-        $("#column-modal").dialog("open");
-    }
-    function saveColumnOrder(){
-        const order = $("#column-list").sortable("toArray", { attribute: "data-col" });
-        $.ajax({url: "/update_preference", type: "POST", contentType: "application/json", data: JSON.stringify({key: "search_columns_order", value: order}), success: function(){ location.reload(); }});
-    }
-</script>
     {% include 'pre_body_close.html' %}
 </body>
 </html>
