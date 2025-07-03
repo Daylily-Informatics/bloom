@@ -3403,13 +3403,23 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
             # Simulate a POST request to create_file
             #from IPython import embed; embed()
             response = client.post("/create_file", data=row)
-            logging.info(f"Row {i + 1}: {response.json()} ... {response.status_code}")
-            if response.status_code in [200,307]:
+            content_type = response.headers.get("content-type", "")
+            if content_type.startswith("application/json"):
+                resp_json = response.json()
+            else:
+                resp_json = {}
+
+            logging.info(
+                f"Row {i + 1}: {content_type} {response.status_code}"
+            )
+
+            if response.status_code in [200, 307]:
                 num_success += 1
                 messages.append("File created successfully.")
             else:
                 num_failed += 1
-                messages.append(response.json().get("detail", "Unknown error"))
+                msg = resp_json.get("detail", response.text if response.text else "Unknown error")
+                messages.append(msg)
         except Exception as e:
             num_failed += 1
             messages.append(str(e))
