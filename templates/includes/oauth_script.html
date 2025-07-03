@@ -1,0 +1,35 @@
+<script>
+    function checkForOauthCode() {
+        const urlFragment = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = urlFragment.get('access_token');
+        console.log("Access token:", accessToken);
+
+        if (accessToken) {
+            fetch('/oauth_callback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ accessToken: accessToken }),
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log("Response from server:", data);
+                if (!sessionStorage.getItem('pageReloaded')) {
+                    sessionStorage.setItem('pageReloaded', 'true');
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("Failed to process GitHub authentication.");
+            });
+        } else {
+            console.log("No GitHub code found on home page.");
+        }
+    }
+
+    window.onload = function() {
+        checkForOauthCode();
+    };
+</script>
