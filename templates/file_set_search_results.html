@@ -5,6 +5,9 @@
     {% set page_title = 'File Search Results' %}
     <title>{{ page_title }}</title>
     {% set bloom_mod = 'dewey' %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
     <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
     <link rel="stylesheet" type="text/css" href="static/style.css">
@@ -12,14 +15,24 @@
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>{{ num_results }} Results</h1>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h1 style="margin:0;">{{ num_results }} Results</h1>
+        <div>
+            <button onclick="openColumnModal()" type="button">Edit Column Order</button>
+            <button onclick="downloadTableAsTSV()" type="button">⬇️</button>
+        </div>
+    </div>
+    <div id="column-modal" title="Column Order" style="display:none;">
+        <ul id="column-list">{% for col in columns %}<li class="ui-state-default" data-col="{{ col }}">{{ col }}</li>{% endfor %}</ul>
+        <button onclick="saveColumnOrder()" type="button">Save</button>
+    </div>
 
     <table id="results-table" border="1">
         <thead>
             <tr>
                 <th>Link</th> <!-- New column header for the link -->
                 {% for column in columns %}
-                <th onclick="sortTable({{ loop.index0 }})">{{ column }}</th>
+                <th onclick="sortTableByHeader(this)">{{ column }}</th>
                 {% endfor %}
             </tr>
         </thead>
@@ -47,20 +60,20 @@
 
     <a href="/dewey">Go Back</a>
 
-    <button class="floating-button" onclick="downloadTableAsTSV()">⬇️ Download TSV</button>
-
     <script>
         let sortDirections = Array({{ columns | length }}).fill(true); // Track sort direction for each column
 
-        function sortTable(columnIndex) {
+        function sortTableByHeader(header) {
             const table = document.getElementById('results-table');
+            const columnIndex = Array.from(header.parentNode.children).indexOf(header) - 1; // subtract 1 for the link column
+            if (columnIndex < 0) return;
             const tbody = table.tBodies[0];
             const rows = Array.from(tbody.rows);
 
             const direction = sortDirections[columnIndex] ? 1 : -1;
 
             const sortedRows = rows.sort((a, b) => {
-                const cellA = a.cells[columnIndex + 1].innerText.toLowerCase(); // +1 because of new first column
+                const cellA = a.cells[columnIndex + 1].innerText.toLowerCase();
                 const cellB = b.cells[columnIndex + 1].innerText.toLowerCase();
 
                 if (cellA < cellB) return -1 * direction;
@@ -69,7 +82,7 @@
             });
 
             tbody.append(...sortedRows);
-            sortDirections[columnIndex] = !sortDirections[columnIndex]; // Toggle sort direction
+            sortDirections[columnIndex] = !sortDirections[columnIndex];
         }
 
         function downloadTableAsTSV() {
@@ -91,24 +104,21 @@
             document.body.removeChild(downloadLink);
         }
     </script>
+<script>
+    $(function(){
+        $("#column-list").sortable();
+        $("#column-modal").dialog({ autoOpen: false, modal: true });
+    });
+    function openColumnModal(){
+        $("#column-modal").dialog("open");
+    }
+    function saveColumnOrder(){
+        const order = $("#column-list").sortable("toArray", { attribute: "data-col" });
+        $.ajax({url: "/update_preference", type: "POST", contentType: "application/json", data: JSON.stringify({key: "file_set_search_columns_order", value: order}), success: function(){ location.reload(); }});
+    }
+</script>
 
     <style>
-        .floating-button {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            padding: 10px;
-            background-color: #008CBA; /* Blue background */
-            color: white; /* White text */
-            border: none;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 50%;
-        }
-
         th {
             cursor: pointer;
         }
