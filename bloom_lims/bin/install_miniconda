@@ -7,7 +7,7 @@ if [[ $? -ne 0 ]]; then
     echo "Miniconda is not installed. Proceeding with installation..."
 else
     echo "Miniconda is already installed. Please uninstall it before proceeding."
-    exit 0
+    return 0
 fi
 
 
@@ -31,7 +31,7 @@ if [[ -z "$MACHINE" ]]; then
             ;;
         *)
             echo "Unsupported architecture: $uname_output"
-            exit 1
+            return 1
             ;;
     esac
 fi
@@ -64,7 +64,7 @@ elif [[ "$MACHINE" == "linux_arm" ]]; then
 else
     echo "Unsupported machine type: $MACHINE"
     echo "Please visit https://docs.conda.io/en/latest/miniconda.html for manual installation instructions."
-    exit 2
+    return 2
 fi
 
 # Initialize Conda
@@ -120,12 +120,18 @@ if [[ -x ~/miniconda3/bin/conda ]]; then
     else
         echo "No Conda initialization block found in either .bashrc or .bash_profile."
         echo "From a bash shell, please run 'conda init bash' to initialize Conda."
-        exit 1
+        return 1
     fi
 
     echo "Miniconda installation successful."
     echo "Open a new shell, and conda should be available (try: 'conda -v')."
+    if [ "$SHELL" = "/bin/zsh" ]; then
+        source ~/.zshrc
+    else
+        source ~/.bashrc
+    fi
+
 else
     echo "Miniconda installation failed. Please try again and/or atttempt the commands in this script manually."
-    exit 3
+    return 3
 fi
