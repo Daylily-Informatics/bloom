@@ -103,6 +103,17 @@
     </table>
     {% if results_tsv %}
     <p><a href="{{ results_tsv }}" download>Download results TSV</a></p>
+    <script>
+        window.addEventListener('DOMContentLoaded', function() {
+            var link = document.createElement('a');
+            link.href = '{{ results_tsv }}';
+            link.download = '';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
     {% endif %}
     <hr>
     <a href="/dewey">Back to Create File Form</a>
