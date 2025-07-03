@@ -577,7 +577,7 @@ class BLOOMdb3:
     def __init__(
         self,
         db_url_prefix="postgresql://",
-        db_hostname="localhost:" + os.environ.get("PGPORT", "5445"),  # 5432
+        db_hostname=f"{os.environ.get('PGHOST', 'localhost')}:" + os.environ.get("PGPORT", "5445"),  # 5432
         db_pass=(
             None if "PGPASSWORD" not in os.environ else os.environ.get("PGPASSWORD")
         ),

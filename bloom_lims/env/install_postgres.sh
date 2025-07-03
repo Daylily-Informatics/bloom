@@ -5,7 +5,7 @@
 PGDATA=${PGDATA:-bloom_lims/database/bloom_lims} 
 PGUSER=${PGUSER:-$USER}
 PGPASSWORD=${PGPASSWORD:-passw0rd}
-export PGDBNAME=${PGDBNAME:-bloom}
+export PGDBNAME=${PGDBNAME:-bloom_lims}
 
 
 source bloom_lims/bin/install_miniconda
