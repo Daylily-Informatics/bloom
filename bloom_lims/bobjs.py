@@ -3909,6 +3909,20 @@ class BloomFileSet(BloomObj):
         self.session.commit()
         return file_set
 
+    def update_file_set_metadata(self, file_set_euid, file_set_metadata={}):
+        """Update properties of a file set"""
+        file_set = self.get_by_euid(file_set_euid)
+        if file_set is None:
+            raise Exception(f"File set {file_set_euid} not found")
+
+        if "properties" not in file_set.json_addl:
+            file_set.json_addl["properties"] = {}
+
+        _update_recursive(file_set.json_addl["properties"], file_set_metadata)
+        flag_modified(file_set, "json_addl")
+        self.session.commit()
+        return file_set
+
     def search_file_sets_by_metadata(self, search_criteria, greedy=True):
         """
         Search for file sets based on additional metadata.

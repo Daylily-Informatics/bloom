@@ -2790,6 +2790,10 @@ async def share_file_set(
         if not file_set:
             raise HTTPException(status_code=404, detail="File set not found")
 
+        existing_ref_type = file_set.json_addl.get("properties", {}).get("ref_type")
+        if existing_ref_type not in [None, "", "na"]:
+            raise HTTPException(status_code=400, detail="ref_type already set for this file set")
+
         file_euids_list = [
             lineage.child_instance.euid
             for lineage in file_set.parent_of_lineages
@@ -2812,6 +2816,16 @@ async def share_file_set(
             pass
         else:
             raise ValueError(f"UNSUPPORTED ref_type: {ref_type}")
+
+        bfs.update_file_set_metadata(
+            fs_euid,
+            {
+                "ref_type": ref_type,
+                "duration": duration,
+                "rclone_config": rclone_config,
+                "creating_user": request.session["user_data"]["email"],
+            },
+        )
 
         return RedirectResponse(
             url=f"/euid_details?euid={fs_euid}", status_code=303
