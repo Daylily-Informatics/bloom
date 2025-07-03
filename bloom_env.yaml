@@ -21,6 +21,7 @@ dependencies:
   - fd-find
   - rclone
   - gunicorn
+  - gettext
   - pip:
     - zebra_day==0.3.4 
     - fedex_tracking_day==0.2.8
