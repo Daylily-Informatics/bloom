@@ -194,6 +194,19 @@
         updateMergedField();
         updateMergedFielde();
         toggleImportOrRemote();
+
+        const tagInput = document.getElementById('file_tags');
+        if (tagInput) {
+            const tagify = new Tagify(tagInput, {
+                delimiters: ' ',
+                pattern: /[^\s]+/,
+                originalInputValueFormat: values => values.map(v => v.value).join(' ')
+            });
+
+            fetch('/file_tag_suggestions')
+                .then(r => r.json())
+                .then(data => { tagify.settings.whitelist = data; });
+        }
     });
     
 </script>    

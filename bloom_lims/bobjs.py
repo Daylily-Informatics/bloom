@@ -747,6 +747,22 @@ class BloomObj:
 
         return unique_values
 
+    def get_unique_file_tags(self):
+        """Return a list of unique file tags across all file instances."""
+
+        q = text(
+            """
+            SELECT DISTINCT jsonb_array_elements_text(json_addl->'properties'->'file_tags') AS tag
+            FROM generic_instance
+            WHERE super_type = 'file' AND is_deleted = :is_deleted
+            AND jsonb_typeof(json_addl->'properties'->'file_tags') = 'array'
+            """
+        )
+
+        result = self.session.execute(q, {"is_deleted": self.is_deleted})
+        rows = result.fetchall()
+        return [r[0] for r in rows if r[0]]
+
     def query_template_by_component_v2(
         self, super_type=None, btype=None, b_sub_type=None, version=None
     ):
