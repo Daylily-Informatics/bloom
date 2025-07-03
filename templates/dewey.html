@@ -289,6 +289,16 @@
                     target.scrollIntoView();
                 }
             }
+
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('all_files') === '1') {
+                const f = document.getElementById('queryAll');
+                if (f) { f.submit(); }
+            }
+            if (params.get('all_file_sets') === '1') {
+                const f = document.getElementById('searchFileSetFormALL');
+                if (f) { f.submit(); }
+            }
         });
     </script>
 
