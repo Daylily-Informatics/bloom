@@ -5,9 +5,6 @@
     {% set page_title = 'File Search Results' %}
     <title>{{ page_title }}</title>
     {% set bloom_mod = 'dewey' %}
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
     <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
     <link rel="stylesheet" type="text/css" href="static/style.css">
@@ -16,11 +13,6 @@
     {% include 'bloom_header.html' %}
 
     <h1>{{ num_results }} Results</h1>
-    <button onclick="openColumnModal()" type="button">Edit Column Order</button>
-    <div id="column-modal" title="Column Order" style="display:none;">
-        <ul id="column-list">{% for col in columns %}<li class="ui-state-default" data-col="{{ col }}">{{ col }}</li>{% endfor %}</ul>
-        <button onclick="saveColumnOrder()" type="button">Save</button>
-    </div>
 
     <form id="shareFileSetForm" action="/share_file_set" method="post">
         <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
@@ -123,19 +115,6 @@
             document.body.removeChild(downloadLink);
         }
     </script>
-<script>
-    $(function(){
-        $("#column-list").sortable();
-        $("#column-modal").dialog({ autoOpen: false, modal: true });
-    });
-    function openColumnModal(){
-        $("#column-modal").dialog("open");
-    }
-    function saveColumnOrder(){
-        const order = $("#column-list").sortable("toArray", { attribute: "data-col" });
-        $.ajax({url: "/update_preference", type: "POST", contentType: "application/json", data: JSON.stringify({key: "file_set_search_columns_order", value: order}), success: function(){ location.reload(); }});
-    }
-</script>
 
     <script>
         function shareFileSet(event) {
