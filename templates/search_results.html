@@ -110,29 +110,6 @@
             document.body.removeChild(downloadLink);
         }
 
-        function sortTable(columnIndex) {
-            const table = document.querySelector('table');
-            const rows = Array.from(table.querySelectorAll('tbody > tr'));
-            const header = table.querySelector(`thead > tr > th:nth-child(${columnIndex + 1})`);
-            const isAscending = header.classList.contains('ascending');
-
-            rows.sort((a, b) => {
-                const aText = a.children[columnIndex].innerText.trim();
-                const bText = b.children[columnIndex].innerText.trim();
-
-                if (!isNaN(aText) && !isNaN(bText)) {
-                    return isAscending ? aText - bText : bText - aText;
-                } else {
-                    return isAscending ? aText.localeCompare(bText) : bText.localeCompare(aText);
-                }
-            });
-
-            rows.forEach(row => table.querySelector('tbody').appendChild(row));
-            table.querySelectorAll('thead > tr > th').forEach(th => th.classList.remove('ascending', 'descending'));
-
-            header.classList.toggle('ascending', !isAscending);
-            header.classList.toggle('descending', isAscending);
-        }
     </script>
 
 
@@ -360,18 +337,18 @@
     <table border="1">
         <thead>
             <tr>
-                <th onclick="sortTable(0)" class="download-column">
+                <th onclick="sortTableByHeader(this)" class="download-column">
                     <input type="checkbox" id="select-all-download" onclick="toggleSelectAll('.file-checkbox', 'select-all-download')">
                     Flag to download
                 </th>
-                <th onclick="sortTable(1)" class="file-set-column">
+                <th onclick="sortTableByHeader(this)" class="file-set-column">
                     <input type="checkbox" id="select-all-file-set" onclick="toggleSelectAll('.file-set-checkbox', 'select-all-file-set')">
                     Create File Set
                 </th>
                 {% for column in columns %}
-                <th onclick="sortTable({{ loop.index + 1 }})">{{ column }}</th>
+                <th onclick="sortTableByHeader(this)">{{ column }}</th>
                 {% endfor %}
-                <th onclick="sortTable({{ columns|length + 2 }})">S3 URI</th>
+                <th onclick="sortTableByHeader(this)">S3 URI</th>
             </tr>
         </thead>
         <tbody>
@@ -465,10 +442,10 @@
             }
         } 
 
-        function sortTable(columnIndex) {
-            const table = document.querySelector('table');
+        function sortTableByHeader(header) {
+            const table = header.closest('table');
+            const columnIndex = Array.from(header.parentNode.children).indexOf(header);
             const rows = Array.from(table.querySelectorAll('tbody > tr'));
-            const header = table.querySelector(`thead > tr > th:nth-child(${columnIndex + 1})`);
             const isAscending = header.classList.contains('ascending');
 
             rows.sort((a, b) => {
