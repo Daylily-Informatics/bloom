@@ -85,15 +85,41 @@
     <body>
         {% include 'bloom_header.html' %}
 
-        <ul style="padding: 0;"><div class="button-container" style="margin-top: 20px; text-align: center;padding: 0;">
-            <a href="/serve_endpoint" style="display: inline-block; margin: 20px; padding: 20px 40px; background-color: #28a745; color: white; text-decoration: none; font-size: 24px; border-radius: 8px;">Navigate Data Directories</a>
-            <a href="/dewey" style="display: inline-block; margin: 20px; padding: 20px 40px; background-color: #17a2b8; color: white; text-decoration: none; font-size: 24px; border-radius: 8px;">DEWEY</a>
+        <div class="button-container" style="margin-top:20px; text-align:center;">
+            <h2>DEWEY</h2>
+            <a href="/dewey" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:#17a2b8; color:white;">DEWEY</a>
+            <div style="margin-top:10px;">
+                <a href="/dewey#register-files" class="idx_button">Register Files</a>
+                <a href="/dewey#query-files" class="idx_button">Query Files</a>
+                <a href="/dewey#queryAll" class="idx_button">All Files</a>
+                <a href="/dewey#query-file-sets" class="idx_button">Query File Sets</a>
+                <a href="/dewey#searchFileSetFormALL" class="idx_button">All File Sets</a>
+            </div>
+            <div id="dewey-stats" style="margin-top:10px;"></div>
         </div>
-        <br><br><br><hr><hr><br>
-        <div>
-            <a href="/admin" style="display: inline-block; margin: 20px; padding: 20px 40px; background-color: rgb(10,44,77); color: gray; text-decoration: none; font-size: 24px; border-radius: 8px;">ADMIN</a>
 
-            <a href="/lims" style="display: none; margin: 20px; padding: 20px 40px; background-color: rgb(77,44,10); color: gray; text-decoration: none; font-size: 24px; border-radius: 8px;">LIMS</a>
+        <hr>
+
+        <div class="button-container" style="text-align:center;">
+            <h2>Navigate Data Directories</h2>
+            <a href="/serve_endpoint" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:#28a745; color:white;">Navigate Data Directories</a>
         </div>
+
+        <hr>
+
+        <div class="button-container" style="text-align:center;">
+            <h2>Admin</h2>
+            <a href="/admin" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:rgb(10,44,77); color:gray;">ADMIN</a>
+        </div>
+
+        <script>
+            fetch('/dewey_counts')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('dewey-stats').innerText =
+                        `Files: ${d.files} | File Sets: ${d.file_sets}`;
+                })
+                .catch(e => console.error('Failed to load stats', e));
+        </script>
     </body>
 </html>

@@ -1359,6 +1359,23 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     )
     return HTMLResponse(content=content)
 
+
+@app.get("/dewey_counts", response_class=JSONResponse)
+async def dewey_counts(request: Request, _auth=Depends(require_auth)):
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    GI = bobdb.Base.classes.generic_instance
+    file_count = (
+        bobdb.session.query(GI)
+        .filter(GI.btype == "file", GI.is_deleted == False)
+        .count()
+    )
+    file_set_count = (
+        bobdb.session.query(GI)
+        .filter(GI.btype == "file_set", GI.is_deleted == False)
+        .count()
+    )
+    return {"files": file_count, "file_sets": file_set_count}
+
 @app.post("/save_json_addl_key")
 async def save_json_addl_key(request: Request):
     try:
