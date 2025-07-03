@@ -3542,8 +3542,8 @@ class BloomFile(BloomObj):
         """
         import random
 
-        random.randint(1, 99999999)
-        save_path = os.path.join(save_path, str(random.randint(1, 99999999)))
+        save_d = f"{euid}_{random.randint(1, 99999999)}"
+        save_path = os.path.join(save_path, save_d)
         os.system(f"mkdir -p {save_path}")
 
         if not os.path.exists(save_path):
