@@ -191,6 +191,7 @@
         var globalStartNodeEUID = '{{ globalStartNodeEUID }}' || 'AY1';
         var currentLayoutName = 'dagre'; // Default layout
         function filterNodes(distance) {
+            console.log('filterNodes called with distance:', distance);
             document.getElementById('distanceDisplay').innerText = distance;
         
             if (!cy) return;
@@ -203,16 +204,18 @@
             var currentEUID = currentURL.searchParams.get('globalStartNodeEUID');
         
             if (currentDistance !== distance || currentEUID !== selectedNodeId) {
+                console.log('Reloading page to apply new filter level or start node');
                 currentURL.searchParams.set('globalFilterLevel', distance);
                 currentURL.searchParams.set('globalStartNodeEUID', selectedNodeId);
                 window.location.href = currentURL.toString();
             } else {
-                // Adjust the graph without reloading the page
+                console.log('Adjusting graph without page reload');
                 adjustGraphBasedOnDistance(distance, selectedNodeId);
             }
         }
         
         function adjustGraphBasedOnDistance(distance, nodeId) {
+            console.log('adjustGraphBasedOnDistance called with', distance, nodeId);
             // Implement the logic to adjust the graph based on the distance
             // This might involve showing/hiding nodes, changing styles, etc.
             // For example:
@@ -234,9 +237,11 @@
         }
         
         function selectAndCenterRandomNode() {
+            console.log('selectAndCenterRandomNode called with globalStartNodeEUID:', globalStartNodeEUID);
             if (globalStartNodeEUID) {
                 var startNode = cy.getElementById(globalStartNodeEUID);
                 if (startNode.length > 0) {
+                    console.log('Found start node', globalStartNodeEUID);
                     startNode.select();
                     cy.animate({
                         center: { eles: startNode },
@@ -252,13 +257,15 @@
                 selectRandomNode();
             }
         }
-        
+
         function selectRandomNode() {
             var nodes = cy.nodes();
+            console.log('selectRandomNode from', nodes.length, 'nodes');
             if (nodes.length === 0) return;
-        
+
             var randomIndex = Math.floor(Math.random() * nodes.length);
             var randomNode = nodes[randomIndex];
+            console.log('Random node selected:', randomNode.id());
             randomNode.select();
             cy.animate({
                 center: { eles: randomNode },
@@ -270,12 +277,31 @@
         var cy;
         var clickCount = {}; // Object to keep track of clicks on nodes
 
-        $(document).ready(function() {    
+        $(document).ready(function() {
             const queryParams = new URLSearchParams(window.location.search);
-        
-    
-        
-            $.getJSON('/get_dagv2', { euid: globalStartNodeEUID,  depth: globalFilterLevel },  function(data) {            
+
+            console.log('dindex2 loaded with params:', {
+                globalFilterLevel: globalFilterLevel,
+                globalZoom: globalZoom,
+                globalStartNodeEUID: globalStartNodeEUID
+            });
+
+            console.log('Requesting DAG data from /get_dagv2', {
+                euid: globalStartNodeEUID,
+                depth: globalFilterLevel
+            });
+
+            $.ajax({
+                url: '/get_dagv2',
+                data: { euid: globalStartNodeEUID, depth: globalFilterLevel },
+                dataType: 'json'
+            }).done(function(data) {
+                console.log('Received DAG data:', data);
+                if (!data || !data.elements) {
+                    console.warn('No elements found in returned DAG data');
+                } else {
+                    console.log('Node count:', data.elements.nodes.length, 'Edge count:', data.elements.edges.length);
+                }
 
                 cy = cytoscape({
                     container: document.getElementById('cy'),
@@ -366,6 +392,7 @@
                     userPanningEnabled: data.userPanningEnabled !== undefined ? data.userPanningEnabled : true,
                     boxSelectionEnabled: data.boxSelectionEnabled !== undefined ? data.boxSelectionEnabled : true
                 });
+                console.log('Cytoscape initialized. Nodes:', cy.nodes().length, 'Edges:', cy.edges().length);
 
                 selectAndCenterRandomNode();
                 //if (cy) {
@@ -815,7 +842,12 @@ updateNodeTransparency();
                 }
 
 
-           });
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                console.error('Error fetching DAG data:', textStatus, errorThrown);
+                if (jqXHR && jqXHR.responseText) {
+                    console.error('Response text:', jqXHR.responseText);
+                }
+            });
         });
         function centerOnEuid() {
             var euid = document.getElementById('euidInput').value;
