@@ -1479,9 +1479,7 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
 async def patient_views(request: Request, patient_id: str = None, sort_by: str = "created", _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
 
-    patient_euids = bobdb.search_objs_by_addl_metadata({}, True, btype="generic", b_sub_type="patient", super_type="actor")
-    patient_objs = [bobdb.get_by_euid(euid) for euid in patient_euids]
-    patient_ids = sorted({p.json_addl.get("properties", {}).get("patient_id") for p in patient_objs if p})
+    patient_ids = sorted(bobdb.get_unique_property_values("patient_id"))
 
     files = []
     if patient_id:
