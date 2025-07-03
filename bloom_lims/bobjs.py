@@ -3549,6 +3549,7 @@ class BloomFile(BloomObj):
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         else:
+            save_pattern="dewey"
             self.logger.warn(f"Directory already exists: {save_path}")
 
         file_instance = self.get_by_euid(euid)
