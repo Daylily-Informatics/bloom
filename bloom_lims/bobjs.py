@@ -2854,7 +2854,8 @@ class BloomFile(BloomObj):
             folder_prefix = folders[-1] if euid_numeric_part >= folders[-1] else 0
 
         logging.debug(f"Determined folder_prefix: {folder_prefix}")
-        return f"{folder_prefix}/{euid}.{data_file_name.split('.')[-1]}"
+        file_extension = os.path.splitext(data_file_name)[1].lstrip(".")
+        return f"{folder_prefix}/{euid}.{file_extension}"
 
     def DELME_check_s3_key_exists(self, bucket_name, s3_key):
         try:
@@ -3152,9 +3153,11 @@ class BloomFile(BloomObj):
 
         if file_name is None:
             if url:
-                file_name = url.split("/")[-1]
+                parsed = urllib.parse.urlparse(url)
+                file_name = os.path.basename(parsed.path)
             elif s3_uri:
-                file_name = s3_uri.split("/")[-1]
+                parsed = urllib.parse.urlparse(s3_uri)
+                file_name = os.path.basename(parsed.path)
             elif full_path_to_file:
                 file_name = Path(full_path_to_file).name
             else:
@@ -3162,7 +3165,7 @@ class BloomFile(BloomObj):
                     "file_name must be provided if file_data or url is passed without a filename."
                 )
 
-        file_suffix = file_name.split(".")[-1]
+        file_suffix = os.path.splitext(file_name)[1].lstrip(".")
         s3_key = self._determine_s3_key(euid, file_name)
 
         # Check if a file with the same EUID already exists in the bucket
@@ -3181,8 +3184,9 @@ class BloomFile(BloomObj):
             )
 
         if s3_uri:
-            s3uri_bucket = s3_uri.split("/")[2]
-            s3uri_key = "/".join(s3_uri.split("/")[3:])
+            parsed_s3 = urllib.parse.urlparse(s3_uri)
+            s3uri_bucket = parsed_s3.netloc
+            s3uri_key = parsed_s3.path.lstrip("/")
 
             if import_or_remote.lower() == "remote":
                 search_criteria = {"properties": {"current_s3_uri": s3_uri}}
@@ -3343,8 +3347,9 @@ class BloomFile(BloomObj):
                 }
 
             elif url:
-                url_info = url.split("/")[-1]
-                file_suffix = url_info.split(".")[-1]
+                parsed = urllib.parse.urlparse(url)
+                url_info = os.path.basename(parsed.path)
+                file_suffix = os.path.splitext(url_info)[1].lstrip(".")
 
                 if import_or_remote.lower() == "remote":
                     file_properties = {
