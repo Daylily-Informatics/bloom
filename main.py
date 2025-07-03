@@ -335,14 +335,35 @@ def pg_dump_file(out_path: Path):
 
 def pg_restore_file(sql_path: Path):
     env = _pg_env()
-    # Drop existing objects to ensure the restore can proceed
-    drop_cmd = ["psql", env["PGDBNAME"], "-c", "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"]
+    schema = env["PGDBNAME"]
+    # Drop the schema matching the DB name to avoid restore conflicts
+    logging.info("Dropping schema %s before restore", schema)
+    drop_cmd = [
+        "psql",
+        env["PGDBNAME"],
+        "-c",
+        f"DROP SCHEMA IF EXISTS {schema} CASCADE; CREATE SCHEMA {schema};",
+    ]
     subprocess.run(drop_cmd, check=True, env=env)
 
     cmd = ["psql", env["PGDBNAME"], "-v", "ON_ERROR_STOP=1"]
+    logging.info("Restoring database from %s", sql_path)
 
     with open(sql_path, "r") as fh:
-        subprocess.run(cmd, stdin=fh, check=True, env=env)
+        try:
+            subprocess.run(
+                cmd,
+                stdin=fh,
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logging.error("Restore failed: %s", e.stderr.strip())
+            raise RuntimeError(
+                f"Database restore failed: {e.stderr.strip()}"
+            ) from e
 
 
 class RequireAuthException(HTTPException):
@@ -914,7 +935,11 @@ async def db_restore(request: Request, filename: str = Form(...), _auth=Depends(
     new_backup = Path(backup_path) / f"pre_restore_{get_clean_timestamp()}.sql"
     async with db_lock:
         await asyncio.to_thread(pg_dump_file, new_backup)
-        await asyncio.to_thread(pg_restore_file, target)
+        try:
+            await asyncio.to_thread(pg_restore_file, target)
+        except Exception as e:
+            logging.error("Restore error: %s", e)
+            raise HTTPException(status_code=500, detail=str(e))
     return RedirectResponse(url="/admin?dest=backup", status_code=303)
 
 
