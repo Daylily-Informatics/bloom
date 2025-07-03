@@ -31,6 +31,7 @@ if [[ "$1" == "" ]]; then
         echo "Conda environment BLOOM activated successfully."
     fi
 fi
+sleep 10
 
 export PGPORT=5445
 echo "SHELL IS: $SHELL"
