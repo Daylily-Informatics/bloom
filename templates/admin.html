@@ -1,36 +1,25 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+{% extends 'includes/base.html' %}
+{% set page_title = 'Admin' %}
+{% set bloom_mod = 'admin' %}
 
-    {% set page_title = 'Admin' %}
-    <title>{{ page_title }}</title>
-    
-    {% set bloom_mod = 'admin' %}
-
-
-    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
-    <link rel="stylesheet" type="text/css" href="static/style.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js" > </script>
-
-    <style> 
+{% block extra_head %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
     </style>
     <script>
         $(document).ready(function() {
-            // Assuming 'dest_section.sec' is a variable available in your templating engine
             {% if dest_section.section == 'skin' %}
                 $('#skin-css-section').addClass('flash-effect');
-            {% elif  dest_section.section == 'zebra' %}
+            {% elif dest_section.section == 'zebra' %}
                 $('#zebra-css-section').addClass('flash-effect');
-            {% elif  dest_section.section == 'template' %}
+            {% elif dest_section.section == 'template' %}
                 $('#template-css-section').addClass('flash-effect');
             {% endif %}
         });
     </script>
-</head>
-<body>
+{% endblock %}
 
-    {% include 'bloom_header.html' %}
+{% block content %}
     <br>
 <ul>
     <h2>Dewey Administration</h2>
@@ -83,25 +72,5 @@
         <p>No backups found in {{ backup_path }}</p>
         {% endif %}
     </div>
-
-
-     <script>    
-    function updatePreferenceAndReload(key, value) {
-        console.log('Updating', key, 'to', value);
-        $.ajax({
-            url: '/update_preference',
-            type: 'POST',
-            contentType: 'application/json', // Specify the content type
-            data: JSON.stringify({ key: key, value: value }), // Convert the data to a JSON string
-            success: function(response) {
-                console.log('Update successful:', response);
-                window.location.reload();
-            },
-            error: function(xhr, status, error) {
-                console.error('Update failed:', status, error);
-            }
-        });
-        
-    }
-    </script>
-</body>
+    {% include 'includes/update_preference_script.html' %}
+{% endblock %}

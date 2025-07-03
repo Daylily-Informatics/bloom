@@ -1,15 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+{% extends 'includes/base.html' %}
+{% set page_title = 'User Home' %}
+{% set bloom_mod = 'user_home' %}
 
-    {% set page_title = 'User Home' %}
-    <title>{{ page_title }}</title>
-    
-    {% set bloom_mod = 'user_home' %}
-
-    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
-    <link rel="stylesheet" type="text/css" href="static/style.css">
+{% block extra_head %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <style>
@@ -62,9 +55,9 @@
             {% endif %}
         });
     </script>
-</head>
-<body>
-    
+{% endblock %}
+
+{% block content %}
     {% include 'bloom_header.html' %}
 <ul>
     <h1>Welcome, {{ user_data.email }}</h1>
@@ -220,23 +213,5 @@
     </td></tr></table>
 
 </ul>
-    <script>
-        function updatePreferenceAndReload(key, value) {
-            console.log('Updating', key, 'to', value);
-            $.ajax({
-                url: '/update_preference',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ key: key, value: value }),
-                success: function(response) {
-                    console.log('Update successful:', response);
-                    window.location.reload();
-                },
-                error: function(xhr, status, error) {
-                    console.error('Update failed:', status, error);
-                }
-            });
-        }
-    </script>
-</body>
-</html>
+    {% include 'includes/update_preference_script.html' %}
+{% endblock %}

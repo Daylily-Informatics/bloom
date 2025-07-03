@@ -1,17 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+{% extends 'includes/base.html' %}
+{% set page_title = 'File Search Results' %}
+{% set bloom_mod = 'dewey' %}
 
-    {% set page_title = 'File Search Results' %}
-    <title>{{ page_title }}</title>
-
-    {% set bloom_mod = 'dewey' %}
-
-    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
-    <link rel="stylesheet" type="text/css" href="static/style.css">
+{% block extra_head %}
     <script src="static/action_buttons.js"></script>
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
@@ -246,8 +238,9 @@
             background-color: var(--form-in-bg-color);
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
     {% include 'bloom_header.html' %}
 
     <b>{{ n_results }} File Search Results</b>
@@ -503,5 +496,4 @@
 </script>
 
     {% include 'pre_body_close.html' %}
-</body>
-</html>
+{% endblock %}

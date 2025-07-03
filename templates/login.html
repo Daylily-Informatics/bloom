@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html>
-    <head>
+{% extends 'includes/base.html' %}
+{% set page_title = 'Bloom Login' %}
+{% set bloom_mod = 'admin' %}
 
-        {% set page_title = 'Bloom Login' %}
-        <title>{{ page_title }}</title>
-
-        {% set bloom_mod = 'admin' %}
-
-        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
-        <link rel="stylesheet" type="text/css" href="static/style.css">
+{% block extra_head %}
 <script>
     function validateEmail(email) {
         try {
@@ -71,9 +65,9 @@
       }
     }
 </script>
+{% endblock %}
 
-    </head>
-    <body>
+{% block content %}
         {% include 'bloom_header.html' %}
 
         <div id="error-message" style="color: red;"></div> <!-- Error message display -->
@@ -94,5 +88,4 @@
 
 
   
-    </body>
-</html>
+    {% endblock %}
