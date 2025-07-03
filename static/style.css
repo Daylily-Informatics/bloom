@@ -90,11 +90,6 @@ button:hover {
     margin: 1px;
     transition: background-color var(--transition-speed);
 }
-.idx_button:visited,
-.idx_button:active,
-.idx_button:focus {
-    color: var(--text-color);
-}
     
 form {
     padding: 0px;
