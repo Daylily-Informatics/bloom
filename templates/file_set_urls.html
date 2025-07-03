@@ -29,7 +29,7 @@
                 <td><a target=euid href=/euid_details?euid={{ ref.orig_file.euid }} >{{ ref.orig_file.euid }} </a></td>
                 <td>{{ ref.orig_file.json_addl.get('properties','').get('original_file_name') }} </td>
                 <td><a target=euid href=/euid_details?euid={{ ref.euid }}>{{ ref.euid }} </a></td>
-                <td><a href="{{ ref.url }}" target="_blank">{{ ref.url }}</a></td>
+                <td><a href="{{ ref.url }}" target="_blank" class="preview-link">{{ ref.url }}</a></td>
                 <td>{{ ref.start_datetime }}</td>
                 <td>{{ ref.end_datetime }}</td>
 

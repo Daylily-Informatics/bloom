@@ -611,3 +611,6 @@ th {
     margin-left: 10px;
 }
 
+#file-preview-box {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
