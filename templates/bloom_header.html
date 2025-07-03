@@ -1,7 +1,6 @@
-<div class="header-container" style="display: flex; align-items: flex-end;">
-    <h1 style="margin: 0 0px; line-height: 1.2;"><a href="/index2" >home</a></h1> 
-    <span style="margin: 0 5px;"> /// </span>
-    <small style="margin: 0 5px;">
+<nav class="header-container">
+    <h1><a href="/index2">home</a></h1>
+    <div class="nav-links">
         {% if bloom_mod == 'admin' %}
             <a href="/admin">admin</a>
         {% elif bloom_mod == 'index' %}
@@ -11,35 +10,27 @@
         {% elif bloom_mod == 'dewey' %}
             <a href="/dewey">dewey</a>
         {% else %}
-                       <a href="dewey">dewey</a>
+            <a href="dewey">dewey</a>
         {% endif %}
-    </small>
-    <span style="margin: 0 5px;"> /// </span>
-    <small style="margin: 0 5px;">
         {% if page_title %}
             {% if page_title == 'Bloom' %}
-                 
             {% else %}
-                {{ page_title }}
+                <span class="page-title">{{ page_title }}</span>
             {% endif %}
         {% else %}
-                <small style="margin: 0 0px;"><a href="dindex2" >(g)</a></small>
+            <a href="dindex2">(g)</a>
         {% endif %}
-    </small>
-    <span style="margin: 0 5px;"> /// </span>
-        <small>
-            hello 
-            {% if udat and 'email' in udat %}
-                <a href="/user_home" style="margin: 0 5px;">
-                {{ udat['email'] }}
-                </a>
-            {% else %}
-                <a href=login>==> please login <==</a>
-            {% endif %}
-        </small>
-    
-    <span style="margin: 0 5px;"> /// </span>
-    <small style="margin: 0 5px;"><a href="logout">logout</a></small>
-</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="nav-user">
+        <span>hello</span>
+        {% if udat and 'email' in udat %}
+            <a href="/user_home">{{ udat['email'] }}</a>
+        {% else %}
+            <a href="login">==> please login <==</a>
+        {% endif %}
+        <a class="logout-link" href="logout">logout</a>
+    </div>
+</nav>
 <hr>
 
