@@ -342,7 +342,19 @@ def pg_restore_file(sql_path: Path):
     cmd = ["psql", env["PGDBNAME"], "-v", "ON_ERROR_STOP=1"]
 
     with open(sql_path, "r") as fh:
-        subprocess.run(cmd, stdin=fh, check=True, env=env)
+        try:
+            subprocess.run(
+                cmd,
+                stdin=fh,
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Database restore failed: {e.stderr.strip()}"
+            ) from e
 
 
 class RequireAuthException(HTTPException):
@@ -914,7 +926,10 @@ async def db_restore(request: Request, filename: str = Form(...), _auth=Depends(
     new_backup = Path(backup_path) / f"pre_restore_{get_clean_timestamp()}.sql"
     async with db_lock:
         await asyncio.to_thread(pg_dump_file, new_backup)
-        await asyncio.to_thread(pg_restore_file, target)
+        try:
+            await asyncio.to_thread(pg_restore_file, target)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
     return RedirectResponse(url="/admin?dest=backup", status_code=303)
 
 
