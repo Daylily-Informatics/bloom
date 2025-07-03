@@ -41,6 +41,8 @@ etc/udat.json
 pip-log.txt
 pip-delete-this-directory.txt
 
+db_backups/*sql
+
 # logs
 logs/
 tmp/
