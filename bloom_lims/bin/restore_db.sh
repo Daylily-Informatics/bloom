@@ -59,7 +59,8 @@ PGDBNAME=${PGDBNAME:-bloom_lims}
 export PGHOST PGPORT PGUSER PGPASSWORD
 
 # Drop the schema to avoid restore conflicts
-psql "$PGDBNAME" -c "DROP SCHEMA IF EXISTS $PGDBNAME CASCADE;"
+dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDBNAME"
+createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDBNAME"
 
 # Restore from the sql file
 psql "$PGDBNAME" -v ON_ERROR_STOP=1 < "$SQL_FILE"

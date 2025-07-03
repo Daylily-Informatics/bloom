@@ -316,46 +316,69 @@ async def get_relationship_data(obj):
     return relationship_data
 
 
-def _pg_env():
-    env = os.environ.copy()
-    env.setdefault("PGHOST", "localhost")
-    env.setdefault("PGPORT", "5445")
-    env.setdefault("PGUSER", env.get("USER", "bloom"))
-    env.setdefault("PGPASSWORD", env.get("PGPASSWORD", "SETTHISPROPERLY"))
-    env.setdefault("PGDBNAME", env.get("PGDBNAME", "bloom_lims"))
-    return env
+def resolve_env_var(val):
+    # Only expands $USER or ${USER} style patterns
+    if isinstance(val, str) and val.startswith('$'):
+        env_key = val[1:]
+        return os.environ.get(env_key, val)
+    return val
 
 
 def pg_dump_file(out_path: Path):
-    env = _pg_env()
-    cmd = ["pg_dump", "-Fp", env["PGDBNAME"]]
-    with open(out_path, "w") as fh:
-        subprocess.run(cmd, stdout=fh, check=True, env=env)
+    # Use environment variables with defaults
+    pg_db = os.environ.get("PGDBNAME", "bloom_lims")
+    pg_host = os.environ.get("PGHOST", "localhost")
+    pg_port = os.environ.get("PGPORT", "5445")
+    pg_user = resolve_env_var(os.environ.get("PGUSER", os.environ.get("USER", "bloom")))
+    pg_password = os.environ.get("PGPASSWORD", "SETTHISPROPERLY")
+    # Build env for subprocess
+    
+    env = os.environ.copy()
+    env.update({
+        "PGHOST": pg_host,
+        "PGPORT": pg_port,
+        "PGUSER": pg_user,
+        "PGPASSWORD": pg_password,
+        "PGDBNAME": pg_db,
+    })
+    print(f"YYYXXXXXX {pg_user} {pg_password} {pg_db} {pg_host} {pg_port}  ")
 
+    # Build env for sub
+    cmd = ["pg_dump", "-Fp", pg_db]
+    with open(out_path, "w") as fh:
+        subprocess.run(cmd, stdout=fh, check=True, env=env )
 
 def pg_restore_file(sql_path: Path):
     """Restore the database using a helper shell script."""
-    env = _pg_env()
-    script = Path(__file__).resolve().parent / "restore_db.sh"
+    pg_db = os.environ.get("PGDBNAME", "bloom_lims")
+    pg_host = os.environ.get("PGHOST", "localhost")
+    pg_port = os.environ.get("PGPORT", "5445")
+    pg_user = resolve_env_var(os.environ.get("PGUSER", os.environ.get("USER", "bloom")))
+    pg_password = os.environ.get("PGPASSWORD", "SETTHISPROPERLY")
+
+
+    print(f"XXXXXX {pg_user} {pg_password} {pg_db} {pg_host} {pg_port} {sql_path}  ")
+    # Build env for subprocess
+    env = os.environ.copy()
+    env.update({
+        "PGHOST": pg_host,
+        "PGPORT": pg_port,
+        "PGUSER": pg_user,
+        "PGPASSWORD": pg_password,
+        "PGDBNAME": pg_db,
+    })
+    
+    script = Path(__file__).resolve().parent / "bloom_lims/bin/restore_db.sh"
     cmd = [str(script), "--sql", str(sql_path)]
-
-    flag_map = {
-        "PGHOST": "--host",
-        "PGPORT": "--port",
-        "PGUSER": "--user",
-        "PGPASSWORD": "--password",
-        "PGDBNAME": "--dbname",
-    }
-
-    for var, flag in flag_map.items():
-        if env.get(var):
-            cmd.extend([flag, env[var]])
+    # Optionally append flags (if needed by the script)
+    cmd.extend(["--host", pg_host, "--port", pg_port, "--user", pg_user, "--password", pg_password, "--dbname", pg_db])
 
     logging.info("Restoring database from %s using %s", sql_path, script)
     try:
-        subprocess.run(cmd, check=True, env=env)
+        subprocess.run(cmd, check=True, env=env) 
     except subprocess.CalledProcessError as e:
         logging.error("Restore failed: %s", e)
+
 
 
 

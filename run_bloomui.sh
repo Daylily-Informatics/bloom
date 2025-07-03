@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+
+
+set -a
+source .env
+set +a
+
 # Default values
 host="0.0.0.0"
 port=8911

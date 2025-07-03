@@ -2,10 +2,16 @@
 
 # Conda install steps credit: https://gist.github.com/gwangjinkim/f13bf596fefa7db7d31c22efd1627c7a
 
+set -a
+source .env
+set +a
+
+# set the followiung in your .env file
 PGDATA=${PGDATA:-bloom_lims/database/bloom_lims}
 PGUSER=${PGUSER:-$USER}
-PGPASSWORD=${PGPASSWORD:-passw0rd}
-export PGDBNAME=${PGDBNAME:-bloom_lims}
+PGPASSWORD=${PGPASSWORD:-SETINDOTENV}
+PGDBNAME=${PGDBNAME:-bloom_lims}
+PGPORT=${PGPORT:-5445}
 # Optional starting value for the file index sequence (FI euid prefix)
 FILE_INDEX_START=${FILE_INDEX_START:-1}
 
@@ -56,13 +62,13 @@ initdb -D $PGDATA
 # start server
 pg_ctl -D $PGDATA -o "-p $PGPORT" -l $PGDATA/db.log start 
 
-PGPORT=5445 psql -U $PGUSER -d postgres << EOF
+psql -U $PGUSER -d postgres << EOF
 
 ALTER USER $PGUSER PASSWORD '$PGPASSWORD';
 
 EOF
 
-createdb --owner $USER $PGDBNAME
+createdb --owner $PGUSER $PGDBNAME
 
 # create the schema/db from the template
 
