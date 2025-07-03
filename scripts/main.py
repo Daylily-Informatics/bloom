@@ -4,7 +4,7 @@ import httpx
 import os
 import json
 import subprocess
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 import random
 import asyncio
@@ -799,10 +799,13 @@ async def Acalculate_cogs_children(euid, request: Request, _auth=Depends(require
         return json.dumps({"success": False, "message": str(e)})
 
 @app.post("/query_by_euids", response_class=HTMLResponse)
-async def query_by_euids(request: Request, file_euids: str = Form(...)):
+async def query_by_euids(request: Request, file_euids: Optional[str] = Form(None)):
     try:
         bfi = BloomFile(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-        euid_list = [euid.strip() for euid in file_euids.split("\n") if euid.strip()]
+        if file_euids:
+            euid_list = [euid.strip() for euid in file_euids.split("\n") if euid.strip()]
+        else:
+            euid_list = bfi.search_objs_by_addl_metadata({}, True, "file", super_type="file")
 
         detailed_results = [bfi.get_by_euid(euid) for euid in euid_list if euid]
 
