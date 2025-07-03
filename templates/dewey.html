@@ -166,7 +166,7 @@
     <h1>File Tools</h1>
     <hr>
     
-    <button class="accordion" style="width: -webkit-fill-available;">Register File(s)</button>
+    <button id="register-files" class="accordion" style="width: -webkit-fill-available;">Register File(s)</button>
     <div class="accordion-content" data-form="register">
         {% include 'register_file.html' %}
     </div>
@@ -178,7 +178,7 @@
     </div>
     <hr><hr>
     
-    <button class="accordion" style="width: -webkit-fill-available;">File Search (bulk d/l | create file sets | create presigned s3 URLS | share via HTTP/SFTP/webDAV/...)</button>
+    <button id="query-files" class="accordion" style="width: -webkit-fill-available;">File Search (bulk d/l | create file sets | create presigned s3 URLS | share via HTTP/SFTP/webDAV/...)</button>
     <div class="accordion-content" data-form="search">
         {% include 'file_search.html' %}
     </div>
@@ -190,7 +190,7 @@
     </div>
     <hr><hr>
 
-    <button class="accordion" style="width: -webkit-fill-available;">Search File Sets</button>
+    <button id="query-file-sets" class="accordion" style="width: -webkit-fill-available;">Search File Sets</button>
     <div class="accordion-content">
         {% include 'search_file_sets.html' %}
     </div>
@@ -276,6 +276,18 @@
         window.addEventListener('pageshow', function(event) {
             if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
                 resetForms();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.location.hash) {
+                var target = document.querySelector(window.location.hash);
+                if (target && target.classList.contains('accordion')) {
+                    target.classList.add('active');
+                    var panel = target.nextElementSibling;
+                    if (panel) { panel.style.display = 'block'; }
+                    target.scrollIntoView();
+                }
             }
         });
     </script>
