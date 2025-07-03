@@ -1482,30 +1482,28 @@ async def patient_views(request: Request, patient_id: str = None, sort_by: str =
     patient_ids = sorted(bobdb.get_unique_property_values("patient_id"))
 
     # Fetch template data for dynamic fields    
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    
-    f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
-    fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
- 
+    #bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    #
+    #f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
+    #fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
+    #
     # these should only be 1
-    if len(f_templates) > 1:
-        logging.error(f"Multiple file templates found for file/file/generic/1.0")
-        raise HTTPException(status_code=500, detail="Multiple file templates found for file/file/generic/1.0")
-    if len(fset_templates) > 1:
-        logging.error(f"Multiple file set templates found for file/file_set/generic/1.0")
-        raise HTTPException(status_code=500, detail="Multiple file set templates found for file/file_set/generic/1.0")
-
+    #if len(f_templates) > 1:
+    #    logging.error(f"Multiple file templates found for file/file/generic/1.0")
+    #    raise HTTPException(status_code=500, detail="Multiple file templates found for file/file/generic/1.0")
+    #if len(fset_templates) > 1:
+    #    logging.error(f"Multiple file set templates found for file/file_set/generic/1.0")
+    #    raise HTTPException(status_code=500, detail="Multiple file set templates found for file/file_set/generic/1.0")
     
-    f_template = f_templates[0]
-    ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
-    ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
-    ui_form_fields_query = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file", version=None)
-
+    #f_template = f_templates[0]
+    #ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
+    #ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+    #ui_form_fields_query = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file", version=None)
     
-    fset_template = fset_templates[0]
-    ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
-    ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
-    ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
+    #fset_template = fset_templates[0]
+    #ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
+    #ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+    #ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
     
     
     files = []
@@ -1536,8 +1534,7 @@ async def patient_views(request: Request, patient_id: str = None, sort_by: str =
         patient_ids=patient_ids,
         patient_id=patient_id,
         files=files,
-        color_map=color_map,        
-        ui_fields=ui_form_fields
+        color_map=color_map
     )
     return HTMLResponse(content=content)
 
