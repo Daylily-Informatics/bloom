@@ -109,7 +109,11 @@ git clone git@github.com:Daylily-Informatics/bloom_lims.git
 cd bloom_lims
 
 # This will attempt to build the conda env, install postgres, the database, build the schema and start postgres
-source bloom_lims/env/install_postgres.sh 
+source bloom_lims/env/install_postgres.sh
+
+# To start file identifiers at a custom index, set `FILE_INDEX_START`
+# before sourcing the script:
+# FILE_INDEX_START=5000 source bloom_lims/env/install_postgres.sh
  
 # conda activate BLOOM if is has not happened already.
 
@@ -281,7 +285,7 @@ source clear_and_rebuild_postgres.sh
 - `rm -rf bloom_lims/database/*`
 
 ### Rebuild the schema
--  `source bloom_lims/env/install_postgres.sh skip` the skip will skip building the conda env. This will start pgsql in the env, and build the schema.
+-  `source bloom_lims/env/install_postgres.sh skip` the skip will skip building the conda env. This will start pgsql in the env, and build the schema. Use `FILE_INDEX_START=<num>` before the command to set the starting file index.
 
 ### Build LIMS Workflows With Autogen Objects
 Similar to `pytest`, but more extensive. Largely useful in development work.  The following will auto-gen 'n=2' passes of the lims schema
