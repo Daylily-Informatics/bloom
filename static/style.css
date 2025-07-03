@@ -493,7 +493,6 @@ th {
     justify-content: space-between;
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: var(--text-color);
-    padding: 15px 30px;
     border-radius: var(--border-radius);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
