@@ -582,7 +582,7 @@ class BLOOMdb3:
             None if "PGPASSWORD" not in os.environ else os.environ.get("PGPASSWORD")
         ),
         db_user=os.environ.get("USER", "bloom"),
-        db_name="bloom",
+        db_name=os.environ.get("PGDBNAME", "bloom_lims"),
         app_username=os.environ.get("USER", "bloomdborm"),
         echo_sql=os.environ.get("ECHO_SQL", False),
     ):
