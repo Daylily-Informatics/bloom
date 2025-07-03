@@ -102,9 +102,21 @@ button:hover {
 /* Style for main menu links on index2 */
 .idx_button_title {
     display: block;
-    width: 100%;
+    margin-top: 20px;
+    margin-left: 20%;
+    margin-right: 20%;
     padding: 15px 40px; /* 20% taller than default main-button */
     margin-bottom: 20px; /* space below the button */
+    border-radius: 160px;
+    color: var(--text-color) !important;
+}
+
+.idx_button_title:hover {
+    background-color: var(--th-background-color);
+}
+
+.idx_button_title a {
+    color: var(--text-color) !important;
 }
 
 .idx_section {
