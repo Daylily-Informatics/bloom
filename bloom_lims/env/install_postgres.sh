@@ -10,6 +10,14 @@ export PGDBNAME=${PGDBNAME:-bloom}
 
 source bloom_lims/bin/install_miniconda
 
+
+if ! command -v conda >/dev/null 2>&1; then
+    source /root/miniconda3/etc/profile.d/conda.sh
+else
+    echo "Miniconda is already installed. Proceeding."
+fi
+
+
 sleep 5
 # Create a Conda environment named BLOOM if $1 is not set
 

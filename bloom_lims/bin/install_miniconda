@@ -3,9 +3,9 @@
 
 
 if ! command -v conda >/dev/null 2>&1; then
- echo "Miniconda is not installed. Proceeding with installation..."
+    echo "Miniconda is not installed. Proceeding with installation..."
 else
-    echo "Miniconda is already installed. Please uninstall it before proceeding."
+    echo "Miniconda is already installed. Proceeding."
     return 0
 fi
 
