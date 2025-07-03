@@ -150,6 +150,10 @@ button:hover {
 .admin-button {
     background-color: var(--accent-color);
 }
+
+.exploratory-button {
+    background-color: var(--addl-button-color);
+}
     
 form {
     padding: 0px;

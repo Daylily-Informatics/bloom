@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+    <link rel="stylesheet" type="text/css" href="static/style.css">
+    {% set page_title = 'Patient Views' %}
+    <title>{{ page_title }}</title>
+    {% set bloom_mod = 'exploratory' %}
+</head>
+<body>
+    {% include 'bloom_header.html' %}
+    <small><a href="dindex2">(graph)</a></small> <small><a href="/">(B)</a></small>
+
+    <h1>Patient Views</h1>
+    <form method="get" action="/patient_views">
+        <label for="patient_id">Select Patient:</label>
+        <select name="patient_id" id="patient_id" onchange="this.form.submit()">
+            <option value="">-- choose --</option>
+            {% for pid in patient_ids %}
+            <option value="{{ pid }}" {% if pid == patient_id %}selected{% endif %}>{{ pid }}</option>
+            {% endfor %}
+        </select>
+        <noscript><button type="submit">Go</button></noscript>
+    </form>
+
+    {% if patient_id %}
+    <h2>Files for {{ patient_id }}</h2>
+    <div>
+        Sort:
+        <a href="?patient_id={{ patient_id }}&sort_by=created">by db creation</a> |
+        <a href="?patient_id={{ patient_id }}&sort_by=record">by record start</a>
+    </div>
+    <table>
+        <tr><th>EUID</th><th>Created</th><th>Record Start</th><th>Purpose</th></tr>
+        {% for file in files %}
+        <tr style="background-color: {{ color_map.get(file.euid, '#222') }};">
+            <td><a href="euid_details?euid={{ file.euid }}">{{ file.euid }}</a></td>
+            <td>{{ file.created_dt.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ file.json_addl['properties'].get('record_datetime','') }}</td>
+            <td>{{ file.json_addl['properties'].get('purpose','') }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>

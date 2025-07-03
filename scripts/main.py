@@ -1474,6 +1474,47 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
     )
     return HTMLResponse(content=content)
 
+
+@app.get("/patient_views", response_class=HTMLResponse)
+async def patient_views(request: Request, patient_id: str = None, sort_by: str = "created", _auth=Depends(require_auth)):
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+
+    patient_euids = bobdb.search_objs_by_addl_metadata({}, True, btype="generic", b_sub_type="patient", super_type="actor")
+    patient_objs = [bobdb.get_by_euid(euid) for euid in patient_euids]
+    patient_ids = sorted({p.json_addl.get("properties", {}).get("patient_id") for p in patient_objs if p})
+
+    files = []
+    if patient_id:
+        search_criteria = {"properties": {"patient_id": patient_id}}
+        file_euids = bobdb.search_objs_by_addl_metadata(search_criteria, True, btype="file", super_type="file")
+        files = [bobdb.get_by_euid(euid) for euid in file_euids]
+        if sort_by == "record":
+            files.sort(key=lambda x: x.json_addl.get("properties", {}).get("record_datetime", "") or "")
+        else:
+            files.sort(key=lambda x: x.created_dt)
+
+    color_choices = ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6"]
+    def purpose_color(val):
+        if not val:
+            return "#222"
+        return color_choices[hash(val) % len(color_choices)]
+
+    color_map = {f.euid: purpose_color(f.json_addl.get("properties", {}).get("purpose")) for f in files}
+
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+
+    content = templates.get_template("patient_views.html").render(
+        request=request,
+        style=style,
+        udat=user_data,
+        patient_ids=patient_ids,
+        patient_id=patient_id,
+        files=files,
+        color_map=color_map,
+    )
+    return HTMLResponse(content=content)
+
 # Quick hack to allow the details page to display deleted items.  Need to rework how the rest of the system juggles this.
 @app.get("/euid_details")
 async def euid_details(
