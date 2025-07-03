@@ -15,6 +15,74 @@ p    {{ patient_id }}
     <br>
 pp    {{ patient_ids}}
 <br>
+xx
+                            {% for field in ui_fields %}
+                                {% if field.name == 'import_or_remote' %}
+                                <div id="import_or_remote_container" style="display:none;">
+                                    <label for="{{ field.name }}">{{ field.label }}</label>
+                                    <select name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
+                                        <option value="" selected></option>
+                                        {% for option in field.options %}
+                                            <option value="{{ option }}">{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% else %}
+                                <div>
+                                    {% if field.type == "select" %}
+                                        {% if field.name == "creating_user" %}
+
+                                        {% else %}
+                                        <label for="{{ field.name }}">{{ field.label }}</label>
+
+                                        <select name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
+                                            <option value="" selected></option> <!-- Placeholder for blank state -->
+                                            {% for option in field.options %}
+                                                <option value="{{ option }}">{{ option }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% endif %}
+                                    {% else %}
+                                    <label for="{{ field.name }}">{{ field.label }}</label>
+
+                                        {% if field.name.endswith('record_datetime')  %}
+                                                
+                                                <!-- Date and Time Selectors -->
+                                                <input type="date" id="custom-date-start" name="custom-date-start" pattern="\d{2}-\d{2}-\d{4}" placeholder="MM-DD-YYYY">
+                                                <label for="custom-date-start"> time:</label>
+                                                                                        
+                                                <input type="time" id="custom-time-start" name="custom-time-start"  placeholder="--:--:--">
+                                                
+
+                                                <!-- Hidden Merged Field -->
+                                                <input type="hidden" id="record_datetime" name="record_datetime">
+
+                                        {% elif field.name.endswith('record_datetime_end')  %}
+                                                <!-- Date and Time Selectors -->
+                                                <input type="date" id="custom-date-end" name="custom-date-end" pattern="\d{2}-\d{2}-\d{4}" placeholder="MM-DD-YYYY">
+                                                <label for="custom-time-end"> time:</label>
+                                                
+                                                <input type="time" id="custom-time-end" name="custom-time-end" placeholder="--:--:--">
+
+    
+                                                <!-- Hidden Merged Field -->
+                                                <input type="hidden" id="record_datetime_end" name="record_datetime_end">
+
+                                        {% elif field.name.endswith('_date') %}
+                                            <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
+                                        {% elif field.name.endswith('_break') %}
+                                    </ul><hr><ul>
+                                        {% else %}
+                                            <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+
+                            zz
+                            <br>
+
     <small><a href="dindex2">(graph)</a></small> <small><a href="/">(B)</a></small>
 
     <h1>Patient Views</h1>
