@@ -7,6 +7,7 @@ import subprocess
 from typing import List
 from pathlib import Path
 import random
+import asyncio
 
 import csv
 import os
@@ -120,6 +121,10 @@ BVARS = BloomVars()
 BASE_DIR = Path("./served_data").resolve()  # Base directory for serving files
 
 from auth.supabase.connection import create_supabase_client
+
+
+# Lock to serialize backup and restore operations
+db_lock = asyncio.Lock()
 
 
 # local udata prefernces
@@ -255,6 +260,14 @@ def highlight_json_changes(old_json_str, new_json_str):
     return '\n'.join(old_json_highlighted), '\n'.join(new_json_highlighted)
 
 
+def apply_column_order(columns, order_pref):
+    """Reorder columns based on user preference."""
+    if isinstance(order_pref, list):
+        ordered = [c for c in order_pref if c in columns]
+        remaining = [c for c in columns if c not in ordered]
+        return ordered + remaining
+    return columns
+
 async def get_relationship_data(obj):
     relationship_data = {}
     for relationship in obj.__mapper__.relationships:
@@ -309,6 +322,47 @@ async def get_relationship_data(obj):
                 )
             ]
     return relationship_data
+
+
+def _pg_env():
+    env = os.environ.copy()
+    env.setdefault("PGHOST", "localhost")
+    env.setdefault("PGPORT", "5445")
+    env.setdefault("PGUSER", env.get("USER", "bloom"))
+    env.setdefault("PGPASSWORD", env.get("PGPASSWORD", "passw0rd"))
+    env.setdefault("PGDBNAME", env.get("PGDBNAME", "bloom"))
+    return env
+
+
+def pg_dump_file(out_path: Path):
+    env = _pg_env()
+    cmd = ["pg_dump", "-Fp", env["PGDBNAME"]]
+    with open(out_path, "w") as fh:
+        subprocess.run(cmd, stdout=fh, check=True, env=env)
+
+
+def pg_restore_file(sql_path: Path):
+    env = _pg_env()
+    # Drop existing objects to ensure the restore can proceed
+    drop_cmd = ["psql", env["PGDBNAME"], "-c", "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"]
+    subprocess.run(drop_cmd, check=True, env=env)
+
+    cmd = ["psql", env["PGDBNAME"], "-v", "ON_ERROR_STOP=1"]
+
+    with open(sql_path, "r") as fh:
+        try:
+            subprocess.run(
+                cmd,
+                stdin=fh,
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Database restore failed: {e.stderr.strip()}"
+            ) from e
 
 
 class RequireAuthException(HTTPException):
@@ -729,6 +783,8 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
+        order_pref = user_data.get("search_columns_order")
+        columns = apply_column_order(columns, order_pref)
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
         content = templates.get_template("search_results.html").render(
@@ -804,6 +860,13 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     ]  # Get just the file names
 
     printer_info["style_css"] = csss
+
+    backup_path = user_data.get("db_backup_path", "./db_backups")
+    if os.path.isdir(backup_path):
+        backup_files = sorted([p.name for p in Path(backup_path).glob("*.sql")], reverse=True)
+    else:
+        backup_files = []
+
     style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
     # Rendering the template with the dynamic content
@@ -813,6 +876,8 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         user_data=user_data,
         printer_info=printer_info,
         dest_section=dest_section,
+        backup_path=backup_path,
+        backups=backup_files,
         udat=request.session["user_data"],
     )
 
@@ -849,6 +914,33 @@ async def update_preference(request: Request, auth: dict = Depends(require_auth)
         return {"status": "success", "message": "User preference updated"}
     else:
         return {"status": "error", "message": "User not found in user data"}
+
+
+@app.post("/db_backup")
+async def db_backup(request: Request, _auth=Depends(require_auth)):
+    backup_path = request.session["user_data"].get("db_backup_path", "./db_backups")
+    os.makedirs(backup_path, exist_ok=True)
+    outfile = Path(backup_path) / f"backup_{get_clean_timestamp()}.sql"
+    async with db_lock:
+        await asyncio.to_thread(pg_dump_file, outfile)
+    return RedirectResponse(url="/admin?dest=backup", status_code=303)
+
+
+@app.post("/db_restore")
+async def db_restore(request: Request, filename: str = Form(...), _auth=Depends(require_auth)):
+    backup_path = request.session["user_data"].get("db_backup_path", "./db_backups")
+    target = Path(backup_path) / filename
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Backup not found")
+    os.makedirs(backup_path, exist_ok=True)
+    new_backup = Path(backup_path) / f"pre_restore_{get_clean_timestamp()}.sql"
+    async with db_lock:
+        await asyncio.to_thread(pg_dump_file, new_backup)
+        try:
+            await asyncio.to_thread(pg_restore_file, target)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    return RedirectResponse(url="/admin?dest=backup", status_code=303)
 
 
 @app.get("/queue_details", response_class=HTMLResponse)
@@ -1940,10 +2032,12 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
 
 
 def generate_unique_upload_key():
-    color = random.choice(BVARS.pantone_colors)
-    invertebrate = random.choice(BVARS.marine_invertebrates)
-    number = random.randint(0, 1000000)
-    return f"{color.replace(' ','_')}_{invertebrate.replace(' ','_')}_{number}"
+    """Return a datestamp for default file set names.
+
+    The datestamp format follows ``YYYYMMDDTHHMMSS`` as required when a
+    file set name isn't explicitly provided.
+    """
+    return datetime.utcnow().strftime("%Y%m%dT%H%M%S")
 
 
 
@@ -2276,7 +2370,12 @@ async def create_file(
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
         content = templates.get_template("create_file_report.html").render(
-            request=request, results=results, style=style, udat=user_data
+            request=request,
+            results=results,
+            style=style,
+            udat=user_data,
+            file_set_euid=new_file_set.euid,
+            file_set_name=file_set_name,
         )
 
         return HTMLResponse(content=content)
@@ -2505,6 +2604,8 @@ async def search_files(
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
+        order_pref = user_data.get("search_columns_order")
+        columns = apply_column_order(columns, order_pref)
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
         fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
   
@@ -2714,6 +2815,8 @@ async def search_file_sets(
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
+        order_pref = user_data.get("file_set_search_columns_order")
+        columns = apply_column_order(columns, order_pref)
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
         num_results = len(table_data)
@@ -3115,11 +3218,11 @@ def directory_listing(directory: Path, file_path: str) -> HTMLResponse:
     for item in items:
         if item.is_dir():
             files.append(
-                f'<li><a href="/serve_endpoint/{file_path.lstrip('/')}/{item.name}/">{item.name}/</a></li>'
+                f"<li><a href='/serve_endpoint/{file_path.lstrip('/')}/{item.name}/'>{item.name}/</a></li>"
             )
         else:
             files.append(
-                f'<li><a href="/serve_endpoint/{file_path.lstrip('/')}/{item.name}">{item.name}</a></li>'
+                f"<li><a href='/serve_endpoint/{file_path.lstrip('/')}/{item.name}'>{item.name}</a></li>"
             )
     print('PPPPPP', str(parent_path))
     html_content = f"""
