@@ -3966,6 +3966,20 @@ class BloomFileSet(BloomObj):
         self.session.commit()
         return file_set
 
+    def get_unique_file_set_tags(self):
+        """Return a list of unique tags across all file sets."""
+        q = text(
+            """
+            SELECT DISTINCT jsonb_array_elements_text(json_addl->'properties'->'tags') AS tag
+            FROM generic_instance
+            WHERE super_type = 'file' AND btype = 'file_set' AND is_deleted = :is_deleted
+            AND jsonb_typeof(json_addl->'properties'->'tags') = 'array'
+            """
+        )
+        result = self.session.execute(q, {"is_deleted": self.is_deleted})
+        rows = result.fetchall()
+        return [r[0] for r in rows if r[0]]
+
     def get_file_set_by_euid(self, euid):
         return self.get_by_euid(euid)
 

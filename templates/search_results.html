@@ -5,6 +5,8 @@
 {% block extra_head %}
     <script src="static/action_buttons.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="static/tagify.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="static/tagify.css">
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
     <script>
@@ -277,8 +279,6 @@
         
                         {% elif field.name == "ref_type" %}
         
-                        {% elif field.name == "tags" %}
-        
                         {% elif field.type == "select" %}
                             
                               
@@ -491,6 +491,18 @@
     // Call the function on page load to set the correct state
     document.addEventListener("DOMContentLoaded", function() {
         toggleRcloneOptions();
+        const tagInput = document.getElementById('tags');
+        if (tagInput) {
+            const tagify = new Tagify(tagInput, {
+                delimiters: ' ',
+                pattern: /[^\s]+/,
+                originalInputValueFormat: values => values.map(v => v.value).join(' ')
+            });
+
+            fetch('/file_set_tag_suggestions')
+                .then(r => r.json())
+                .then(data => { tagify.settings.whitelist = data; });
+        }
     });
 </script>
 

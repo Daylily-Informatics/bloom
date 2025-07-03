@@ -9,8 +9,6 @@
 
                 {% elif field.name == "ref_type" %}
 
-                {% elif field.name == "tags" %}
-
                 {% elif field.type == "select" %}
                     
                       
@@ -86,5 +84,18 @@
     // Call the function on page load to set the correct state
     document.addEventListener("DOMContentLoaded", function() {
         toggleRcloneOptions();
+
+        const tagInput = document.getElementById('tags');
+        if (tagInput) {
+            const tagify = new Tagify(tagInput, {
+                delimiters: ' ',
+                pattern: /[^\s]+/,
+                originalInputValueFormat: values => values.map(v => v.value).join(' ')
+            });
+
+            fetch('/file_set_tag_suggestions')
+                .then(r => r.json())
+                .then(data => { tagify.settings.whitelist = data; });
+        }
     });
 </script>
