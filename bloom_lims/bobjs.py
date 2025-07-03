@@ -3194,8 +3194,8 @@ class BloomFile(BloomObj):
                     b_sub_type="generic",
                 )
                 if len(existing_euids) > 0:
-                    raise Exception(
-                        f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}."
+                    self.logger.warning(
+                        f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}. Creating a new record anyway."
                     )
 
                 file_properties = {
