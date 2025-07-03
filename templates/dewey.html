@@ -165,7 +165,7 @@
 <body>
     {% include 'bloom_header.html' %}
 
-    <h1>File Tools</h1>
+    <h1>Available Tools</h1>
     <hr>
     
     <button id="register-files" class="accordion" style="width: -webkit-fill-available;">Register File(s)</button>
@@ -174,13 +174,13 @@
     </div>
     <hr><hr>
 
-    <button class="accordion" style="width: -webkit-fill-available;">Download File</button>
+    <button class="accordion" style="width: -webkit-fill-available;">Download File(s)</button>
     <div class="accordion-content">
         {% include 'download_file.html' %}
     </div>
     <hr><hr>
     
-    <button id="query-files" class="accordion" style="width: -webkit-fill-available;">File Search (bulk d/l | create file sets | create presigned s3 URLS | share via HTTP/SFTP/webDAV/...)</button>
+    <button id="query-files" class="accordion" style="width: -webkit-fill-available;">Search Files</button>
     <div class="accordion-content" data-form="search">
         {% include 'file_search.html' %}
     </div>

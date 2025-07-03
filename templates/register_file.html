@@ -2,8 +2,7 @@
     <ul>
 
 
-            <h3><a href=/bulk_create_files class="button">Bulk File Creation</a></h3>
-            <br>
+            <h3><b><a href=/bulk_create_files class="button">Bulk File Creation</a></b></h3>
             <hr>        
         <form id="createFileForm" data-form="register" action="create_file" method="post" enctype="multipart/form-data">
             <input type="hidden" name="upload_group_key_ifnone" value="{{ upload_group_key }}">
@@ -12,7 +11,7 @@
                     <td style="align-content: flex-start;" >
                         <input type="hidden" value="na" id="name" name="name">
 
-                        <h3>Specify Files</h3>
+                        <h3>Register Files</h3>
                         <hr>
                         <ul>
                             <label for="file_data">A Local File:</label>
@@ -33,15 +32,19 @@
                         </ul>
                     </td>
                     <td style="align-content: flex-start;">
-                        <ul>
-                            <br><br>
+                        
+                            <br><br><br>
+                        
                             <h4>Add Metadata</h4>
 
+                            
+                        <ul>
+<ul>
                             <label for="upload_group_key" >File Set Name: </label>
                             <input type=text name="upload_group_key"></input>
-                            
-                            <ul>
-
+                        </ul>
+                            <hr>
+                        <ul>
                             {% for field in ui_fields %}
                                 {% if field.name == 'import_or_remote' %}
                                 <div id="import_or_remote_container" style="display:none;">
