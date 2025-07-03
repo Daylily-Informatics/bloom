@@ -563,3 +563,42 @@ th {
     background-color: rgba(0, 0, 0, 0.3);
     border-radius: var(--border-radius);
 }
+=======
+    background-color: var(--panel-bg-color);
+    padding: 10px 20px;
+    border-radius: var(--border-radius);
+}
+
+.header-container h1 {
+    margin: 0;
+    margin-right: 20px;
+    font-size: var(--font-size-large);
+}
+
+.header-container a {
+    margin: 0 10px;
+    color: var(--text-color);
+}
+
+.header-container .nav-links {
+    display: flex;
+    align-items: center;
+}
+
+.header-container .page-title {
+    margin-left: 10px;
+}
+
+.header-container .spacer {
+    flex: 1;
+}
+
+.header-container .nav-user {
+    display: flex;
+    align-items: center;
+}
+
+.header-container .logout-link {
+    margin-left: 10px;
+}
+
