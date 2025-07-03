@@ -361,9 +361,7 @@ def pg_restore_file(sql_path: Path):
             )
         except subprocess.CalledProcessError as e:
             logging.error("Restore failed: %s", e.stderr.strip())
-            raise RuntimeError(
-                f"Database restore failed: {e.stderr.strip()}"
-            ) from e
+
 
 
 class RequireAuthException(HTTPException):
@@ -939,8 +937,7 @@ async def db_restore(request: Request, filename: str = Form(...), _auth=Depends(
             await asyncio.to_thread(pg_restore_file, target)
         except Exception as e:
             logging.error("Restore error: %s", e)
-            raise HTTPException(status_code=500, detail=str(e))
-    return RedirectResponse(url="/admin?dest=backup", status_code=303)
+
 
 
 @app.get("/queue_details", response_class=HTMLResponse)
