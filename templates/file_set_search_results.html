@@ -35,14 +35,9 @@
             <input type="hidden" id="selected_fs_euid" name="fs_euid">
             <button onclick="shareFileSet(event)">Share File Set</button>
         </div>
-        <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
-            <small>
-                d/l<br>table<br>as<br>TSV<br>
-            </small>
-            <button type="button" class="download-tsv" onclick="downloadTableAsTSV()">⬇️</button>
-        </div>
         </div>
     </form>
+    <button type="button" class="floating-button download-tsv" onclick="downloadTableAsTSV()">⬇️</button>
 
     <table id="results-table" border="1">
         <thead>
@@ -150,6 +145,10 @@
     <style>
         th {
             cursor: pointer;
+        }
+        .floating-button.download-tsv {
+            top: 20px;
+            bottom: auto;
         }
     </style>
 </body>
