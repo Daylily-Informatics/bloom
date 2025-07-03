@@ -7,9 +7,10 @@ PGUSER=${PGUSER:-$USER}
 PGPASSWORD=${PGPASSWORD:-passw0rd}
 export PGDBNAME=${PGDBNAME:-bloom_lims}
 # Optional starting value for the file index sequence (FI euid prefix)
-FILE_INDEX_START=${FILE_INDEX_START:1}
+FILE_INDEX_START=${FILE_INDEX_START:-1}
 
-
+echo "FISTART: $FILE_INDEX_START"
+sleep 5
 source bloom_lims/bin/install_miniconda
 
 
@@ -75,12 +76,12 @@ else
     echo "You may use the pgsql datastore $PGDATA to connect to the '$PGDBNAME' databse using $PGUSER and pw: $PGPASSWORD and connect to database: $PGDBNAME ."
 fi
 
-if [[ -n "$FILE_INDEX_START" ]]; then
-    echo "Setting starting file index to $FILE_INDEX_START"
-    PGPORT=5445 psql -U "$PGUSER" -d "$PGDBNAME" -c "ALTER SEQUENCE fi_instance_seq RESTART WITH $FILE_INDEX_START;" || {
+
+echo "Setting starting file index to $FILE_INDEX_START"
+PGPORT=5445 psql -U "$PGUSER" -d "$PGDBNAME" -c "ALTER SEQUENCE fi_instance_seq RESTART WITH $FILE_INDEX_START;" || {
         echo "Failed to set file index start" && return 1
     }
-fi
+unset FILE_INDEX_START
 
 echo "\n\n\nSeeding the database templates now...\n\n\n"
 
