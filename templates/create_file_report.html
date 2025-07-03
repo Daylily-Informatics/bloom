@@ -101,6 +101,9 @@
             {% endfor %}
         </tbody>
     </table>
+    {% if results_tsv %}
+    <p><a href="{{ results_tsv }}" download>Download results TSV</a></p>
+    {% endif %}
     <hr>
     <a href="/dewey">Back to Create File Form</a>
 

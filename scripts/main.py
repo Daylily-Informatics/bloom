@@ -3399,6 +3399,7 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
     bulk_file_set = bfs.create_file_set(file_set_metadata={"name": file_set_name, "description": "Bulk upload"})
 
     results = []
+    file_results = []
     for i, row in enumerate(rows):
         num_success = 0
         num_failed = 0
@@ -3454,9 +3455,21 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
                 bfs.add_files_to_file_set(file_set_euid=bulk_file_set.euid, file_euids=[new_file.euid])
                 url_uids.append(new_file.euid)
                 num_success += 1
+                file_results.append({
+                    "identifier": new_file.euid,
+                    "status": "Success",
+                    "original": url,
+                    "current_s3_uri": new_file.json_addl["properties"]["current_s3_uri"],
+                })
             except Exception as e:
                 num_failed += 1
                 messages.append(str(e))
+                file_results.append({
+                    "identifier": url,
+                    "status": f"Failed: {e}",
+                    "original": url,
+                    "current_s3_uri": "",
+                })
 
         for s3_uri, imp in zip(s3_uris, s3_uris_import):
             try:
@@ -3468,13 +3481,31 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
                         bfs.add_files_to_file_set(file_set_euid=bulk_file_set.euid, file_euids=[nf.euid])
                         s3_uids.append(nf.euid)
                         num_success += 1
+                        file_results.append({
+                            "identifier": nf.euid,
+                            "status": "Success",
+                            "original": s3_uri,
+                            "current_s3_uri": nf.json_addl["properties"]["current_s3_uri"],
+                        })
                 else:
                     bfs.add_files_to_file_set(file_set_euid=bulk_file_set.euid, file_euids=[new_file.euid])
                     s3_uids.append(new_file.euid)
                     num_success += 1
+                    file_results.append({
+                        "identifier": new_file.euid,
+                        "status": "Success",
+                        "original": s3_uri,
+                        "current_s3_uri": new_file.json_addl["properties"]["current_s3_uri"],
+                    })
             except Exception as e:
                 num_failed += 1
                 messages.append(str(e))
+                file_results.append({
+                    "identifier": s3_uri,
+                    "status": f"Failed: {e}",
+                    "original": s3_uri,
+                    "current_s3_uri": "",
+                })
 
         results.append({
             "row": i + 1,
@@ -3511,8 +3542,23 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
         for row, result in zip(rows, results):
             writer.writerow({**row, **result, "FileSet": bulk_file_set.euid})
 
-    return FileResponse(
-        fin_tsv_path,
-        media_type="text/tab-separated-values",
-        filename=fin_tsv_path.name,
+    served_dir = BASE_DIR / "bulk_results"
+    served_dir.mkdir(parents=True, exist_ok=True)
+    final_path = served_dir / fin_tsv_path.name
+    shutil.copy(fin_tsv_path, final_path)
+
+    tsv_url = f"/serve_endpoint/{final_path.relative_to(BASE_DIR)}"
+
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    content = templates.get_template("create_file_report.html").render(
+        request=request,
+        results=file_results,
+        style=style,
+        udat=user_data,
+        file_set_euid=bulk_file_set.euid,
+        file_set_name=file_set_name,
+        results_tsv=tsv_url,
     )
+
+    return HTMLResponse(content=content)
