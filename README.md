@@ -118,7 +118,7 @@ source bloom_lims/env/install_postgres.sh
 # conda activate BLOOM if is has not happened already.
 
 # Start the Bloom LIMS UI
-source run_bloomui.sh
+source scripts/run_bloomui.sh
 
 ```
 
@@ -271,11 +271,11 @@ __note:__ all commands below are expected to be run from a shell with conda acti
 
 ## Drop The Entire Database(loose all data!) > Rebuild The Database / Re-seed With All Accessible json Templates
 
-**The steps are wrapped in a script, please see [clear_and_rebuild_postgres.sh](bloom_lims/env/clear_and_rebuild_postgres.sh).**
+**The steps are wrapped in a script, please see [clear_and_rebuild_postgres.sh](scripts/clear_and_rebuild_postgres.sh).**
 
 It is executed as follows:
 ```bash
-source clear_and_rebuild_postgres.sh
+source scripts/clear_and_rebuild_postgres.sh
 ```
 
 ### Stop pgsql
@@ -289,16 +289,16 @@ source clear_and_rebuild_postgres.sh
 
 ### Build LIMS Workflows With Autogen Objects
 Similar to `pytest`, but more extensive. Largely useful in development work.  The following will auto-gen 'n=2' passes of the lims schema
-- `python tx.py 2 `.
+- `python scripts/tx.py 2 `.
 
 ### Run the bloom UI
-- `source run_bloomui.sh`
+- `source scripts/run_bloomui.sh`
  
 ### Run the pgadmin UI
 - `source bloom_lims/env/install_pgadmin.sh`
 
 ### Start Interactive Shell w/Core Bloom Objects Instantiated
-`python bloom_shell.py` 
+`python scripts/bloom_shell.py`
  
  
  # Random Notes

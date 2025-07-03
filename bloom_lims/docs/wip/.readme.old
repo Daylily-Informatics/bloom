@@ -454,10 +454,10 @@ Rebuild the schema
 -  `source bloom_lims/env/install_postgres.sh skip` the skip will skip building the conda env. This will start pgsql in the env, and build the schema.
 
 Auto-gen 'n' passes of the lims schema
-- `python tx.py 2 ` . # runs through creating objects in the current workflows.
+- `python scripts/tx.py 2 ` . # runs through creating objects in the current workflows.
 
 Run the bloom UI
-- `uvicorn main:app --reload --log-level trace --port 8911 --timeout-keep-alive 303`
+- `uvicorn scripts.main:app --reload --log-level trace --port 8911 --timeout-keep-alive 303`
 
  
  
