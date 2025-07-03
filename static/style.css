@@ -377,6 +377,11 @@ a:active {
     color: var(--a-active); /* Change to your preferred color */
 }
 
+/* Links to file objects (with preview) have a subtle glow */
+a[href*="euid_details?euid=FI"] {
+    text-shadow: 0 0 5px var(--hilight-color);
+}
+
 .subtype-button {
     font-size: var(--font-size-xsmall);
     padding: 1px 2px;
