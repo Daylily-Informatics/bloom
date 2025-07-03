@@ -3421,9 +3421,10 @@ class BloomFile(BloomObj):
             file_instance.json_addl["properties"]["comments"] = (
                 str(e) + f" FILENAM == {file_name}"
             )
+            # Reattach the object in case the session was rolled back
+            file_instance = self.session.merge(file_instance)
             flag_modified(file_instance, "json_addl")
             flag_modified(file_instance, "bstatus")
-            self.session.flush()
             self.session.commit()
             raise (e)
 
