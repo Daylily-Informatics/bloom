@@ -93,7 +93,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyCookie
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.testclient import TestClient
 
 from starlette.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -2191,6 +2190,7 @@ async def create_file(
     sub_variable: str = Form(""),
     file_tags: str = Form(""),
     import_or_remote: str = Form("import_or_remote"),
+    file_set_euid: str = Form(""),
     further_metadata: str = Form(""),
 ):
     user_data = request.session.get("user_data", {})
@@ -2207,16 +2207,18 @@ async def create_file(
     
     try:
      
-        # Creating a file set to tag all the files uploaded in the same batch together.
+        # Creating or retrieving a file set to tag all the files uploaded in the same batch together.
         bfs = BloomFileSet(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
-        file_set_metadata = {
-            "name": file_set_name,
-            "description": "File set created by Dewey file manager",
-            "tag": "on-create",
-            "comments": "",
-        }
-        # Create the file set
-        new_file_set = bfs.create_file_set(file_set_metadata=file_set_metadata)
+        if file_set_euid:
+            new_file_set = bfs.get_file_set_by_euid(file_set_euid)
+        else:
+            file_set_metadata = {
+                "name": file_set_name,
+                "description": "File set created by Dewey file manager",
+                "tag": "on-create",
+                "comments": "",
+            }
+            new_file_set = bfs.create_file_set(file_set_metadata=file_set_metadata)
         
         bfi = BloomFile(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
         file_metadata = {
@@ -3347,7 +3349,6 @@ async def protected_content(request: Request, auth=Depends(require_auth)):
     content = "You are authenticated and can access protected resources."
     return HTMLResponse(content=content)
 
-client = TestClient(app)  # Create a test client for programmatic requests
 
 @app.post("/bulk_create_files_from_tsv")
 async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(...)):
@@ -3371,10 +3372,11 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
 
         # Validate required columns
         required_columns = [
-            "name", "comments", "lab_code", "urls", "s3_uris", "study_id",
-            "clinician_id", "record_datetime", "record_datetime_end", "patient_id",
-            "purpose", "category", "sub_category", "sub_category_2", "variable",
-            "sub_variable", "file_tags", "upload_key"
+            "name", "comments", "lab_code", "urls", "s3_uris", "urls_import",
+            "s3_uris_import", "study_id", "clinician_id", "record_datetime",
+            "record_datetime_end", "patient_id", "purpose", "category",
+            "sub_category", "sub_category_2", "variable", "sub_variable",
+            "file_tags", "upload_key"
         ]
 
         for column in required_columns:
@@ -3386,63 +3388,123 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
     except Exception as e:
         return {"status": "error", "message": f"Failed to process TSV: {e}"}
 
-    # Process rows and hit create_file
+    # create a single file set for this bulk upload
+    bdb = BLOOMdb3(app_username=request.session.get("user_data", {}).get("email", "na"))
+    bfs = BloomFileSet(bdb)
+    file_set_name = generate_unique_upload_key()
+    bulk_file_set = bfs.create_file_set(file_set_metadata={"name": file_set_name, "description": "Bulk upload"})
+
     results = []
     for i, row in enumerate(rows):
-        num_files = 0
         num_success = 0
         num_failed = 0
         messages = []
+        url_uids = []
+        s3_uids = []
 
-        # Determine the number of files to create
-        urls = row.get("urls", "").split(",") if row.get("urls") else []
-        s3_uris = row.get("s3_uris", "").split(",") if row.get("s3_uris") else []
-        num_files = len(urls) + len(s3_uris)
+        urls = [u.strip() for u in row.get("urls", "").split(',') if u.strip()]
+        s3_uris = [u.strip() for u in row.get("s3_uris", "").split(',') if u.strip()]
+        urls_import = [u.strip() for u in row.get("urls_import", "").split(',') if u.strip()]
+        s3_uris_import = [u.strip() for u in row.get("s3_uris_import", "").split(',') if u.strip()]
 
-        try:
-            # Simulate a POST request to create_file
-            #from IPython import embed; embed()
-            response = client.post("/create_file", data=row)
-            content_type = response.headers.get("content-type", "")
-            if content_type.startswith("application/json"):
-                resp_json = response.json()
-            else:
-                resp_json = {}
+        if len(urls_import) < len(urls):
+            urls_import.extend(["Import"] * (len(urls) - len(urls_import)))
+        if len(s3_uris_import) < len(s3_uris):
+            s3_uris_import.extend(["Import"] * (len(s3_uris) - len(s3_uris_import)))
 
-            logging.info(
-                f"Row {i + 1}: {content_type} {response.status_code}"
-            )
+        base_metadata = {
+            "name": row.get("name", ""),
+            "comments": row.get("comments", ""),
+            "lab_code": row.get("lab_code", ""),
+            "clinician_id": row.get("clinician_id", ""),
+            "health_event_id": row.get("health_event_id", ""),
+            "record_datetime": row.get("record_datetime", ""),
+            "record_datetime_end": row.get("record_datetime_end", ""),
+            "patient_id": row.get("patient_id", ""),
+            "creating_user": request.session.get("user_data", {}).get("email", "na"),
+            "upload_group_key": file_set_name,
+            "study_id": row.get("study_id", ""),
+            "purpose": row.get("purpose", ""),
+            "category": row.get("category", ""),
+            "sub_category": row.get("sub_category", ""),
+            "sub_category_2": row.get("sub_category_2", ""),
+            "variable": row.get("variable", ""),
+            "sub_variable": row.get("sub_variable", ""),
+            "file_tags": row.get("file_tags", ""),
+        }
 
-            if response.status_code in [200, 307]:
+        if row.get("further_metadata"):
+            try:
+                base_metadata.update(json.loads(row.get("further_metadata")))
+            except Exception as e:
+                messages.append(f"Invalid further_metadata: {e}")
+
+        addl_tags = {"patient_id": row.get("patient_id", ""), "study_id": row.get("study_id", ""), "clinician_id": row.get("clinician_id", "")}
+        bfi = BloomFile(bdb)
+
+        for url, imp in zip(urls, urls_import):
+            try:
+                meta = dict(base_metadata)
+                meta["import_or_remote"] = imp or "Import"
+                new_file = bfi.create_file(file_metadata=meta, url=url, addl_tags=addl_tags)
+                bfs.add_files_to_file_set(file_set_euid=bulk_file_set.euid, file_euids=[new_file.euid])
+                url_uids.append(new_file.euid)
                 num_success += 1
-                messages.append("File created successfully.")
-            else:
+            except Exception as e:
                 num_failed += 1
-                msg = resp_json.get("detail", response.text if response.text else "Unknown error")
-                messages.append(msg)
-        except Exception as e:
-            num_failed += 1
-            messages.append(str(e))
+                messages.append(str(e))
 
-        # Append the result
+        for s3_uri, imp in zip(s3_uris, s3_uris_import):
+            try:
+                meta = dict(base_metadata)
+                meta["import_or_remote"] = imp or "Import"
+                new_file = bfi.create_file(file_metadata=meta, s3_uri=s3_uri, addl_tags=addl_tags)
+                if isinstance(new_file, list):
+                    for nf in new_file:
+                        bfs.add_files_to_file_set(file_set_euid=bulk_file_set.euid, file_euids=[nf.euid])
+                        s3_uids.append(nf.euid)
+                        num_success += 1
+                else:
+                    bfs.add_files_to_file_set(file_set_euid=bulk_file_set.euid, file_euids=[new_file.euid])
+                    s3_uids.append(new_file.euid)
+                    num_success += 1
+            except Exception as e:
+                num_failed += 1
+                messages.append(str(e))
+
         results.append({
             "row": i + 1,
-            "num_files_to_create": num_files,
+            "num_files_to_create": len(urls) + len(s3_uris),
             "num_success": num_success,
             "num_failed": num_failed,
             "create_message": "; ".join(messages),
-            "datetime_finished": datetime.now().isoformat()
+            "datetime_finished": datetime.now().isoformat(),
+            "url_file_uid": ",".join(url_uids),
+            "s3uri_file_uid": ",".join(s3_uids),
         })
 
-    # Append results to TSV and save as .fin.tsv
-    fin_tsv_path = tsv_path.with_suffix(".fin.tsv")
-    
+    # Append results to TSV and save with the file set uid
+    fin_tsv_path = temp_dir / f"{bulk_file_set.euid}_dewey_bulk_create_outcomes.tsv"
+
     with open(fin_tsv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) + [ "row",
-            "num_files_to_create", "num_success", "num_failed", "create_message", "datetime_finished"
-        ], delimiter="\t")
+        writer = csv.DictWriter(
+            f,
+            fieldnames=list(rows[0].keys())
+            + [
+                "url_file_uid",
+                "s3uri_file_uid",
+                "FileSet",
+                "row",
+                "num_files_to_create",
+                "num_success",
+                "num_failed",
+                "create_message",
+                "datetime_finished",
+            ],
+            delimiter="\t",
+        )
         writer.writeheader()
         for row, result in zip(rows, results):
-            writer.writerow({**row, **result})
+            writer.writerow({**row, **result, "FileSet": bulk_file_set.euid})
 
     return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
