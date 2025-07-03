@@ -83,7 +83,7 @@ button:hover {
 .idx_button {
     font-size: var(--font-size-standard);
     background-color: var(--primary-color);
-    color: var(--text-color);
+    color: white;
     border: none;
     border-radius: var(--border-radius);
     cursor: pointer;
@@ -91,7 +91,7 @@ button:hover {
     transition: background-color var(--transition-speed);
 }
 .idx_button:visited {
-    color: var(--text-color);
+    color: white;
 }
 
 .main-button {
