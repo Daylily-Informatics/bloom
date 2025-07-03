@@ -34,7 +34,8 @@
         <button id="toggle-view-btn" style="float:right;">Timeline View</button>
     </div>
     <div id="patient-table-view">
-    <table>
+    <button id="download-tsv-btn" style="margin-bottom:5px;">Download TSV</button>
+    <table id="patient-table">
         <tr>
             <th>EUID</th>
             <th>Original Name</th>
@@ -70,7 +71,9 @@
     <script>
         window.patientFilesData = {{ files_data | tojson | safe }};
         window.patientColorMap = {{ color_map | tojson | safe }};
+        window.currentPatientId = {{ patient_id | tojson | safe }};
     </script>
+    <script src="static/patient_table.js"></script>
     <script src="static/patient_timeline.js"></script>
     {% endif %}
 </body>
