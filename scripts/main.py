@@ -583,6 +583,17 @@ async def login(request: Request, response: Response, email: str = Form(...)):
         key="session", value="user_session_token", httponly=True, max_age=3600, path="/"
     )
     request.session["user_data"] = proc_udat(email)
+
+    # Track session details
+    now = datetime.now().isoformat()
+    session_info = request.session.get("session_data", {})
+    login_count = session_info.get("login_count", 0) + 1
+    request.session["session_data"] = {
+        "last_login": now,
+        "login_count": login_count,
+        "session_start": now,
+    }
+
     # Redirect to the root path ("/") after successful login/signup
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     # Add this line at the end of the /login endpoint
@@ -1788,6 +1799,17 @@ async def user_home(request: Request):
 
     user_data = request.session.get("user_data", {})
     session_data = request.session.get("session_data", {})  # Extract session_data from session
+
+    start_ts = session_data.get("session_start")
+    if start_ts:
+        try:
+            start_dt = datetime.fromisoformat(start_ts)
+            session_data["session_duration"] = str(datetime.now() - start_dt).split(".")[0]
+        except Exception:
+            session_data["session_duration"] = "NA"
+    else:
+        session_data["session_duration"] = "NA"
+    request.session["session_data"] = session_data
 
 
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]), cfg_printers=True,cfg_fedex=True)
