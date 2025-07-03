@@ -15,7 +15,7 @@
     <h1>{{ num_results }} Results</h1>
 
     <form id="shareFileSetForm" action="/share_file_set" method="post">
-        <div style="display: flex; flex:none;">
+        <div style="display: flex; flex: none;">
         <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
             <label for="ref_type">Share Files In Set?</label>
             <select id="ref_type" name="ref_type" onchange="toggleRcloneOptions()">
@@ -35,7 +35,7 @@
             <input type="hidden" id="selected_fs_euid" name="fs_euid">
             <button onclick="shareFileSet(event)">Share File Set</button>
         </div>
-        <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
+        <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1); margin-left: auto;">
             <small>
                 d/l<br>table<br>as<br>TSV<br>
             </small>
