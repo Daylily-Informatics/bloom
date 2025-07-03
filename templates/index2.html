@@ -20,3 +20,125 @@
     </div>
 {% endblock %}
 
+        {% set bloom_mod = 'index' %}
+
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+        <link rel="stylesheet" type="text/css" href="static/style.css">
+        <script src="static/action_buttons.js"></script>
+
+        <script>
+            function checkForOauthCode() {
+                const urlFragment = new URLSearchParams(window.location.hash.substring(1)); // Remove the # and parse
+                const accessToken = urlFragment.get('access_token');
+                console.log("Access token:", accessToken);
+            
+                if (accessToken) {
+                    // Send the code to the backend
+                    fetch('/oauth_callback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ accessToken: accessToken }),
+                    })
+                    .then(response => response.text())
+                    .then(data => {
+                        console.log("Response from server:", data);
+                        if (!sessionStorage.getItem('pageReloaded')) {
+                            sessionStorage.setItem('pageReloaded', 'true');
+                            window.location.reload(); // Force page reload
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert("Failed to process GitHub authentication.");
+                    });
+                } else {
+                    console.log("No GitHub code found on home page.");
+                }
+            }
+
+            window.onload = function() {
+                checkForOauthCode();
+            };
+        </script>
+
+        <style>
+            .accordion {
+                cursor: pointer;
+                padding: 18px;
+                width: 100%;
+                border: none;
+                text-align: left;
+                outline: none;
+                font-size: 15px;
+                transition: 0.4s;
+            }
+         
+            .panel {
+                padding: 0 18px;
+                display: none;
+                overflow: hidden;
+            }
+            b {
+                color: gold;        
+            }
+            button .accordion {  
+                background-color: var(--secondary-color);
+            }
+            .blink {
+                animation: blinker 1s linear infinite;
+                color: red;
+                font-weight: bold;
+            }
+            @keyframes blinker {
+                50% {
+                    opacity: 0;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        {% include 'bloom_header.html' %}
+
+        <div class="button-container" style="margin-top:20px; text-align:center;">
+            <a href="/dewey" class="idx_button" style="padding:20px 24px; font-size:24px; background-color:#17a2b8; color:white;">DEWEY</a>
+            <div style="margin-top:15px;">
+                <a href="/dewey#register-files" class="idx_button">Register Files</a>
+                <a href="/dewey#query-files" class="idx_button">Query Files</a>
+                <form action="/search_files" method="post" style="display:inline; margin:0;">
+                    <input type="hidden" name="is_greedy" value="yes">
+                    <button type="submit" class="idx_button">All Files</button>
+                </form>
+                <a href="/dewey#query-file-sets" class="idx_button">Query File Sets</a>
+                <form action="/search_file_sets" method="post" style="display:inline; margin:0;">
+                    <input type="hidden" name="is_greedy" value="yes">
+                    <button type="submit" class="idx_button">All File Sets</button>
+                </form>
+            </div>
+            <div id="dewey-stats" style="margin-top:10px;"></div>
+        </div>
+
+        <hr>
+
+        <div class="button-container" style="text-align:center; margin-bottom:20px;">
+            <a href="/serve_endpoint" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:#28a745; color:white;">Navigate Data Directories</a>
+        </div>
+
+        <hr>
+
+        <div class="button-container" style="text-align:center;">
+            <a href="/admin" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:rgb(10,44,77); color:white;">ADMIN</a>
+        </div>
+
+        <script>
+            fetch('/dewey_counts')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('dewey-stats').innerText =
+                        `Files: ${d.files} | File Sets: ${d.file_sets}`;
+                })
+                .catch(e => console.error('Failed to load stats', e));
+        </script>
+    </body>
+</html>
