@@ -86,30 +86,33 @@
         {% include 'bloom_header.html' %}
 
         <div class="button-container" style="margin-top:20px; text-align:center;">
-            <h2>DEWEY</h2>
-            <a href="/dewey" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:#17a2b8; color:white;">DEWEY</a>
-            <div style="margin-top:10px;">
+            <a href="/dewey" class="idx_button" style="padding:20px 24px; font-size:24px; background-color:#17a2b8; color:white;">DEWEY</a>
+            <div style="margin-top:15px;">
                 <a href="/dewey#register-files" class="idx_button">Register Files</a>
                 <a href="/dewey#query-files" class="idx_button">Query Files</a>
-                <a href="/dewey#queryAll" class="idx_button">All Files</a>
+                <form action="/search_files" method="post" style="display:inline; margin:0;">
+                    <input type="hidden" name="is_greedy" value="yes">
+                    <button type="submit" class="idx_button">All Files</button>
+                </form>
                 <a href="/dewey#query-file-sets" class="idx_button">Query File Sets</a>
-                <a href="/dewey#searchFileSetFormALL" class="idx_button">All File Sets</a>
+                <form action="/search_file_sets" method="post" style="display:inline; margin:0;">
+                    <input type="hidden" name="is_greedy" value="yes">
+                    <button type="submit" class="idx_button">All File Sets</button>
+                </form>
             </div>
             <div id="dewey-stats" style="margin-top:10px;"></div>
         </div>
 
         <hr>
 
-        <div class="button-container" style="text-align:center;">
-            <h2>Navigate Data Directories</h2>
+        <div class="button-container" style="text-align:center; margin-bottom:20px;">
             <a href="/serve_endpoint" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:#28a745; color:white;">Navigate Data Directories</a>
         </div>
 
         <hr>
 
         <div class="button-container" style="text-align:center;">
-            <h2>Admin</h2>
-            <a href="/admin" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:rgb(10,44,77); color:gray;">ADMIN</a>
+            <a href="/admin" class="idx_button" style="padding:20px 40px; font-size:24px; background-color:rgb(10,44,77); color:white;">ADMIN</a>
         </div>
 
         <script>
