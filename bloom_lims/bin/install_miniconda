@@ -1,15 +1,13 @@
 
 
 
-# Check if Miniconda is already installed
-conda --version &> /dev/null
-if [[ $? -ne 0 ]]; then
-    echo "Miniconda is not installed. Proceeding with installation..."
+
+if ! command -v conda >/dev/null 2>&1; then
+ echo "Miniconda is not installed. Proceeding with installation..."
 else
     echo "Miniconda is already installed. Please uninstall it before proceeding."
     return 0
 fi
-
 
 # Detect the machine type if MACHINE is not set
 if [[ -z "$MACHINE" ]]; then
