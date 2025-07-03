@@ -2067,6 +2067,7 @@ async def create_file(
     file_tags: str = Form(""),
     import_or_remote: str = Form("import_or_remote"),
     further_metadata: str = Form(""),
+    create_presigned: str = Form(None),
 ):
     user_data = request.session.get("user_data", {})
     controlled_properties = {}  # Or fetch from relevant source
@@ -2120,6 +2121,7 @@ async def create_file(
             file_metadata.update(json.loads(further_metadata))
 
         results = []
+        created_euids = []
         
         addl_tags = {"patient_id": patient_id, "study_id": study_id, "clinician_id": clinician_id}
 
@@ -2147,7 +2149,8 @@ async def create_file(
                         )
                         bfs.add_files_to_file_set(
                             file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
-                        )   
+                        )
+                        created_euids.append(new_file.euid)
                     except Exception as e:
                         results.append(
                             {
@@ -2191,7 +2194,8 @@ async def create_file(
                         )
                         bfs.add_files_to_file_set(
                             file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
-                        )  
+                        )
+                        created_euids.append(new_file.euid)
                     except Exception as e:
                         results.append(
                             {
@@ -2221,7 +2225,8 @@ async def create_file(
                         )
                         bfs.add_files_to_file_set(
                             file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
-                        )  
+                        )
+                        created_euids.append(new_file.euid)
                     except Exception as e:
                         results.append(
                             {"identifier": url.strip(), "status": f"Failed: {str(e)}"}
@@ -2250,6 +2255,7 @@ async def create_file(
                                 bfs.add_files_to_file_set(
                                     file_set_euid=new_file_set.euid, file_euids=[nf.euid]
                                 )
+                                created_euids.append(nf.euid)
                         else:
                             results.append(
                                 {
@@ -2263,7 +2269,8 @@ async def create_file(
                             )
                             bfs.add_files_to_file_set(
                                 file_set_euid=new_file_set.euid, file_euids=[new_file.euid]
-                            )  
+                            )
+                            created_euids.append(new_file.euid)
                     except Exception as e:
                         results.append(
                             {
@@ -2272,11 +2279,22 @@ async def create_file(
                             }
                         )
 
+        if create_presigned:
+            for feuid in created_euids:
+                bfi.create_presigned_url(
+                    file_euid=feuid,
+                    file_set_euid=new_file_set.euid,
+                )
+
         # Render the report
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
         content = templates.get_template("create_file_report.html").render(
-            request=request, results=results, style=style, udat=user_data
+            request=request,
+            results=results,
+            style=style,
+            udat=user_data,
+            file_set_euid=new_file_set.euid,
         )
 
         return HTMLResponse(content=content)
