@@ -340,6 +340,7 @@ def pg_restore_file(sql_path: Path):
     subprocess.run(drop_cmd, check=True, env=env)
 
     cmd = ["psql", env["PGDBNAME"], "-v", "ON_ERROR_STOP=1"]
+
     with open(sql_path, "r") as fh:
         subprocess.run(cmd, stdin=fh, check=True, env=env)
 
@@ -2006,10 +2007,12 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
 
 
 def generate_unique_upload_key():
-    color = random.choice(BVARS.pantone_colors)
-    invertebrate = random.choice(BVARS.marine_invertebrates)
-    number = random.randint(0, 1000000)
-    return f"{color.replace(' ','_')}_{invertebrate.replace(' ','_')}_{number}"
+    """Return a datestamp for default file set names.
+
+    The datestamp format follows ``YYYYMMDDTHHMMSS`` as required when a
+    file set name isn't explicitly provided.
+    """
+    return datetime.utcnow().strftime("%Y%m%dT%H%M%S")
 
 
 
@@ -2342,7 +2345,12 @@ async def create_file(
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
         content = templates.get_template("create_file_report.html").render(
-            request=request, results=results, style=style, udat=user_data
+            request=request,
+            results=results,
+            style=style,
+            udat=user_data,
+            file_set_euid=new_file_set.euid,
+            file_set_name=file_set_name,
         )
 
         return HTMLResponse(content=content)

@@ -3194,8 +3194,8 @@ class BloomFile(BloomObj):
                     b_sub_type="generic",
                 )
                 if len(existing_euids) > 0:
-                    raise Exception(
-                        f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}."
+                    self.logger.warning(
+                        f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}. Creating a new record anyway."
                     )
 
                 file_properties = {
@@ -3213,15 +3213,15 @@ class BloomFile(BloomObj):
                     "import_or_remote": "remote",
                 }
 
+                existing_dewey_euid = None
                 try:
                     existing_tags = self.s3_client.get_object_tagging(
                         Bucket=s3uri_bucket, Key=s3uri_key
                     )
                     for tag in existing_tags.get("TagSet", []):
                         if tag["Key"] == "dewey_euid":
-                            raise Exception(
-                                f"Object {s3_uri} already has a 'dewey_euid' tag with value {tag['Value']}."
-                            )
+                            existing_dewey_euid = tag["Value"]
+                            break
                 except self.s3_client.exceptions.NoSuchKey:
                     raise Exception(f"S3 object {s3_uri} does not exist.")
                 except Exception as e:
@@ -3230,31 +3230,36 @@ class BloomFile(BloomObj):
                     )
                     raise Exception(f"Failed to check tags for S3 object: {e}")
 
-                tagging = {
-                    "TagSet": [
-                        {
-                            "Key": "dewey_original_file_name",
-                            "Value": self.sanitize_tag(file_name),
-                        },
-                        {"Key": "dewey_original_file_path", "Value": "N/A"},
-                        {
-                            "Key": "dewey_original_file_suffix",
-                            "Value": self.sanitize_tag(file_suffix),
-                        },
-                        {"Key": "dewey_euid", "Value": self.sanitize_tag(euid)},
-                    ]
-                }
+                if existing_dewey_euid:
+                    self.logger.warning(
+                        f"S3 object {s3_uri} already has a 'dewey_euid' tag with value {existing_dewey_euid}. Skipping re-tagging."
+                    )
+                else:
+                    tagging = {
+                        "TagSet": [
+                            {
+                                "Key": "dewey_original_file_name",
+                                "Value": self.sanitize_tag(file_name),
+                            },
+                            {"Key": "dewey_original_file_path", "Value": "N/A"},
+                            {
+                                "Key": "dewey_original_file_suffix",
+                                "Value": self.sanitize_tag(file_suffix),
+                            },
+                            {"Key": "dewey_euid", "Value": self.sanitize_tag(euid)},
+                        ]
+                    }
 
-                try:
-                    self.s3_client.put_object_tagging(
-                        Bucket=s3uri_bucket, Key=s3uri_key, Tagging=tagging
-                    )
-                    self.logger.info(f"Tags successfully applied to S3 object {s3_uri}")
-                except Exception as e:
-                    self.logger.exception(
-                        f"Error tagging existing S3 object {s3_uri}: {e}\n\n{tagging}"
-                    )
-                    raise Exception(f"Failed to tag S3 object: {e}\n{tagging}")
+                    try:
+                        self.s3_client.put_object_tagging(
+                            Bucket=s3uri_bucket, Key=s3uri_key, Tagging=tagging
+                        )
+                        self.logger.info(f"Tags successfully applied to S3 object {s3_uri}")
+                    except Exception as e:
+                        self.logger.exception(
+                            f"Error tagging existing S3 object {s3_uri}: {e}\n\n{tagging}"
+                        )
+                        raise Exception(f"Failed to tag S3 object: {e}\n{tagging}")
 
                 _update_recursive(
                     file_instance.json_addl["properties"], file_properties
