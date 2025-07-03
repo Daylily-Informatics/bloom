@@ -69,9 +69,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             previewBox.innerHTML = '';
             if (fileType.toLowerCase() === 'pdf') {
-                previewBox.innerHTML = `<embed src="${fileUrl}" type="application/pdf" width="600" height="400">`;
+                previewBox.style.width = '1200px';
+                previewBox.style.height = '800px';
+                previewBox.innerHTML = `<embed src="${fileUrl}" type="application/pdf" style="width:100%;height:100%;">`;
+                previewBox.onclick = e => e.stopPropagation();
             } else {
-                previewBox.innerHTML = `<img src="${fileUrl}" style="max-width:600px; max-height:400px;">`;
+                previewBox.style.width = '';
+                previewBox.style.height = '';
+                previewBox.innerHTML = `<img src="${fileUrl}" style="max-width:600px; max-height:400px; cursor:pointer;">`;
+                const img = previewBox.querySelector('img');
+                img.addEventListener('click', ev => {
+                    window.open(fileUrl, '_blank');
+                    ev.stopPropagation();
+                });
 
             }
             previewBox.style.left = event.pageX + 20 + 'px';
