@@ -95,19 +95,19 @@ echo "\n\n\nSeeding the database templates now...\n\n\n"
 # The actions need to be available for some other containers to be seeded, so we do them first
 for file in $(ls ./bloom_lims/config/*/*json | grep  'action/' | grep -v 'metadata.json' | sort); do
     echo "$file"
-    python seed_db_containersGeneric.py "$file"
+    python scripts/seed_db_containersGeneric.py "$file"
 done
 
 # Seed the remaining templates
 for file in $(ls ./bloom_lims/config/*/*json | grep -v 'metadata.json'  | grep -v 'action/' | sort); do
     echo "$file"
-    python seed_db_containersGeneric.py "$file"
+    python scripts/seed_db_containersGeneric.py "$file"
 done
 
 # And create some of the singleton assay objects
-python pregen_AY.py go
+python scripts/pregen_AY.py go
 
 echo "\n\n\nBloom Installation Is Complete. Postgres should be running in the background, you can start the bloom ui with 
-bash run_bloomui[_local].sh --port 8911 ' and then navigate to http://localhost:8911 in your browser.\n\n\n"
+bash scripts/run_bloomui[_local].sh --port 8911 ' and then navigate to http://localhost:8911 in your browser.\n\n\n"
 echo "complete"
  

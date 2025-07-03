@@ -64,7 +64,7 @@ num_workers=$(( (num_cores * 2) - 1 ))
 if [[ "$mode" == "dev" ]]; then
   echo "Running in development mode on $host:$port"
   sleep 2
-  uvicorn main:app \
+  uvicorn scripts.main:app \
     --reload \
     --log-level trace \
     --port $port \
@@ -78,7 +78,7 @@ elif [[ "$mode" == "prod" ]]; then
   echo "Running in production mode on $host:$port"
   echo "Using $num_workers workers"
   sleep 4
-  gunicorn main:app \
+  gunicorn scripts.main:app \
     -w $num_workers \
     -k uvicorn.workers.UvicornWorker \
     --log-level trace \
