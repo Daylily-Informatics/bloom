@@ -342,7 +342,7 @@ def pg_restore_file(sql_path: Path):
         "psql",
         env["PGDBNAME"],
         "-c",
-        f"DROP SCHEMA IF EXISTS {schema} CASCADE; CREATE SCHEMA {schema};",
+        f"DROP SCHEMA IF EXISTS {schema} CASCADE;",
     ]
     subprocess.run(drop_cmd, check=True, env=env)
 
