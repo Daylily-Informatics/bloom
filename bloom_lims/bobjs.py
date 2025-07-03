@@ -3301,6 +3301,13 @@ class BloomFile(BloomObj):
                     "import_or_remote": import_or_remote,
                 }
 
+                _update_recursive(
+                    file_instance.json_addl["properties"], file_properties
+                )
+                flag_modified(file_instance, "json_addl")
+                self.session.commit()
+                return file_instance
+
         try:
             if file_data:
                 file_data.seek(0)  # Ensure the file pointer is at the beginning
