@@ -8,6 +8,9 @@ PGPASSWORD=${PGPASSWORD:-passw0rd}
 export PGDBNAME=${PGDBNAME:-bloom}
 
 
+bash bloom_lims/bin/install_miniconda
+
+sleep 5
 # Create a Conda environment named BLOOM if $1 is not set
 
 # github action $1 = ghmac

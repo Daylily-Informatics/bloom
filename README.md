@@ -327,7 +327,24 @@ TEST
 A widely adopted UUID spec (and used by postgres), [rfc4122](https://datatracker.ietf.org/doc/html/rfc4122), treates uc and lc as the same character. Bloom EUIDs only contain uc characters in a prefix followed by integers.
 
 
-...
+# GOTCHAS
+
+## Tmux fails to source conda env correctly
+
+Add this to ~/.zshrc or ~/.bashrc
+
+```sh
+
+
+if [ -n "$TMUX" ]; then
+    # Explicitly initialize Conda for tmux
+    source ~/miniconda3/etc/profile.d/conda.sh
+    export PATH="/Users/daylily/miniconda3/bin:/Users/daylily/miniconda3/condabin:$PATH"
+
+fi
+
+```
+
  
  
  
