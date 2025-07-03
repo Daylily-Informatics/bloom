@@ -3110,6 +3110,11 @@ class BloomFile(BloomObj):
 
         return sanitized_value
 
+    def encode_tag(self, value, is_key=False):
+        """Return a URL-encoded version of the sanitized tag."""
+        sanitized = self.sanitize_tag(value, is_key=is_key)
+        return urllib.parse.quote(sanitized, safe="")
+
     def format_addl_tags(self, add_tags):
         if not isinstance(add_tags, dict):
             raise ValueError("Input must be a dictionary.")
@@ -3118,9 +3123,9 @@ class BloomFile(BloomObj):
         for key, value in add_tags.items():
             if not isinstance(value, str):
                 raise ValueError(f"Value for key '{key}' must be a string.")
-            formatted_tags.append(
-                f"{self.sanitize_tag(key)}={self.sanitize_tag(value)}"
-            )
+            encoded_key = self.encode_tag(key, is_key=True)
+            encoded_value = self.encode_tag(value)
+            formatted_tags.append(f"{encoded_key}={encoded_value}")
 
         return "&".join(formatted_tags)
 
@@ -3323,7 +3328,12 @@ class BloomFile(BloomObj):
                         Bucket=s3_bucket_name,
                         Key=s3_key,
                         Body=file_data,
-                        Tagging=f"dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                        Tagging=(
+                            f"dewey_original_file_name={self.encode_tag(file_name)}"
+                            f"&dewey_original_file_path={self.encode_tag('N/A')}"
+                            f"&dewey_original_file_suffix={self.encode_tag(file_suffix)}"
+                            f"&dewey_euid={self.encode_tag(euid)}{addl_tag_string}"
+                        ),
                     )
 
                 except Exception as e:
@@ -3376,7 +3386,12 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=response.content,
-                    Tagging=f"dewey_original_file_name={self.sanitize_tag(url_info)}&dewey_original_url={self.sanitize_tag(url)}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=(
+                        f"dewey_original_file_name={self.encode_tag(url_info)}"
+                        f"&dewey_original_url={self.encode_tag(url)}"
+                        f"&dewey_original_file_suffix={self.encode_tag(file_suffix)}"
+                        f"&dewey_euid={self.encode_tag(euid)}{addl_tag_string}"
+                    ),
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
@@ -3406,7 +3421,12 @@ class BloomFile(BloomObj):
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Body=file_data,
-                    Tagging=f"dewey_original_file_name={self.sanitize_tag(local_path_info.name)}&dewey_original_file_path={self.sanitize_tag(full_path_to_file)}&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
+                    Tagging=(
+                        f"dewey_original_file_name={self.encode_tag(local_path_info.name)}"
+                        f"&dewey_original_file_path={self.encode_tag(full_path_to_file)}"
+                        f"&dewey_original_file_suffix={self.encode_tag(file_suffix)}"
+                        f"&dewey_euid={self.encode_tag(euid)}{addl_tag_string}"
+                    ),
                 )
                 file_properties = {
                     "current_s3_key": s3_key,
