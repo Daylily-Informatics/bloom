@@ -11,7 +11,6 @@ import yaml
 
 from pathlib import Path
 import urllib.parse
-from urllib.parse import urlparse
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -3076,8 +3075,7 @@ class BloomFile(BloomObj):
         
         if file_name is None:
             if url:
-                parsed_url = urlparse(url)
-                file_name = os.path.basename(parsed_url.path)
+                file_name = url.split("/")[-1]
             elif s3_uri:
                 file_name = s3_uri.split("/")[-1]
             elif full_path_to_file:

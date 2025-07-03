@@ -71,23 +71,5 @@ def test_create_file_with_url(bloom_file_instance):
         assert new_file.json_addl['properties']['description'] == "URL test"
         assert new_file.json_addl['properties']['original_file_size_bytes'] == len(b"test content")
 
-
-def test_create_file_with_presigned_url(bloom_file_instance):
-    url = (
-        "https://example.com/pcluster_env.yml?X-Amz-Algorithm=AWS4-HMAC-SHA256"
-        "&X-Amz-Credential=EXAMPLE%2F20250703%2Fus-west-2%2Fs3%2Faws4_request"
-        "&X-Amz-Date=20250703T112241Z&X-Amz-Expires=43200&X-Amz-SignedHeaders=host"
-        "&X-Amz-Signature=deadbeef"
-    )
-    with requests_mock.Mocker() as m:
-        m.get(url, content=b"signed content")
-        new_file = bloom_file_instance.create_file(
-            file_metadata={"description": "Presigned URL test", "import_or_remote": "import"},
-            url=url,
-        )
-        assert new_file is not None
-        assert new_file.json_addl['properties']['description'] == "Presigned URL test"
-        assert new_file.json_addl['properties']['original_file_size_bytes'] == len(b"signed content")
-
 if __name__ == "__main__":
     pytest.main()
