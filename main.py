@@ -322,7 +322,7 @@ def _pg_env():
     env.setdefault("PGPORT", "5445")
     env.setdefault("PGUSER", env.get("USER", "bloom"))
     env.setdefault("PGPASSWORD", env.get("PGPASSWORD", "SETTHISPROPERLY"))
-    env.setdefault("PGDBNAME", env.get("PGDBNAME", "bloom"))
+    env.setdefault("PGDBNAME", env.get("PGDBNAME", "bloom_lims"))
     return env
 
 
