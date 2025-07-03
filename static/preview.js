@@ -96,6 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let currentLink = null;
+    let isDragging = false;
+    let resizeInfo = null;
+    const edgeSize = 8;
 
     document.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
         link.addEventListener('mouseenter', event => {
@@ -107,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // hide the preview when clicking outside of it and the originating link
     document.addEventListener('click', event => {
+        if (isDragging) return;
         if (previewBox.style.display === 'block') {
             if (!previewBox.contains(event.target) && (!currentLink || !currentLink.contains(event.target))) {
                 hidePreview();
@@ -117,5 +121,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // prevent clicks inside the preview from bubbling up and closing it
     previewBox.addEventListener('click', event => event.stopPropagation());
+
+    // --- resizing logic ---
+
+    function getEdges(e) {
+        const rect = previewBox.getBoundingClientRect();
+        const edges = {
+            left: e.clientX - rect.left <= edgeSize,
+            right: rect.right - e.clientX <= edgeSize,
+            top: e.clientY - rect.top <= edgeSize,
+            bottom: rect.bottom - e.clientY <= edgeSize
+        };
+        if (edges.left || edges.right || edges.top || edges.bottom) return edges;
+        return null;
+    }
+
+    previewBox.addEventListener('mousedown', e => {
+        const edges = getEdges(e);
+        if (edges) {
+            const rect = previewBox.getBoundingClientRect();
+            resizeInfo = {
+                edges,
+                startX: e.clientX,
+                startY: e.clientY,
+                startW: rect.width,
+                startH: rect.height,
+                startL: rect.left,
+                startT: rect.top
+            };
+            isDragging = true;
+            e.preventDefault();
+        } else {
+            isDragging = true; // track simple dragging to prevent close on drag
+        }
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!resizeInfo) return;
+        const dx = e.clientX - resizeInfo.startX;
+        const dy = e.clientY - resizeInfo.startY;
+        if (resizeInfo.edges.right) previewBox.style.width = resizeInfo.startW + dx + 'px';
+        if (resizeInfo.edges.bottom) previewBox.style.height = resizeInfo.startH + dy + 'px';
+        if (resizeInfo.edges.left) {
+            previewBox.style.width = resizeInfo.startW - dx + 'px';
+            previewBox.style.left = resizeInfo.startL + dx + 'px';
+        }
+        if (resizeInfo.edges.top) {
+            previewBox.style.height = resizeInfo.startH - dy + 'px';
+            previewBox.style.top = resizeInfo.startT + dy + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        resizeInfo = null;
+        setTimeout(() => { isDragging = false; }, 0);
+    });
 });
 
