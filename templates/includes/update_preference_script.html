@@ -1,0 +1,18 @@
+<script>
+function updatePreferenceAndReload(key, value) {
+    console.log('Updating', key, 'to', value);
+    $.ajax({
+        url: '/update_preference',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ key: key, value: value }),
+        success: function(response) {
+            console.log('Update successful:', response);
+            window.location.reload();
+        },
+        error: function(xhr, status, error) {
+            console.error('Update failed:', status, error);
+        }
+    });
+}
+</script>
