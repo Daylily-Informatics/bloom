@@ -35,7 +35,9 @@
     </div>
     <div id="patient-table-view">
     <button id="download-tsv-btn" style="margin-bottom:5px;">Download TSV</button>
+    <button id="colorize-toggle" style="margin-bottom:5px;">Colorize</button>
     <table id="patient-table">
+        <thead>
         <tr>
             <th>EUID</th>
             <th>Original Name</th>
@@ -48,6 +50,8 @@
             <th>Purpose + Subtype</th>
             <th>Category + SubCat1 + SubCat2</th>
         </tr>
+        </thead>
+        <tbody>
         {% for file in files %}
         <tr style="background-color: {{ color_map.get(file.euid, '#222') }};">
             <td><a href="euid_details?euid={{ file.euid }}">{{ file.euid }}</a></td>
@@ -62,6 +66,7 @@
             <td>{{ file.json_addl['properties'].get('category','') }} {{ file.json_addl['properties'].get('sub_category','') }} {{ file.json_addl['properties'].get('sub_category_2','') }}</td>
         </tr>
         {% endfor %}
+        </tbody>
     </table>
     </div>
     <div id="timeline-view" style="display:none;">
