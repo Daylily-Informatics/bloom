@@ -72,12 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 previewBox.innerHTML = `<embed src="${fileUrl}" type="application/pdf" width="600" height="400">`;
             } else {
                 previewBox.innerHTML = `<img src="${fileUrl}" style="max-width:600px; max-height:400px;">`;
+
             }
             previewBox.style.left = event.pageX + 20 + 'px';
             previewBox.style.top = event.pageY + 20 + 'px';
             previewBox.style.display = 'block';
         } catch (e) {
             console.error('Preview error', e);
+
         }
     }
 
@@ -94,8 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
+
         link.addEventListener('mouseenter', showPreview);
         link.addEventListener('mouseleave', hidePreview);
         link.addEventListener('mousemove', movePreview);
     });
 });
+

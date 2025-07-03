@@ -273,27 +273,39 @@
             <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1);">
                 Create File Set (from selected)<br>
                 <div class="form-group">
+                    <div>
+                        <label for="name">Set Name</label>
+                        <input type="text" name="name" id="name">
+                    </div>
+                    <div>
+                        <label for="description">Set Description</label>
+                        <input type="text" name="description" id="description">
+                    </div>
+                    <div>
+                        <label for="tag">Tag</label>
+                        <input type="text" name="tag" id="tag">
+                    </div>
                     {% for field in ui_fields_fset %}
+                    {% if field.name not in ['name', 'description', 'tag'] %}
                     <div>
                         {% if field.name == "creating_user" %}
-        
+
                         {% elif field.name == "ref_type" %}
-        
+
                         {% elif field.type == "select" %}
-                            
-                              
+
                             <label for="{{ field.name }}">{{ field.label }}</label>
-                            
+
                             <select data-form="create-fs" name="{{ field.name }}" id="{{ field.name }}" class="select-filter">
                                 <option value="" selected></option> <!-- Placeholder for blank state -->
                                 {% for option in field.options %}
                                     <option value="{{ option }}">{{ option }}</option>
                                 {% endfor %}
                             </select>
-        
+
                         {% else %}
                         <label for="{{ field.name }}">{{ field.label }}</label>
-        
+
                             {% if field.name.endswith('_datetime') %}
                                 <input type="date" name="{{ field.name }}" id="{{ field.name }}" />
                             {% else %}
@@ -301,7 +313,8 @@
                             {% endif %}
                         {% endif %}
                     </div>
-                {% endfor %}
+                    {% endif %}
+                    {% endfor %}
                 </div>
                 <div class="form-group">
                   
@@ -491,18 +504,20 @@
     // Call the function on page load to set the correct state
     document.addEventListener("DOMContentLoaded", function() {
         toggleRcloneOptions();
-        const tagInput = document.getElementById('tags');
-        if (tagInput) {
-            const tagify = new Tagify(tagInput, {
-                delimiters: ' ',
-                pattern: /[^\s]+/,
-                originalInputValueFormat: values => values.map(v => v.value).join(' ')
-            });
+        ['tag', 'tags'].forEach(function(id) {
+            const tagInput = document.getElementById(id);
+            if (tagInput) {
+                const tagify = new Tagify(tagInput, {
+                    delimiters: ' ',
+                    pattern: /[^\s]+/,
+                    originalInputValueFormat: values => values.map(v => v.value).join(' ')
+                });
 
-            fetch('/file_set_tag_suggestions')
-                .then(r => r.json())
-                .then(data => { tagify.settings.whitelist = data; });
-        }
+                fetch('/file_set_tag_suggestions')
+                    .then(r => r.json())
+                    .then(data => { tagify.settings.whitelist = data; });
+            }
+        });
     });
 </script>
 
