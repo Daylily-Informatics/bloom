@@ -335,7 +335,12 @@ def pg_dump_file(out_path: Path):
 
 def pg_restore_file(sql_path: Path):
     env = _pg_env()
-    cmd = ["psql", env["PGDBNAME"]]
+    # Drop existing objects to ensure the restore can proceed
+    drop_cmd = ["psql", env["PGDBNAME"], "-c", "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"]
+    subprocess.run(drop_cmd, check=True, env=env)
+
+    cmd = ["psql", env["PGDBNAME"], "-v", "ON_ERROR_STOP=1"]
+
     with open(sql_path, "r") as fh:
         subprocess.run(cmd, stdin=fh, check=True, env=env)
 
