@@ -17,14 +17,16 @@
     
     <h1>Bulk File Creation</h1>
     <p>
-        Use this form to upload a TSV file for bulk file creation. Your TSV file should contain the following columns:
+        Use this form to upload a TSV file for bulk file creation. Your TSV file should contain the following columns in the order shown:
     </p>
     <ul>
         <li><strong>name</strong>: The name of the file.</li>
         <li><strong>comments</strong>: Any comments or description about the file.</li>
         <li><strong>lab_code</strong>: The laboratory code associated with the file.</li>
         <li><strong>urls</strong>: Comma-separated list of URLs pointing to the file locations.</li>
+        <li><strong>urls_import</strong>: "Import" (default) or "Remote" for each URL listed in <code>urls</code>.</li>
         <li><strong>s3_uris</strong>: Comma-separated list of S3 URIs pointing to the file locations.</li>
+        <li><strong>s3_uris_import</strong>: "Import" (default) or "Remote" for each S3 URI listed in <code>s3_uris</code>.</li>
         <li><strong>study_id</strong>: The ID of the study the file belongs to.</li>
         <li><strong>clinician_id</strong>: The ID of the clinician associated with the file.</li>
         <li><strong>record_datetime</strong>: The start datetime of the record (format: YYYY-MM-DDThh:mm:ss).</li>
@@ -37,7 +39,21 @@
         <li><strong>variable</strong>: The primary variable associated with the file (e.g., Age).</li>
         <li><strong>sub_variable</strong>: Secondary variable information (e.g., Gender).</li>
         <li><strong>file_tags</strong>: Comma-separated tags associated with the file.</li>
-        <li style="display:none;"><strong>further_metadata</strong>: A JSON string with additional metadata as key-value pairs.</li>
+        <li><strong>further_metadata</strong>: A JSON string with additional metadata as key-value pairs.</li>
+        <li><strong>upload_key</strong>: Optional unique identifier to group files in the same upload.</li>
+    </ul>
+
+    <p>The TSV returned after processing will include your original columns along with the following additional fields:</p>
+    <ul>
+        <li><strong>url_file_uid</strong>: File identifiers created from values in <code>urls</code>.</li>
+        <li><strong>s3uri_file_uid</strong>: File identifiers created from values in <code>s3_uris</code>.</li>
+        <li><strong>FileSet</strong>: The EUID of the file set used for this bulk upload.</li>
+        <li><strong>row</strong>: Input row number.</li>
+        <li><strong>num_files_to_create</strong>: Count of URLs and S3 URIs provided.</li>
+        <li><strong>num_success</strong>: Number of files successfully created.</li>
+        <li><strong>num_failed</strong>: Number of files that failed to create.</li>
+        <li><strong>create_message</strong>: Notes from the creation process.</li>
+        <li><strong>datetime_finished</strong>: Time the row was processed.</li>
     </ul>
     <p>
         You can download a template TSV file here:
