@@ -1481,6 +1481,7 @@ async def patient_views(request: Request, patient_id: str = None, sort_by: str =
 
     patient_ids = sorted(bobdb.get_unique_property_values("patient_id"))
 
+    # Fetch template data for dynamic fields    
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     
     f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
@@ -1498,6 +1499,14 @@ async def patient_views(request: Request, patient_id: str = None, sort_by: str =
     f_template = f_templates[0]
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
     ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+    ui_form_fields_query = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file", version=None)
+
+    
+    fset_template = fset_templates[0]
+    ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
+    ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
+    ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
+    
     
     files = []
     if patient_id:
