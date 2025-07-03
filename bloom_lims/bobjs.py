@@ -3723,6 +3723,30 @@ class BloomFile(BloomObj):
         end_datetime = start_datetime + timedelta(seconds=valid_duration)
 
         file_instance = self.get_by_euid(file_euid)
+        current_s3_uri = file_instance.json_addl["properties"].get("current_s3_uri", "")
+
+        file_ref_obj = BloomFileReference(self._bdb)
+
+        if not str(current_s3_uri).startswith("s3:"):
+            error_msg = (
+                f"Unable to create presigned URL, current_s3_uri has no s3: prefix: {current_s3_uri}"
+            )
+
+            file_reference = file_ref_obj.create_file_reference(
+                file_euid=file_euid,
+                reference_type="presigned",
+                valid_duration=valid_duration,
+                start_datetime=start_datetime,
+                end_datetime=end_datetime,
+                comments=error_msg,
+                status="error",
+                presigned_url="",
+                file_set_euid=file_set_euid,
+                visibility=None,
+            )
+
+            return {"file_reference": file_reference, "presigned_url": None}
+
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
         s3_key = file_instance.json_addl["properties"]["current_s3_key"]
 
@@ -3731,8 +3755,6 @@ class BloomFile(BloomObj):
             Params={"Bucket": s3_bucket_name, "Key": s3_key},
             ExpiresIn=valid_duration,
         )
-
-        file_ref_obj = BloomFileReference(self._bdb)
         file_reference = file_ref_obj.create_file_reference(
             file_euid=file_euid,
             reference_type="presigned",
