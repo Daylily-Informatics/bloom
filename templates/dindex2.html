@@ -79,6 +79,15 @@
     <body>
         {% include 'bloom_header.html'  %}
 
+
+        {{ request }} <br>
+        {{ style }} <br>
+        {{ globalFilterLevel }} <br>
+        {{ globalZoom }} <br>
+        {{ globalStartNodeEUID }} <br>
+        {{ dag_data }} <br>
+        {{ udat }} <br>
+
         <div id="nodeDialog" class="node-dialog" style="display: none;">
             <p id="nodeEuid">
                 EUID: <span></span>
@@ -293,7 +302,7 @@
 
             $.ajax({
                 url: '/get_dagv2',
-                data: { euid: globalStartNodeEUID, depth: globalFilterLevel },
+                data: { euid: globalStartNodeEUID, depth: globalFilterLevel, dag_fn: '{{ dag_data }}' },
                 dataType: 'json'
             }).done(function(data) {
                 console.log('Received DAG data:', data);

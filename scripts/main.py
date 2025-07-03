@@ -2028,6 +2028,8 @@ def generate_dag_json_from_all_objects_v2(
 
     print(f"All DAG JSON saved to {output_file}")
 
+    return output_file
+
 
 def get_dag(request: Request, _auth=Depends(require_auth)):
     dag_fn = request.session["user_data"]["dag_fn"]
@@ -2040,14 +2042,16 @@ def get_dag(request: Request, _auth=Depends(require_auth)):
 
 @app.get("/get_dagv2")
 async def get_dagv2(
-    request: Request, _euid="AY1", _depth=6, _auth=Depends(require_auth)
+    request: Request, _euid="AY1", _depth=6, dag_fn="None", _auth=Depends(require_auth)
 ):
-    dag_fn = request.session["user_data"]["dag_fnv2"]
+    #dag_fn = request.session["user_data"]["dag_fnv2"]
     # dag_fn = "./dags/j.json"
+    print(request.session, dag_fn)
     dag_data = {"elements": {"nodes": [], "edges": []}}
     if os.path.exists(dag_fn):
         with open(dag_fn, "r") as f:
             dag_data = json.load(f)
+    print("XXXXXX",dag_data, "\n\nXXXXXXXX")
     return dag_data
 
 
