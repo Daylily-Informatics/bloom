@@ -19,12 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const controls = document.getElementById('timeline-controls');
         if (controls) controls.innerHTML = '';
 
-        const purposes = [...new Set(filesData.map(f => f.purpose))].filter(Boolean);
-        const activePurposes = new Set(purposes);
+        const purposeCombos = [...new Set(filesData.map(f => `${f.purpose || ''} ${f.purpose_subtype || ''}`.trim()))].filter(Boolean);
+        const categoryCombos = [...new Set(filesData.map(f => `${f.category || ''} ${f.sub_category || ''} ${f.sub_category_2 || ''}`.trim()))].filter(Boolean);
+        const activePurposes = new Set(purposeCombos);
+        const activeCategories = new Set(categoryCombos);
 
         if (controls) {
             controls.style.marginBottom = '10px';
-            purposes.forEach(p => {
+            purposeCombos.forEach(p => {
                 const label = document.createElement('label');
                 label.style.marginRight = '10px';
                 const cb = document.createElement('input');
@@ -42,6 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 label.append(' ' + p);
                 controls.appendChild(label);
             });
+            controls.appendChild(document.createElement('br'));
+            categoryCombos.forEach(c => {
+                const label = document.createElement('label');
+                label.style.marginRight = '10px';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = true;
+                cb.addEventListener('change', () => {
+                    if (cb.checked) {
+                        activeCategories.add(c);
+                    } else {
+                        activeCategories.delete(c);
+                    }
+                    updateMarkers();
+                });
+                label.appendChild(cb);
+                label.append(' ' + c);
+                controls.appendChild(label);
+            });
         }
 
         function updateMarkers() {
@@ -49,7 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const sorted = [...filesData].sort((a,b)=>new Date(a.record_datetime || a.created) - new Date(b.record_datetime || b.created));
             const groups = {};
             sorted.forEach(file => {
-                if (file.purpose && !activePurposes.has(file.purpose)) return;
+                const pCombo = `${file.purpose || ''} ${file.purpose_subtype || ''}`.trim();
+                const cCombo = `${file.category || ''} ${file.sub_category || ''} ${file.sub_category_2 || ''}`.trim();
+                if (pCombo && !activePurposes.has(pCombo)) return;
+                if (cCombo && !activeCategories.has(cCombo)) return;
                 const d = new Date(file.record_datetime || file.created);
                 const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
                 if (!groups[key]) groups[key] = [];
@@ -66,7 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const label = document.createElement('div');
                 label.textContent = key;
-                label.style.fontSize = '10px';
+                label.style.fontSize = '14px';
+                label.style.fontWeight = 'bold';
+                label.style.marginTop = '20px';
                 bin.appendChild(label);
 
                 groups[key].forEach(file => {
