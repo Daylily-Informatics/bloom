@@ -367,7 +367,21 @@ def pg_restore_file(sql_path: Path):
         "PGPASSWORD": pg_password,
         "PGDBNAME": pg_db,
     })
-    
+    dbname = os.environ.get("PGDBNAME", "bloom_lims")
+    pg_host = os.environ.get("PGHOST", "localhost")
+    pg_port = os.environ.get("PGPORT", "5445")
+    pg_user = resolve_env_var(os.environ.get("PGUSER", os.environ.get("USER", "bloom")))
+    env = os.environ.copy()
+    sql = f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{dbname}' AND pid <> pg_backend_pid();"
+    cmd = [
+        "psql",
+        "-h", pg_host,
+        "-U", pg_user,
+        "-p", str(pg_port),
+        "-d", "postgres",
+        "-c", sql
+    ]
+    subprocess.run(cmd, check=True, env=env)
     script = Path(__file__).resolve().parent / "bloom_lims/bin/restore_db.sh"
     cmd = [str(script), "--sql", str(sql_path)]
     # Optionally append flags (if needed by the script)
