@@ -490,13 +490,76 @@ th {
 .header-container {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: var(--text-color);
+    padding: 15px 30px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
+
 .header-container h1 {
+    display: flex;
+    align-items: center;
+    margin: 0;
     margin-right: 20px;
+    font-size: var(--font-size-large);
+    font-weight: bold;
 }
+
+.header-container h1 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.header-container .logo-icon {
+    margin-right: 8px;
+}
+
 .header-container a {
-    margin: 0 10px;
+    color: var(--text-color);
 }
-.header-container small {
-    margin-left: 5px;
+
+.header-container .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-container .nav-links a {
+    padding: 4px 8px;
+    border-radius: var(--border-radius);
+    background-color: rgba(255, 255, 255, 0.15);
+    text-decoration: none;
+    transition: background-color var(--transition-speed);
+}
+
+.header-container .nav-links a:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.header-container .page-title {
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+.header-container .spacer {
+    flex: 1;
+}
+
+.header-container .nav-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-container .nav-user a {
+    color: var(--text-color);
+}
+
+.header-container .logout-link {
+    margin-left: 10px;
+    padding: 4px 8px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: var(--border-radius);
 }
