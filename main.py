@@ -334,33 +334,28 @@ def pg_dump_file(out_path: Path):
 
 
 def pg_restore_file(sql_path: Path):
+    """Restore the database using a helper shell script."""
     env = _pg_env()
-    schema = env["PGDBNAME"]
-    # Drop the schema matching the DB name to avoid restore conflicts
-    logging.info("Dropping schema %s before restore", schema)
-    drop_cmd = [
-        "psql",
-        env["PGDBNAME"],
-        "-c",
-        f"DROP SCHEMA IF EXISTS {schema} CASCADE;",
-    ]
-    subprocess.run(drop_cmd, check=True, env=env)
+    script = Path(__file__).resolve().parent / "restore_db.sh"
+    cmd = [str(script), "--sql", str(sql_path)]
 
-    cmd = ["psql", env["PGDBNAME"], "-v", "ON_ERROR_STOP=1"]
-    logging.info("Restoring database from %s", sql_path)
+    flag_map = {
+        "PGHOST": "--host",
+        "PGPORT": "--port",
+        "PGUSER": "--user",
+        "PGPASSWORD": "--password",
+        "PGDBNAME": "--dbname",
+    }
 
-    with open(sql_path, "r") as fh:
-        try:
-            subprocess.run(
-                cmd,
-                stdin=fh,
-                check=True,
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as e:
-            logging.error("Restore failed: %s", e.stderr.strip())
+    for var, flag in flag_map.items():
+        if env.get(var):
+            cmd.extend([flag, env[var]])
+
+    logging.info("Restoring database from %s using %s", sql_path, script)
+    try:
+        subprocess.run(cmd, check=True, env=env)
+    except subprocess.CalledProcessError as e:
+        logging.error("Restore failed: %s", e)
 
 
 
