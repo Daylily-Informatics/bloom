@@ -96,11 +96,11 @@
                     <td class="value-box" style="width:40%;">{{ session_data.last_login }}</td>
                 </tr>
                 <tr>
-                    <td style="width:40%; white-space: nowrap;"><strong>Session Duration</strong> {{ session_data.session_duration }}</td>
+                    <td style="width:40%; white-space: nowrap;"><strong>Session Duration</strong></td>
                     <td class="value-box" style="width:40%;">{{ session_data.session_duration }}</td>
                 </tr>
                 <tr>
-                    <td style="width:40%; white-space: nowrap;"><strong>Login Count:</strong> {{ session_data.login_count }}</td>
+                    <td style="width:40%; white-space: nowrap;"><strong>Login Count:</strong></td>
                     <td class="value-box" style="width:40%;">{{ session_data.login_count }}</td>
                 </tr>
                 <!-- Display other user data that are not in the specified keys -->
@@ -152,6 +152,10 @@
                 <div class="label-value">
                     <strong>Zebra Printer Version:</strong>
                     <span class="value-box">{{ zebra_printer_version }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>DAG File (v2):</strong>
+                    <span class="value-box">{{ user_data.get('dag_fnv2', 'Not generated') }}</span>
                 </div>
             </ul>
         </div>
