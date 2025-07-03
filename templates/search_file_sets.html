@@ -1,60 +1,50 @@
 <div class="accordion-content">
-    <ul>
-        <h3>Search File Sets By</h3>
-        <form id="searchFileSetForm" action="search_file_sets" method="post" enctype="multipart/form-data">
-
-
-
-            {% for field in ui_search_fields_fset %}
-            <div>
-                {% if field.name in ["tags",  "xxx"] %}
-
-                {% else %}
-                
-                  {% if field.type == "select" and field.multiple %}
-                    
-                    <label for="{{ field.name }}">{{ field.label }}</label>          
+    <h3>Search File Sets By</h3>
+    <form id="searchFileSetForm" action="search_file_sets" method="post" enctype="multipart/form-data">
+        {% for field in ui_search_fields_fset %}
+        <div>
+            {% if field.name in ["tags", "xxx"] %}
+            {% else %}
+                {% if field.type == "select" and field.multiple %}
+                    <label for="{{ field.name }}">{{ field.label }}</label>
                     <div class="option-buttons" data-select-id="{{ field.name }}">
                         <select class="no-selectize" name="{{ field.name }}" id="{{ field.name }}" multiple style="display: none;">
-                            <option value="" selected></option> <!-- Placeholder for blank state -->
+                            <option value="" selected></option>
                             <option value=".na">isnull</option>
                             {% for option in field.options %}
                                 <option value="{{ option }}">{{ option }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    {% elif field.type == "select" %}
-                    <label for="{{ field.name }}">{{ field.label }}</label>          
+                {% elif field.type == "select" %}
+                    <label for="{{ field.name }}">{{ field.label }}</label>
                     <select class="no-selectize" name="{{ field.name }}" id="{{ field.name }}">
-                            <option value="" selected></option> <!-- Placeholder for blank state -->
-                            <option value=".na">isnull</option>
-                            {% for option in field.options %}
-                                <option value="{{ option }}">{{ option }}</option>
-                            {% endfor %}
-                        </select>
-                    {% else %}
-                        {% if not field.name.endswith('_datetime') %}
-                        <label for="{{ field.name }}">{{ field.label }}</label>
-                        <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
-                        {% endif %}
+                        <option value="" selected></option>
+                        <option value=".na">isnull</option>
+                        {% for option in field.options %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    {% if not field.name.endswith('_datetime') %}
+                    <label for="{{ field.name }}">{{ field.label }}</label>
+                    <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" />
                     {% endif %}
+                {% endif %}
             {% endif %}
-            </div>
+        </div>
+        {% endfor %}
 
-            {% endfor %}
+        <label for="is_greedy">Greedy Search: </label>
+        <select name="is_greedy">
+            <option value="yes" selected>yes</option>
+            <option value="no">no</option>
+        </select><br><br>
 
-
-            <label for="is_greedy">Greedy Search: </label>
-            <select name="is_greedy">
-                <option value="yes" selected>yes</option>
-                <option value="no">no</option>
-            </select><br><br>
-
-            <button type="submit">Search File Sets</button>
-        </form>
-        <ul><ul> ... or for all file sets         <form id="searchFileSetFormALL" action="search_file_sets" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="is_greedy" value="yes">
-            <button type="submit">All File Sets</button>
-        </form></ul></ul>
-    </ul>
+        <button type="submit">Search File Sets</button>
+    </form>
+    <form id="searchFileSetFormALL" action="search_file_sets" method="post" enctype="multipart/form-data" style="margin-top:10px;">
+        <input type="hidden" name="is_greedy" value="yes">
+        <button type="submit">All File Sets</button>
+    </form>
 </div>

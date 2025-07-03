@@ -1,16 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ page_title }}</title>
+{% extends 'includes/base.html' %}
+{% set page_title = 'Dewey' %}
+{% set bloom_mod = 'dewey' %}
 
-    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
-    <link rel="stylesheet" type="text/css" href="static/style.css">
-    <script src="static/action_buttons.js"></script>    
+{% block extra_head %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
-
     <style>
         .floating-button { /* styles */ }
         .form-section { /* styles */ }
@@ -20,8 +15,7 @@
         .option-buttons {
             display: flex;
             flex-wrap: wrap;
-            margin-left: 10px; /* Indent buttons by 10px */
-
+            margin-left: 10px;
         }
         .option-button {
             margin: 1px;
@@ -35,7 +29,6 @@
             color: var(--text-color);
             border-color: var(--button-border-color);
         }
-
         .div.selectize-input {
             padding: inherit;
             border: inherit;
@@ -49,12 +42,9 @@
             position: inherit;
             background-color: var(--form-in-bg-color);
         }
-
-
     </style>
     <script>
         const controlledProperties = {{ controlled_properties | tojson | safe }};
-        
         function updateDependentFields(formContext) {
             function populateSelectField(selectFieldId, options) {
                 const selectField = $(`[data-form=${formContext}] #${selectFieldId}`);
@@ -64,7 +54,6 @@
                 });
                 selectField.trigger('change');
             }
-
             function handleFieldChange(field, dependentField, enumObj, formContext) {
                 $(`[data-form=${formContext}] #${field}`).change(function() {
                     const selectedValue = $(this).val();
@@ -72,7 +61,6 @@
                     populateSelectField(dependentField, dependentOptions, formContext);
                 });
             }
-
             Object.keys(controlledProperties).forEach(function(prop) {
                 if (controlledProperties[prop].type === "dependent string") {
                     const dependentField = controlledProperties[prop].on;
@@ -81,12 +69,10 @@
                 }
             });
         }
-
         function filterOptions(event) {
             const input = event.target.value.toLowerCase();
             const selectField = event.target;
             const options = selectField.options;
-
             for (let i = 0; i < options.length; i++) {
                 const optionText = options[i].text.toLowerCase();
                 if (optionText.includes(input) || options[i].value === "") {
@@ -96,9 +82,7 @@
                 }
             }
         }
-
-        $(document).ready(function() {  
-            // Apply to 'register' context
+        $(document).ready(function() {
             updateDependentFields('register');
             $('[data-form=register] #patient_id, [data-form=register] #clinician_id, [data-form=register] #study_id, [data-form=register] #lab_code, [data-form=register] #creating_user' ).on('keyup change', filterOptions);
             $('[data-form=register] #patient_id, [data-form=register] #clinician_id, [data-form=register] #study_id, [data-form=register] #lab_code, [data-form=register] #creating_user').selectize({
@@ -112,7 +96,6 @@
                     }
                 }
             });
-
             updateDependentFields('create-fs');
             $('[data-form=create-fs] #tag').on('keyup change', filterOptions);
             $('[data-form=create-fs] #tag').selectize({
@@ -126,10 +109,8 @@
                     }
                 }
             });
-            // Apply to search form with 'search' context
             updateDependentFields('search');
             $('[data-form=search] #patient_id, [data-form=search] #clinician_id, [data-form=search] #lab_code, [data-form=search] #study_id').on('keyup change', filterOptions);
-            
             $('.option-buttons').each(function() {
                 const select = $(this).find('select');
                 const buttonsContainer = $(this);
@@ -149,7 +130,6 @@
                     }
                 });
             });
-
             function updateSelectField(select, buttonsContainer) {
                 const selectedValues = [];
                 buttonsContainer.find('.option-button.selected').each(function() {
@@ -159,13 +139,12 @@
             }
         });
     </script>
-</head>
-<body>
-    {% include 'bloom_header.html' %}
+{% endblock %}
 
+{% block content %}
     <h1>File Tools</h1>
     <hr>
-    
+
     <button id="register-files" class="accordion" style="width: -webkit-fill-available;">Register File(s)</button>
     <div class="accordion-content" data-form="register">
         {% include 'register_file.html' %}
@@ -177,7 +156,7 @@
         {% include 'download_file.html' %}
     </div>
     <hr><hr>
-    
+
     <button id="query-files" class="accordion" style="width: -webkit-fill-available;">File Search (bulk d/l | create file sets | create presigned s3 URLS | share via HTTP/SFTP/webDAV/...)</button>
     <div class="accordion-content" data-form="search">
         {% include 'file_search.html' %}
@@ -196,73 +175,45 @@
     </div>
     <hr><hr>
 
-        <script>
-            async function triggerDownload(url) {
-                return new Promise((resolve) => {
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = '';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    resolve();
-                });
+    <script>
+        async function triggerDownload(url) {
+            return new Promise((resolve) => {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = '';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                resolve();
+            });
+        }
+        async function downloadFile(euid, downloadType, createMetadataFile) {
+            const formData = new URLSearchParams();
+            formData.append('euid', euid);
+            formData.append('download_type', downloadType);
+            formData.append('create_metadata_file', createMetadataFile);
+            formData.append('ret_json', 'True');
+            const response = await fetch(`/download_file`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            });
+            if (response.ok) {
+                const jsonResponse = await response.json();
+                const fileDownloadPath = jsonResponse.file_download_path;
+                const metadataDownloadPath = jsonResponse.metadata_download_path;
+                await triggerDownload(fileDownloadPath);
+                if (metadataDownloadPath) { await triggerDownload(metadataDownloadPath); }
             }
-    
-            async function downloadFile(euid, downloadType, createMetadataFile) {
-                console.log(`Downloading file for EUID: ${euid}`);
-    
-                const formData = new URLSearchParams();
-                formData.append('euid', euid);
-                formData.append('download_type', downloadType);
-                formData.append('create_metadata_file', createMetadataFile);
-                formData.append('ret_json', 'True');
-    
-                const response = await fetch(`/download_file`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData.toString()
-                });
-    
-                if (response.ok) {
-                    const jsonResponse = await response.json();
-                    const fileDownloadPath = jsonResponse.file_download_path;
-                    const metadataDownloadPath = jsonResponse.metadata_download_path;
-    
-                    console.log('fileDownloadPath:', fileDownloadPath);
-                    console.log('metadataDownloadPath:', metadataDownloadPath);
-    
-                    // Trigger downloads
-                    await triggerDownload(fileDownloadPath);
-                    if (metadataDownloadPath) {
-                        await triggerDownload(metadataDownloadPath);
-                    }
-                } else {
-                    console.error(`Failed to download file for EUID: ${euid}`);
-                }
-            }
-    
-            async function downloadSelectedFiles() {
-                const checkboxes = document.querySelectorAll('.file-checkbox:checked');
-                const euids = Array.from(checkboxes).map(cb => cb.value);
-            
-                const downloadType = document.getElementById('download-type').value;
-                const createMetadataFile = document.getElementById('create-metadata').value;
-            
-                if (euids.length === 0) {
-                    alert("Please select files to download.");
-                    return;
-                }
-            
-                console.log('Selected EUIDs:', euids);
-            
-                for (const euid of euids) {
-                    await downloadFile(euid, downloadType, createMetadataFile);
-                }
-            } 
-
+        }
+        async function downloadSelectedFiles() {
+            const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+            const euids = Array.from(checkboxes).map(cb => cb.value);
+            const downloadType = document.getElementById('download-type').value;
+            const createMetadataFile = document.getElementById('create-metadata').value;
+            if (euids.length === 0) { alert("Please select files to download."); return; }
+            for (const euid of euids) { await downloadFile(euid, downloadType, createMetadataFile); }
+        }
         function resetForms() {
             document.getElementById('createFileForm').reset();
             document.getElementById('downloadFileForm').reset();
@@ -270,15 +221,12 @@
             document.getElementById('searchFileSetForm').reset();
             document.getElementById('queryByEuidsForm').reset();
         }
-
         window.onload = resetForms;
-
         window.addEventListener('pageshow', function(event) {
             if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
                 resetForms();
             }
         });
-
         document.addEventListener('DOMContentLoaded', function() {
             if (window.location.hash) {
                 var target = document.querySelector(window.location.hash);
@@ -291,28 +239,21 @@
             }
         });
     </script>
-
     <script>
-        const directory = "templates/scripts/theseareloaded"; // Update this path accordingly
-
-        // Fetch the list of scripts
+        const directory = "templates/scripts/theseareloaded";
         fetch(`/list-scripts?directory=${encodeURIComponent(directory)}`)
             .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
                 return response.json();
             })
             .then((data) => {
                 data.scripts.forEach((file) => {
                     const script = document.createElement('script');
-                    script.src = file; // The file path returned by the API
+                    script.src = file;
                     document.body.appendChild(script);
                 });
             })
             .catch((error) => console.error('Error loading scripts:', error));
-
     </script>
     {% include 'pre_body_close.html' %}
-</body>
-</html>
+{% endblock %}

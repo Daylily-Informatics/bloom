@@ -299,7 +299,7 @@ a {
 
 /* Visited link color */
 a:visited {
-    color: var(--a-visited); /* Change to your preferred color */
+    color: var(--text-color);
 }
 
 /* Hover link color */
