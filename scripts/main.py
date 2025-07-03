@@ -39,6 +39,19 @@ import difflib
 def get_clean_timestamp():
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
+def get_git_hash():
+    """Return the short git commit hash or 'nogithash' if unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return "nogithash"
+
 os.makedirs("logs", exist_ok=True)
 
 import logging
@@ -984,7 +997,7 @@ async def update_preference(request: Request, auth: dict = Depends(require_auth)
 async def db_backup(request: Request, _auth=Depends(require_auth)):
     backup_path = request.session["user_data"].get("db_backup_path", "./db_backups")
     os.makedirs(backup_path, exist_ok=True)
-    outfile = Path(backup_path) / f"backup_{get_clean_timestamp()}.sql"
+    outfile = Path(backup_path) / f"backup_{get_clean_timestamp()}_{get_git_hash()}.sql"
     async with db_lock:
         await asyncio.to_thread(pg_dump_file, outfile)
     return RedirectResponse(url="/admin?dest=backup", status_code=303)
@@ -997,7 +1010,7 @@ async def db_restore(request: Request, filename: str = Form(...), _auth=Depends(
     if not target.exists():
         raise HTTPException(status_code=404, detail="Backup not found")
     os.makedirs(backup_path, exist_ok=True)
-    new_backup = Path(backup_path) / f"pre_restore_{get_clean_timestamp()}.sql"
+    new_backup = Path(backup_path) / f"pre_restore_{get_clean_timestamp()}_{get_git_hash()}.sql"
     async with db_lock:
         await asyncio.to_thread(pg_dump_file, new_backup)
         try:
