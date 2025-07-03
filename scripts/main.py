@@ -3507,4 +3507,8 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
         for row, result in zip(rows, results):
             writer.writerow({**row, **result, "FileSet": bulk_file_set.euid})
 
-    return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
+    return FileResponse(
+        fin_tsv_path,
+        media_type="text/tab-separated-values",
+        filename=fin_tsv_path.name,
+    )
