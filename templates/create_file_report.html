@@ -73,6 +73,13 @@
     {% include 'bloom_header.html' %}
 
     <h1>Create File Report</h1>
+    {% if file_set_euid %}
+    <p>File Set:
+        <a target="_blank" href="euid_details?euid={{ file_set_euid }}">
+            {{ file_set_name }}
+        </a>
+    </p>
+    {% endif %}
     <hr>
     <table>
         <thead>
