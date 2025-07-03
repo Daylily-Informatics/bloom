@@ -7,7 +7,7 @@ PGUSER=${PGUSER:-$USER}
 PGPASSWORD=${PGPASSWORD:-passw0rd}
 export PGDBNAME=${PGDBNAME:-bloom_lims}
 # Optional starting value for the file index sequence (FI euid prefix)
-FILE_INDEX_START=${FILE_INDEX_START:-$2}
+FILE_INDEX_START=${FILE_INDEX_START:1}
 
 
 source bloom_lims/bin/install_miniconda
