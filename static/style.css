@@ -99,6 +99,14 @@ button:hover {
     display: inline-block;
 }
 
+/* Style for main menu links on index2 */
+.idx_button_title {
+    display: block;
+    width: 100%;
+    padding: 15px 40px; /* 20% taller than default main-button */
+    margin-bottom: 20px; /* space below the button */
+}
+
 .idx_section {
     text-align: center;
     padding-bottom: 20px;
