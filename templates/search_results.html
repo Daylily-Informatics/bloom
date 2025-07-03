@@ -13,8 +13,6 @@
     <script src="static/action_buttons.js"></script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
     <script>
@@ -110,6 +108,29 @@
             document.body.removeChild(downloadLink);
         }
 
+        function sortTable(columnIndex) {
+            const table = document.querySelector('table');
+            const rows = Array.from(table.querySelectorAll('tbody > tr'));
+            const header = table.querySelector(`thead > tr > th:nth-child(${columnIndex + 1})`);
+            const isAscending = header.classList.contains('ascending');
+
+            rows.sort((a, b) => {
+                const aText = a.children[columnIndex].innerText.trim();
+                const bText = b.children[columnIndex].innerText.trim();
+
+                if (!isNaN(aText) && !isNaN(bText)) {
+                    return isAscending ? aText - bText : bText - aText;
+                } else {
+                    return isAscending ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                }
+            });
+
+            rows.forEach(row => table.querySelector('tbody').appendChild(row));
+            table.querySelectorAll('thead > tr > th').forEach(th => th.classList.remove('ascending', 'descending'));
+
+            header.classList.toggle('ascending', !isAscending);
+            header.classList.toggle('descending', isAscending);
+        }
     </script>
 
 
@@ -230,11 +251,6 @@
     {% include 'bloom_header.html' %}
 
     <b>{{ n_results }} File Search Results</b>
-    <button onclick="openColumnModal()" type="button">Edit Column Order</button>
-    <div id="column-modal" title="Column Order" style="display:none;">
-        <ul id="column-list">{% for col in columns %}<li class="ui-state-default" data-col="{{ col }}">{{ col }}</li>{% endfor %}</ul>
-        <button onclick="saveColumnOrder()" type="button">Save</button>
-    </div>
     <form id="fileSetForm" action="/create_file_set" method="post"  >
         <div style="display: flex; flex:none;">
             <div class="form-section" style="background-color: rgba(204, 255, 204, 0.1); flex:none;">
@@ -337,18 +353,18 @@
     <table border="1">
         <thead>
             <tr>
-                <th onclick="sortTableByHeader(this)" class="download-column">
+                <th onclick="sortTable(0)" class="download-column">
                     <input type="checkbox" id="select-all-download" onclick="toggleSelectAll('.file-checkbox', 'select-all-download')">
                     Flag to download
                 </th>
-                <th onclick="sortTableByHeader(this)" class="file-set-column">
+                <th onclick="sortTable(1)" class="file-set-column">
                     <input type="checkbox" id="select-all-file-set" onclick="toggleSelectAll('.file-set-checkbox', 'select-all-file-set')">
                     Create File Set
                 </th>
                 {% for column in columns %}
-                <th onclick="sortTableByHeader(this)">{{ column }}</th>
+                <th onclick="sortTable({{ loop.index + 1 }})">{{ column }}</th>
                 {% endfor %}
-                <th onclick="sortTableByHeader(this)">S3 URI</th>
+                <th onclick="sortTable({{ columns|length + 2 }})">S3 URI</th>
             </tr>
         </thead>
         <tbody>
@@ -442,10 +458,10 @@
             }
         } 
 
-        function sortTableByHeader(header) {
-            const table = header.closest('table');
-            const columnIndex = Array.from(header.parentNode.children).indexOf(header);
+        function sortTable(columnIndex) {
+            const table = document.querySelector('table');
             const rows = Array.from(table.querySelectorAll('tbody > tr'));
+            const header = table.querySelector(`thead > tr > th:nth-child(${columnIndex + 1})`);
             const isAscending = header.classList.contains('ascending');
 
             rows.sort((a, b) => {
@@ -486,19 +502,6 @@
     });
 </script>
 
-<script>
-    $(function(){
-        $("#column-list").sortable();
-        $("#column-modal").dialog({ autoOpen: false, modal: true });
-    });
-    function openColumnModal(){
-        $("#column-modal").dialog("open");
-    }
-    function saveColumnOrder(){
-        const order = $("#column-list").sortable("toArray", { attribute: "data-col" });
-        $.ajax({url: "/update_preference", type: "POST", contentType: "application/json", data: JSON.stringify({key: "search_columns_order", value: order}), success: function(){ location.reload(); }});
-    }
-</script>
     {% include 'pre_body_close.html' %}
 </body>
 </html>
