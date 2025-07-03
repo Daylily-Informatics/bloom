@@ -789,6 +789,17 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
     return HTMLResponse(content=content)
 
 
+@app.get("/file_tag_suggestions", response_class=JSONResponse)
+async def file_tag_suggestions(request: Request, q: str = ""):
+    """Return a list of existing file tags starting with q."""
+    bdb = BLOOMdb3(app_username=request.session.get("user_data", {}).get("email", "na"))
+    bobj = BloomObj(bdb)
+    tags = bobj.get_unique_file_tags()
+    if q:
+        tags = [t for t in tags if t.lower().startswith(q.lower())]
+    return tags
+
+
 @app.get("/calculate_cogs_children")
 async def Acalculate_cogs_children(euid, request: Request, _auth=Depends(require_auth)):
     try:
@@ -2271,6 +2282,9 @@ async def create_file(
             new_file_set = bfs.create_file_set(file_set_metadata=file_set_metadata)
         
         bfi = BloomFile(BLOOMdb3(app_username=request.session.get("user_data",{}).get("email","na")))
+
+        tag_list = [t for t in file_tags.split() if t]
+
         file_metadata = {
             "name": name,
             "comments": comments,
@@ -2289,7 +2303,7 @@ async def create_file(
             "sub_category_2": sub_category_2,
             "variable": variable,
             "sub_variable": sub_variable,
-            "file_tags": file_tags,
+            "file_tags": tag_list,
             "import_or_remote": import_or_remote,
         }
 
@@ -3481,7 +3495,7 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
             "sub_category_2": row.get("sub_category_2", ""),
             "variable": row.get("variable", ""),
             "sub_variable": row.get("sub_variable", ""),
-            "file_tags": row.get("file_tags", ""),
+            "file_tags": [t for t in row.get("file_tags", "").split() if t],
         }
 
         if row.get("further_metadata"):
