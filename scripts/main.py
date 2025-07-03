@@ -800,6 +800,17 @@ async def file_tag_suggestions(request: Request, q: str = ""):
     return tags
 
 
+@app.get("/file_set_tag_suggestions", response_class=JSONResponse)
+async def file_set_tag_suggestions(request: Request, q: str = ""):
+    """Return a list of existing file set tags starting with q."""
+    bdb = BLOOMdb3(app_username=request.session.get("user_data", {}).get("email", "na"))
+    bfs = BloomFileSet(bdb)
+    tags = bfs.get_unique_file_set_tags()
+    if q:
+        tags = [t for t in tags if t.lower().startswith(q.lower())]
+    return tags
+
+
 @app.get("/calculate_cogs_children")
 async def Acalculate_cogs_children(euid, request: Request, _auth=Depends(require_auth)):
     try:
@@ -2761,6 +2772,7 @@ async def create_file_set(
     name: str = Form(None),
     description: str = Form(None),
     tag: str = Form(None),
+    tags: str = Form(""),
     comments: str = Form(None),
     file_euids: str = Form(None),
     ref_type: str = Form("na"),
@@ -2787,6 +2799,7 @@ async def create_file_set(
             "name": name,
             "description": description,
             "tag": tag,
+            "tags": [t for t in tags.split() if t],
             "comments": comments,
             "ref_type": ref_type,
             "duration": duration,
