@@ -15,7 +15,7 @@ p    {{ patient_id }}
     <br>
 pp    {{ patient_ids}}
 <br>
-xx
+xx{{ ui_fields }}
                             {% for field in ui_fields %}
                                 {% if field.name == 'import_or_remote' %}
                                 <div id="import_or_remote_container" style="display:none;">
