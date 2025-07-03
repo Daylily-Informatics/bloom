@@ -101,7 +101,7 @@ done
 # Seed the remaining templates
 for file in $(ls ./bloom_lims/config/*/*json | grep -v 'metadata.json'  | grep -v 'action/' | sort); do
     echo "$file"
-    python scripts/seed_db_containersGeneric.py "$file"
+    python seed_db_containersGeneric.py "$file"
 done
 
 # And create some of the singleton assay objects

@@ -1124,6 +1124,8 @@ class BloomObj:
             r = self.do_action_add_file_to_file_set(euid, action_ds)
         elif action_method == "do_action_remove_file_from_file_set":
             r = self.do_action_remove_file_from_file_set(euid, action_ds)
+        elif action_method == "do_action_share_file_set_presigned_urls":
+            r = self.do_action_share_file_set_presigned_urls(euid, action_ds)
         elif action_method == "do_action_add_relationships":
             r = self.do_action_add_relationships(euid, action_ds)
         else:
@@ -1142,6 +1144,35 @@ class BloomObj:
         bfs = BloomFileSet(BLOOMdb3())
         bfs.remove_files_from_file_set(
             euid=file_set_euid, file_euid=[action_ds["captured_data"]["file_euid"]]
+        )
+
+    def do_action_share_file_set_presigned_urls(self, file_set_euid, action_ds):
+        bfs = BloomFileSet(BLOOMdb3())
+        bf = BloomFile(BLOOMdb3())
+
+        duration_days = float(action_ds["captured_data"].get("duration", 1))
+        duration_sec = duration_days * 24 * 60 * 60
+
+        file_set = bfs.get_by_euid(file_set_euid)
+        file_euids_list = [
+            lineage.child_instance.euid
+            for lineage in file_set.parent_of_lineages
+            if lineage.child_instance.btype == "file"
+        ]
+
+        for f_euid in file_euids_list:
+            bf.create_presigned_url(
+                file_euid=f_euid,
+                file_set_euid=file_set_euid,
+                valid_duration=duration_sec,
+            )
+
+        bfs.update_file_set_metadata(
+            file_set_euid,
+            {
+                "ref_type": "presigned_url",
+                "duration": duration_days,
+            },
         )
 
     def do_action_add_relationships(self, euid, action_ds):

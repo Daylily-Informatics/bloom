@@ -1875,7 +1875,11 @@ def generate_dag_json_from_all_objects_v2(
         return
 
     request.session["schema_mod_dt"] = last_schema_edit_dt.changed_at.isoformat()
-    request.session["user_data"]["dag_fnv2"] = output_file
+
+    # Update nested session data safely
+    user_data = request.session.get("user_data", {})
+    user_data["dag_fnv2"] = output_file
+    request.session["user_data"] = user_data
 
     colors = {
         "container": "#8B00FF",  # Electric Purple
@@ -3507,4 +3511,8 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
         for row, result in zip(rows, results):
             writer.writerow({**row, **result, "FileSet": bulk_file_set.euid})
 
-    return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
+    return FileResponse(
+        fin_tsv_path,
+        media_type="text/tab-separated-values",
+        filename=fin_tsv_path.name,
+    )
