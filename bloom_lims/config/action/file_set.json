@@ -21,26 +21,48 @@
       }
     }
   },
-  "remove-file": {
-    "1.0": {
-      "action_template": {
-        "action_name": "Remove File From File Set",
-        "method_name": "do_action_remove_file_from_file_set",
-        "action_executed": "0",
-        "max_executions": "-1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "file_euid": "File EUID: <input name=file_euid />"
-        },
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "curr_user": "",
-        "description": "Remove a file from a file set."
+    "remove-file": {
+      "1.0": {
+        "action_template": {
+          "action_name": "Remove File From File Set",
+          "method_name": "do_action_remove_file_from_file_set",
+          "action_executed": "0",
+          "max_executions": "-1",
+          "action_enabled": "1",
+          "capture_data": "yes",
+          "captured_data": {
+            "file_euid": "File EUID: <input name=file_euid />"
+          },
+          "deactivate_actions_when_executed": [],
+          "executed_datetime": [],
+          "action_order": "0",
+          "action_simple_value": "",
+          "action_user": [],
+          "curr_user": "",
+          "description": "Remove a file from a file set."
+        }
+      }
+    },
+    "share-presigned": {
+      "1.0": {
+        "action_template": {
+          "action_name": "Share File Set",
+          "method_name": "do_action_share_file_set_presigned_urls",
+          "action_executed": "0",
+          "max_executions": "-1",
+          "action_enabled": "1",
+          "capture_data": "yes",
+          "captured_data": {
+            "duration": "Duration (days): <input name=duration value=\"1\" />"
+          },
+          "deactivate_actions_when_executed": [],
+          "executed_datetime": [],
+          "action_order": "0",
+          "action_simple_value": "",
+          "action_user": [],
+          "curr_user": "",
+          "description": "Create presigned URLs for each file in the set."
+        }
       }
     }
   }
-}
