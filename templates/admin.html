@@ -49,6 +49,40 @@
         <a style="display: none;" href="/workflow_summary">Original Raw Workflow View (not intended for operational use)</a>
     </h2>
 
+    <div id="backup-section">
+        <h3>Database Backups</h3>
+        <table>
+            <tr>
+                <td>Backup Directory:</td>
+                <td>
+                    <input type="text" value="{{ user_data.get('db_backup_path', './db_backups') }}" onchange="updatePreferenceAndReload('db_backup_path', this.value)">
+                    <form method="post" action="/db_backup" style="display:inline;">
+                        <button type="submit">Dump Backup</button>
+                    </form>
+                </td>
+            </tr>
+        </table>
+
+        {% if backups %}
+        <table border="1">
+            <tr><th>Backup File</th><th>Action</th></tr>
+            {% for b in backups %}
+            <tr>
+                <td>{{ b }}</td>
+                <td>
+                    <form method="post" action="/db_restore">
+                        <input type="hidden" name="filename" value="{{ b }}">
+                        <button type="submit">Restore</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p>No backups found in {{ backup_path }}</p>
+        {% endif %}
+    </div>
+
 
      <script>    
     function updatePreferenceAndReload(key, value) {
