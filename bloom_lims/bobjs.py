@@ -3573,6 +3573,7 @@ class BloomFile(BloomObj):
         local_file_path = os.path.join(save_path, local_file_name)
 
         if os.path.exists(local_file_path):
+            return local_file_path
             self.logger.exception(f"File already exists: {local_file_path}")
             if delete_if_exists:
                 os.remove(local_file_path)  # Delete the existing file
