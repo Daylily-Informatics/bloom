@@ -1839,7 +1839,7 @@ async def user_home(request: Request):
     github_tag = subprocess.check_output(["git", "describe", "--tags"]).decode().strip()
     setup_py_version = subprocess.check_output(["python", "setup.py", "--version"]).decode().strip()
     fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()  
-    zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()  
+    zebra_printer_version = os.popen("pip freeze | grep zebra_day | cut -d = -f 3").readline().rstrip()  
 
     # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
     content = templates.get_template("user_home.html").render(
