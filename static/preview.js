@@ -110,8 +110,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let resizeInfo = null;
     const edgeSize = 8;
 
+    function markPreviewable(link) {
+        if (link.dataset.previewChecked) return;
+        link.dataset.previewChecked = '1';
+        const u = new URL(link.href);
+        const euid = u.searchParams.get('euid');
+        if (!euid) return;
+        fetchProperty(euid, 'file_type').then(type => {
+            if (type && allowed.has(type.toLowerCase())) {
+                link.classList.add('previewable');
+            }
+        }).catch(() => {});
+    }
+
     function attachPreviewLinks(root=document) {
         root.querySelectorAll('a[href*="euid_details?euid=FI"]').forEach(link => {
+            markPreviewable(link);
             link.addEventListener('mouseenter', event => {
                 currentLink = event.currentTarget;
                 showPreview(event);
