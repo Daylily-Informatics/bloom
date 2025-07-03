@@ -70,7 +70,8 @@
             <tr>
                 <td>{{ b }}</td>
                 <td>
-                    <form method="post" action="/db_restore">
+                    <form method="post" action="/db_restore" onsubmit="return confirm('Restore from {{ b }}? This will overwrite the current database.');">
+
                         <input type="hidden" name="filename" value="{{ b }}">
                         <button type="submit">Restore</button>
                     </form>
