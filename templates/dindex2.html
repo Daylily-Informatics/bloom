@@ -30,7 +30,7 @@
             
                 .modal-content {
                     background-color: #fefefe;
-                    margin: 5% auto;
+                    margin: 10% auto;
                     padding: 20px;
                     border: 1px solid #888;
                     width: 80%;
@@ -532,12 +532,16 @@
                                         dialog.find('#nodeName span').text(nodeName);
 
                                         // Position and show dialog
+                                        var windowHeight = $(window).height();
+                                        var topOffset = windowHeight * 0.10;
                                         var renderedPosition = evt.renderedPosition;
-                                        dialog.css({ top: renderedPosition.y, left: renderedPosition.x }).show();
+                                        dialog.css({ top: topOffset, left: renderedPosition.x }).show();
                                     },
                                     error: function() {
                                         dialog.find('#nodeName span').text('Unknown Name');
-                                        dialog.css({ top: evt.renderedPosition.y, left: evt.renderedPosition.x }).show();
+                                        var windowHeight = $(window).height();
+                                        var topOffset = windowHeight * 0.10;
+                                        dialog.css({ top: topOffset, left: evt.renderedPosition.x }).show();
                                     }
                                 });
                             // Prevent other tap actions when triple-clicked
