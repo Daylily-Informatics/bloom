@@ -57,8 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const size = parseInt(await fetchProperty(euid, 'original_file_size_bytes') || '0', 10);
             if (size > SIZE_LIMIT) {
                 previewBox.textContent = `File too large for preview (${(size/1024/1024).toFixed(1)} MB)`;
-                previewBox.style.left = event.pageX + 20 + 'px';
-                previewBox.style.top = event.pageY + 20 + 'px';
+                const topOffset = window.scrollY + window.innerHeight * 0.10;
+                previewBox.style.left = '50%';
+                previewBox.style.top = topOffset + 'px';
+                previewBox.style.transform = 'translateX(-50%)';
                 previewBox.style.display = 'block';
                 return;
             }
@@ -84,8 +86,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
             }
-            previewBox.style.left = event.pageX + 20 + 'px';
-            previewBox.style.top = event.pageY + 20 + 'px';
+            const topOffset = window.scrollY + window.innerHeight * 0.10;
+            previewBox.style.left = '50%';
+            previewBox.style.top = topOffset + 'px';
+            previewBox.style.transform = 'translateX(-50%)';
             previewBox.style.display = 'block';
         } catch (e) {
             console.error('Preview error', e);
@@ -99,10 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function movePreview(event) {
-        if (previewBox.style.display === 'block') {
-            previewBox.style.left = event.pageX + 20 + 'px';
-            previewBox.style.top = event.pageY + 20 + 'px';
-        }
+        // No-op: previews remain fixed once opened
     }
 
     let currentLink = null;
@@ -130,7 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentLink = event.currentTarget;
                 showPreview(event);
             });
-            link.addEventListener('mousemove', movePreview);
         });
     }
 
