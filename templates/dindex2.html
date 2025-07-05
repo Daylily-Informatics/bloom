@@ -532,16 +532,13 @@
                                         dialog.find('#nodeName span').text(nodeName);
 
                                         // Position and show dialog
-                                        var windowHeight = $(window).height();
-                                        var topOffset = windowHeight * 0.10;
-                                        var renderedPosition = evt.renderedPosition;
-                                        dialog.css({ top: topOffset, left: renderedPosition.x }).show();
+                                        var topOffset = $(window).scrollTop() + $(window).height() * 0.10;
+                                        dialog.css({ top: topOffset, left: '50%', transform: 'translateX(-50%)' }).show();
                                     },
                                     error: function() {
                                         dialog.find('#nodeName span').text('Unknown Name');
-                                        var windowHeight = $(window).height();
-                                        var topOffset = windowHeight * 0.10;
-                                        dialog.css({ top: topOffset, left: evt.renderedPosition.x }).show();
+                                        var topOffset = $(window).scrollTop() + $(window).height() * 0.10;
+                                        dialog.css({ top: topOffset, left: '50%', transform: 'translateX(-50%)' }).show();
                                     }
                                 });
                             // Prevent other tap actions when triple-clicked
