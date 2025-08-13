@@ -139,6 +139,9 @@
         <button type="button" class="collapsiblex" data-target="relationshipsContent">Relationships</button>
         <button style="display:none;" type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
         <button type="button" class="collapsiblex" data-target="actionGroupsContent">Action Groups</button>
+        {% if object.btype == 'file_set' %}
+        <button type="button" class="collapsiblex" data-target="shareFileSetContent">Share File Set</button>
+        {% endif %}
         <button type="button" class="collapsiblex" data-target="auditLogContent">Audit Log</button>
         <button type="button" class="collapsiblex" data-target="fullEditContent">Edit Obj Properties (admin)</button>
         {% if object.parent_template_euid %}
@@ -277,6 +280,19 @@
             </div>
         {% endif %}
     </div>
+
+    {% if object.btype == 'file_set' %}
+    <div id="shareFileSetContent" class="content" style="display:none;">
+        <h3>Share File Set as Presigned URLs</h3>
+        <form id="shareFileSetForm" action="/share_file_set" method="post">
+            <input type="hidden" name="fs_euid" value="{{ object.euid }}">
+            <input type="hidden" name="ref_type" value="presigned_url">
+            <label for="duration">Share Duration (days): </label>
+            <input type="text" id="duration" name="duration" value="1" style="width:30px;">
+            <button type="submit">Share File Set</button>
+        </form>
+    </div>
+    {% endif %}
 
     <div id="auditLogContent" class="content" style="display:none;">
         <h2>Audit Log</h2>
