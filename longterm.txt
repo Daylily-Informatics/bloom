@@ -1,0 +1,10 @@
+to address next:
+
+	No Caching Layer	Performance ceiling at ~1000 concurrent users
+    Synchronous Operations Only	Cannot handle high-throughput lab automation
+    No Rate Limiting	DoS vulnerability; cannot offer as SaaS
+    Limited Batch Operations	Slow bulk processing; lab techs frustrated	
+    Single Database Pattern	No read replicas; vertical scaling only
+    No Plugin Architecture	Custom extensions require core code changes
+    Missing Workflow Orchestration	No Airflow/Prefect integration for automation
+    Incomplete Template Library	Limited out-of-box value for new labs

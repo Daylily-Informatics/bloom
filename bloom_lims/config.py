@@ -1,0 +1,258 @@
+"""
+BLOOM LIMS Configuration Management
+
+Centralized configuration using Pydantic Settings with support for environment
+variable overrides. All hardcoded values should be defined here.
+
+Usage:
+    from bloom_lims.config import get_settings
+    
+    settings = get_settings()
+    print(settings.database.host)
+    print(settings.api.pagination_default_size)
+"""
+
+import os
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class DatabaseSettings(BaseModel):
+    """Database connection configuration."""
+    
+    host: str = Field(default="localhost", description="PostgreSQL host")
+    port: int = Field(default=5432, description="PostgreSQL port")
+    database: str = Field(default="bloom_lims", description="Database name")
+    user: str = Field(default="postgres", description="Database user")
+    password: str = Field(default="", description="Database password")
+    pool_size: int = Field(default=5, description="Connection pool size")
+    max_overflow: int = Field(default=10, description="Max pool overflow")
+    pool_timeout: int = Field(default=30, description="Pool connection timeout (seconds)")
+    pool_recycle: int = Field(default=1800, description="Connection recycle time (seconds)")
+    echo: bool = Field(default=False, description="Echo SQL statements")
+    
+    @property
+    def connection_string(self) -> str:
+        """Generate SQLAlchemy connection string."""
+        if self.password:
+            return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        return f"postgresql://{self.user}@{self.host}:{self.port}/{self.database}"
+    
+    @property
+    def async_connection_string(self) -> str:
+        """Generate async SQLAlchemy connection string."""
+        if self.password:
+            return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        return f"postgresql+asyncpg://{self.user}@{self.host}:{self.port}/{self.database}"
+
+
+class StorageSettings(BaseModel):
+    """File storage configuration."""
+    
+    # Local storage
+    upload_dir: str = Field(default="/var/lib/bloom/uploads", description="Upload directory")
+    temp_dir: str = Field(default="/tmp/bloom", description="Temporary file directory")
+    max_file_size_mb: int = Field(default=100, description="Max upload file size (MB)")
+    allowed_extensions: List[str] = Field(
+        default=["pdf", "csv", "xlsx", "txt", "json", "png", "jpg", "jpeg"],
+        description="Allowed file extensions"
+    )
+    
+    # S3/Object storage
+    s3_bucket: str = Field(default="", description="S3 bucket name")
+    s3_prefix: str = Field(default="bloom-files/", description="S3 key prefix")
+    s3_region: str = Field(default="us-east-1", description="S3 region")
+    s3_endpoint: str = Field(default="", description="S3-compatible endpoint URL")
+    
+    @property
+    def max_file_size_bytes(self) -> int:
+        """Get max file size in bytes."""
+        return self.max_file_size_mb * 1024 * 1024
+
+
+class APISettings(BaseModel):
+    """API configuration."""
+    
+    title: str = Field(default="BLOOM LIMS API", description="API title")
+    version: str = Field(default="1.0.0", description="API version")
+    prefix: str = Field(default="/api/v1", description="API URL prefix")
+    
+    # Pagination
+    pagination_default_size: int = Field(default=50, description="Default page size")
+    pagination_max_size: int = Field(default=1000, description="Maximum page size")
+    
+    # Rate limiting
+    rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
+    rate_limit_requests: int = Field(default=100, description="Requests per window")
+    rate_limit_window_seconds: int = Field(default=60, description="Rate limit window")
+    
+    # Timeouts
+    request_timeout_seconds: int = Field(default=30, description="Request timeout")
+    long_running_timeout_seconds: int = Field(default=300, description="Long-running op timeout")
+    
+    # CORS
+    cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
+    cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
+
+
+class AuthSettings(BaseModel):
+    """Authentication configuration."""
+    
+    # Supabase
+    supabase_url: str = Field(default="", description="Supabase URL")
+    supabase_key: str = Field(default="", description="Supabase anon key")
+    supabase_service_key: str = Field(default="", description="Supabase service key")
+    
+    # JWT
+    jwt_secret: str = Field(default="", description="JWT secret key")
+    jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
+    jwt_expiry_hours: int = Field(default=24, description="JWT token expiry (hours)")
+    
+    # Session
+    session_timeout_minutes: int = Field(default=30, description="Session timeout")
+    max_sessions_per_user: int = Field(default=5, description="Max concurrent sessions")
+
+
+class LoggingSettings(BaseModel):
+    """Logging configuration."""
+    
+    level: str = Field(default="INFO", description="Log level")
+    format: str = Field(
+        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        description="Log format"
+    )
+    json_format: bool = Field(default=False, description="Use JSON log format")
+    log_file: str = Field(default="", description="Log file path (empty for stdout)")
+    max_file_size_mb: int = Field(default=10, description="Max log file size")
+    backup_count: int = Field(default=5, description="Number of backup files")
+
+
+class FeatureFlags(BaseModel):
+    """Feature flags for enabling/disabling features."""
+
+    enable_audit_logging: bool = Field(default=True, description="Enable audit trail")
+    enable_workflow_notifications: bool = Field(default=True, description="Workflow notifications")
+    enable_file_versioning: bool = Field(default=True, description="Enable file versioning")
+    enable_advanced_search: bool = Field(default=True, description="Advanced search features")
+    enable_api_caching: bool = Field(default=False, description="Enable API response caching")
+    maintenance_mode: bool = Field(default=False, description="Enable maintenance mode")
+
+
+class BloomSettings(BaseSettings):
+    """
+    Main settings class for BLOOM LIMS.
+
+    Configuration is loaded from environment variables with the BLOOM_ prefix.
+    Nested settings use double underscore separator.
+
+    Examples:
+        BLOOM_DATABASE__HOST=localhost
+        BLOOM_DATABASE__PORT=5432
+        BLOOM_API__PAGINATION_DEFAULT_SIZE=100
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="BLOOM_",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Application info
+    app_name: str = Field(default="BLOOM LIMS", description="Application name")
+    environment: str = Field(default="development", description="Environment name")
+    debug: bool = Field(default=False, description="Debug mode")
+
+    # Nested settings
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
+    api: APISettings = Field(default_factory=APISettings)
+    auth: AuthSettings = Field(default_factory=AuthSettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    features: FeatureFlags = Field(default_factory=FeatureFlags)
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        """Validate environment value."""
+        valid_envs = ["development", "staging", "production", "testing"]
+        if v.lower() not in valid_envs:
+            raise ValueError(f"Environment must be one of: {', '.join(valid_envs)}")
+        return v.lower()
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production."""
+        return self.environment == "production"
+
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development."""
+        return self.environment == "development"
+
+
+@lru_cache()
+def get_settings() -> BloomSettings:
+    """
+    Get cached settings instance.
+
+    Uses lru_cache to ensure settings are only loaded once.
+    Call get_settings.cache_clear() to reload settings.
+
+    Returns:
+        BloomSettings instance with all configuration
+    """
+    return BloomSettings()
+
+
+def validate_settings() -> List[str]:
+    """
+    Validate settings and return list of warnings/issues.
+
+    This should be called on application startup to catch
+    configuration issues early.
+
+    Returns:
+        List of warning messages (empty if all good)
+    """
+    warnings = []
+    settings = get_settings()
+
+    # Check database settings
+    if not settings.database.password and settings.is_production:
+        warnings.append("Database password is not set in production")
+
+    # Check auth settings
+    if not settings.auth.supabase_url:
+        warnings.append("Supabase URL is not configured")
+
+    if not settings.auth.jwt_secret and settings.is_production:
+        warnings.append("JWT secret is not set in production")
+
+    # Check storage settings
+    upload_path = Path(settings.storage.upload_dir)
+    if not upload_path.exists():
+        warnings.append(f"Upload directory does not exist: {settings.storage.upload_dir}")
+
+    # Check for S3 configuration if bucket is specified
+    if settings.storage.s3_bucket:
+        if not os.environ.get("AWS_ACCESS_KEY_ID"):
+            warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
+
+    return warnings
+
+
+# Legacy compatibility - allow direct imports of common values
+def get_database_url() -> str:
+    """Get database connection string for backward compatibility."""
+    return get_settings().database.connection_string
+
+
+def get_supabase_config() -> tuple:
+    """Get Supabase configuration for backward compatibility."""
+    settings = get_settings()
+    return settings.auth.supabase_url, settings.auth.supabase_key
+

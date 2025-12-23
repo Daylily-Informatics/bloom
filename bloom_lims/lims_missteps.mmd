@@ -1,0 +1,28 @@
+flowchart LR
+  IC["Instrument control / acquisition\n(CDS, sequencer PCs)"]
+  SDMS["SDMS / raw data archive\n(files, spectra, FASTQs)"]
+  ELN["ELN\n(unstructured experimental notes)"]
+  LES["LES\n(guided SOP execution / eBR)"]
+  LIMS["LIMS\n(sample + test + results)"]
+  QMS["QMS\n(CAPA, change control, training)"]
+  ERP["ERP\n(procurement, finance, inventory costing)"]
+  CRM["CRM / customer portal\n(requests, status, billing)"]
+  DW["Analytics / data warehouse"]
+  INT["Integration layer\n(iPaaS / ETL / APIs)"]
+  SHADOW["Shadow IT\n(Excel, email, shared drives)"]
+
+  CRM --> LIMS
+  ELN <--> LIMS
+  LES <--> LIMS
+  IC --> SDMS
+  IC --> LIMS
+  SDMS --> DW
+  LIMS --> DW
+  ERP <--> LIMS
+  QMS <--> LIMS
+  SHADOW -.-> LIMS
+  INT --- ELN
+  INT --- LIMS
+  INT --- SDMS
+  INT --- ERP
+  INT --- QMS

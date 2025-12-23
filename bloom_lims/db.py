@@ -574,37 +574,124 @@ class file_instance_lineage(generic_instance_lineage):
 
 
 class BLOOMdb3:
+    """
+    BLOOM LIMS Database Connection Manager.
+
+    Provides SQLAlchemy session management for BLOOM LIMS.
+
+    Usage:
+        # Standard usage (legacy - session persists)
+        bdb = BLOOMdb3()
+        result = bdb.session.query(...)
+        bdb.close()  # Don't forget to close!
+
+        # Recommended: Context manager (auto-cleanup)
+        with BLOOMdb3() as bdb:
+            result = bdb.session.query(...)
+        # Session automatically closed
+
+        # For scoped operations with automatic rollback on error
+        with bdb.transaction() as session:
+            session.add(obj)
+            # Commits on success, rolls back on exception
+
+    Attributes:
+        session: SQLAlchemy Session instance
+        engine: SQLAlchemy Engine instance
+        Base: Automap base with reflected tables
+        app_username: Username for audit logging
+    """
+
+    # Class-level session factory for connection pooling
+    _session_factory = None
+    _engine = None
+
     def __init__(
         self,
-        db_url_prefix="postgresql://",
-        db_hostname="localhost:" + os.environ.get("PGPORT", "5445"),  # 5432
-        db_pass=(
+        db_url_prefix: str = "postgresql://",
+        db_hostname: str = "localhost:" + os.environ.get("PGPORT", "5445"),
+        db_pass: str = (
             None if "PGPASSWORD" not in os.environ else os.environ.get("PGPASSWORD")
         ),
-        db_user=os.environ.get("USER", "bloom"),
-        db_name="bloom",
-        app_username=os.environ.get("USER", "bloomdborm"),
-        echo_sql=os.environ.get("ECHO_SQL", False),
+        db_user: str = os.environ.get("USER", "bloom"),
+        db_name: str = "bloom",
+        app_username: str = os.environ.get("USER", "bloomdborm"),
+        echo_sql: bool = None,  # Will be resolved from env var if None
+        pool_size: int = 5,
+        max_overflow: int = 10,
+        pool_timeout: int = 30,
+        pool_recycle: int = 1800,
     ):
-        self.logger = logging.getLogger(__name__)
+        """
+        Initialize database connection.
+
+        Args:
+            db_url_prefix: Database URL prefix (default: postgresql://)
+            db_hostname: Database host:port
+            db_pass: Database password
+            db_user: Database user
+            db_name: Database name
+            app_username: Username for audit logging
+            echo_sql: Whether to log SQL statements
+            pool_size: Connection pool size
+            max_overflow: Max connections above pool_size
+            pool_timeout: Seconds to wait for connection
+            pool_recycle: Seconds before connection recycled
+        """
+        self.logger = logging.getLogger(__name__ + ".BLOOMdb3")
         self.logger.debug("STARTING BLOOMDB3")
         self.app_username = app_username
+        self._owns_session = True  # Track if we created the session
+
+        # Resolve echo_sql from environment if not explicitly set
+        if echo_sql is None:
+            echo_env = os.environ.get("ECHO_SQL", "").lower()
+            echo_sql = echo_env in ("true", "1", "yes")
+
+        # Build database URL
+        db_url = f"{db_url_prefix}{db_user}:{db_pass}@{db_hostname}/{db_name}"
+
+        # Create engine with connection pooling
         self.engine = create_engine(
-            f"{db_url_prefix}{db_user}:{db_pass}@{db_hostname}/{db_name}", echo=echo_sql
+            db_url,
+            echo=echo_sql,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
+            pool_recycle=pool_recycle,
+            pool_pre_ping=True,  # Verify connections before use
         )
+
+        # Create session factory
+        self._Session = sessionmaker(bind=self.engine)
+
+        # Create metadata and automap base
         metadata = MetaData()
         self.Base = automap_base(metadata=metadata)
 
-        self.session = sessionmaker(bind=self.engine)()
+        # Create session
+        self.session = self._Session()
 
-        # This is so the database can log a user if changes are made
-        set_current_username_sql = text("SET session.current_username = :username")
-        self.session.execute(set_current_username_sql, {"username": self.app_username})
-        self.session.commit()
+        # Set application username for audit logging
+        self._set_session_username()
 
-        # reflect and load the support tables just in case they are needed, but this can prob be disabled in prod
+        # Reflect and load the support tables
         self.Base.prepare(autoload_with=self.engine)
 
+        # Register ORM classes
+        self._register_orm_classes()
+
+    def _set_session_username(self) -> None:
+        """Set the session username for audit logging."""
+        try:
+            set_current_username_sql = text("SET session.current_username = :username")
+            self.session.execute(set_current_username_sql, {"username": self.app_username})
+            self.session.commit()
+        except Exception as e:
+            self.logger.warning(f"Could not set session username: {e}")
+
+    def _register_orm_classes(self) -> None:
+        """Register ORM classes with the automap base."""
         classes_to_register = [
             generic_template,
             generic_instance,
@@ -647,8 +734,110 @@ class BLOOMdb3:
             class_name = cls.__name__
             setattr(self.Base.classes, class_name, cls)
 
-    def close(self):
-        self.session.close()
-        self.engine.dispose()
+    def __enter__(self) -> "BLOOMdb3":
+        """Context manager entry - returns self."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """
+        Context manager exit - ensures proper cleanup.
+
+        If an exception occurred, rollback the session.
+        Always close the session and dispose of the engine.
+        """
+        if exc_type is not None:
+            self.logger.warning(f"Exception in context: {exc_type.__name__}: {exc_val}")
+            self.session.rollback()
+        self.close()
+        return False  # Don't suppress exceptions
+
+    def transaction(self):
+        """
+        Get a transaction context manager for atomic operations.
+
+        Usage:
+            with bdb.transaction() as session:
+                session.add(obj)
+                # Commits on success, rolls back on exception
+
+        Returns:
+            Transaction context manager
+        """
+        return _TransactionContext(self.session)
+
+    def new_session(self) -> Session:
+        """
+        Create a new session from the factory.
+
+        Use this when you need a separate session for concurrent operations.
+        Caller is responsible for closing the session.
+
+        Returns:
+            New SQLAlchemy Session
+        """
+        session = self._Session()
+        try:
+            set_current_username_sql = text("SET session.current_username = :username")
+            session.execute(set_current_username_sql, {"username": self.app_username})
+            session.commit()
+        except Exception as e:
+            self.logger.warning(f"Could not set session username on new session: {e}")
+        return session
+
+    def close(self) -> None:
+        """
+        Close the session and dispose of the engine.
+
+        This should be called when done with the database connection,
+        unless using the context manager which handles this automatically.
+        """
+        if self.session:
+            try:
+                self.session.close()
+                self.logger.debug("Session closed")
+            except Exception as e:
+                self.logger.warning(f"Error closing session: {e}")
+
+        if self.engine and self._owns_session:
+            try:
+                self.engine.dispose()
+                self.logger.debug("Engine disposed")
+            except Exception as e:
+                self.logger.warning(f"Error disposing engine: {e}")
+
+
+class _TransactionContext:
+    """
+    Context manager for database transactions.
+
+    Provides automatic commit on success and rollback on failure.
+    """
+
+    def __init__(self, session: Session):
+        self.session = session
+        self.logger = logging.getLogger(__name__ + "._TransactionContext")
+
+    def __enter__(self) -> Session:
+        """Begin transaction and return session."""
+        return self.session
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """
+        End transaction - commit or rollback.
+
+        Commits if no exception, rolls back if exception occurred.
+        """
+        if exc_type is not None:
+            self.logger.warning(f"Transaction rollback due to: {exc_type.__name__}: {exc_val}")
+            self.session.rollback()
+        else:
+            try:
+                self.session.commit()
+                self.logger.debug("Transaction committed")
+            except Exception as e:
+                self.logger.error(f"Commit failed, rolling back: {e}")
+                self.session.rollback()
+                raise
+        return False  # Don't suppress exceptions
 
  
