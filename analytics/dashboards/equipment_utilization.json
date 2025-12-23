@@ -1,0 +1,125 @@
+{
+  "name": "Equipment Utilization",
+  "description": "Dashboard for monitoring laboratory equipment usage, availability, and maintenance needs",
+  "version": "1.0",
+  "refresh_interval": "30 minutes",
+  "layout": {
+    "rows": 3,
+    "columns": 4
+  },
+  "cards": [
+    {
+      "id": "total_equipment",
+      "title": "Total Equipment",
+      "type": "scalar",
+      "position": {"row": 1, "col": 1, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "aggregation": "count"
+      }
+    },
+    {
+      "id": "active_equipment",
+      "title": "Active (7 days)",
+      "type": "scalar",
+      "position": {"row": 1, "col": 2, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "aggregation": "count",
+        "filters": [
+          {"column": "operations_last_7_days", "operator": ">", "value": "0"}
+        ]
+      }
+    },
+    {
+      "id": "idle_equipment",
+      "title": "Idle (>7 days)",
+      "type": "scalar",
+      "position": {"row": 1, "col": 3, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "aggregation": "count",
+        "filters": [
+          {"column": "hours_since_activity", "operator": ">", "value": "168"}
+        ]
+      },
+      "visualization": {
+        "type": "number",
+        "alert_threshold": 5
+      }
+    },
+    {
+      "id": "total_ops_today",
+      "title": "Operations (7 days)",
+      "type": "scalar",
+      "position": {"row": 1, "col": 4, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "aggregation": "sum",
+        "column": "operations_last_7_days"
+      }
+    },
+    {
+      "id": "equipment_by_type",
+      "title": "Equipment by Type",
+      "type": "chart",
+      "position": {"row": 2, "col": 1, "width": 2, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "columns": ["equipment_type"],
+        "aggregation": {"function": "count", "group_by": ["equipment_type"]}
+      },
+      "visualization": {
+        "type": "pie",
+        "show_legend": true
+      }
+    },
+    {
+      "id": "usage_by_equipment",
+      "title": "Usage by Equipment (7 days)",
+      "type": "chart",
+      "position": {"row": 2, "col": 3, "width": 2, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "columns": ["equipment_name", "operations_last_7_days"],
+        "order_by": [{"column": "operations_last_7_days", "direction": "desc"}],
+        "limit": 10
+      },
+      "visualization": {
+        "type": "bar",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "id": "equipment_list",
+      "title": "Equipment Status",
+      "type": "table",
+      "position": {"row": 3, "col": 1, "width": 4, "height": 1},
+      "query": {
+        "source_table": "v_equipment_utilization",
+        "columns": [
+          "equipment_name",
+          "equipment_type",
+          "equipment_model",
+          "current_status",
+          "operations_last_7_days",
+          "operations_last_30_days",
+          "hours_since_activity"
+        ],
+        "order_by": [{"column": "hours_since_activity", "direction": "desc"}]
+      },
+      "visualization": {
+        "type": "table",
+        "conditional_formatting": {
+          "column": "hours_since_activity",
+          "rules": [
+            {"condition": "> 168", "color": "#ef4444"},
+            {"condition": "> 72", "color": "#f59e0b"},
+            {"condition": "<= 72", "color": "#22c55e"}
+          ]
+        }
+      }
+    }
+  ]
+}
+

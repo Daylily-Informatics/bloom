@@ -1,0 +1,68 @@
+version: '3.9'
+
+services:
+  metabase:
+    image: metabase/metabase:latest
+    container_name: bloom_metabase
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+    environment:
+      # Metabase application database (stores dashboards, users, etc.)
+      MB_DB_TYPE: h2
+      MB_DB_FILE: /metabase-data/metabase.db
+      
+      # Java settings for performance
+      JAVA_OPTS: "-Xmx2g -Xms512m"
+      
+      # Site settings
+      MB_SITE_NAME: "BLOOM LIMS Analytics"
+      MB_SITE_URL: "${METABASE_SITE_URL:-http://localhost:3000}"
+      
+      # Embedding settings (for embedding in BLOOM UI)
+      MB_EMBEDDING_SECRET_KEY: "${METABASE_EMBED_SECRET:-}"
+      MB_ENABLE_EMBEDDING: "true"
+      
+      # Security
+      MB_PASSWORD_COMPLEXITY: "strong"
+      MB_SESSION_COOKIES: "true"
+      
+    volumes:
+      - metabase_data:/metabase-data
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    restart: unless-stopped
+    
+    # Network for connecting to BLOOM's PostgreSQL
+    # If PostgreSQL runs on host, use network_mode: host
+    # Or configure extra_hosts for Docker-to-host communication
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  metabase_data:
+    driver: local
+
+# Optional: Add PostgreSQL for Metabase app database (production)
+# Uncomment below for production deployment
+#
+#   metabase-db:
+#     image: postgres:15
+#     container_name: metabase_postgres
+#     environment:
+#       POSTGRES_DB: metabase
+#       POSTGRES_USER: metabase
+#       POSTGRES_PASSWORD: ${METABASE_DB_PASSWORD:-metabase_secret}
+#     volumes:
+#       - metabase_postgres_data:/var/lib/postgresql/data
+#     restart: unless-stopped
+#
+# volumes:
+#   metabase_postgres_data:
+
