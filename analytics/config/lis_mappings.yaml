@@ -1,0 +1,145 @@
+# BLOOM LIMS to Standard LIS Terminology Mappings
+# This file enables portability of analytics dashboards across different LIS systems
+#
+# Usage: Edit the 'source_column' values to match your LIS database schema
+# The 'standard_name' values should remain unchanged for dashboard compatibility
+
+version: "1.0"
+lis_name: "BLOOM LIMS"
+database_type: "postgresql"
+
+# Core object mappings
+objects:
+  sample:
+    source_table: "generic_instance"
+    standard_name: "sample"
+    columns:
+      id: "uuid"
+      display_id: "euid"
+      name: "name"
+      type: "btype"
+      subtype: "b_sub_type"
+      status: "bstatus"
+      created_date: "created_dt"
+      modified_date: "modified_dt"
+      is_deleted: "is_deleted"
+      properties: "json_addl"
+    filters:
+      - column: "super_type"
+        values: ["content", "container"]
+
+  workflow:
+    source_table: "generic_instance"
+    standard_name: "workflow"
+    columns:
+      id: "uuid"
+      display_id: "euid"
+      name: "name"
+      type: "btype"
+      status: "bstatus"
+      created_date: "created_dt"
+    filters:
+      - column: "super_type"
+        values: ["workflow"]
+
+  workflow_step:
+    source_table: "generic_instance"
+    standard_name: "workflow_step"
+    columns:
+      id: "uuid"
+      display_id: "euid"
+      name: "name"
+      type: "btype"
+      step_type: "b_sub_type"
+      status: "bstatus"
+    filters:
+      - column: "super_type"
+        values: ["workflow_step"]
+
+  equipment:
+    source_table: "generic_instance"
+    standard_name: "equipment"
+    columns:
+      id: "uuid"
+      display_id: "euid"
+      name: "name"
+      type: "btype"
+      model: "b_sub_type"
+      status: "bstatus"
+      location: "json_addl->>'location'"
+      serial_number: "json_addl->>'serial_number'"
+    filters:
+      - column: "super_type"
+        values: ["equipment"]
+
+# Relationship mappings
+relationships:
+  lineage:
+    source_table: "generic_instance_lineage"
+    columns:
+      id: "uuid"
+      parent_id: "parent_instance_uuid"
+      child_id: "child_instance_uuid"
+      parent_type: "parent_type"
+      child_type: "child_type"
+      relationship_type: "relationship_type"
+      created_date: "created_dt"
+
+# Audit log mappings
+audit:
+  source_table: "audit_log"
+  columns:
+    id: "uuid"
+    table_name: "rel_table_name"
+    record_id: "rel_table_uuid_fk"
+    record_display_id: "rel_table_euid_fk"
+    user: "changed_by"
+    timestamp: "changed_at"
+    operation: "operation_type"
+    old_value: "old_value"
+    new_value: "new_value"
+    column_changed: "column_name"
+
+# Status value mappings (normalize across different LIS)
+status_mappings:
+  standard_statuses:
+    pending: ["created", "pending", "queued", "waiting"]
+    in_progress: ["in_progress", "processing", "active", "running"]
+    complete: ["complete", "completed", "done", "finished"]
+    failed: ["failed", "error", "rejected"]
+    cancelled: ["abandoned", "cancelled", "canceled", "voided"]
+  
+  bloom_to_standard:
+    created: "pending"
+    in_progress: "in_progress"
+    complete: "complete"
+    failed: "failed"
+    abandoned: "cancelled"
+    destroyed: "cancelled"
+    active: "in_progress"
+
+# Metric definitions for dashboards
+metrics:
+  sample_throughput:
+    description: "Number of samples processed per time period"
+    calculation: "COUNT(*) WHERE status = 'complete'"
+    
+  turnaround_time:
+    description: "Time from sample receipt to completion"
+    calculation: "modified_dt - created_dt WHERE status = 'complete'"
+    unit: "hours"
+    
+  queue_depth:
+    description: "Number of items waiting in a queue"
+    calculation: "COUNT(*) WHERE status IN ('pending', 'in_progress')"
+    
+  completion_rate:
+    description: "Percentage of samples successfully completed"
+    calculation: "(completed / total) * 100"
+    unit: "percent"
+
+# Time zone configuration
+timezone:
+  database: "UTC"
+  display: "America/New_York"  # Adjust for your lab's timezone
+

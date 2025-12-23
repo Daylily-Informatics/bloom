@@ -1,0 +1,166 @@
+{
+  "name": "BLOOM Operations Overview",
+  "description": "Executive dashboard showing daily laboratory operations metrics",
+  "version": "1.0",
+  "refresh_interval": "5 minutes",
+  "layout": {
+    "rows": 3,
+    "columns": 4
+  },
+  "cards": [
+    {
+      "id": "daily_samples",
+      "title": "Samples Today",
+      "type": "scalar",
+      "position": {"row": 1, "col": 1, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_daily_summary",
+        "aggregation": "sum",
+        "column": "instances_created",
+        "filters": [
+          {"column": "summary_date", "operator": "=", "value": "CURRENT_DATE"}
+        ]
+      },
+      "visualization": {
+        "type": "number",
+        "prefix": "",
+        "suffix": " samples"
+      }
+    },
+    {
+      "id": "completion_rate",
+      "title": "Completion Rate",
+      "type": "scalar",
+      "position": {"row": 1, "col": 2, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_daily_summary",
+        "expression": "(instances_completed::float / NULLIF(instances_created, 0)) * 100",
+        "filters": [
+          {"column": "summary_date", "operator": "=", "value": "CURRENT_DATE"}
+        ]
+      },
+      "visualization": {
+        "type": "number",
+        "suffix": "%",
+        "decimals": 1
+      }
+    },
+    {
+      "id": "active_users",
+      "title": "Active Users Today",
+      "type": "scalar",
+      "position": {"row": 1, "col": 3, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_daily_summary",
+        "column": "active_users",
+        "filters": [
+          {"column": "summary_date", "operator": "=", "value": "CURRENT_DATE"}
+        ]
+      },
+      "visualization": {
+        "type": "number"
+      }
+    },
+    {
+      "id": "health_status",
+      "title": "System Health",
+      "type": "scalar",
+      "position": {"row": 1, "col": 4, "width": 1, "height": 1},
+      "query": {
+        "source_table": "v_daily_summary",
+        "column": "health_status",
+        "filters": [
+          {"column": "summary_date", "operator": "=", "value": "CURRENT_DATE"}
+        ]
+      },
+      "visualization": {
+        "type": "text",
+        "conditional_formatting": {
+          "NORMAL": "#22c55e",
+          "WARNING": "#f59e0b",
+          "ALERT": "#ef4444"
+        }
+      }
+    },
+    {
+      "id": "throughput_trend",
+      "title": "Sample Throughput (Last 30 Days)",
+      "type": "timeseries",
+      "position": {"row": 2, "col": 1, "width": 2, "height": 1},
+      "query": {
+        "source_table": "v_sample_throughput",
+        "columns": ["processing_date", "sample_count"],
+        "aggregation": {"column": "sample_count", "function": "sum"},
+        "group_by": ["processing_date"],
+        "filters": [
+          {"column": "processing_date", "operator": ">=", "value": "CURRENT_DATE - 30"}
+        ],
+        "order_by": [{"column": "processing_date", "direction": "asc"}]
+      },
+      "visualization": {
+        "type": "line",
+        "x_axis": "processing_date",
+        "y_axis": "sample_count",
+        "show_trend": true
+      }
+    },
+    {
+      "id": "workflow_bottlenecks",
+      "title": "Workflow Bottlenecks",
+      "type": "table",
+      "position": {"row": 2, "col": 3, "width": 2, "height": 1},
+      "query": {
+        "source_table": "v_workflow_bottlenecks",
+        "columns": ["workflow_step_name", "queue_depth", "avg_wait_hours", "bottleneck_status"],
+        "filters": [
+          {"column": "bottleneck_status", "operator": "!=", "value": "NORMAL"}
+        ],
+        "order_by": [{"column": "queue_depth", "direction": "desc"}],
+        "limit": 10
+      },
+      "visualization": {
+        "type": "table",
+        "conditional_formatting": {
+          "column": "bottleneck_status",
+          "rules": {
+            "CRITICAL": "#ef4444",
+            "WARNING": "#f59e0b"
+          }
+        }
+      }
+    },
+    {
+      "id": "object_distribution",
+      "title": "Objects by Type",
+      "type": "chart",
+      "position": {"row": 3, "col": 1, "width": 2, "height": 1},
+      "query": {
+        "source_table": "v_object_counts",
+        "columns": ["super_type", "active_count"],
+        "aggregation": {"column": "active_count", "function": "sum"},
+        "group_by": ["super_type"]
+      },
+      "visualization": {
+        "type": "pie",
+        "label_column": "super_type",
+        "value_column": "active_count"
+      }
+    },
+    {
+      "id": "recent_activity",
+      "title": "Recent Activity",
+      "type": "table", 
+      "position": {"row": 3, "col": 3, "width": 2, "height": 1},
+      "query": {
+        "source_table": "v_audit_activity",
+        "columns": ["user_id", "operation_type", "action_count", "last_action"],
+        "filters": [
+          {"column": "activity_date", "operator": "=", "value": "CURRENT_DATE"}
+        ],
+        "order_by": [{"column": "action_count", "direction": "desc"}],
+        "limit": 10
+      }
+    }
+  ]
+}
+

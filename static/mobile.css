@@ -1,0 +1,457 @@
+/* BLOOM LIMS Mobile/Tablet Responsive Styles
+ * This file provides responsive design for mobile and tablet devices
+ * Include after style.css in templates
+ */
+
+/* ============================================================================
+ * CSS Variables for Mobile
+ * ============================================================================ */
+:root {
+    --mobile-touch-target: 44px;      /* Minimum touch target size (Apple HIG) */
+    --mobile-spacing: 12px;
+    --mobile-font-size: 16px;         /* Prevents iOS zoom on focus */
+    --tablet-breakpoint: 768px;
+    --mobile-breakpoint: 480px;
+}
+
+/* ============================================================================
+ * Base Mobile Optimizations
+ * ============================================================================ */
+
+/* Prevent horizontal scroll and ensure proper viewport behavior */
+html {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================================
+ * Touch-Friendly Elements
+ * ============================================================================ */
+
+/* Larger touch targets for buttons */
+@media (max-width: 768px) {
+    button,
+    .btn,
+    .action_button,
+    .status_button,
+    .wf_action_button,
+    .idx_button,
+    .form-button,
+    .accordion,
+    .subtype-button {
+        min-height: var(--mobile-touch-target);
+        min-width: var(--mobile-touch-target);
+        padding: 12px 16px;
+        font-size: var(--mobile-font-size);
+        margin: 4px 2px;
+    }
+
+    /* Action buttons in groups - stack vertically on mobile */
+    .action-group-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .action-group {
+        margin-right: 0;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+
+    /* Form inputs - larger touch targets */
+    input,
+    textarea,
+    select {
+        min-height: var(--mobile-touch-target);
+        font-size: var(--mobile-font-size);
+        padding: 10px 12px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Checkbox and radio - larger touch area */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 24px;
+        height: 24px;
+        margin-right: 10px;
+    }
+}
+
+/* ============================================================================
+ * Responsive Header
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .header-container {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: var(--mobile-spacing);
+    }
+
+    .header-container h1 {
+        margin-right: 0;
+        margin-bottom: 8px;
+        font-size: 1.5rem;
+    }
+
+    .header-container span {
+        display: none;  /* Hide separators on mobile */
+    }
+
+    .header-container small {
+        display: block;
+        margin: 4px 0;
+    }
+
+    .header-container a {
+        padding: 8px 12px;
+        display: inline-block;
+        margin: 2px 0;
+    }
+}
+
+/* ============================================================================
+ * Responsive Navigation - Mobile Menu
+ * ============================================================================ */
+
+/* Mobile menu toggle button (add to header via JS) */
+.mobile-menu-toggle {
+    display: none;
+    background: var(--primary-color);
+    border: none;
+    padding: 12px;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-toggle {
+        display: block;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1001;
+        width: 50px;
+        height: 50px;
+    }
+
+    .mobile-menu-toggle span {
+        display: block;
+        width: 25px;
+        height: 3px;
+        background: var(--text-color);
+        margin: 5px auto;
+        transition: 0.3s;
+    }
+}
+
+/* ============================================================================
+ * Responsive Tables
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    /* Make tables scrollable horizontally */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -10px;
+        padding: 0 10px;
+    }
+
+    table {
+        min-width: 600px;  /* Force scroll on narrow screens */
+        font-size: 14px;
+    }
+
+    th, td {
+        padding: 10px 8px;
+        white-space: nowrap;
+    }
+
+    /* Card-style tables for very small screens */
+    @media (max-width: 480px) {
+        table.responsive-cards,
+        table.responsive-cards thead,
+        table.responsive-cards tbody,
+        table.responsive-cards th,
+        table.responsive-cards td,
+        table.responsive-cards tr {
+            display: block;
+        }
+
+        table.responsive-cards thead tr {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
+
+        table.responsive-cards tr {
+            margin-bottom: 15px;
+            border: 1px solid var(--table-border-color);
+            border-radius: var(--border-radius);
+            padding: 10px;
+        }
+
+        table.responsive-cards td {
+            border: none;
+            position: relative;
+            padding-left: 50%;
+            text-align: left;
+            white-space: normal;
+        }
+
+        table.responsive-cards td:before {
+            content: attr(data-label);
+            position: absolute;
+            left: 10px;
+            width: 45%;
+            font-weight: bold;
+        }
+    }
+}
+
+/* ============================================================================
+ * Responsive Forms
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .form-container {
+        grid-template-columns: 1fr;  /* Single column on mobile */
+        gap: 15px;
+    }
+
+    .form-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-label {
+        text-align: left;
+        margin-bottom: 5px;
+    }
+
+    .list-input-container {
+        flex-direction: column;
+    }
+
+    .list-input-item {
+        min-width: 100%;
+    }
+}
+
+/* ============================================================================
+ * Responsive Containers
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .container {
+        padding: var(--mobile-spacing);
+        margin: 10px 0;
+        border-radius: 0;
+    }
+
+    .panel {
+        padding: var(--mobile-spacing);
+    }
+
+    .content {
+        padding: 0 var(--mobile-spacing);
+    }
+}
+
+/* ============================================================================
+ * Floating Buttons - Mobile Optimization
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .floating-button,
+    .floating-button2 {
+        width: 56px;
+        height: 56px;
+        font-size: 20px;
+        bottom: 80px;  /* Above mobile browser nav */
+    }
+
+    .floating-button-logout2 {
+        bottom: 150px;
+    }
+
+    .floating-button-skin2 {
+        bottom: 80px;
+    }
+
+    #collapseAll {
+        right: 80px;
+        bottom: 80px;
+    }
+}
+
+/* ============================================================================
+ * Accordion - Mobile Friendly
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .accordion {
+        padding: 15px;
+        font-size: var(--mobile-font-size);
+    }
+
+    .accordion:after {
+        font-size: 20px;
+    }
+}
+
+/* ============================================================================
+ * Dialog and Modal - Mobile Full Screen
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .node-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        overflow-y: auto;
+        z-index: 1000;
+    }
+
+    .close-dialog-btn {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        bottom: auto;
+        padding: 10px 20px;
+        font-size: var(--mobile-font-size);
+    }
+}
+
+/* ============================================================================
+ * Info Box - Mobile Positioning
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .info-box {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+}
+
+/* ============================================================================
+ * Plate Display - Mobile Scrollable
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    .plate-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .plate-grid {
+        min-width: 500px;  /* Ensure plate doesn't get too compressed */
+    }
+
+    .well {
+        min-width: 30px;
+        min-height: 30px;
+    }
+}
+
+/* ============================================================================
+ * Graph View - Mobile Adjustments
+ * ============================================================================ */
+
+@media (max-width: 768px) {
+    #cy,
+    .cytoscape-container {
+        height: 60vh;  /* Reduced height on mobile */
+        touch-action: pan-x pan-y;  /* Enable touch scrolling */
+    }
+
+    #euidInput {
+        width: 100%;
+        margin: 5px 0;
+    }
+
+    #distanceSlider {
+        width: 100%;
+        margin: 10px 0;
+    }
+}
+
+/* ============================================================================
+ * Print Styles - Hide Mobile Elements
+ * ============================================================================ */
+
+@media print {
+    .mobile-menu-toggle,
+    .floating-button,
+    .floating-button2 {
+        display: none !important;
+    }
+}
+
+/* ============================================================================
+ * Landscape Mobile Specific
+ * ============================================================================ */
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .header-container {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .floating-button,
+    .floating-button2 {
+        bottom: 20px;  /* Lower in landscape */
+    }
+}
+
+/* ============================================================================
+ * High DPI / Retina Displays
+ * ============================================================================ */
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* Ensure crisp borders on retina */
+    button,
+    input,
+    select,
+    textarea {
+        border-width: 0.5px;
+    }
+}
+
+/* ============================================================================
+ * Safe Area Insets (for notched devices)
+ * ============================================================================ */
+
+@supports (padding: max(0px)) {
+    .header-container {
+        padding-top: max(10px, env(safe-area-inset-top));
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+    }
+
+    .floating-button,
+    .floating-button2 {
+        bottom: max(20px, env(safe-area-inset-bottom));
+        right: max(20px, env(safe-area-inset-right));
+    }
+}
+
