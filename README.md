@@ -1,24 +1,91 @@
-# BLOOM LIMS - Comprehensive System Specification
+# Bloom: Templated Abstract Polymorphic (and opinionated) LIMS
+_a conceptual gambit in collaboration with chatGPT4_  /// _POC v0.10.12_
 
-## Table of Contents
-1. [Executive Summary](#executive-summary)
-2. [System Architecture](#system-architecture)
-3. [Core Data Model](#core-data-model)
-4. [Database Schema](#database-schema)
-5. [Object Hierarchy](#object-hierarchy)
-6. [Template System](#template-system)
-7. [Workflow Engine](#workflow-engine)
-8. [Action System](#action-system)
-9. [File Management](#file-management)
-10. [API Layer](#api-layer)
-11. [Web Interface](#web-interface)
-12. [External Integrations](#external-integrations)
-13. [Configuration](#configuration)
-14. [Deployment](#deployment)
+[![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml) [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml) _ARM hardware is not supported_
+
+Built from first principles and drawing upon 30 years experience scaling laboratory process. Constructed with as few object model shortcuts as I could manage (I believe these shortcuts are among the main reasons LIMS nearly universally disappoint). Supporting both arbitrary and prescribed interacting objects. Intended for use: by small to factory scale laboratories, in regulated environments, for both research & operations use cases. Bloom can handle multiple areas LIS tend to touch: accessioning, lab processes, specimen/sample management, equipment, regulatory and compliance.
 
 ---
 
-## 1. Executive Summary
+## Table of Contents
+1. [Spoilers (Screenshots)](#spoilers)
+2. [Executive Summary](#executive-summary)
+3. [Installation](#installation)
+4. [System Architecture](#system-architecture)
+5. [Core Data Model](#core-data-model)
+6. [Database Schema](#database-schema)
+7. [Object Hierarchy](#object-hierarchy)
+8. [Template System](#template-system)
+9. [Workflow Engine](#workflow-engine)
+10. [Action System](#action-system)
+11. [File Management](#file-management)
+12. [API Layer](#api-layer)
+13. [Web Interface](#web-interface)
+14. [External Integrations](#external-integrations)
+15. [Configuration](#configuration)
+16. [Deployment](#deployment)
+17. [Testing](#testing)
+18. [Regulatory & Compliance](#regulatory--compliance)
+19. [Design Principles](#design-principles)
+20. [Dev Tools](#dev-tools)
+21. [Support, Authors & License](#support)
+
+---
+
+## Spoilers
+_bloom early peeks_
+
+### Oauth2 Authentication w/All Major Social Providers
+_and flexible whitelisting, etc..._
+* [Bloom supabase config](bloom_lims/docs/supabase.md).
+
+### Graph Object View (add, remove, edit, take actions, explore)
+
+#### Interactive, Dynamic Metrics
+<img width="1071" alt="bloom-lims-graph" src="bloom_lims/docs/imgs/bloom_graph.png" >
+
+### Accessioning Modalities
+<img width="1165" src="bloom_lims/docs/imgs/bloom_accessioning.png" >
+
+### Nested Assay / Queue / Workset
+<img width="1165" alt="bloom-lims-trad-view" src="bloom_lims/docs/imgs/bloom_assays.png" >
+
+### Instantiate Objects From Available Templates
+<img width="1200" alt="bloom-lims-instantiated-abstracts" src="bloom_lims/docs/imgs/bloom_nested.png">
+
+### Object Detail
+<img width="1202" alt="bloom-lims-obj-view" src="bloom_lims/docs/imgs/bloom-lims-obj-view.png">
+
+### Specialized Object Detail Views
+
+#### Labware (ie: a 96w plate)
+_bloom natively will support arbitrarily defined labware, a 96w plate is just one example. Anything that nested arrays of arrays can describe can be configured as a type of labware with next to no effort!_
+<img width="1202" alt="bloom-lims-obj-view" src="bloom_lims/docs/imgs/bloom_plate.png">
+
+### Exhaustive & Comprehensive Audit Trails (+soft deletes only)
+<img width="1192" alt="bloom-lims-audit" src="bloom_lims/docs/imgs/bloom-lims-audit.png" >
+
+### Bells And Whistles
+
+* [Integrated with FedEx tracking for entered fedex barcodes](https://github.com/Daylily-Informatics/fedex_tracking_day).
+
+#### Integrated Barcode Label Printing For All Objects
+* [See detailed docs here](bloom_lims/docs/printer_config.md).
+
+  > ![bcimg](bloom_lims/docs/imgs/bc_scan.png)
+
+  * [Leverages the zebra_day library](https://github.com/Daylily-Informatics/zebra_day).
+
+### Workflows Available
+#### Accessioning
+> Package receipt -> kits registration (multiple) -> specimen registration (multiple) -> requisition capture & association -> adding specimens to assay queues.
+> Fedex tracking details fetched, barcode printing available.
+#### Plasma Isolation -> DNA Extraction -> DNA Quant
+> managing all object relationships, tracking all details, printing labels, etc.
+
+---
+
+## Executive Summary
 
 BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laboratory Information Management System (LIMS) designed for managing laboratory workflows, sample tracking, and data management. The system is built on a flexible, template-driven architecture that allows laboratories to define custom object types, workflows, and actions without code changes.
 
@@ -47,53 +114,49 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 
 ### 2.1 High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              BLOOM LIMS                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │  Flask UI   │  │ FastAPI API │  │  CherryPy   │  │   CLI Tools         │ │
-│  │  (Port 5000)│  │ (Port 8000) │  │  (Port 8080)│  │                     │ │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘ │
-│         │                │                │                     │           │
-│  ┌──────┴────────────────┴────────────────┴─────────────────────┴─────────┐ │
-│  │                        Business Logic Layer                             │ │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐   │ │
-│  │  │  BloomObj   │ │BloomWorkflow│ │ BloomFile   │ │ BloomEquipment  │   │ │
-│  │  │  (bobjs.py) │ │ Step        │ │ Set         │ │                 │   │ │
-│  │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────────┘   │ │
-│  └────────────────────────────────────┬───────────────────────────────────┘ │
-│                                       │                                     │
-│  ┌────────────────────────────────────┴───────────────────────────────────┐ │
-│  │                        Data Access Layer                                │ │
-│  │  ┌─────────────────────────────────────────────────────────────────┐   │ │
-│  │  │                    BLOOMdb3 (db.py)                              │   │ │
-│  │  │  - SQLAlchemy Session Management                                │   │ │
-│  │  │  - Connection Pooling                                           │   │ │
-│  │  │  - Transaction Management                                       │   │ │
-│  │  └─────────────────────────────────────────────────────────────────┘   │ │
-│  └────────────────────────────────────┬───────────────────────────────────┘ │
-│                                       │                                     │
-│  ┌────────────────────────────────────┴───────────────────────────────────┐ │
-│  │                        ORM Models (bdb.py)                              │ │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐   │ │
-│  │  │BloomObj Model│ │GenericLineage│ │EquipmentInst│ │ DataLineage  │   │ │
-│  │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘   │ │
-│  └────────────────────────────────────┬───────────────────────────────────┘ │
-│                                       │                                     │
-└───────────────────────────────────────┼─────────────────────────────────────┘
-                                        │
-                    ┌───────────────────┴───────────────────┐
-                    │           PostgreSQL Database          │
-                    │  ┌─────────────┐  ┌─────────────────┐ │
-                    │  │ bloom_obj   │  │generic_instance │ │
-                    │  │             │  │_lineage         │ │
-                    │  └─────────────┘  └─────────────────┘ │
-                    │  ┌─────────────┐  ┌─────────────────┐ │
-                    │  │equipment_   │  │ data_lineage    │ │
-                    │  │instance     │  │                 │ │
-                    │  └─────────────┘  └─────────────────┘ │
-                    └───────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph BLOOM["BLOOM LIMS"]
+        subgraph Presentation["Presentation Layer"]
+            Flask["Flask UI<br/>(Port 5000)"]
+            FastAPI["FastAPI API<br/>(Port 8000)"]
+            Cherry["CherryPy Admin<br/>(Port 8080)"]
+            CLI["CLI Tools"]
+        end
+
+        subgraph Business["Business Logic Layer"]
+            BloomObj["BloomObj<br/>(bobjs.py)"]
+            BloomWF["BloomWorkflow<br/>Step"]
+            BloomFile["BloomFile<br/>Set"]
+            BloomEquip["BloomEquipment"]
+        end
+
+        subgraph DataAccess["Data Access Layer"]
+            BLOOMdb3["BLOOMdb3 (db.py)<br/>- SQLAlchemy Session Management<br/>- Connection Pooling<br/>- Transaction Management"]
+        end
+
+        subgraph ORM["ORM Models (bdb.py)"]
+            BloomObjModel["BloomObj Model"]
+            GenericLineage["GenericLineage"]
+            EquipmentInst["EquipmentInst"]
+            DataLineage["DataLineage"]
+        end
+    end
+
+    subgraph DB["PostgreSQL Database"]
+        bloom_obj["bloom_obj"]
+        generic_lineage["generic_instance_lineage"]
+        equipment["equipment_instance"]
+        data_lineage["data_lineage"]
+    end
+
+    Flask --> Business
+    FastAPI --> Business
+    Cherry --> Business
+    CLI --> Business
+    Business --> DataAccess
+    DataAccess --> ORM
+    ORM --> DB
 ```
 
 ### 2.2 Module Organization
@@ -376,14 +439,16 @@ instance = bobj.create_instance_by_code(
 
 ### 7.2 Workflow Lifecycle
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   created   │────▶│ in_progress │────▶│  complete   │     │  abandoned  │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                           │                                       ▲
-                           │                                       │
-                           └───────────────────────────────────────┘
-                                        (can abandon)
+```mermaid
+stateDiagram-v2
+    [*] --> created
+    created --> in_progress: Start Work
+    in_progress --> complete: Finish Successfully
+    in_progress --> abandoned: Cancel/Stop
+    in_progress --> failed: Error Occurred
+    complete --> [*]
+    abandoned --> [*]
+    failed --> [*]
 ```
 
 ### 7.3 Status Values
@@ -1065,6 +1130,249 @@ gunicorn -w 4 -b 0.0.0.0:5000 bloom_lims.bkend.bkend:app
 
 ---
 
+## 15. Installation
+
+### Hardware Supported
+_see build test badges above for all supported platforms_
+* Mac (14+)
+  * `brew install coreutils` is required for the `gtimeout` command for some rclone functionality. Run `alias timeout=gtimeout` to use the gtimeout w/zsh.
+* Ubuntu 22+
+* Centos 9
+
+### Prerequisites
+
+#### Conda
+* Conda (you may swap in mamba if you prefer). [Installing conda](https://docs.conda.io/en/latest/miniconda.html):
+
+  * Be sure `wget` is available to you.
+
+  *Linux*
+  _a pinned version: https://repo.anaconda.com/miniconda/Miniconda3-py312_24.5.0-0-Linux-x86_64.sh_
+
+  >  x86_64: `wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
+
+  >   arm64: `wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh`
+
+  *macOS*
+
+  > intel: `wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh`
+
+  >   ARM: `wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh`
+
+  * Then execute the Miniconda.sh script, follow the prompts, when installation completed, follow these last 2 steps:
+
+```bash
+~/miniconda3/bin/conda init
+bash  # newly created shells should not auto load the conda (base) env.
+```
+
+#### Supabase
+* [Please follow the supabase configuration instructions here](bloom_lims/docs/supabase.md).
+
+### Very Quickest Start
+_assumes you have completed the prerequisites_
+
+```bash
+# Clone the repository
+git clone git@github.com:Daylily-Informatics/bloom.git
+cd bloom
+
+# This will attempt to build the conda env, install postgres, the database, build the schema and start postgres
+source bloom_lims/env/install_postgres.sh
+
+# conda activate BLOOM if it has not happened already.
+
+# Start the Bloom LIMS UI
+source run_bloomui.sh
+```
+
+### (Optional) Install & Run pgadmin4 Database Admin UI
+
+```bash
+# RUN TESTS
+pytest
+
+# START THE UIs (on localhost:8080)
+source bloom_lims/env/install_pgadmin.sh
+```
+
+---
+
+## 16. Testing
+
+```bash
+conda activate BLOOM
+pytest
+```
+
+---
+
+## 17. Regulatory & Compliance
+
+### CLIA
+* There is no reason bloom can not be used in a CLIA regulated environment.
+
+### CAP
+* Bloom can satisfy all relevant CAP checklist items which apply to it. But, as it is s/w you will be running yourself, most checklist items will be concerned with the environment you are using bloom in.
+
+### HIPAA
+* If installed in an already HIPAA compliant environment, bloom should not need much or any work to be compliant.
+
+---
+
+## 18. Design Principles
+
+### Enterprise UIDs
+* [stripe uuid](https://stripe.com/docs/api/identity/object#identity_object-verification-document)
+
+#### Each Object Has A UUID & UUIDs Are Immutable & UUIDs Are Not Reused Or Applied To Other Objects
+* Using a UUID on children objects for convenience will lead to a mess as the need to know details about each object is next to impossible when a UUID is assigned to multiple objects.
+
+#### The UID Identifies The Object Class And The UUID w/in The Class
+* That is all [reference regarding not putting metadata in a uuid](https://stackoverflow.com/questions/19989481/what-is-the-best-way-to-store-metadata-for-a-file-in-postgresql)
+
+#### Exhaustive Metadata About An Object May Be Queried Using The Enterprise UUID.
+##### Metadata may also be printed on labels along with the UUID.
+* Keeping metadata out of the UUID formula is a fundamental requirement in building flexible and scalable systems. FUNDAMENTAL.
+
+#### Trust The Database To Manage The UUIDs
+
+### Clear And Concise Data Model
+
+### TSV's not CSV's
+* There are few/no compelling reasons to use CSV's over TSV's & so many reasons not to use CSV's.
+
+### All LIMS Data Editable w/CRUD UI
+* It is! Fully (though with some safeguards still not in place).
+  * _soft deletes need to be reviewed more closely_
+
+### Easily Configurable Object Definitions As Well As Actions
+* Requiring as little code changes as possible.
+
+### Other Principles
+* Simple
+* Scalable
+* Secure
+* Flexible & Extensible
+* Open Source
+* Operationally Robust
+* Free
+* Sustainable
+  * [as defined in the snakemake rolling paper](https://f1000research.com/articles/10-33/v1)
+
+### Use Cases
+
+#### Many To Many Relationships Among All Objects
+All other relationships are subsets of this, and designing parts of the LIMS which disallow many to many will result in an inflexible system.
+
+#### Objects May Be Involved In Multiple Workflows Simultaneously
+
+#### Support For Predefined and Arbitrary Workflows
+
+#### Objects May All Be: Root (Singleton, Parent & Able To Become A Child At Some Point), Child (Singleton, Parent And Possibly Terminal) Of One Another
+
+#### Zero Loss Of Data (Comprehensive Audit Trails, Soft Deletes) && 100% Audit Coverage
+
+---
+
+## 19. Dev Tools
+
+__note:__ all commands below are expected to be run from a shell with conda activated.
+`conda activate BLOOM`
+
+### Drop The Entire Database (Loose All Data!) > Rebuild The Database / Re-seed With All Accessible JSON Templates
+
+**The steps are wrapped in a script, please see [clear_and_rebuild_postgres.sh](bloom_lims/env/clear_and_rebuild_postgres.sh).**
+
+It is executed as follows:
+```bash
+source clear_and_rebuild_postgres.sh
+```
+
+#### Stop pgsql
+- `source bloom_lims/bin/stop_bloom_db.sh`
+
+#### Remove the db
+- `rm -rf bloom_lims/database/*`
+
+#### Rebuild the schema
+-  `source bloom_lims/env/install_postgres.sh skip` the skip will skip building the conda env. This will start pgsql in the env, and build the schema.
+
+#### Build LIMS Workflows With Autogen Objects
+Similar to `pytest`, but more extensive. Largely useful in development work. The following will auto-gen 'n=2' passes of the lims schema
+- `python tx.py 2`
+
+#### Run the bloom UI
+- `source run_bloomui.sh`
+
+#### Run the pgadmin UI
+- `source bloom_lims/env/install_pgadmin.sh`
+
+#### Start Interactive Shell w/Core Bloom Objects Instantiated
+`python bloom_shell.py`
+
+### Random Notes
+
+#### File System Case Sensitivity
+
+##### MacOS is Not Case Sensitive
+```bash
+echo "test" > test.log
+echo "TEST" > TEST.LOG
+more test.log
+# OUTPUT: TEST
+more TEST.log
+# OUTPUT: TEST
+```
+* This still shocks me & is worth a reminder.
+
+##### Ubuntu Is Case Sensitive
+```bash
+echo "test" > test.log
+echo "TEST" > TEST.LOG
+more test.log
+# OUTPUT: test
+more TEST.LOG
+# OUTPUT: TEST
+```
+
+##### Assume Case Insensitivity In All File Names
+* Given we can not be certain where files will be reconstituted, we must assume that files might be created in a case insensitive file system when allowing download.
+
+##### Bloom UUIDs and EUIDs Are Safe As File Names
+A widely adopted UUID spec (and used by postgres), [rfc4122](https://datatracker.ietf.org/doc/html/rfc4122), treats uc and lc as the same character. Bloom EUIDs only contain uc characters in a prefix followed by integers.
+
+---
+
+## 20. Support
+
+No promises, please file issues to log a bug or request a feature.
+
+### Authors
+* [John Major:li](https://www.linkedin.com/in/john--major/) aka [iamh2o:gh](http://github.com/iamh2o)
+* Josh Durham
+* Adam Tracy
+
+### Deployment & Maintenance
+You may deploy bloom wherever it will run. This does mean you are responsible for all aspects of the deployment, including security, backups (AND recovery), performance optimization, monitoring, etc. This need not be daunting. [I am available for consulting on these topics](https://www.linkedin.com/in/john--major/).
+
+### License
+* MIT
+
+### References // Acknowledgments
+* [chatGPT4](http://chat.openai.com/) for helping me build this.
+* All the folks I've built systems for to date and were patient with my tools and offered helpful feedback.
+* [snakemake](https://f1000research.com/articles/10-33/v1) :: inspiration.
+* [multiqc](https://multiqc.info/) :: inspiration.
+* [ga4cgh](https://ga4gh.org/) :: inspiration.
+* [the human genome project](https://www.genome.gov/human-genome-project) :: where I learned I dug LIS.
+* [cytoscape](https://cytoscape.org/) :: incredible graph visualization tools!
+* The OSS world.
+* [Semantic Mediawiki](https://www.semantic-mediawiki.org/wiki/Semantic_MediaWiki) :: inspiration.
+* [Datomic](https://www.datomic.com/) :: inspiration.
+
+---
+
 ## Appendix A: Common Patterns
 
 ### A.1 Creating a New Sample Workflow
@@ -1239,33 +1547,22 @@ results = bobj.search_objects(
 
 ### C.3 Technical Debt Summary
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    TECHNICAL DEBT MATRIX                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  HIGH IMPACT                                                    │
-│     ▲                                                           │
-│     │  ┌─────────────┐  ┌─────────────┐                        │
-│     │  │ Migrations  │  │ Error       │                        │
-│     │  │ (CRITICAL)  │  │ Handling    │                        │
-│     │  └─────────────┘  └─────────────┘                        │
-│     │                                                           │
-│     │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
-│     │  │ Session     │  │ Input       │  │ Test        │       │
-│     │  │ Management  │  │ Validation  │  │ Coverage    │       │
-│     │  └─────────────┘  └─────────────┘  └─────────────┘       │
-│     │                                                           │
-│     │  ┌─────────────┐  ┌─────────────┐                        │
-│     │  │ Monolithic  │  │ API         │                        │
-│     │  │ Code        │  │ Versioning  │                        │
-│     │  └─────────────┘  └─────────────┘                        │
-│     │                                                           │
-│  LOW IMPACT                                                     │
-│     └──────────────────────────────────────────────────────▶   │
-│           LOW EFFORT                    HIGH EFFORT             │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+quadrantChart
+    title Technical Debt Priority Matrix
+    x-axis Low Effort --> High Effort
+    y-axis Low Impact --> High Impact
+    quadrant-1 Plan Carefully
+    quadrant-2 Address First
+    quadrant-3 Defer
+    quadrant-4 Quick Wins
+    Migrations: [0.25, 0.95]
+    Error Handling: [0.35, 0.90]
+    Session Mgmt: [0.45, 0.75]
+    Input Validation: [0.55, 0.75]
+    Test Coverage: [0.70, 0.70]
+    Monolithic Code: [0.80, 0.55]
+    API Versioning: [0.30, 0.50]
 ```
 
 ### C.4 Recommended Improvement Roadmap
