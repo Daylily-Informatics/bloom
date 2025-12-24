@@ -1,7 +1,6 @@
 channels:
   - conda-forge
 dependencies:
-  - cherrypy=18.8.0
   - ipython=8.18.1
   - parallel=20230922
   - pip=23.3.1

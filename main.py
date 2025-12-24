@@ -1535,11 +1535,10 @@ async def update_obj_json_addl_properties(
         obj_euid euid(): OBJECT.euid being edited
 
     Raises:
-        Exception: Cherrypy redirect back to referring page
-        cherrypy.HTTPRedirect: _description_
+        HTTPException: If object not found or update fails
 
     Returns:
-        cherrypy.HTTPRedirect: to referrer
+        RedirectResponse: Redirect to referrer page
     """
 
     referer = request.headers.get("Referer", "/default_page")
