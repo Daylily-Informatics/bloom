@@ -100,12 +100,12 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 - **File management**: S3-compatible file storage with metadata tracking
 - **Barcode/label printing**: Integration with Zebra label printers via zebra_day
 - **FedEx tracking**: Package tracking integration via fedex_tracking_day
-- **Multi-interface support**: Flask web UI, FastAPI REST API, and CherryPy admin interface
+- **Multi-interface support**: FastAPI REST API and standard+admin user web page
 
 ### Technology Stack
 - **Language**: Python 3.12+
 - **Database**: PostgreSQL 15+ (via SQLAlchemy ORM)
-- **Web Frameworks**: FastAPI (primary), Flask (legacy UI)
+- **Web Frameworks**: FastAPI (primary)
 - **Storage**: AWS S3 / Supabase Storage
 - **Authentication**: Supabase Auth (OAuth2 with social providers)
 - **Label Printing**: zebra_day library
@@ -197,9 +197,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 flowchart TB
     subgraph BLOOM["BLOOM LIMS"]
         subgraph Presentation["Presentation Layer"]
-            Flask["Flask UI<br/>(Port 5000)"]
             FastAPI["FastAPI API<br/>(Port 8000)"]
-            Cherry["CherryPy Admin<br/>(Port 8080)"]
             CLI["CLI Tools"]
         end
 
@@ -229,9 +227,7 @@ flowchart TB
         data_lineage["data_lineage"]
     end
 
-    Flask --> Business
     FastAPI --> Business
-    Cherry --> Business
     CLI --> Business
     Business --> DataAccess
     DataAccess --> ORM
@@ -259,9 +255,6 @@ bloom_lims/
 | Entry Point | File | Port | Purpose |
 |-------------|------|------|---------|
 | Flask UI | `bloom_lims/bkend/bkend.py` | 5000 | Web-based user interface |
-| FastAPI | `bloom_lims/bkend/fastapi_bkend.py` | 8000 | REST API |
-| CherryPy | `bloom_lims/bkend/cherrypy_bkend.py` | 8080 | Admin interface |
-
 ---
 
 ## 3. Core Data Model
@@ -1194,14 +1187,9 @@ bobj.load_templates_from_directory('bloom_lims/templates/')
 ### 14.3 Running Services
 
 ```bash
-# Flask UI (development)
-python -m bloom_lims.bkend.bkend
 
 # FastAPI (development)
 uvicorn bloom_lims.bkend.fastapi_bkend:app --reload --port 8000
-
-# CherryPy Admin
-python -m bloom_lims.bkend.cherrypy_bkend
 
 # Production with gunicorn
 gunicorn -w 4 -b 0.0.0.0:5000 bloom_lims.bkend.bkend:app
@@ -1321,7 +1309,7 @@ pytest
 ### TSV's not CSV's
 * There are few/no compelling reasons to use CSV's over TSV's & so many reasons not to use CSV's.
 
-### All LIMS Data Editable w/CRUD UI
+### All LIMS Data Editable w/CRUD UI (and noting is ever really deleted)
 * It is! Fully (though with some safeguards still not in place).
   * _soft deletes need to be reviewed more closely_
 
