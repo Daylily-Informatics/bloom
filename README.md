@@ -187,10 +187,13 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 ---
 
 ## 2. System Architecture
-
+ 
 ### 2.1 High-Level Architecture
 
 ```mermaid
+%%{init: {
+  "flowchart": {"defaultRenderer": "elk"}
+}}%%
 flowchart TB
     subgraph BLOOM["BLOOM LIMS"]
         subgraph Presentation["Presentation Layer"]

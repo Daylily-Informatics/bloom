@@ -1,0 +1,45 @@
+%%{init: {
+  "flowchart": {"defaultRenderer": "elk"}
+}}%%
+flowchart TB
+    subgraph BLOOM["BLOOM LIMS"]
+        subgraph Presentation["Presentation Layer"]
+            Flask["Flask UI<br/>(Port 5000)"]
+            FastAPI["FastAPI API<br/>(Port 8000)"]
+            Cherry["CherryPy Admin<br/>(Port 8080)"]
+            CLI["CLI Tools"]
+        end
+
+        subgraph Business["Business Logic Layer"]
+            BloomObj["BloomObj<br/>(bobjs.py)"]
+            BloomWF["BloomWorkflow<br/>Step"]
+            BloomFile["BloomFile<br/>Set"]
+            BloomEquip["BloomEquipment"]
+        end
+
+        subgraph DataAccess["Data Access Layer"]
+            BLOOMdb3["BLOOMdb3 (db.py)<br/>- SQLAlchemy Session Management<br/>- Connection Pooling<br/>- Transaction Management"]
+        end
+
+        subgraph ORM["ORM Models (bdb.py)"]
+            BloomObjModel["BloomObj Model"]
+            GenericLineage["GenericLineage"]
+            EquipmentInst["EquipmentInst"]
+            DataLineage["DataLineage"]
+        end
+    end
+
+    subgraph DB["PostgreSQL Database"]
+        bloom_obj["bloom_obj"]
+        generic_lineage["generic_instance_lineage"]
+        equipment["equipment_instance"]
+        data_lineage["data_lineage"]
+    end
+
+    Flask --> Business
+    FastAPI --> Business
+    Cherry --> Business
+    CLI --> Business
+    Business --> DataAccess
+    DataAccess --> ORM
+    ORM --> DB
