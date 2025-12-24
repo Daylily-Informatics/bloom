@@ -92,7 +92,10 @@ _bloom natively will support arbitrarily defined labware, a 96w plate is just on
 
 BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laboratory Information Management System (LIMS) designed for managing laboratory workflows, sample tracking, and data management. The system is built on a flexible, template-driven architecture that allows laboratories to define custom object types, workflows, and actions without code changes.
 
-### Key Features
+### Specification
+* [BLOOM LIMS - Comprehensive System Specification](BLOOM_SPECIFICATION.md)s.
+
+### Features
 - **Template-driven object creation**: All laboratory objects (containers, samples, workflows) are created from JSON templates
 - **Hierarchical lineage tracking**: Parent-child relationships between all objects with full audit trail
 - **Flexible workflow engine**: Configurable multi-step workflows with queue management
@@ -115,8 +118,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 
 ---
 
-## Features
-
+## Feature Roadmap
 ### Completed ✅
 
 #### Core Infrastructure
@@ -189,6 +191,8 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 ## 2. System Architecture
  
 ### 2.1 High-Level Architecture
+
+  ![wgsflow](docs/bloom_lims.png)
 
 ```mermaid
 %%{init: {
