@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pytest
 
 from bloom_lims.db import BLOOMdb3

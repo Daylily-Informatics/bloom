@@ -42,4 +42,5 @@ dependencies:
     - moto
     - pandas
     - matplotlib
+    - pydantic-settings>=2.0.0
 

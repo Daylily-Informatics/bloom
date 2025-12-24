@@ -1,0 +1,60 @@
+flowchart LR
+
+%% Domains / trust zones
+subgraph Z0["Intake & Case Domain (PHI-heavy)"]
+  OCA["Order & Case Authority (OCA)\nAuthoritative for:\n• orders • cases • patients • providers • consent\nNot authoritative for:\n• lab artifacts • execution • decisions"]
+end
+
+subgraph Z1["Lab Object Domain (lab truth & lineage)"]
+  LOR["Laboratory Object Registry (LOR / Bloom)\nAuthoritative for:\n• specimens • aliquots • libraries • plates • runs • lineage\nLinks to OCA via order/case refs"]
+end
+
+subgraph Z2["Control Plane (facts → decisions → execution)"]
+  LEL(("Laboratory Event Ledger (LEL)\nImmutable event record"))
+  LOI["Laboratory Operations Intelligence (LOI)\nAuthoritative for:\n• decision outputs (routing/batching/priority/policy)"]
+  LOO["Laboratory Operations Orchestrator (LOO)\nAuthoritative for:\n• execution state (tasks/retries/holds/compensation)"]
+end
+
+subgraph Z3["Compute"]
+  DAY["daylily-ephemeral-cluster\nElastic analysis execution\n(Nextflow/Cromwell/Snakemake/etc)"]
+end
+
+%% External actors / systems
+HUM["Lab Staff UIs / Webforms"]
+ZEB["Zebra Printers"]
+INST["Instruments / Sequencers / QC devices"]
+AUTO["Lab Automation / Robots"]
+EXT["External APIs\n(courier, vendors, payor, etc.)"]
+INT["Internal APIs\n(auth, notifications, inventory, etc.)"]
+
+%% Event flows
+OCA -->|"order/case events"| LEL
+LOR -->|"state change events"| LEL
+HUM -->|"actions / signoffs"| LEL
+INST -->|"telemetry / run events"| LEL
+AUTO -->|"robot status / completion"| LEL
+EXT -->|"logistics events"| LEL
+INT -->|"service events"| LEL
+
+%% Decision loop
+LEL -->|"facts"| LOI
+LOR -->|"current object state"| LOI
+LOI -->|"Decision* events"| LEL
+
+%% Execution loop
+LEL -->|"Decision* events"| LOO
+LOO -->|"updates lab object state"| LOR
+LOO -->|"execution events"| LEL
+
+%% Operations integrations
+LOO -->|"tasks"| HUM
+LOO -->|"print jobs"| ZEB
+LOO -->|"commands/adapters"| AUTO
+LOO -->|"run control / polling"| INST
+LOO -->|"API calls"| EXT
+LOO -->|"API calls"| INT
+
+%% Analysis handoff
+LOO -->|"launch analysis"| DAY
+DAY -->|"status + artifacts"| LEL
+DAY -->|"results registration"| LOR
