@@ -46,3 +46,4 @@ requests_mock
 moto
 pandas
 matplotlib
+pydantic-settings>=2.0.0
