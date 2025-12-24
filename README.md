@@ -1306,7 +1306,7 @@ pytest
 ### TSV's not CSV's
 * There are few/no compelling reasons to use CSV's over TSV's & so many reasons not to use CSV's.
 
-### All LIMS Data Editable w/CRUD UI
+### All LIMS Data Editable w/CRUD UI (and noting is ever really deleted)
 * It is! Fully (though with some safeguards still not in place).
   * _soft deletes need to be reviewed more closely_
 
