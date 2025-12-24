@@ -10,7 +10,7 @@ import subprocess
 import logging
 import tempfile
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 
 from .config import BackupConfig, StorageType, BackupType
@@ -68,7 +68,7 @@ class BackupManager:
     
     def _generate_backup_id(self) -> str:
         """Generate a unique backup ID based on timestamp."""
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         db_name = self.config.database.database
         backup_type = self.config.backup_type.value
         return f"bloom_{db_name}_{backup_type}_{timestamp}"

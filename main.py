@@ -1535,11 +1535,10 @@ async def update_obj_json_addl_properties(
         obj_euid euid(): OBJECT.euid being edited
 
     Raises:
-        Exception: Cherrypy redirect back to referring page
-        cherrypy.HTTPRedirect: _description_
+        HTTPException: If object not found or update fails
 
     Returns:
-        cherrypy.HTTPRedirect: to referrer
+        RedirectResponse: Redirect to referrer page
     """
 
     referer = request.headers.get("Referer", "/default_page")
@@ -1692,10 +1691,10 @@ async def user_home(request: Request):
 
 
     # Fetching version details
-    github_tag = subprocess.check_output(["git", "describe", "--tags"]).decode().strip()
-    setup_py_version = subprocess.check_output(["python", "setup.py", "--version"]).decode().strip()
-    fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()  
-    zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()  
+    from bloom_lims._version import get_version
+    bloom_version = get_version()
+    fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()
+    zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()
 
     # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
     content = templates.get_template("user_home.html").render(
@@ -1705,12 +1704,11 @@ async def user_home(request: Request):
         css_files=css_files,
         style=style,
         dest_section=dest_section,
-        whitelisted_domains=" , ".join(os.environ.get("SUPABASE_WHITELIST_DOMAINS", "all").split(",")), 
+        whitelisted_domains=" , ".join(os.environ.get("SUPABASE_WHITELIST_DOMAINS", "all").split(",")),
         s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
         supabase_url=os.environ.get("SUPABASE_URL", "NEEDS TO BE SET!"),
         printer_info=printer_info,
-        github_tag=github_tag,
-        setup_py_version=setup_py_version,
+        bloom_version=bloom_version,
         fedex_version=fedex_version,
         zebra_printer_version=zebra_printer_version,
         udat=user_data

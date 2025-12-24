@@ -333,3 +333,60 @@ def create_cache(max_size: int = 1000, default_ttl: float = 300) -> LRUCache:
         New LRUCache instance
     """
     return LRUCache(max_size=max_size, default_ttl=default_ttl)
+
+
+def cached_method(
+    ttl: Optional[float] = None,
+    key_prefix: Optional[str] = None,
+    cache: Optional[LRUCache] = None,
+) -> Callable[[Callable[P, T]], Callable[P, T]]:
+    """
+    Decorator for caching instance method results.
+
+    Similar to @cached but designed for class methods where 'self'
+    should not be part of the cache key.
+
+    Args:
+        ttl: Time-to-live in seconds
+        key_prefix: Custom key prefix
+        cache: Custom cache instance
+
+    Usage:
+        class MyClass:
+            @cached_method(ttl=300)
+            def expensive_query(self, euid: str):
+                return self.db.query(euid)
+    """
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        target_cache = cache or _global_cache
+        prefix = key_prefix or f"{func.__module__}.{func.__qualname__}"
+
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # Build cache key excluding 'self'
+            cache_key = target_cache._make_key(prefix, args, kwargs)
+
+            # Try to get from cache
+            result = target_cache.get(cache_key)
+            if result is not None:
+                logger.debug(f"Cache hit for {prefix}")
+                return result
+
+            # Call the actual method
+            result = func(self, *args, **kwargs)
+
+            # Cache non-None results
+            if result is not None:
+                effective_ttl = ttl if ttl is not None else target_cache.default_ttl
+                target_cache.set(cache_key, result, effective_ttl)
+                logger.debug(f"Cached result for {prefix}")
+
+            return result
+
+        # Store reference for invalidation
+        wrapper._cache_prefix = prefix
+        _cached_functions[prefix] = wrapper
+
+        return wrapper  # type: ignore
+
+    return decorator

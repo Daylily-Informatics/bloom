@@ -12,6 +12,7 @@ from bloom_lims.bobjs import BloomWorkflow, BloomFile
 
 from io import BytesIO
 
+import re
 
 
 @pytest.fixture

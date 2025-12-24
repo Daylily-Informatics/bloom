@@ -43,7 +43,13 @@ def format_size(size_bytes: int) -> str:
 
 def format_age(dt: datetime) -> str:
     """Format datetime as human-readable age."""
-    delta = datetime.utcnow() - dt
+    from datetime import timezone
+    # Handle both naive and aware datetimes
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        # Assume naive datetime is UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = now - dt
     if delta.days > 0:
         return f"{delta.days}d ago"
     hours = delta.seconds // 3600

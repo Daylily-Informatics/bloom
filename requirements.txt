@@ -34,7 +34,6 @@ deprecation~=2.1.0
 StrEnum~=0.4.15
 packaging~=23.1
 requests~=2.28.2
-CherryPy~=18.9.0
 Flask~=2.3.2
 PyJWT~=2.8.0
 fastapi~=0.109.1

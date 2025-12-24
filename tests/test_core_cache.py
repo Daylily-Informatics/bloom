@@ -10,6 +10,7 @@ from bloom_lims.core.cache import (
     CacheEntry,
     CacheStats,
     cached,
+    cached_method,
     cache_invalidate,
     cache_clear,
     get_cache_stats,
@@ -185,8 +186,103 @@ class TestCacheHelpers:
     def test_create_cache(self):
         """Test create_cache creates new cache instance."""
         cache = create_cache(max_size=50, default_ttl=60)
-        
+
         assert cache.max_size == 50
         assert cache.default_ttl == 60
         assert len(cache) == 0
+
+
+class TestCacheInvalidatePrefix:
+    """Tests for prefix-based invalidation."""
+
+    def test_invalidate_prefix(self):
+        """Test invalidating entries by prefix."""
+        cache = LRUCache(max_size=100)
+
+        cache.set("user:1:name", "Alice")
+        cache.set("user:1:email", "alice@test.com")
+        cache.set("user:2:name", "Bob")
+        cache.set("other:key", "value")
+
+        # Invalidate all user:1: entries
+        count = cache.invalidate_prefix("user:1:")
+
+        assert count == 2
+        assert cache.get("user:1:name") is None
+        assert cache.get("user:1:email") is None
+        assert cache.get("user:2:name") == "Bob"  # Different prefix
+        assert cache.get("other:key") == "value"  # Different prefix
+
+    def test_invalidate_prefix_no_matches(self):
+        """Test invalidating with no matching prefix."""
+        cache = LRUCache(max_size=100)
+        cache.set("key1", "value1")
+
+        count = cache.invalidate_prefix("nonexistent:")
+
+        assert count == 0
+        assert cache.get("key1") == "value1"
+
+
+class TestCachedMethodDecorator:
+    """Tests for @cached_method decorator."""
+
+    def test_caches_method_result(self, clean_cache):
+        """Test that decorator caches instance method result."""
+        call_count = 0
+
+        class MyClass:
+            @cached_method(ttl=300)
+            def expensive_method(self, x: int) -> int:
+                nonlocal call_count
+                call_count += 1
+                return x * 2
+
+        obj = MyClass()
+        result1 = obj.expensive_method(5)
+        result2 = obj.expensive_method(5)
+
+        assert result1 == 10
+        assert result2 == 10
+        assert call_count == 1  # Only called once
+
+    def test_different_instances_share_cache(self, clean_cache):
+        """Test that different instances share the method cache."""
+        call_count = 0
+
+        class MyClass:
+            @cached_method(ttl=300)
+            def expensive_method(self, x: int) -> int:
+                nonlocal call_count
+                call_count += 1
+                return x * 2
+
+        obj1 = MyClass()
+        obj2 = MyClass()
+
+        result1 = obj1.expensive_method(5)
+        result2 = obj2.expensive_method(5)  # Same args, should hit cache
+
+        assert result1 == 10
+        assert result2 == 10
+        assert call_count == 1  # Only called once across instances
+
+    def test_different_args_different_cache(self, clean_cache):
+        """Test that different arguments create different cache entries."""
+        call_count = 0
+
+        class MyClass:
+            @cached_method(ttl=300)
+            def expensive_method(self, x: int) -> int:
+                nonlocal call_count
+                call_count += 1
+                return x * 2
+
+        obj = MyClass()
+        result1 = obj.expensive_method(5)
+        result2 = obj.expensive_method(10)
+
+        assert result1 == 10
+        assert result2 == 20
+        assert call_count == 2  # Called twice for different args
 

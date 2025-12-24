@@ -73,11 +73,20 @@ class StorageSettings(BaseModel):
         return self.max_file_size_mb * 1024 * 1024
 
 
+def _get_default_api_version() -> str:
+    """Get default API version from _version module."""
+    try:
+        from bloom_lims._version import get_version
+        return get_version()
+    except ImportError:
+        return "0.10.7"
+
+
 class APISettings(BaseModel):
     """API configuration."""
-    
+
     title: str = Field(default="BLOOM LIMS API", description="API title")
-    version: str = Field(default="1.0.0", description="API version")
+    version: str = Field(default_factory=_get_default_api_version, description="API version")
     prefix: str = Field(default="/api/v1", description="API URL prefix")
     
     # Pagination
@@ -141,6 +150,86 @@ class FeatureFlags(BaseModel):
     maintenance_mode: bool = Field(default=False, description="Enable maintenance mode")
 
 
+class CacheSettings(BaseModel):
+    """Cache configuration for application caching layer."""
+
+    enabled: bool = Field(default=True, description="Enable caching")
+    max_size: int = Field(default=5000, description="Maximum cache entries")
+    default_ttl: int = Field(default=300, description="Default TTL in seconds (5 minutes)")
+
+    # TTL settings for different object types (in seconds)
+    template_ttl: int = Field(default=3600, description="Template cache TTL (1 hour)")
+    instance_ttl: int = Field(default=300, description="Instance cache TTL (5 minutes)")
+    lineage_ttl: int = Field(default=300, description="Lineage cache TTL (5 minutes)")
+    query_ttl: int = Field(default=60, description="Query result cache TTL (1 minute)")
+
+    # Cache key prefixes
+    template_prefix: str = Field(default="tmpl:", description="Template cache key prefix")
+    instance_prefix: str = Field(default="inst:", description="Instance cache key prefix")
+    query_prefix: str = Field(default="qry:", description="Query cache key prefix")
+
+
+class BusinessConstants(BaseModel):
+    """Business logic constants extracted from code."""
+
+    # Version defaults
+    default_version: str = Field(default="1.0", description="Default object version")
+    wildcard_version: str = Field(default="*", description="Wildcard version string")
+
+    # Status values
+    status_created: str = Field(default="created", description="Created status")
+    status_in_progress: str = Field(default="in_progress", description="In progress status")
+    status_complete: str = Field(default="complete", description="Complete status")
+    status_failed: str = Field(default="failed", description="Failed status")
+    status_abandoned: str = Field(default="abandoned", description="Abandoned status")
+    status_active: str = Field(default="active", description="Active status")
+
+    # Workflow states
+    workflow_state_active: str = Field(default="active", description="Active workflow state")
+    workflow_state_paused: str = Field(default="paused", description="Paused workflow state")
+    workflow_state_completed: str = Field(default="completed", description="Completed workflow state")
+
+    # Object type prefixes
+    template_suffix: str = Field(default="_template", description="Template table suffix")
+    instance_suffix: str = Field(default="_instance", description="Instance table suffix")
+    lineage_suffix: str = Field(default="_instance_lineage", description="Lineage table suffix")
+
+    # Singleton handling
+    singleton_true_values: List[str] = Field(
+        default=["1", "true", "True", "yes", "Yes"],
+        description="Values that indicate singleton=True"
+    )
+    singleton_false_values: List[str] = Field(
+        default=["0", "false", "False", "no", "No", ""],
+        description="Values that indicate singleton=False"
+    )
+
+    # Graph/lineage settings
+    max_lineage_depth: int = Field(default=10, description="Max depth for lineage queries")
+    max_children_per_query: int = Field(default=10000, description="Max children in recursive queries")
+
+    # Default printer settings
+    default_label_style: str = Field(default="tube_2inX1in", description="Default label style")
+    default_lab_code: str = Field(default="BLOOM", description="Default lab code")
+
+    # Timezone settings
+    default_timezone: str = Field(default="US/Eastern", description="Default timezone")
+
+    # Template config paths (relative to bloom_lims)
+    config_base_path: str = Field(
+        default="config",
+        description="Base path for template configuration files"
+    )
+
+    # Action execution
+    action_max_executions_unlimited: str = Field(
+        default="-1",
+        description="Value indicating unlimited action executions"
+    )
+    action_enabled_true: str = Field(default="1", description="Action enabled value")
+    action_enabled_false: str = Field(default="0", description="Action disabled value")
+
+
 class BloomSettings(BaseSettings):
     """
     Main settings class for BLOOM LIMS.
@@ -173,6 +262,8 @@ class BloomSettings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
+    cache: CacheSettings = Field(default_factory=CacheSettings)
+    constants: BusinessConstants = Field(default_factory=BusinessConstants)
 
     @field_validator("environment")
     @classmethod

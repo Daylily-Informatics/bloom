@@ -11,7 +11,7 @@ import hashlib
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, BinaryIO
 from dataclasses import dataclass
 
@@ -95,7 +95,7 @@ class LocalStorage(StorageBackend):
             'backup_id': backup_id,
             'filename': dest_path.name,
             'size_bytes': dest_path.stat().st_size,
-            'created_at': datetime.utcnow().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'checksum': checksum,
             'checksum_algorithm': 'sha256',
         }

@@ -135,7 +135,7 @@ class TestValidatedDecorator:
 
 class TestValidateSchema:
     """Tests for validate_schema function."""
-    
+
     def test_valid_data(self):
         """Test validation of valid data against schema."""
         schema = {
@@ -143,29 +143,155 @@ class TestValidateSchema:
             "count": {"type": int, "required": False},
         }
         data = {"name": "test", "count": 5}
-        
+
         errors = validate_schema(data, schema)
         assert len(errors) == 0
-    
+
     def test_missing_required_field(self):
         """Test that missing required field returns error."""
         schema = {
             "name": {"type": str, "required": True},
         }
         data = {}
-        
+
         errors = validate_schema(data, schema)
         assert len(errors) == 1
         assert errors[0].field == "name"
-    
+
     def test_wrong_type(self):
         """Test that wrong type returns error."""
         schema = {
             "count": {"type": int, "required": True},
         }
         data = {"count": "not an int"}
-        
+
         errors = validate_schema(data, schema)
         assert len(errors) == 1
         assert "Expected int" in errors[0].message
+
+
+# Template Validation Tests
+from bloom_lims.core.template_validation import (
+    TemplateValidator,
+    ValidationResult,
+    TemplateDefinition,
+)
+from pathlib import Path
+import tempfile
+import json
+
+
+class TestValidationResult:
+    """Tests for ValidationResult dataclass."""
+
+    def test_default_values(self):
+        """Test default values."""
+        result = ValidationResult()
+        assert result.valid is True
+        assert result.errors == []
+        assert result.warnings == []
+        assert result.templates_checked == 0
+        assert result.files_checked == 0
+
+    def test_with_errors(self):
+        """Test result with errors."""
+        result = ValidationResult(
+            valid=False,
+            errors=["Error 1", "Error 2"],
+            templates_checked=5,
+        )
+        assert result.valid is False
+        assert len(result.errors) == 2
+
+
+class TestTemplateDefinition:
+    """Tests for TemplateDefinition dataclass."""
+
+    def test_creation(self):
+        """Test creating a template definition."""
+        td = TemplateDefinition(
+            file_path=Path("/test/template.json"),
+            super_type="workflow",
+            btype="dna_extraction",
+            b_sub_type="dna_extraction_v1",
+            version="1.0",
+            data={"singleton": "0"},
+        )
+        assert td.super_type == "workflow"
+        assert td.version == "1.0"
+        assert td.action_imports == {}
+
+
+class TestTemplateValidator:
+    """Tests for TemplateValidator class."""
+
+    def test_missing_config_directory(self):
+        """Test validation with missing config directory."""
+        validator = TemplateValidator(config_path=Path("/nonexistent/path"))
+        result = validator.validate_all()
+
+        assert result.valid is False
+        assert "not found" in result.errors[0]
+
+    def test_valid_reference_pattern(self):
+        """Test reference pattern matching."""
+        validator = TemplateValidator()
+
+        # Valid patterns
+        assert validator._is_valid_reference("action/generic/test/1.0")
+        assert validator._is_valid_reference("workflow/dna_extraction/v1/1.0")
+        assert validator._is_valid_reference("content/sample/blood/*/")
+
+        # Invalid patterns
+        assert not validator._is_valid_reference("invalid")
+        assert not validator._is_valid_reference("no/slashes")
+
+    def test_validate_with_temp_directory(self):
+        """Test validation with temporary test files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+
+            # Create subdirectory for super_type
+            workflow_dir = tmppath / "workflow"
+            workflow_dir.mkdir()
+
+            # Create valid template file
+            template_data = {
+                "test_workflow": {
+                    "1.0": {
+                        "singleton": "0",
+                        "action_imports": {
+                            "default": {
+                                "actions": {
+                                    "action/generic/test/1.0": {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            with open(workflow_dir / "test.json", "w") as f:
+                json.dump(template_data, f)
+
+            validator = TemplateValidator(config_path=tmppath)
+            result = validator.validate_all()
+
+            assert result.files_checked == 1
+            assert result.templates_checked == 1
+
+    def test_invalid_json(self):
+        """Test handling of invalid JSON files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+
+            # Create invalid JSON file
+            with open(tmppath / "invalid.json", "w") as f:
+                f.write("{ invalid json }")
+
+            validator = TemplateValidator(config_path=tmppath)
+            result = validator.validate_all()
+
+            assert result.valid is False
+            assert any("Invalid JSON" in e for e in result.errors)
 
