@@ -194,7 +194,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 
   ![wgsflow](docs/bloom_lims.png)
 
-```mermaid
+```text
 %%{init: {
   "flowchart": {"defaultRenderer": "elk"}
 }}%%
