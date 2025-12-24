@@ -4,9 +4,7 @@
 flowchart TB
     subgraph BLOOM["BLOOM LIMS"]
         subgraph Presentation["Presentation Layer"]
-            Flask["Flask UI<br/>(Port 5000)"]
             FastAPI["FastAPI API<br/>(Port 8000)"]
-            Cherry["CherryPy Admin<br/>(Port 8080)"]
             CLI["CLI Tools"]
         end
 
@@ -36,9 +34,7 @@ flowchart TB
         data_lineage["data_lineage"]
     end
 
-    Flask --> Business
     FastAPI --> Business
-    Cherry --> Business
     CLI --> Business
     Business --> DataAccess
     DataAccess --> ORM
