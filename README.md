@@ -194,9 +194,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 flowchart TB
     subgraph BLOOM["BLOOM LIMS"]
         subgraph Presentation["Presentation Layer"]
-            Flask["Flask UI<br/>(Port 5000)"]
             FastAPI["FastAPI API<br/>(Port 8000)"]
-            Cherry["CherryPy Admin<br/>(Port 8080)"]
             CLI["CLI Tools"]
         end
 
