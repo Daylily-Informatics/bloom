@@ -323,9 +323,9 @@ class TestBackupCLI:
     def test_format_age(self):
         """Test human-readable age formatting."""
         from bloom_lims.backup.cli import format_age
-        from datetime import timedelta
+        from datetime import timedelta, timezone
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Minutes ago
         recent = now - timedelta(minutes=30)

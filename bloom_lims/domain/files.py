@@ -24,7 +24,9 @@ from sqlalchemy import desc
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.domain.base import BloomObj
-from bloom_lims.domain.utils import get_datetime_string, generate_random_string
+from bloom_lims.domain.utils import get_datetime_string, generate_random_string, _update_recursive
+
+import re
 
 logger = logging.getLogger(__name__)
 

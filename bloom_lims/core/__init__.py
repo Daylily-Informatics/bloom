@@ -111,6 +111,7 @@ from .exceptions import (
 # Caching utilities
 from .cache import (
     cached,
+    cached_method,
     cache_invalidate,
     cache_clear,
     get_cache_stats,
@@ -119,6 +120,16 @@ from .cache import (
     LRUCache,
     CacheStats,
 )
+
+# Template validation
+from .template_validation import (
+    TemplateValidator,
+    ValidationResult,
+    TemplateDefinition,
+)
+
+# Cached repository
+from .cached_repository import CachedRepository
 
 __all__ = [
     # Base objects
@@ -183,6 +194,7 @@ __all__ = [
     "BloomSingletonError",
     # Cache
     "cached",
+    "cached_method",
     "cache_invalidate",
     "cache_clear",
     "get_cache_stats",
@@ -190,5 +202,11 @@ __all__ = [
     "create_cache",
     "LRUCache",
     "CacheStats",
+    # Template validation
+    "TemplateValidator",
+    "ValidationResult",
+    "TemplateDefinition",
+    # Cached repository
+    "CachedRepository",
 ]
 

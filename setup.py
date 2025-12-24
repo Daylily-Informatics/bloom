@@ -12,6 +12,7 @@ setup(
         "console_scripts": [
             "install-bloom=bloom_lims.thing:main",
             "bloom-backup=bloom_lims.backup.cli:main",
+            "bloom=bloom_lims.cli:main",
         ],
     },
 )
