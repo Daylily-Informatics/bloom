@@ -73,11 +73,20 @@ class StorageSettings(BaseModel):
         return self.max_file_size_mb * 1024 * 1024
 
 
+def _get_default_api_version() -> str:
+    """Get default API version from _version module."""
+    try:
+        from bloom_lims._version import get_version
+        return get_version()
+    except ImportError:
+        return "0.10.7"
+
+
 class APISettings(BaseModel):
     """API configuration."""
-    
+
     title: str = Field(default="BLOOM LIMS API", description="API title")
-    version: str = Field(default="1.0.0", description="API version")
+    version: str = Field(default_factory=_get_default_api_version, description="API version")
     prefix: str = Field(default="/api/v1", description="API URL prefix")
     
     # Pagination

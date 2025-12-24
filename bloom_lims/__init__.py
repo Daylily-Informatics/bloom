@@ -14,7 +14,7 @@ Main modules:
     - api: Versioned API endpoints
 """
 
-__version__ = "0.1.0"
+from bloom_lims._version import __version__, get_version
 
 # Core imports for convenience
 from bloom_lims.config import get_settings, BloomSettings
@@ -47,6 +47,7 @@ Settings = BloomSettings
 
 __all__ = [
     "__version__",
+    "get_version",
     "get_settings",
     "Settings",
     "BloomSettings",

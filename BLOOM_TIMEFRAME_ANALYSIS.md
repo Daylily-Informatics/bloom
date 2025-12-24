@@ -262,7 +262,7 @@ Move from environment variables to:
 - AWS Secrets Manager
 - Azure Key Vault
 
-#### 12. **Multi-Tenancy Support**
+#### 12. **Multi-Tenancy Support** (unecessary for non-phi LIMS)
 Design for SaaS deployment:
 - Schema-per-tenant isolation
 - Row-level security (PostgreSQL RLS)
