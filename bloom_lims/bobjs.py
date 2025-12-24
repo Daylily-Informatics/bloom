@@ -181,13 +181,21 @@ class BloomObj:
 
 
         # Move the  fedex and zebra stuff outside these objs
+        self.track_fedex = None
         if cfg_fedex:
-            try:
-                self.track_fedex = FTD.FedexTrack()
-            except Exception as e:
-                self.track_fedex = None
-        else:
-            self.track_fedex = None
+            fedex_key = os.environ.get("FEDEX_API_KEY")
+            fedex_secret = os.environ.get("FEDEX_SECRET")
+            if fedex_key and fedex_secret and "FTD" in globals():
+                try:
+                    self.track_fedex = FTD.FedexTrack()
+                except Exception as e:
+                    self.logger.warning(
+                        "FedEx tracking disabled; failed to initialize client: %s", e
+                    )
+            else:
+                self.logger.info(
+                    "FedEx tracking disabled; missing FEDEX_API_KEY/FEDEX_SECRET"
+                )
     
         self._bdb = bdb
         self.is_deleted = is_deleted
@@ -1341,14 +1349,19 @@ class BloomObj:
         # 1001897582860000245100773464327825
         fx_opsmd = {}
 
-        try:
-            fx_opsmd = self.track_fedex.get_fedex_ops_meta_ds(
-                action_ds["captured_data"]["Tracking Number"]
-            )
-            # Check the transit time is calculated
-            tt = fx_opsmd[0]["Transit_Time_sec"]
-        except Exception as e:
-            self.logger.exception(f"ERROR: {e}")
+        if self.track_fedex:
+            try:
+                fx_opsmd = self.track_fedex.get_fedex_ops_meta_ds(
+                    action_ds["captured_data"]["Tracking Number"]
+                )
+                # Check the transit time is calculated
+                tt = fx_opsmd[0]["Transit_Time_sec"]
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to fetch FedEx tracking data for %s: %s",
+                    action_ds["captured_data"].get("Tracking Number", ""),
+                    e,
+                )
 
         action_ds["captured_data"]["Fedex Tracking Data"] = fx_opsmd
 
