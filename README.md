@@ -1,7 +1,9 @@
 # Bloom: Templated Abstract Polymorphic (and opinionated) LIMS
-_a conceptual gambit in collaboration with chatGPT4_  /// _POC v0.10.12_
+_A conceptual gambit in collaboration with AI_ /// _Pre-Production Release_
 
-[![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml) [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml) _ARM hardware is not supported_
+[![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/macos.yaml) [![BLOOM LIMS Build Tests, MacOS, Ubuntu & CentOS](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml/badge.svg)](https://github.com/Daylily-Informatics/bloom/actions/workflows/ubuntu.yaml)
+
+> **Version**: Dynamically fetched from [GitHub Releases](https://github.com/Daylily-Informatics/bloom/releases) (current: v0.10.7)
 
 Built from first principles and drawing upon 30 years experience scaling laboratory process. Constructed with as few object model shortcuts as I could manage (I believe these shortcuts are among the main reasons LIMS nearly universally disappoint). Supporting both arbitrary and prescribed interacting objects. Intended for use: by small to factory scale laboratories, in regulated environments, for both research & operations use cases. Bloom can handle multiple areas LIS tend to touch: accessioning, lab processes, specimen/sample management, equipment, regulatory and compliance.
 
@@ -10,25 +12,26 @@ Built from first principles and drawing upon 30 years experience scaling laborat
 ## Table of Contents
 1. [Spoilers (Screenshots)](#spoilers)
 2. [Executive Summary](#executive-summary)
-3. [Installation](#installation)
-4. [System Architecture](#system-architecture)
-5. [Core Data Model](#core-data-model)
-6. [Database Schema](#database-schema)
-7. [Object Hierarchy](#object-hierarchy)
-8. [Template System](#template-system)
-9. [Workflow Engine](#workflow-engine)
-10. [Action System](#action-system)
-11. [File Management](#file-management)
-12. [API Layer](#api-layer)
-13. [Web Interface](#web-interface)
-14. [External Integrations](#external-integrations)
-15. [Configuration](#configuration)
-16. [Deployment](#deployment)
-17. [Testing](#testing)
-18. [Regulatory & Compliance](#regulatory--compliance)
-19. [Design Principles](#design-principles)
-20. [Dev Tools](#dev-tools)
-21. [Support, Authors & License](#support)
+3. [Features](#features)
+4. [Installation](#installation)
+5. [System Architecture](#system-architecture)
+6. [Core Data Model](#core-data-model)
+7. [Database Schema](#database-schema)
+8. [Object Hierarchy](#object-hierarchy)
+9. [Template System](#template-system)
+10. [Workflow Engine](#workflow-engine)
+11. [Action System](#action-system)
+12. [File Management](#file-management)
+13. [API Layer](#api-layer)
+14. [Web Interface](#web-interface)
+15. [External Integrations](#external-integrations)
+16. [Configuration](#configuration)
+17. [Deployment](#deployment)
+18. [Testing](#testing)
+19. [Regulatory & Compliance](#regulatory--compliance)
+20. [Design Principles](#design-principles)
+21. [Dev Tools](#dev-tools)
+22. [Support, Authors & License](#support)
 
 ---
 
@@ -100,13 +103,86 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 - **Multi-interface support**: Flask web UI, FastAPI REST API, and CherryPy admin interface
 
 ### Technology Stack
-- **Language**: Python 3.x
-- **Database**: PostgreSQL (via SQLAlchemy ORM)
-- **Web Frameworks**: Flask (UI), FastAPI (API), CherryPy (Admin)
+- **Language**: Python 3.12+
+- **Database**: PostgreSQL 15+ (via SQLAlchemy ORM)
+- **Web Frameworks**: FastAPI (primary), Flask (legacy UI)
 - **Storage**: AWS S3 / Supabase Storage
-- **Authentication**: Supabase Auth
+- **Authentication**: Supabase Auth (OAuth2 with social providers)
 - **Label Printing**: zebra_day library
 - **Package Tracking**: fedex_tracking_day library
+- **Validation**: Pydantic v2 with pydantic-settings
+- **Migrations**: Alembic
+
+---
+
+## Features
+
+### Completed ✅
+
+#### Core Infrastructure
+- **Domain-Driven Architecture**: Clean separation into 8 domain modules (`bloom_lims/domain/`)
+- **Database Migrations**: Alembic integration with baseline migration (`bloom_lims/migrations/`)
+- **Pydantic Schema Validation**: 10 schema modules for comprehensive input validation (`bloom_lims/schemas/`)
+- **Structured Exception Handling**: Typed exception hierarchy (`bloom_lims/exceptions.py`, `bloom_lims/core/exceptions.py`)
+- **Session Management**: Context managers, `_TransactionContext`, proper rollback in `BLOOMdb3`
+- **API Versioning**: `/api/v1/` prefix structure with version negotiation (`bloom_lims/api/versioning.py`)
+- **Health Check Endpoints**: Kubernetes-ready probes at `/health`, `/health/live`, `/health/ready`, `/health/metrics`
+- **Dynamic Version Management**: Version pulled from GitHub releases (`bloom_lims/_version.py`)
+
+#### Workflow Engine
+- **Template-Driven Object Creation**: All objects created from JSON templates without code changes
+- **Hierarchical Lineage Tracking**: Full parent-child relationships with comprehensive audit trail
+- **Multi-Step Workflow Engine**: Configurable workflows with queue management
+- **Action System**: Extensible framework for object state transitions and operations
+- **Operational Workflows**: Accessioning → Plasma Isolation → DNA Extraction → Quant pipeline
+
+#### Authentication & Security
+- **OAuth2/Supabase Authentication**: Enterprise-grade auth with Google, GitHub, and social providers
+- **Domain Whitelisting**: Flexible access control configuration
+- **JWT Token Validation**: Secure API authentication
+
+#### File Management
+- **S3-Compatible Storage**: AWS S3 and Supabase Storage support
+- **File Sets**: Grouping related files with metadata tracking
+- **Dewey File Manager**: Organized file intake, storage, and retrieval system
+
+#### External Integrations
+- **Zebra Label Printing**: Full barcode printing via zebra_day library
+- **FedEx Tracking**: Package tracking integration via fedex_tracking_day
+- **Graph Visualization**: Cytoscape integration for complex relationship exploration
+
+#### Developer Experience
+- **Cross-Platform CI/CD**: GitHub Actions for macOS, Ubuntu, CentOS
+- **Comprehensive Logging**: Structured logging with rotation
+- **CLI Tools**: `bloom-backup`, `bloom` command-line interfaces
+- **Interactive Shell**: `bloom_shell.py` for development
+
+### In Queue 📋
+
+#### Performance & Scale
+- [ ] **Caching Layer Integration**: Redis/memcached integration (module exists at `bloom_lims/core/cache.py`)
+- [ ] **Async Operations**: Non-blocking operations for high-throughput automation
+- [ ] **Rate Limiting**: API request limiting middleware
+- [ ] **Batch Operations**: Bulk processing API endpoints
+- [ ] **Read Replicas**: Database scaling with read replicas
+
+#### Features
+- [ ] **Plugin Architecture**: Custom extensions without core code changes
+- [ ] **Workflow Orchestration**: Airflow/Prefect integration for automation
+- [ ] **Enhanced Reporting/Analytics**: Built-in insights and dashboards
+- [ ] **Mobile/Tablet Optimization**: Responsive lab-friendly interface
+- [ ] **GraphQL API**: Flexible queries for complex many-to-many relationships
+
+#### Infrastructure
+- [ ] **Multi-Tenancy Support**: Schema-per-tenant isolation
+- [ ] **Secrets Management**: HashiCorp Vault / AWS Secrets Manager integration
+- [ ] **Observability Stack**: OpenTelemetry, Prometheus metrics, distributed tracing
+- [ ] **Development Containers**: devcontainer configuration for consistent environments
+
+#### Content
+- [ ] **Template Library Expansion**: More out-of-box templates for common lab workflows
+- [ ] **User Documentation**: Comprehensive guides and tutorials
+- [ ] **Contributor Guide**: Documentation for community contributions
 
 ---
 
@@ -1489,109 +1565,7 @@ results = bobj.search_objects(
 
 ---
 
-## Appendix C: System Strengths and Weaknesses Analysis
+*Document Version: 2.0*
+*Last Updated: 2024-12-24*
+*BLOOM LIMS - Version dynamically fetched from GitHub releases*
 
-### C.1 Strengths (Ranked by Impact)
-
-#### 🟢 HIGH IMPACT STRENGTHS
-
-| Rank | Strength | Description | Business Value |
-|------|----------|-------------|----------------|
-| 1 | **Template-Driven Architecture** | All objects created from JSON templates without code changes | Enables rapid customization for different lab workflows |
-| 2 | **Flexible JSON Storage** | `json_addl` field allows arbitrary properties without schema changes | Adapts to evolving requirements without migrations |
-| 3 | **Comprehensive Lineage Tracking** | Full parent-child relationships with audit trail | Complete sample provenance and regulatory compliance |
-| 4 | **Multi-Interface Support** | Flask UI, FastAPI, CherryPy all available | Different interfaces for different use cases |
-| 5 | **Action System** | Configurable actions defined in templates | Business logic changes without code deployment |
-
-#### 🟡 MEDIUM IMPACT STRENGTHS
-
-| Rank | Strength | Description | Business Value |
-|------|----------|-------------|----------------|
-| 6 | **SQLAlchemy ORM** | Mature, well-tested database abstraction | Reliable data access, potential DB portability |
-| 7 | **External Integrations** | zebra_day, fedex_tracking_day built-in | Ready-to-use lab equipment integration |
-| 8 | **Soft Delete Pattern** | `is_deleted` flag preserves data | Data recovery, audit compliance |
-| 9 | **Hierarchical Classification** | super_type/btype/b_sub_type/version | Organized, queryable object taxonomy |
-| 10 | **EUID System** | Human-readable unique identifiers | Easy barcode scanning and manual entry |
-
-### C.2 Weaknesses (Ranked by Urgency)
-
-#### 🔴 CRITICAL - Address Immediately
-
-| Rank | Weakness | Description | Risk | Recommended Fix |
-|------|----------|-------------|------|-----------------|
-| 1 | **No Database Migrations** | Schema changes require manual intervention | Data loss, deployment failures | Implement Alembic migrations |
-| 2 | **Hardcoded Values in Business Logic** | Many methods have hardcoded types/versions | Brittle, hard to maintain | Extract to configuration |
-| 3 | **Inconsistent Error Handling** | Mix of exceptions, logging, silent failures | Unpredictable behavior | Standardize error handling |
-| 4 | **Session Management Issues** | Commented `session.flush()`, manual commits | Transaction integrity risks | Implement proper UoW pattern |
-| 5 | **No Input Validation** | Limited validation on API inputs | Security vulnerabilities | Add Pydantic models |
-
-#### 🟠 HIGH - Address Soon
-
-| Rank | Weakness | Description | Risk | Recommended Fix |
-|------|----------|-------------|------|-----------------|
-| 6 | **Limited Test Coverage** | Tests exist but coverage unclear | Regression bugs | Add comprehensive test suite |
-| 7 | **No API Versioning** | API endpoints not versioned | Breaking changes affect clients | Implement /v1/ prefix |
-| 8 | **Monolithic bobjs.py** | 3800+ lines in single file | Hard to maintain/test | Split into focused modules |
-| 9 | **No Caching Layer** | Every query hits database | Performance issues at scale | Add Redis/memcached |
-| 10 | **Synchronous Operations** | All operations blocking | Poor scalability | Add async support |
-
-#### 🟡 MEDIUM - Plan for Future
-
-| Rank | Weakness | Description | Risk | Recommended Fix |
-|------|----------|-------------|------|-----------------|
-| 11 | **No Rate Limiting** | API has no request limits | DoS vulnerability | Add rate limiting middleware |
-| 12 | **Limited Logging Structure** | Inconsistent log formats | Hard to debug/monitor | Implement structured logging |
-| 13 | **No Health Checks** | No endpoint for service health | Deployment monitoring gaps | Add /health endpoint |
-| 14 | **Documentation Gaps** | Limited inline documentation | Onboarding difficulty | Add docstrings, type hints |
-| 15 | **No Batch Operations** | Single-object operations only | Slow bulk processing | Add batch API endpoints |
-
-### C.3 Technical Debt Summary
-
-```mermaid
-quadrantChart
-    title Technical Debt Priority Matrix
-    x-axis Low Effort --> High Effort
-    y-axis Low Impact --> High Impact
-    quadrant-1 Plan Carefully
-    quadrant-2 Address First
-    quadrant-3 Defer
-    quadrant-4 Quick Wins
-    Migrations: [0.25, 0.95]
-    Error Handling: [0.35, 0.90]
-    Session Mgmt: [0.45, 0.75]
-    Input Validation: [0.55, 0.75]
-    Test Coverage: [0.70, 0.70]
-    Monolithic Code: [0.80, 0.55]
-    API Versioning: [0.30, 0.50]
-```
-
-### C.4 Recommended Improvement Roadmap
-
-#### Phase 1: Stability (1-2 months)
-1. Implement Alembic database migrations
-2. Standardize error handling across all modules
-3. Add input validation with Pydantic
-4. Fix session management patterns
-5. Add comprehensive logging
-
-#### Phase 2: Quality (2-3 months)
-1. Increase test coverage to 80%+
-2. Split bobjs.py into focused modules
-3. Add API versioning
-4. Implement health check endpoints
-5. Add type hints throughout
-
-#### Phase 3: Scale (3-6 months)
-1. Add caching layer (Redis)
-2. Implement async operations
-3. Add batch API endpoints
-4. Implement rate limiting
-5. Add performance monitoring
-
----
-
-*Document Version: 1.0*
-*Last Updated: 2024-12-23*
-*Generated for BLOOM LIMS v0.10.12*
-
- 
