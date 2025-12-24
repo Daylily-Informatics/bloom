@@ -678,10 +678,10 @@ class BloomWorkflowStep(BloomObj):
                 prior_cont_euid_n += 1
         if prior_cont_euid_n != 1:
             self.logger.exception(
-                f"Prior container count is {prior_cont_euid_n} for {wf.euid}, and should be ==1... this logic needs tightening up w/r/t finding the desired plate"
+                f"Prior container count is {prior_cont_euid_n} for {wfs.euid}, and should be ==1... this logic needs tightening up w/r/t finding the desired plate"
             )
             raise Exception(
-                f"Prior container count is {prior_cont_euid_n} for {wf.euid}, and should be ==1... this logic needs tightening up"
+                f"Prior container count is {prior_cont_euid_n} for {wfs.euid}, and should be ==1... this logic needs tightening up"
             )
 
         self.create_generic_instance_lineage_by_euids(
