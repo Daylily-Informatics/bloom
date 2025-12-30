@@ -20,9 +20,19 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class ReadReplicaSettings(BaseModel):
+    """Configuration for a single read replica."""
+
+    host: str = Field(description="Replica host address")
+    port: int = Field(default=5432, description="Replica port")
+    weight: int = Field(default=1, description="Load balancing weight (higher = more traffic)")
+    max_lag_seconds: int = Field(default=30, description="Maximum acceptable replication lag")
+    enabled: bool = Field(default=True, description="Whether this replica is enabled")
+
+
 class DatabaseSettings(BaseModel):
     """Database connection configuration."""
-    
+
     host: str = Field(default="localhost", description="PostgreSQL host")
     port: int = Field(default=5432, description="PostgreSQL port")
     database: str = Field(default="bloom_lims", description="Database name")
@@ -33,14 +43,28 @@ class DatabaseSettings(BaseModel):
     pool_timeout: int = Field(default=30, description="Pool connection timeout (seconds)")
     pool_recycle: int = Field(default=1800, description="Connection recycle time (seconds)")
     echo: bool = Field(default=False, description="Echo SQL statements")
-    
+
+    # Read replica configuration
+    read_replicas: List[ReadReplicaSettings] = Field(
+        default=[],
+        description="List of read replica configurations for scaling reads"
+    )
+    enable_read_replicas: bool = Field(
+        default=False,
+        description="Enable read replica routing"
+    )
+    replica_health_check_interval: int = Field(
+        default=30,
+        description="Seconds between replica health checks"
+    )
+
     @property
     def connection_string(self) -> str:
         """Generate SQLAlchemy connection string."""
         if self.password:
             return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
         return f"postgresql://{self.user}@{self.host}:{self.port}/{self.database}"
-    
+
     @property
     def async_connection_string(self) -> str:
         """Generate async SQLAlchemy connection string."""
@@ -154,7 +178,11 @@ class CacheSettings(BaseModel):
     """Cache configuration for application caching layer."""
 
     enabled: bool = Field(default=True, description="Enable caching")
-    max_size: int = Field(default=5000, description="Maximum cache entries")
+    backend: str = Field(
+        default="memory",
+        description="Cache backend: 'memory', 'redis', or 'memcached'"
+    )
+    max_size: int = Field(default=5000, description="Maximum cache entries (memory backend)")
     default_ttl: int = Field(default=300, description="Default TTL in seconds (5 minutes)")
 
     # TTL settings for different object types (in seconds)
@@ -167,6 +195,20 @@ class CacheSettings(BaseModel):
     template_prefix: str = Field(default="tmpl:", description="Template cache key prefix")
     instance_prefix: str = Field(default="inst:", description="Instance cache key prefix")
     query_prefix: str = Field(default="qry:", description="Query cache key prefix")
+
+    # Redis backend configuration
+    redis_host: str = Field(default="localhost", description="Redis server host")
+    redis_port: int = Field(default=6379, description="Redis server port")
+    redis_db: int = Field(default=0, description="Redis database number")
+    redis_password: Optional[str] = Field(default=None, description="Redis password")
+    redis_ssl: bool = Field(default=False, description="Enable Redis SSL/TLS")
+    redis_cluster: bool = Field(default=False, description="Enable Redis Cluster mode")
+
+    # Memcached backend configuration
+    memcached_servers: List[str] = Field(
+        default=["localhost:11211"],
+        description="Memcached server addresses"
+    )
 
 
 class BusinessConstants(BaseModel):

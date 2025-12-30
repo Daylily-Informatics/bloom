@@ -12,25 +12,27 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 T = TypeVar("T")
 
 
-# EUID validation pattern - matches format like "PRO-12345" or "SAM-67890-A"
-EUID_PATTERN = re.compile(r"^[A-Z]{2,5}-[A-Z0-9]{3,12}(-[A-Z0-9]{1,4})?$")
+# EUID validation pattern - matches format like "CX1", "CX123", "WX1000", "MRX42"
+# Enterprise Unique Identifier: 2-3 letter prefix + sequence number (no leading zeros)
+EUID_PATTERN = re.compile(r"^[A-Z]{2,3}[1-9][0-9]*$")
 
 
 def validate_euid(value: str) -> str:
     """
-    Validate EUID format.
-    
-    EUIDs follow the pattern: PREFIX-IDENTIFIER[-SUFFIX]
-    - PREFIX: 2-5 uppercase letters (e.g., PRO, SAM, WF)
-    - IDENTIFIER: 3-12 alphanumeric characters
-    - SUFFIX: Optional 1-4 alphanumeric characters
-    
+    Validate EUID (Enterprise Unique Identifier) format.
+
+    EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
+    - PREFIX: 2-3 uppercase letters identifying object type (e.g., CX, WX, MRX)
+    - SEQUENCE_NUMBER: Integer with NO leading zeros (critical LIMS design principle)
+
+    Examples: CX1, CX123, WX1000, MRX42, CWX5
+
     Args:
         value: The EUID string to validate
-        
+
     Returns:
         The validated EUID string (uppercase)
-        
+
     Raises:
         ValueError: If the EUID format is invalid
     """
@@ -38,14 +40,15 @@ def validate_euid(value: str) -> str:
     if not EUID_PATTERN.match(value):
         raise ValueError(
             f"Invalid EUID format: {value}. "
-            "Expected format: PREFIX-IDENTIFIER or PREFIX-IDENTIFIER-SUFFIX"
+            "Expected format: PREFIX + sequence number (e.g., CX123, WX1000). "
+            "No leading zeros allowed in sequence number."
         )
     return value
 
 
-def EUIDField(description: str = "Entity Unique Identifier") -> Any:
+def EUIDField(description: str = "Enterprise Unique Identifier") -> Any:
     """Create a Field with EUID validation."""
-    return Field(..., description=description, min_length=5, max_length=25)
+    return Field(..., description=description, min_length=3, max_length=20)
 
 
 class BloomBaseSchema(BaseModel):

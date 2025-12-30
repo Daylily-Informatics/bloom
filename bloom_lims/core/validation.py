@@ -46,9 +46,10 @@ class ValidationError(ValueError):
         super().__init__(f"Validation failed for '{field}': {message}")
 
 
-# EUID pattern: prefix_base32_checksum format
-# Example: WF_ABC123XY_Z
-EUID_PATTERN = re.compile(r'^[A-Z]{2,4}_[A-Z0-9]{6,12}_[A-Z0-9]$')
+# EUID pattern: Enterprise Unique Identifier
+# Format: 2-3 letter prefix + sequence number (no leading zeros)
+# Examples: CX1, CX123, WX1000, MRX42, CWX5
+EUID_PATTERN = re.compile(r'^[A-Z]{2,3}[1-9][0-9]*$')
 
 # UUID pattern (standard UUID v4)
 UUID_PATTERN = re.compile(
@@ -59,40 +60,42 @@ UUID_PATTERN = re.compile(
 
 def validate_euid(value: Any, field_name: str = "euid") -> bool:
     """
-    Validate an EUID (External Unique Identifier).
-    
-    BLOOM EUIDs follow the pattern: PREFIX_BASE32_CHECKSUM
-    Example: WF_ABC123XY_Z
-    
+    Validate an EUID (Enterprise Unique Identifier).
+
+    BLOOM EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
+    - PREFIX: 2-3 uppercase letters identifying object type (e.g., CX, WX, MRX)
+    - SEQUENCE_NUMBER: Integer with NO leading zeros (critical LIMS design principle)
+
+    Examples: CX1, CX123, WX1000, MRX42, CWX5
+
     Args:
         value: Value to validate
         field_name: Name of the field for error messages
-        
+
     Returns:
         True if valid
-        
+
     Raises:
         ValidationError: If validation fails
     """
     if value is None:
         raise ValidationError(field_name, value, "EUID cannot be None")
-    
+
     if not isinstance(value, str):
         raise ValidationError(field_name, value, f"EUID must be a string, got {type(value).__name__}")
-    
+
     if not value:
         raise ValidationError(field_name, value, "EUID cannot be empty")
-    
-    # Check basic format - must have at least 2 underscores
-    parts = value.split('_')
-    if len(parts) < 2:
-        raise ValidationError(field_name, value, "EUID must contain at least one underscore separator")
-    
-    # Prefix should be uppercase letters
-    prefix = parts[0]
-    if not prefix.isalpha() or not prefix.isupper():
-        raise ValidationError(field_name, value, f"EUID prefix must be uppercase letters, got '{prefix}'")
-    
+
+    value = value.upper().strip()
+
+    if not EUID_PATTERN.match(value):
+        raise ValidationError(
+            field_name,
+            value,
+            "EUID must be PREFIX + sequence number (e.g., CX123, WX1000). No leading zeros allowed."
+        )
+
     return True
 
 

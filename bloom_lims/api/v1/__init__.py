@@ -18,6 +18,8 @@ from .containers import router as containers_router
 from .content import router as content_router
 from .files import router as files_router
 from .equipment import router as equipment_router
+from .batch import router as batch_router
+from .async_tasks import router as async_tasks_router
 
 
 # Main v1 router
@@ -31,6 +33,8 @@ router.include_router(containers_router)
 router.include_router(content_router)
 router.include_router(files_router)
 router.include_router(equipment_router)
+router.include_router(batch_router)
+router.include_router(async_tasks_router)
 
 
 @router.get("/")
@@ -48,6 +52,8 @@ async def api_v1_info():
             "content": "/api/v1/content",
             "files": "/api/v1/files",
             "equipment": "/api/v1/equipment",
+            "batch": "/api/v1/batch",
+            "tasks": "/api/v1/tasks",
         },
     }
 

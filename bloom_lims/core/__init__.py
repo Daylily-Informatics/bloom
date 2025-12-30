@@ -131,6 +131,47 @@ from .template_validation import (
 # Cached repository
 from .cached_repository import CachedRepository
 
+# Cache backends (Redis/Memcached)
+from .cache_backends import (
+    CacheBackend,
+    RedisCache,
+    MemcachedCache,
+    get_cache_backend,
+)
+
+# Read replica support
+from .read_replicas import (
+    ReplicaRouter,
+    ReplicaConfig,
+    ReplicaStatus,
+    get_replica_router,
+    configure_replicas,
+)
+
+# Async operations
+from .async_operations import (
+    AsyncDatabaseSession,
+    BackgroundTaskManager,
+    TaskResult,
+    TaskStatus,
+    get_task_manager,
+    run_async,
+    run_in_background,
+    parallel_execute,
+)
+
+# Batch operations
+from .batch_operations import (
+    BatchProcessor,
+    BatchJob,
+    BatchProgress,
+    JobStatus,
+    bulk_create,
+    bulk_update,
+    bulk_delete,
+    get_batch_processor,
+)
+
 __all__ = [
     # Base objects
     "BloomObj",
@@ -208,5 +249,34 @@ __all__ = [
     "TemplateDefinition",
     # Cached repository
     "CachedRepository",
+    # Cache backends
+    "CacheBackend",
+    "RedisCache",
+    "MemcachedCache",
+    "get_cache_backend",
+    # Read replicas
+    "ReplicaRouter",
+    "ReplicaConfig",
+    "ReplicaStatus",
+    "get_replica_router",
+    "configure_replicas",
+    # Async operations
+    "AsyncDatabaseSession",
+    "BackgroundTaskManager",
+    "TaskResult",
+    "TaskStatus",
+    "get_task_manager",
+    "run_async",
+    "run_in_background",
+    "parallel_execute",
+    # Batch operations
+    "BatchProcessor",
+    "BatchJob",
+    "BatchProgress",
+    "JobStatus",
+    "bulk_create",
+    "bulk_update",
+    "bulk_delete",
+    "get_batch_processor",
 ]
 
