@@ -1,5 +1,4 @@
 import sys
-import jwt
 import httpx
 import os
 import json
@@ -119,7 +118,11 @@ from bloom_lims.bvars import BloomVars
 BVARS = BloomVars()
 BASE_DIR = Path("./served_data").resolve()  # Base directory for serving files
 
-from auth.supabase.connection import create_supabase_client
+from auth.cognito.client import (
+    CognitoConfigurationError,
+    CognitoTokenError,
+    get_cognito_auth,
+)
 
 
 # local udata prefernces
@@ -191,9 +194,18 @@ class AuthenticationRequiredException(HTTPException):
         super().__init__(status_code=401, detail=detail)
 
 
-class MissingSupabaseEnvVarsException(HTTPException):
-    def __init__(self, message="The Supabase environment variables are not found."):
+class MissingCognitoEnvVarsException(HTTPException):
+    def __init__(self, message="The Cognito environment variables are not found."):
         super().__init__(status_code=401, detail=message)
+
+
+def get_allowed_domains() -> List[str]:
+    whitelist_domains = os.getenv("COGNITO_WHITELIST_DOMAINS", "all")
+    if len(whitelist_domains) == 0:
+        whitelist_domains = "all"
+    if whitelist_domains.lower() == "all":
+        return []
+    return [domain.strip() for domain in whitelist_domains.split(",") if domain.strip()]
 
 
 def proc_udat(email):
@@ -336,14 +348,12 @@ async def require_auth(request: Request):
         request.session["user_data"] = {"email": "john@daylilyinformatics.com", "dag_fnv2": ""}
         return request
     
-    if (
-        os.environ.get("SUPABASE_URL", "NA") == "NA"
-        and os.environ.get("SUPABASE_KEY", "NA") == "NA"
-    ):
-        msg = "SUPABASE_* env variables not not set.  Is your .env file missing?"
+    try:
+        get_cognito_auth()
+    except CognitoConfigurationError as exc:
+        msg = f"COGNITO_* env variables not set. Is your .env file missing? ({exc})"
         logging.error(msg)
-
-        raise MissingSupabaseEnvVarsException(msg)
+        raise MissingCognitoEnvVarsException(msg)
 
     if "user_data" not in request.session:
         raise AuthenticationRequiredException()
@@ -398,110 +408,90 @@ async def get_login_page(request: Request):
     user_data = request.session.get("user_data", {})
     style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
+    try:
+        cognito = get_cognito_auth()
+        cognito_login_url = cognito.config.authorize_url
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
+
     # Ensure you have this function defined, and it returns the expected style information
     template = templates.get_template("login.html")
     # Pass the 'style' variable in the context
-    context = {"request": request, "style": style, "udat": user_data, "supabase_url": os.getenv("SUPABASE_URL", "SUPABASE-URL-NOT-SET") } 
+    context = {
+        "request": request,
+        "style": style,
+        "udat": user_data,
+        "cognito_authorize_url": cognito_login_url,
+    }
     return HTMLResponse(content=template.render(context))
 
 
 @app.post("/oauth_callback")
 async def oauth_callback(request: Request):
     body = await request.json()
-    access_token = body.get("accessToken")
+    access_token = body.get("access_token") or body.get("accessToken")
+    id_token = body.get("id_token")
 
-    if not access_token:
-        return "No access token provided."
-    # Attempt to decode the JWT to get email
+    if not id_token and not access_token:
+        return JSONResponse(
+            content={"message": "No Cognito tokens provided."},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
     try:
-        decoded_token = jwt.decode(access_token, options={"verify_signature": False})
-        primary_email = decoded_token.get("email")
-    except jwt.DecodeError:
-        primary_email = None
+        cognito = get_cognito_auth()
+        decoded_token = cognito.validate_token(id_token or access_token)
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
+    except CognitoTokenError as exc:
+        logging.error(f"Unable to validate Cognito token: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Cognito token"
+        ) from exc
 
-    # Fetch user email from GitHub if not present in decoded token
-    #if not primary_email:
-    #    async with httpx.AsyncClient() as client:
-    #        headers = {"Authorization": f"Bearer {access_token}"}
-    #        response = await client.get(
-    #            "https://api.github.com/user/emails", headers=headers
-    #        )
-    #        if response.status_code == 200:
-    #            emails = response.json()
-    #            primary_email = next(
-    #                (email["email"] for email in emails if email.get("primary")), None
-    #            )
-    #        else:
-    #            raise HTTPException(
-    #                status_code=400, detail="Failed to retrieve user email from GitHub"
-    #            )
+    primary_email = decoded_token.get("email") or decoded_token.get("username")
+    if not primary_email:
+        primary_email = decoded_token.get("cognito:username")
 
-    # Check if the email domain is allowed
-    whitelist_domains = os.getenv("SUPABASE_WHITELIST_DOMAINS", "all")
-    if len(whitelist_domains) == 0:
-        whitelist_domains = "all"
-    if whitelist_domains.lower() != "all":
-        allowed_domains = [domain.strip() for domain in whitelist_domains.split(",")]
-        user_domain = primary_email.split("@")[1]
+    if not primary_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to determine email from Cognito token",
+        )
+
+    allowed_domains = get_allowed_domains()
+    if allowed_domains:
+        user_domain = primary_email.split("@")[-1]
         if user_domain not in allowed_domains:
             raise HTTPException(status_code=400, detail="Email domain not allowed")
 
-    request.session["user_data"] = proc_udat(
-        primary_email
-    )  # {"email": primary_email, "style_css": "static/skins/bloom.css"}
+    user_data = proc_udat(primary_email)
+    user_data.update(
+        {
+            "id_token": id_token,
+            "access_token": access_token,
+            "cognito_username": decoded_token.get("cognito:username"),
+            "cognito_sub": decoded_token.get("sub"),
+        }
+    )
+    request.session["user_data"] = user_data
 
     # Redirect to home page or dashboard
     return RedirectResponse(url="/", status_code=303)
 
 
 @app.post("/login", include_in_schema=False)
-async def login(request: Request, response: Response, email: str = Form(...)):
-    # Use a static password for simplicity (not recommended for production)
-    password = "notapplicable"
-    # Initialize the Supabase client
-    supabase = create_supabase_client()
-
+async def login(_: Request, __: Response, email: str = Form(None)):
     if not email:
         return JSONResponse(
-            content={"message": "Email is required"},
+            content={"message": "Direct login is disabled. Please authenticate with Cognito SSO."},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    with open(UDAT_FILE, "r+") as f:
-        user_data = json.load(f)
-        if email not in user_data:
-            # The email is not in udat.json, attempt to sign up the user
-            auth_response = supabase.auth.sign_up(
-                {"email": email, "password": password}
-            )
-            if "error" in auth_response and auth_response["error"]:
-                # Handle signup error
-                return JSONResponse(
-                    content={"message": auth_response["error"]["message"]},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-            else:
-                pass  # set below via proc_udat
-        else:
-            # The email exists in udat.json, attempt to sign in the user
-            auth_response = supabase.auth.sign_in_with_password(
-                {"email": email, "password": password}
-            )
-            if "error" in auth_response and auth_response["error"]:
-                # Handle sign-in error
-                return JSONResponse(
-                    content={"message": auth_response["error"]["message"]},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-
-    # Set session cookie after successful authentication, with a 60-minute expiration
-    response.set_cookie(
-        key="session", value="user_session_token", httponly=True, max_age=3600, path="/"
+    return JSONResponse(
+        content={"message": "Direct login is disabled. Please authenticate with Cognito SSO."},
+        status_code=status.HTTP_400_BAD_REQUEST,
     )
-    request.session["user_data"] = proc_udat(email)
-    # Redirect to the root path ("/") after successful login/signup
-    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    # Add this line at the end of the /login endpoint
 
 
 @app.get(
@@ -512,25 +502,11 @@ async def logout(request: Request, response: Response):
     try:
         logging.warning(f"Logging out user: Clearing session data:  {request.session}")
 
-        # Initialize the Supabase client
-        supabase = create_supabase_client()
-
-        # Get the user's access token
-        access_token = request.session.get("user_data", {}).get("access_token")
-        if access_token:
-            # Call the Supabase sign-out endpoint
-            headers = {"Authorization": f"Bearer {access_token}"}
-            async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
-                logging.debug(f"Logging out user: Calling Supabase logout endpoint")
-                logging.debug(f"Supabase URL: {os.environ.get('SUPABASE_URL')}")
-
-                response = await client.post(
-                    os.environ.get("SUPABASE_URL", "NA") + "/auth/v1/logout",
-                    headers=headers,
-                )
-                logging.debug(f"Logging out user: Supabase logout response: {response}")
-                if response.status_code != 204:
-                    logging.error("Failed to log out from Supabase")
+        cognito_logout_url = "/"
+        try:
+            cognito_logout_url = get_cognito_auth().config.logout_url
+        except CognitoConfigurationError as exc:
+            logging.error(f"Cognito configuration missing during logout: {exc}")
 
         # Clear the session data
         request.session.clear()
@@ -550,7 +526,7 @@ async def logout(request: Request, response: Response):
         )
 
     # Redirect to the homepage
-    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
 #
@@ -1696,6 +1672,16 @@ async def user_home(request: Request):
     fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()
     zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()
 
+    try:
+        cognito = get_cognito_auth()
+        cognito_details = {
+            "domain": cognito.config.domain,
+            "user_pool_id": cognito.config.user_pool_id,
+            "client_id": cognito.config.client_id,
+        }
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
+
     # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
     content = templates.get_template("user_home.html").render(
         request=request,
@@ -1704,9 +1690,9 @@ async def user_home(request: Request):
         css_files=css_files,
         style=style,
         dest_section=dest_section,
-        whitelisted_domains=" , ".join(os.environ.get("SUPABASE_WHITELIST_DOMAINS", "all").split(",")),
+        whitelisted_domains=" , ".join(get_allowed_domains()) or "all",
         s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
-        supabase_url=os.environ.get("SUPABASE_URL", "NEEDS TO BE SET!"),
+        cognito_details=cognito_details,
         printer_info=printer_info,
         bloom_version=bloom_version,
         fedex_version=fedex_version,

@@ -1,19 +1,6 @@
 <div style="width:90%; text-align:center; color:gray;">        
     <br>
-                <h3>Login Without Internet Connection or w/App Specific un/pw</h3>
-                    <small>This is effectively just a string with no auth.<br> 
-                        For dev purposes, if exposed, crude local user/pass mgmt could be added.<br>
-                        I bet the supabase library handles this in fact *CHECK*</small>
+                <h3>Single Sign-On Required</h3>
+                    <small>Direct login is disabled. Please authenticate through the Cognito SSO flow.</small>
                         <br>
-               <br><ul>
-                    <form method="post" action="/login" onsubmit="return validateFormNoNetwork()">
-                        <label for="emailwithoutnetwork">Email:</label>
-                        <input type="text" id="emailwithoutnetwork" name="email">
-                        <br>
-                        <label for="pwd">no p/w needed</label> 
-                        <input value='notapplicable' type="hidden" id="password" name="password">
-                        <br>
-                        <input type="submit" value="Login">
-                    </form>
-            </ul>
         </div>  

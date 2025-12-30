@@ -51,24 +51,13 @@
         }
     }
 
-    function handleGitHubLogin() {
+    function handleCognitoLogin() {
         try {
-            window.location.href = 'https://kslpzwcmkyrbxqmlhgln.supabase.co/auth/v1/authorize?provider=github&scope=user:email&prompt=select_account';
+            window.location.href = '{{ cognito_authorize_url }}';
         } catch (error) {
-            console.error("GitHub login error:", error);
-            alert('An error occurred while attempting to log in with GitHub. Please try again.');
+            console.error("Cognito login error:", error);
+            alert('An error occurred while attempting to log in with Cognito. Please try again.');
         }
-    }
-    
-    function handleGoogleLogin() {
-
-        try {
-            // Update the Supabase authentication URL with your correct IP address and port
-            window.location.href = '{{ supabase_url }}/auth/v1/authorize?provider=google&userinfo.email&prompt=select_account'; // Replace with your actual IP and port
-        } catch (error) {
-            console.error("Google login error:", error);
-            alert('An error occurred while attempting to log in with Google. Please try again.');
-      }
     }
 </script>
 
@@ -80,7 +69,7 @@
                 
         <div style="width:90%; text-align:center;">
             <br><br>
-        <button onclick="handleGoogleLogin()">Login with Google</button>
+        <button onclick="handleCognitoLogin()">Login with Cognito</button>
 
         </div>
 <br><br>

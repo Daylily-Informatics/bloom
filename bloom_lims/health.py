@@ -14,7 +14,6 @@ Usage:
 """
 
 import logging
-import os
 import platform
 import psutil
 from datetime import datetime
@@ -110,44 +109,52 @@ async def check_database_health() -> ComponentHealth:
         )
 
 
-async def check_supabase_health() -> ComponentHealth:
-    """Check Supabase connectivity."""
+async def check_cognito_health() -> ComponentHealth:
+    """Check Cognito connectivity by resolving JWKS metadata."""
     import time
     start = time.time()
     
     settings = get_settings()
-    if not settings.auth.supabase_url:
+    if not (
+        settings.auth.cognito_user_pool_id
+        and settings.auth.cognito_region
+        and settings.auth.cognito_domain
+    ):
         return ComponentHealth(
-            name="supabase",
+            name="cognito",
             status="degraded",
-            message="Supabase not configured",
+            message="Cognito not configured",
         )
     
     try:
         import httpx
+        jwks_url = (
+            f"https://cognito-idp.{settings.auth.cognito_region}.amazonaws.com/"
+            f"{settings.auth.cognito_user_pool_id}/.well-known/jwks.json"
+        )
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{settings.auth.supabase_url}/health")
+            response = await client.get(jwks_url)
             latency = (time.time() - start) * 1000
             
             if response.status_code == 200:
                 return ComponentHealth(
-                    name="supabase",
+                    name="cognito",
                     status="healthy",
                     latency_ms=round(latency, 2),
-                    message="Supabase connection successful",
+                    message="Cognito JWKS reachable",
                 )
             else:
                 return ComponentHealth(
-                    name="supabase",
+                    name="cognito",
                     status="degraded",
                     latency_ms=round(latency, 2),
-                    message=f"Supabase returned status {response.status_code}",
+                    message=f"Cognito JWKS returned status {response.status_code}",
                 )
     except Exception as e:
         latency = (time.time() - start) * 1000
-        logger.warning(f"Supabase health check failed: {e}")
+        logger.warning(f"Cognito health check failed: {e}")
         return ComponentHealth(
-            name="supabase",
+            name="cognito",
             status="degraded",
             latency_ms=round(latency, 2),
             message=str(e),
@@ -192,8 +199,8 @@ async def health_check() -> HealthResponse:
     db_health = await check_database_health()
     components.append(db_health)
 
-    supabase_health = await check_supabase_health()
-    components.append(supabase_health)
+    cognito_health = await check_cognito_health()
+    components.append(cognito_health)
 
     # Determine overall status
     statuses = [c.status for c in components]
@@ -280,4 +287,3 @@ async def metrics() -> Dict[str, Any]:
         "environment": settings.environment,
         "system": get_system_info(),
     }
-

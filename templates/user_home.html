@@ -120,8 +120,16 @@
             <hr>
             <ul>
                 <div class="label-value">
-                    <strong>Supabase URL:</strong>
-                    <span class="value-box">{{ supabase_url }}</span>
+                    <strong>Cognito Domain:</strong>
+                    <span class="value-box">{{ cognito_details.domain }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Cognito User Pool:</strong>
+                    <span class="value-box">{{ cognito_details.user_pool_id }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Cognito Client Id:</strong>
+                    <span class="value-box">{{ cognito_details.client_id }}</span>
                 </div>
                 <div class="label-value">
                     <strong>Whitelisted Domains:</strong>
