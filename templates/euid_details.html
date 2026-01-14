@@ -137,12 +137,15 @@
 
     <div class="collapsible-buttons">
         <button type="button" class="collapsiblex" data-target="relationshipsContent">Relationships</button>
+        {% if subjects_for_object %}
+        <button type="button" class="collapsiblex" data-target="subjectsContent">Subjects ({{ subjects_for_object|length }})</button>
+        {% endif %}
         <button style="display:none;" type="button" class="collapsiblex" data-target="dynamicFieldsContent">Dynamic Fields</button>
         <button type="button" class="collapsiblex" data-target="actionGroupsContent">Action Groups</button>
         <button type="button" class="collapsiblex" data-target="auditLogContent">Audit Log</button>
         <button type="button" class="collapsiblex" data-target="fullEditContent">Edit Obj Properties (admin)</button>
         {% if object.parent_template_euid %}
-            
+
         {% else %}
             <button type="button" class="collapsiblex" data-target="fullEditContentTemplate">Edit Template Form Properties (super admin)</button>
         {% endif %}
@@ -252,6 +255,41 @@
             {% endfor %}
         </table>
     </div>
+
+    {% if subjects_for_object %}
+    <div id="subjectsContent" class="content" style="display:none;">
+        <h2>Subjects (Decision Scopes)</h2>
+        <p><em>This object is part of the following subjects:</em></p>
+        <table class="searchable">
+            <tr>
+                <th>Subject EUID</th>
+                <th>Kind</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Subject Key</th>
+                <th>Name</th>
+            </tr>
+            {% for subject in subjects_for_object %}
+            <tr>
+                <td><a href="euid_details?euid={{ subject.euid }}">{{ subject.euid }}</a></td>
+                <td>{{ subject.kind }}</td>
+                <td>
+                    {% if subject.role == 'anchor' %}
+                        <span style="color: #007BFF; font-weight: bold;">⚓ Anchor</span>
+                    {% elif subject.role == 'member' %}
+                        <span style="color: #28a745;">📎 Member</span>
+                    {% else %}
+                        {{ subject.role }}
+                    {% endif %}
+                </td>
+                <td>{{ subject.status }}</td>
+                <td><code>{{ subject.subject_key }}</code></td>
+                <td>{{ subject.name }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
 
     <div id="dynamicFieldsContent" class="content" style="display:none;">
         <div class="dynamic-fields">

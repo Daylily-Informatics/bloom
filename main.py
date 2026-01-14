@@ -1347,10 +1347,14 @@ async def euid_details(
             for column in obj.__table__.columns
             if hasattr(obj, column.key)
         }
-        obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""  
+        obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""
         audit_logs = bobdb.query_audit_log_by_euid(euid)
         user_data = request.session.get("user_data", {})
         style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+
+        # Get subjects for this object
+        from bloom_lims.subjecting import list_subjects_for_object
+        subjects_for_object = list_subjects_for_object(bobdb, euid)
 
         content = templates.get_template("euid_details.html").render(
             request=request,
@@ -1362,6 +1366,7 @@ async def euid_details(
             audit_logs=audit_logs,
             oobj=obj,
             udat=request.session["user_data"],
+            subjects_for_object=subjects_for_object,
         )
         return HTMLResponse(content=content)
 

@@ -77,5 +77,29 @@
         "description": "Add Parent or Child Relationships (aka lineages)."
       }
     }
+  },
+  "create-subject-and-anchor": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Create Subject (Decision Scope)",
+        "method_name": "do_action_create_subject_and_anchor",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_subject_kind": "Subject Kind: <select required name=&quot;subject_kind&quot;><option value=&quot;accession&quot;>Accession</option><option value=&quot;analysis_bundle&quot;>Analysis Bundle</option><option value=&quot;report&quot;>Report</option><option value=&quot;generic&quot;>Generic</option></select>",
+          "_subject_name": "Subject Name (optional): <input type=&quot;text&quot; name=&quot;subject_name&quot; value=&quot;&quot;/>",
+          "_comments": "Comments: <textarea name=&quot;comments&quot;></textarea>"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "curr_user": "",
+        "description": "Create a Subject (decision scope) with this object as the anchor."
+      }
+    }
   }
 }

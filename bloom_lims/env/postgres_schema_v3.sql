@@ -119,6 +119,7 @@ CREATE SEQUENCE fx_instance_seq;
 CREATE SEQUENCE fi_instance_seq;
 CREATE SEQUENCE fs_instance_seq;
 CREATE SEQUENCE ev_instance_seq;
+CREATE SEQUENCE sx_instance_seq;
 
 CREATE TABLE generic_instance (
     uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,6 +189,7 @@ BEGIN
             WHEN prefix = 'FI' THEN nextval('fi_instance_seq')
             WHEN prefix = 'FS' THEN nextval('fs_instance_seq')
             WHEN prefix = 'EV' THEN nextval('ev_instance_seq')
+            WHEN prefix = 'SX' THEN nextval('sx_instance_seq')
 
             -- Add more cases for other prefixes
             ELSE nextval('generic_instance_seq') -- Default sequence

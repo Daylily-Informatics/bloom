@@ -573,6 +573,22 @@ class file_instance_lineage(generic_instance_lineage):
     }
 
 
+class subject_template(generic_template):
+    __mapper_args__ = {
+        "polymorphic_identity": "subject_template",
+    }
+
+class subject_instance(generic_instance):
+    __mapper_args__ = {
+        "polymorphic_identity": "subject_instance",
+    }
+
+class subject_instance_lineage(generic_instance_lineage):
+    __mapper_args__ = {
+        "polymorphic_identity": "subject_instance_lineage",
+    }
+
+
 class BLOOMdb3:
     """
     BLOOM LIMS Database Connection Manager.
@@ -729,6 +745,9 @@ class BLOOMdb3:
             health_event_template,
             health_event_instance,
             health_event_instance_lineage,
+            subject_template,
+            subject_instance,
+            subject_instance_lineage,
         ]
         for cls in classes_to_register:
             class_name = cls.__name__
