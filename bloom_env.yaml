@@ -1,3 +1,21 @@
+# =============================================================================
+# BLOOM LIMS Conda Environment Definition
+# =============================================================================
+# Environment Name: BLOOM (all caps - this is intentional!)
+#
+# Setup:
+#   conda env create -f bloom_env.yaml
+#   conda activate BLOOM
+#
+# Update existing environment:
+#   conda env update -f bloom_env.yaml --prune
+#
+# NOTE: This project uses CONDA for environment management, NOT pip/poetry/venv.
+#       See pyproject.toml [tool.bloom] section for more configuration details.
+# =============================================================================
+
+name: BLOOM
+
 channels:
   - conda-forge
 dependencies:

@@ -114,6 +114,7 @@ from bloom_lims.bobjs import (
 )
 
 from bloom_lims.bvars import BloomVars
+from bloom_lims.api import api_v1_router, RateLimitMiddleware
 
 BVARS = BloomVars()
 BASE_DIR = Path("./served_data").resolve()  # Base directory for serving files
@@ -153,6 +154,12 @@ app.add_middleware(
 )
 
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
+
+# Add rate limiting middleware for API endpoints
+app.add_middleware(RateLimitMiddleware)
+
+# Include API v1 router
+app.include_router(api_v1_router)
 
 # Serve static files
 cookie_scheme = APIKeyCookie(name="session")

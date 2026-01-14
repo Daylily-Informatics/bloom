@@ -166,6 +166,63 @@ def clean_cache():
     cache_clear()
 
 
+# API Test Fixtures
+@pytest.fixture(scope="function")
+def api_client():
+    """
+    FastAPI test client fixture.
+
+    Creates a test client for the BLOOM LIMS API.
+
+    Yields:
+        TestClient: FastAPI test client
+    """
+    from fastapi.testclient import TestClient
+    from bloom_lims.main import app
+
+    return TestClient(app)
+
+
+@pytest.fixture(scope="function")
+def authenticated_api_client(api_client):
+    """
+    Authenticated API client fixture.
+
+    Creates a test client with mock authentication headers.
+
+    Args:
+        api_client: Base API client fixture
+
+    Yields:
+        TestClient: Authenticated FastAPI test client
+    """
+    # Add mock auth header
+    api_client.headers["X-API-Key"] = "test-api-key"
+    return api_client
+
+
+@pytest.fixture(scope="function")
+def mock_api_auth():
+    """
+    Mock API authentication for testing.
+
+    Patches the require_api_auth dependency to return a test user.
+
+    Yields:
+        MagicMock: Mock user object
+    """
+    from bloom_lims.api.v1.dependencies import APIUser
+
+    mock_user = APIUser(
+        user_id="test-user-id",
+        email="test@example.com",
+        roles=["admin"],
+    )
+
+    with patch("bloom_lims.api.v1.dependencies.require_api_auth", return_value=mock_user):
+        yield mock_user
+
+
 # Test markers
 def pytest_collection_modifyitems(config, items):
     """Add markers to tests based on their location."""
@@ -173,8 +230,12 @@ def pytest_collection_modifyitems(config, items):
         # Mark integration tests
         if "integration" in str(item.fspath):
             item.add_marker(pytest.mark.integration)
-        
+
         # Mark slow tests
         if "slow" in item.name.lower():
             item.add_marker(pytest.mark.slow)
+
+        # Mark API tests
+        if "api" in str(item.fspath) or "api" in item.name.lower():
+            item.add_marker(pytest.mark.api)
 
