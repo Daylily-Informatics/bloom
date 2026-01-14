@@ -1039,6 +1039,8 @@ class BloomObj:
             r = self.do_action_remove_file_from_file_set(euid, action_ds)
         elif action_method == "do_action_add_relationships":
             r = self.do_action_add_relationships(euid, action_ds)
+        elif action_method == "do_action_create_subject_and_anchor":
+            r = self.do_action_create_subject_and_anchor(euid, action_ds)
         else:
             raise Exception(f"Unknown do_action method {action_method}")
 
@@ -1084,6 +1086,47 @@ class BloomObj:
                     )
 
         return euid_obj
+
+    def do_action_create_subject_and_anchor(self, euid, action_ds):
+        """
+        Create a Subject (decision scope) with the given object as the anchor.
+
+        Args:
+            euid: EUID of the object to use as anchor
+            action_ds: Action data structure with captured_data containing:
+                - subject_kind: Type of subject (accession, analysis_bundle, report, generic)
+                - subject_name: Optional name for the subject
+                - comments: Optional comments
+
+        Returns:
+            The created subject EUID, or None if creation failed
+        """
+        from bloom_lims.subjecting import create_subject
+
+        captured = action_ds.get("captured_data", {})
+        subject_kind = captured.get("subject_kind", "generic")
+        subject_name = captured.get("subject_name", "")
+        comments = captured.get("comments", "")
+
+        extra_props = {}
+        if subject_name:
+            extra_props["name"] = subject_name
+        if comments:
+            extra_props["comments"] = comments
+
+        subject_euid = create_subject(
+            bob=self,
+            anchor_euid=euid,
+            subject_kind=subject_kind,
+            extra_props=extra_props,
+        )
+
+        if subject_euid:
+            self.logger.info(f"Created subject {subject_euid} for anchor {euid}")
+        else:
+            self.logger.error(f"Failed to create subject for anchor {euid}")
+
+        return subject_euid
 
     def ret_plate_wells_dict(self, plate):
         plate_wells = {}

@@ -16,22 +16,23 @@ Built from first principles and drawing upon 30 years experience scaling laborat
 4. [Installation](#installation)
 5. [System Architecture](#system-architecture)
 6. [Core Data Model](#core-data-model)
-7. [Database Schema](#database-schema)
-8. [Object Hierarchy](#object-hierarchy)
-9. [Template System](#template-system)
-10. [Workflow Engine](#workflow-engine)
-11. [Action System](#action-system)
-12. [File Management](#file-management)
-13. [API Layer](#api-layer)
-14. [Web Interface](#web-interface)
-15. [External Integrations](#external-integrations)
-16. [Configuration](#configuration)
-17. [Deployment](#deployment)
-18. [Testing](#testing)
-19. [Regulatory & Compliance](#regulatory--compliance)
-20. [Design Principles](#design-principles)
-21. [Dev Tools](#dev-tools)
-22. [Support, Authors & License](#support)
+7. [Subjects vs Objects](#subjects-vs-objects)
+8. [Database Schema](#database-schema)
+9. [Object Hierarchy](#object-hierarchy)
+10. [Template System](#template-system)
+11. [Workflow Engine](#workflow-engine)
+12. [Action System](#action-system)
+13. [File Management](#file-management)
+14. [API Layer](#api-layer)
+15. [Web Interface](#web-interface)
+16. [External Integrations](#external-integrations)
+17. [Configuration](#configuration)
+18. [Deployment](#deployment)
+19. [Testing](#testing)
+20. [Regulatory & Compliance](#regulatory--compliance)
+21. [Design Principles](#design-principles)
+22. [Dev Tools](#dev-tools)
+23. [Support, Authors & License](#support)
 
 ---
 
@@ -298,6 +299,74 @@ super_type / btype / b_sub_type / version
 | `template_uuid` | `NULL` | Points to template |
 | Purpose | Define structure | Represent real objects |
 | `json_addl` | Contains `instantiation_layouts` | Contains `properties`, `actions` |
+
+---
+
+## 3.4 Subjects vs Objects
+
+BLOOM distinguishes between **Objects** (facts) and **Subjects** (decision scopes):
+
+### Objects (Facts)
+Objects represent concrete, immutable facts about the laboratory:
+- A tube exists with EUID `CX123`
+- A sample was collected on 2024-01-15
+- A sequencing run produced file `run_001.fastq`
+
+Objects are the physical or digital entities that exist in the laboratory.
+
+### Subjects (Decision Scopes)
+Subjects are logical aggregates that decisions apply to. They span multiple objects and provide context for:
+- Clinical decisions (e.g., "this accession is reportable")
+- Workflow decisions (e.g., "this analysis bundle passed QC")
+- Regulatory decisions (e.g., "this report was signed out")
+
+### Subject Types
+
+| Subject Kind | Description | Example Use Case |
+|--------------|-------------|------------------|
+| `accession` | Decision scope for an accession/intake bundle | Clinical reporting decisions |
+| `analysis_bundle` | Decision scope for analysis result bundles | QC pass/fail decisions |
+| `report` | Decision scope for clinical reportable units | Sign-out decisions |
+| `generic` | Fallback for custom use cases | Custom workflows |
+
+### Subject Relationships
+
+```mermaid
+graph LR
+    S[Subject SX1] -->|subject_anchor| A[Accession CX123]
+    S -->|subject_member| T1[Tube CX124]
+    S -->|subject_member| T2[Tube CX125]
+    S -->|subject_member| F[FileSet FX456]
+```
+
+- **Anchor**: The primary object that defines the subject (one per subject)
+- **Members**: Additional objects associated with the subject (many per subject)
+
+### Using Subjects
+
+```python
+from bloom_lims.subjecting import create_subject, add_subject_members, list_subjects_for_object
+
+# Create a subject with an anchor
+subject_euid = create_subject(
+    bob=bloom_obj,
+    anchor_euid="CX123",
+    subject_kind="accession",
+)
+
+# Add member objects
+add_subject_members(bob, subject_euid, ["CX124", "CX125", "FX456"])
+
+# Find all subjects containing an object
+subjects = list_subjects_for_object(bob, "CX123")
+```
+
+### Key Design Principles
+
+1. **Idempotency**: Creating a subject with the same anchor and kind returns the existing subject
+2. **Stable Keys**: Subject keys are deterministic: `{subject_kind}:{anchor_euid}`
+3. **Separation of Concerns**: Objects store facts; Subjects store decision context
+4. **Audit Trail**: All subject relationships are tracked via lineage records
 
 ---
 

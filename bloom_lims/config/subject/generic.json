@@ -1,0 +1,187 @@
+{
+  "accession-subject": {
+    "1.0": {
+      "description": "Decision scope for an accession (ACC / TRX / intake bundle).",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "accession",
+        "subject_key": "",
+        "anchor_euid": "",
+        "status": "active"
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["accession"]},
+        "status": {"type": "string", "enum": ["active", "retired"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "inactive",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "analysis-bundle-subject": {
+    "1.0": {
+      "description": "Decision scope for analysis result bundles.",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "analysis_bundle",
+        "subject_key": "",
+        "anchor_euid": "",
+        "status": "active"
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["analysis_bundle"]},
+        "status": {"type": "string", "enum": ["active", "retired"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "inactive",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "report-subject": {
+    "1.0": {
+      "description": "Decision scope for clinical reportable units.",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "report",
+        "subject_key": "",
+        "anchor_euid": "",
+        "status": "active"
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["report"]},
+        "status": {"type": "string", "enum": ["active", "retired"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "inactive",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "generic-subject": {
+    "1.0": {
+      "description": "Fallback decision scope for custom use cases.",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "generic",
+        "subject_key": "",
+        "anchor_euid": "",
+        "status": "active"
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["generic", "accession", "analysis_bundle", "report"]},
+        "status": {"type": "string", "enum": ["active", "retired"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "inactive",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  }
+}
+
