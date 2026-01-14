@@ -49,7 +49,7 @@
               "json_addl": {
                 "description": "In Progress / Active  WorkSets",
                 "properties": {
-                  "name":"In Propgress / Active WorkSets",
+                  "name":"In Progress / Active WorkSets",
                   "comments": "",
                   "step_number": "2",
                   "lab_code":""
@@ -141,7 +141,7 @@
               "json_addl": {
                 "description": "In Progress / Active  WorkSets",
                 "properties": {
-                  "name":"In Propgress / Active WorkSets",
+                  "name":"In Progress / Active WorkSets",
                   "comments": "",
                   "step_number": "2",
                   "lab_code":""
@@ -226,7 +226,7 @@
               "json_addl": {
                 "description": "In Progress Prod Accessioning  WorkSets",
                 "properties": {
-                  "name":"In Propgress Prod Accessioning WorkSets",
+                  "name":"In Progress Prod Accessioning WorkSets",
                   "comments": "",
                   "step_number": "1",
                   "lab_code":""
@@ -327,7 +327,7 @@
               "json_addl": {
                 "description": "In Progress RnD Accessioning  WorkSets",
                 "properties": {
-                  "name":"In Propgress RnD Accessioning WorkSets",
+                  "name":"In Progress RnD Accessioning WorkSets",
                   "comments": "",
                   "step_number": "1",
                   "lab_code":""

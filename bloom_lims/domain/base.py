@@ -534,6 +534,8 @@ class BloomObj:
         Returns:
             [] : Array of rows
         """
+        if euid is None:
+            raise Exception("euid cannot be None")
         res = (
             self.session.query(self.Base.classes.generic_instance)
             .filter(
@@ -870,62 +872,77 @@ class BloomObj:
         return euid_transit_time_tuples
 
     def fetch_graph_data_by_node_depth(self, start_euid, depth):
-        # SQL query with placeholders for parameters
+        """
+        Fetch graph data for a node and its neighbors up to a specified depth.
+
+        Uses parameterized queries to prevent SQL injection attacks.
+
+        Args:
+            start_euid: The EUID of the starting node
+            depth: Maximum depth to traverse from the starting node
+
+        Returns:
+            Query result containing node and edge data
+        """
+        # SQL query with parameterized placeholders for security
         query = text(
-            f"""WITH RECURSIVE graph_data AS (
-                SELECT 
-                    gi.euid, 
-                    gi.uuid, 
-                    gi.name, 
-                    gi.btype, 
-                    gi.super_type, 
-                    gi.b_sub_type, 
-                    gi.version, 
+            """WITH RECURSIVE graph_data AS (
+                SELECT
+                    gi.euid,
+                    gi.uuid,
+                    gi.name,
+                    gi.btype,
+                    gi.super_type,
+                    gi.b_sub_type,
+                    gi.version,
                     0 AS depth,
                     NULL::text AS lineage_euid,
                     NULL::text AS lineage_parent_euid,
                     NULL::text AS lineage_child_euid,
                     NULL::text AS relationship_type
-                FROM 
+                FROM
                     generic_instance gi
-                WHERE 
-                    gi.euid = '{start_euid}' AND gi.is_deleted = FALSE
+                WHERE
+                    gi.euid = :start_euid AND gi.is_deleted = FALSE
 
                 UNION
 
-                SELECT 
-                    gi.euid, 
-                    gi.uuid, 
-                    gi.name, 
-                    gi.btype, 
-                    gi.super_type, 
-                    gi.b_sub_type, 
-                    gi.version, 
+                SELECT
+                    gi.euid,
+                    gi.uuid,
+                    gi.name,
+                    gi.btype,
+                    gi.super_type,
+                    gi.b_sub_type,
+                    gi.version,
                     gd.depth + 1,
                     gil.euid AS lineage_euid,
                     parent_instance.euid AS lineage_parent_euid,
                     child_instance.euid as lineage_child_euid,
                     gil.relationship_type
-                FROM 
+                FROM
                     generic_instance_lineage gil
-                JOIN 
+                JOIN
                     generic_instance gi ON gi.uuid = gil.child_instance_uuid OR gi.uuid = gil.parent_instance_uuid
-                JOIN 
+                JOIN
                     generic_instance parent_instance ON gil.parent_instance_uuid = parent_instance.uuid
-                JOIN 
+                JOIN
                     generic_instance child_instance ON gil.child_instance_uuid = child_instance.uuid
-                JOIN 
-                    graph_data gd ON (gil.parent_instance_uuid = gd.uuid AND gi.uuid = gil.child_instance_uuid) OR 
+                JOIN
+                    graph_data gd ON (gil.parent_instance_uuid = gd.uuid AND gi.uuid = gil.child_instance_uuid) OR
                                     (gil.child_instance_uuid = gd.uuid AND gi.uuid = gil.parent_instance_uuid)
-                WHERE 
-                    gi.is_deleted = FALSE AND gd.depth < {depth}
+                WHERE
+                    gi.is_deleted = FALSE AND gil.is_deleted = FALSE AND gd.depth < :depth
             )
             SELECT DISTINCT * FROM graph_data;
         """
         )
 
-        # Execute the query
-        result = self.session.execute(query)
+        # Execute the query with bound parameters (prevents SQL injection)
+        result = self.session.execute(
+            query,
+            {"start_euid": str(start_euid), "depth": int(depth)}
+        )
         return result
 
     def create_instance_by_template_components(
@@ -1179,16 +1196,31 @@ class BloomObj:
         wfset = self.get_by_euid(euid)
         action_ds["captured_data"]["q_selection"]
 
+        # Filter to only get active (non-deleted) lineages
+        active_child_of_lineages = [lin for lin in wfset.child_of_lineages if not lin.is_deleted]
+
         # EXTRAORDINARILY SLOPPY.  I AM IN A REAL RUSH FOR FEATURES THO :-/
         destination_q = ""
         (super_type, btype, b_sub_type, version) = (
             action_ds["captured_data"]["q_selection"].lstrip("/").rstrip("/").split("/")
         )
-        for q in (
-            wfset.child_of_lineages[0]
-            .parent_instance.child_of_lineages[0]
-            .parent_instance.parent_of_lineages
-        ):
+
+        if len(active_child_of_lineages) == 0:
+            self.logger.exception(f"ERROR: No active child_of_lineages for {euid}")
+            raise Exception(f"ERROR: No active child_of_lineages for workset {euid}")
+
+        # Get active lineages for traversal (filter out deleted ones)
+        current_lineage = active_child_of_lineages[0]
+        parent_active_lineages = [lin for lin in current_lineage.parent_instance.child_of_lineages if not lin.is_deleted]
+
+        if len(parent_active_lineages) == 0:
+            self.logger.exception(f"ERROR: No active parent lineages found")
+            raise Exception(f"ERROR: No active parent lineages found for queue traversal")
+
+        parent_of_parent = parent_active_lineages[0].parent_instance
+        for q in parent_of_parent.parent_of_lineages:
+            if q.is_deleted:
+                continue
             if (
                 q.child_instance.btype == btype
                 and q.child_instance.b_sub_type == b_sub_type
@@ -1196,12 +1228,11 @@ class BloomObj:
                 destination_q = q.child_instance
                 break
 
-        if len(wfset.child_of_lineages.all()) != 1 or destination_q == "":
-            self.logger.exception(f"ERROR: {action_ds['captured_data']['q_selection']}")
-            self.logger.exception(f"ERROR: {action_ds['captured_data']['q_selection']}")
+        if len(active_child_of_lineages) != 1 or destination_q == "":
+            self.logger.exception(f"ERROR: {action_ds['captured_data']['q_selection']} - active lineages: {len(active_child_of_lineages)}, destination_q found: {destination_q != ''}")
             raise Exception(f"ERROR: {action_ds['captured_data']['q_selection']}")
 
-        lineage_link = wfset.child_of_lineages[0]
+        lineage_link = active_child_of_lineages[0]
         self.create_generic_instance_lineage_by_euids(destination_q.euid, wfset.euid)
         self.delete_obj(lineage_link)
         ##self.session.flush()
