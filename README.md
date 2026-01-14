@@ -1204,6 +1204,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 bloom_lims.bkend.bkend:app
 _see build test badges above for all supported platforms_
 * Mac (14+)
   * `brew install coreutils` is required for the `gtimeout` command for some rclone functionality. Run `alias timeout=gtimeout` to use the gtimeout w/zsh.
+  * `brew install mkcert` is required for the `mkcert` command to create a local certificate authority for testing with https.
 * Ubuntu 22+
 * Centos 9
 
@@ -1233,6 +1234,24 @@ _see build test badges above for all supported platforms_
 ~/miniconda3/bin/conda init
 bash  # newly created shells should not auto load the conda (base) env.
 ```
+
+#### https certificates
+
+##### local development
+```bash
+
+# Create local CA (one-time)
+mkcert -install
+
+# Generate cert for localhost
+mkdir -p certs
+mkcert -key-file certs/key.pem -cert-file certs/cert.pem localhost 127.0.0.1
+
+```
+
+##### production server
+
+* [Please follow the instructions here](bloom_lims/docs/https.md).
 
 #### Cognito
 * [Please follow the Cognito configuration instructions here](bloom_lims/docs/cognito.md).
