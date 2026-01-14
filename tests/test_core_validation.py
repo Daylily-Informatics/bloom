@@ -19,43 +19,57 @@ from bloom_lims.core.validation import (
 
 
 class TestValidateEuid:
-    """Tests for validate_euid function."""
-    
+    """Tests for validate_euid function.
+
+    BLOOM EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
+    - PREFIX: 2-3 uppercase letters identifying object type (e.g., CX, WX, MRX)
+    - SEQUENCE_NUMBER: Integer with NO leading zeros
+
+    Valid examples: CX1, CX123, WX1000, MRX42, CWX5
+    """
+
     def test_valid_euid(self):
         """Test validation of valid EUIDs."""
-        assert validate_euid("WF_ABC123_X") is True
-        assert validate_euid("CT_SAMPLE01_Y") is True
-        assert validate_euid("EQ_DEVICE_Z") is True
-    
+        # Format: 2-3 letter prefix + sequence number (no leading zeros)
+        assert validate_euid("CX1") is True
+        assert validate_euid("CX123") is True
+        assert validate_euid("WX1000") is True
+        assert validate_euid("MRX42") is True
+        assert validate_euid("CWX5") is True
+
     def test_none_euid(self):
         """Test that None raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             validate_euid(None)
         assert "cannot be None" in str(exc_info.value)
-    
+
     def test_empty_euid(self):
         """Test that empty string raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             validate_euid("")
         assert "cannot be empty" in str(exc_info.value)
-    
+
     def test_non_string_euid(self):
         """Test that non-string raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             validate_euid(12345)
         assert "must be a string" in str(exc_info.value)
-    
-    def test_no_underscore(self):
-        """Test that EUID without underscore raises ValidationError."""
+
+    def test_invalid_format_with_separator(self):
+        """Test that EUID with separators (underscore/hyphen) raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            validate_euid("WFABC123X")
-        assert "underscore" in str(exc_info.value)
-    
-    def test_lowercase_prefix(self):
-        """Test that lowercase prefix raises ValidationError."""
+            validate_euid("WF-123")
+        assert "PREFIX + sequence number" in str(exc_info.value)
+
         with pytest.raises(ValidationError) as exc_info:
-            validate_euid("wf_ABC123_X")
-        assert "uppercase" in str(exc_info.value)
+            validate_euid("WF_123")
+        assert "PREFIX + sequence number" in str(exc_info.value)
+
+    def test_invalid_format_with_leading_zero(self):
+        """Test that EUID with leading zero in sequence raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            validate_euid("CX01")
+        assert "No leading zeros" in str(exc_info.value)
 
 
 class TestValidateUuid:
@@ -104,33 +118,33 @@ class TestValidateJsonAddl:
 
 class TestValidatedDecorator:
     """Tests for @validated decorator."""
-    
+
     def test_valid_arguments(self):
         """Test that valid arguments pass through."""
         @validated(euid=validate_euid)
         def process(euid: str) -> str:
             return f"processed: {euid}"
-        
-        result = process("WF_ABC123_X")
-        assert result == "processed: WF_ABC123_X"
-    
+
+        result = process("WX123")
+        assert result == "processed: WX123"
+
     def test_invalid_argument_raises(self):
         """Test that invalid arguments raise ValidationError."""
         @validated(euid=validate_euid)
         def process(euid: str) -> str:
             return f"processed: {euid}"
-        
+
         with pytest.raises(ValidationError):
-            process("invalid")
-    
+            process("invalid-format")
+
     def test_multiple_validators(self):
         """Test multiple validators on different arguments."""
         @validated(euid=validate_euid, data=validate_json_addl)
         def process(euid: str, data: dict) -> dict:
             return {"euid": euid, "data": data}
-        
-        result = process("WF_ABC123_X", {"key": "value"})
-        assert result["euid"] == "WF_ABC123_X"
+
+        result = process("MRX42", {"key": "value"})
+        assert result["euid"] == "MRX42"
 
 
 class TestValidateSchema:

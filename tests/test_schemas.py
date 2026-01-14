@@ -27,13 +27,21 @@ class TestBaseSchemas:
         assert params_default.page_size == 50
     
     def test_euid_validation(self):
-        """Test EUID validation function."""
+        """Test EUID validation function.
+
+        BLOOM EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
+        - PREFIX: 2-3 uppercase letters (e.g., CX, WX, MRX)
+        - SEQUENCE_NUMBER: Integer with NO leading zeros
+
+        Valid examples: CX1, CX123, WX1000, MRX42
+        """
         from bloom_lims.schemas import validate_euid
 
-        # Valid EUIDs (format: PREFIX-IDENTIFIER or PREFIX-IDENTIFIER-SUFFIX)
-        assert validate_euid("BLM-123456") == "BLM-123456"
-        assert validate_euid("  BLM-123456  ") == "BLM-123456"
-        assert validate_euid("CONT-12345-A1") == "CONT-12345-A1"
+        # Valid EUIDs (format: PREFIX + sequence number)
+        assert validate_euid("CX1") == "CX1"
+        assert validate_euid("CX123") == "CX123"
+        assert validate_euid("  wx1000  ") == "WX1000"  # Should uppercase and strip
+        assert validate_euid("MRX42") == "MRX42"
 
         # Invalid EUIDs
         with pytest.raises(ValueError):
@@ -41,7 +49,9 @@ class TestBaseSchemas:
         with pytest.raises(ValueError):
             validate_euid("   ")
         with pytest.raises(ValueError):
-            validate_euid("INVALID")  # No hyphen
+            validate_euid("BLM-123456")  # Hyphens not allowed
+        with pytest.raises(ValueError):
+            validate_euid("CX01")  # Leading zeros not allowed
 
 
 class TestObjectSchemas:
@@ -83,7 +93,7 @@ class TestContainerSchemas:
             name="Test Plate",
             container_type="plate",
             b_sub_type="96-well",
-            template_euid="CONT-123456",
+            template_euid="CT123456",  # Valid EUID format: PREFIX + sequence number
         )
         assert data.name == "Test Plate"
         assert data.container_type == "plate"
@@ -139,7 +149,7 @@ class TestWorkflowSchemas:
         data = WorkflowCreateSchema(
             name="Test Workflow",
             workflow_type="sequencing",
-            template_euid="WF-123456",
+            template_euid="WF123456",  # Valid EUID format: PREFIX + sequence number
         )
         assert data.name == "Test Workflow"
     
