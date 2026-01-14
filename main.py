@@ -595,6 +595,9 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
         ay_dss[i]["tot_fx"] = 0
 
         for q in ay_ds[i].parent_of_lineages:
+            # Skip soft-deleted lineages
+            if q.is_deleted:
+                continue
             if show_type == "accessioning":
                 for fex_tup in bobdb.query_all_fedex_transit_times_by_ay_euid(
                     q.child_instance.euid
@@ -614,7 +617,8 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
                 wset = "exception"
             elif n.startswith("Ready"):
                 wset = "avail"
-            lins = q.child_instance.parent_of_lineages.all()
+            # Filter out soft-deleted lineages from count
+            lins = [lin for lin in q.child_instance.parent_of_lineages.all() if not lin.is_deleted]
             ay_dss[i][wset] = len(lins)
             lctr = 0
             lctr_max = 150
@@ -840,7 +844,9 @@ async def queue_details(
     queue = bobdb.get_by_euid(queue_euid)
     qm = []
     for i in queue.parent_of_lineages:
-        qm.append(i.child_instance)
+        # Filter out soft-deleted lineages
+        if not i.is_deleted:
+            qm.append(i.child_instance)
     queue_details = queue.sort_by_euid(qm)
     queue_details = queue_details[(page - 1) * per_page : page * per_page]
     pagination = {"next": page + 1, "prev": page - 1, "euid": queue_euid}
@@ -1025,11 +1031,33 @@ async def control_overview(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=content)
 
 
-@app.post("/create_from_template", response_class=HTMLResponse)
 @app.get("/create_from_template", response_class=HTMLResponse)
-async def create_from_template(
+async def create_from_template_get(
     request: Request, euid: str = None, _auth=Depends(require_auth)
 ):
+    """Handle GET requests with euid as query parameter."""
+    return await _create_from_template(request, euid)
+
+@app.post("/create_from_template", response_class=HTMLResponse)
+async def create_from_template_post(
+    request: Request, euid: str = Form(None), _auth=Depends(require_auth)
+):
+    """Handle POST requests with euid as form field."""
+    return await _create_from_template(request, euid)
+
+async def _create_from_template(request: Request, euid: str):
+    """Common logic for create_from_template."""
+    if euid is None:
+        user_data = request.session.get("user_data", {})
+        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        content = templates.get_template("search_error.html").render(
+            request=request,
+            error="Missing required 'euid' parameter for template creation",
+            style=style,
+            udat=user_data,
+        )
+        return HTMLResponse(content=content)
+
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     template = bobdb.create_instances(euid)
 
@@ -1096,11 +1124,15 @@ async def get_related_plates(request: Request, main_plate, _auth=Depends(require
 
     # Fetching ancestor plates through parent_of_lineages
     for parent_lineage in main_plate.parent_of_lineages:
+        if parent_lineage.is_deleted:
+            continue
         if parent_lineage.child_instance.btype == "plate":
             related_plates.append(parent_lineage.child_instance)
 
     # Fetching descendant plates through child_of_lineages
     for child_lineage in main_plate.child_of_lineages:
+        if child_lineage.is_deleted:
+            continue
         if child_lineage.parent_instance.btype == "plate":
             related_plates.append(child_lineage.parent_instance)
 
@@ -1112,6 +1144,8 @@ async def get_related_plates(request: Request, main_plate, _auth=Depends(require
         num_rows = 0
         num_cols = 0
         for lineage in plate.parent_of_lineages:
+            if lineage.is_deleted:
+                continue
             if (
                 lineage.parent_instance.euid == plate.euid
                 and lineage.child_instance.btype == "well"
@@ -1138,6 +1172,8 @@ async def plate_visualization(
     num_cols = 0
 
     for i in plate.parent_of_lineages:
+        if i.is_deleted:
+            continue
         if i.parent_instance.euid == plate.euid and i.child_instance.btype == "well":
             cd = i.child_instance.json_addl["cont_address"]
             if int(cd["row_idx"]) > num_rows:
@@ -1277,13 +1313,33 @@ async def euid_details(
     )
 
     try:
-    
+
         # Fetch the object using euid
-        obj = bobdb.get_by_euid(euid)
-        relationship_data =  get_relationship_data(obj) if obj else {}
+        obj = None
+        try:
+            obj = bobdb.get_by_euid(euid)
+        except Exception:
+            # get_by_euid raises exception when not found, try with is_deleted=True
+            pass
+
+        # If not found and we weren't already looking for deleted items, try again with is_deleted=True
+        if not obj and not is_deleted:
+            try:
+                bobdb_deleted = BloomObj(
+                    BLOOMdb3(app_username=request.session["user_data"]["email"]),
+                    is_deleted=True,
+                )
+                obj = bobdb_deleted.get_by_euid(euid)
+                if obj:
+                    # Found as soft-deleted - redirect with is_deleted=True for proper handling
+                    return RedirectResponse(url=f"/euid_details?euid={euid}&is_deleted=true", status_code=303)
+            except Exception:
+                pass
+
+        relationship_data = get_relationship_data(obj) if obj else {}
 
         if not obj:
-            raise HTTPException(status_code=404, detail="Object not found")
+            raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
 
         # Convert the SQLAlchemy object to a dictionary, checking for attribute existence
         obj_dict = {
@@ -1310,16 +1366,7 @@ async def euid_details(
         return HTMLResponse(content=content)
 
     except Exception as e:
-        #if not is_deleted:
-        #    # Retry with is_deleted set to True
-        #    return await euid_details(
-        #        request=request,
-        #        euid=euid,
-        #        _uuid=_uuid,
-        #        is_deleted=True,
-        #        _auth=_auth,
-        #    )
-        #else:
+        logging.error(f"Error in euid_details for {euid}: {e}", exc_info=True)
         raise e
 
 
@@ -1418,13 +1465,32 @@ async def delete_object(request: Request, _auth=Depends(require_auth)):
     data = await request.json()
     euid = data.get("euid")
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    bobdb.delete(bobdb.get_by_euid(euid))
-    bobdb.session.flush()
-    bobdb.session.commit()
-    return {
-        "status": "success",
-        "message": f"Delete object performed for EUID {euid}",
-    }
+    try:
+        obj = bobdb.get_by_euid(euid)
+        bobdb.delete(obj)
+        bobdb.session.flush()
+        bobdb.session.commit()
+        return {
+            "status": "success",
+            "message": f"Delete object performed for EUID {euid}",
+        }
+    except Exception as e:
+        # Object might already be deleted, try to find it in deleted items
+        try:
+            bobdb_deleted = BloomObj(
+                BLOOMdb3(app_username=request.session["user_data"]["email"]),
+                is_deleted=True,
+            )
+            obj = bobdb_deleted.get_by_euid(euid)
+            if obj and obj.is_deleted:
+                return {
+                    "status": "success",
+                    "message": f"Object {euid} was already soft-deleted",
+                }
+        except Exception:
+            pass
+        logging.error(f"Error deleting object {euid}: {e}")
+        raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
 
 
 @app.get("/workflow_details", response_class=HTMLResponse)
@@ -1725,16 +1791,20 @@ def generate_dag_json_from_all_objects_v2(
 
     # Check if DAG needs to be regenerated
     schema_mod_dt = request.session.get("schema_mod_dt")
+    existing_dag_fn = request.session.get("user_data", {}).get("dag_fnv2", "")
     if (
         schema_mod_dt != last_schema_edit_dt.changed_at.isoformat()
-        or not os.path.exists(output_file)
+        or not existing_dag_fn
+        or not os.path.exists(existing_dag_fn)
     ):
         print(
             f"Dag WILL BE Regenerated, Schema Has Changed. {output_file} being generated."
         )
     else:
-        print(f"Dag Not Regenerated, Schema Has Not Changed. {output_file} unchanged.")
-        return
+        print(f"Dag Not Regenerated, Schema Has Not Changed. {existing_dag_fn} unchanged.")
+        # Return existing DAG data from file
+        with open(existing_dag_fn, "r") as f:
+            return json.load(f)
 
     request.session["schema_mod_dt"] = last_schema_edit_dt.changed_at.isoformat()
     request.session["user_data"]["dag_fnv2"] = output_file
@@ -1847,6 +1917,8 @@ def generate_dag_json_from_all_objects_v2(
 
     print(f"All DAG JSON saved to {output_file}")
 
+    return dag_json
+
 
 def get_dag(request: Request, _auth=Depends(require_auth)):
     dag_fn = request.session["user_data"]["dag_fn"]
@@ -1861,10 +1933,9 @@ def get_dag(request: Request, _auth=Depends(require_auth)):
 async def get_dagv2(
     request: Request, _euid="AY1", _depth=6, _auth=Depends(require_auth)
 ):
-    dag_fn = request.session["user_data"]["dag_fnv2"]
-    # dag_fn = "./dags/j.json"
+    dag_fn = request.session.get("user_data", {}).get("dag_fnv2", "")
     dag_data = {"elements": {"nodes": [], "edges": []}}
-    if os.path.exists(dag_fn):
+    if dag_fn and os.path.exists(dag_fn):
         with open(dag_fn, "r") as f:
             dag_data = json.load(f)
     return dag_data
@@ -1913,11 +1984,29 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
     edge_euid = input_data["euid"]
 
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    bobdb.delete(bobdb.get_by_euid(edge_euid))
-    bobdb.session.flush()
-    bobdb.session.commit()
-
-    return {"status": "success", "message": "Edge deleted successfully."}
+    try:
+        edge = bobdb.get_by_euid(edge_euid)
+        bobdb.delete(edge)
+        bobdb.session.flush()
+        bobdb.session.commit()
+        return {"status": "success", "message": "Edge deleted successfully."}
+    except Exception as e:
+        # Edge might already be deleted
+        try:
+            bobdb_deleted = BloomObj(
+                BLOOMdb3(app_username=request.session["user_data"]["email"]),
+                is_deleted=True,
+            )
+            edge = bobdb_deleted.get_by_euid(edge_euid)
+            if edge and edge.is_deleted:
+                return {
+                    "status": "success",
+                    "message": f"Edge {edge_euid} was already soft-deleted",
+                }
+        except Exception:
+            pass
+        logging.error(f"Error deleting edge {edge_euid}: {e}")
+        raise HTTPException(status_code=404, detail=f"Edge not found: {edge_euid}")
 
 
 ## File Manager // Dewey (pull into separate file   )
@@ -2685,7 +2774,7 @@ async def search_file_sets(
             for key in columns[3:]:
                 row[key] = result.json_addl["properties"].get(key, "N/A")
             file_euids = [
-                elem.child_instance.euid for elem in result.parent_of_lineages.all()
+                elem.child_instance.euid for elem in result.parent_of_lineages.all() if not elem.is_deleted
             ]
             euid_links = [
                 f'<a href="euid_details?euid={euid}">{euid}</a>' for euid in file_euids
@@ -2965,6 +3054,8 @@ async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_au
         # Fetch all shared references where the file set is a parent
         shared_refs = []
         for lineage in file_set.parent_of_lineages:
+            if lineage.is_deleted:
+                continue
             if lineage.child_instance.btype == 'shared_ref':
  
                 orig_file = None

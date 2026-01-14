@@ -155,6 +155,7 @@
         <h3>Child Of Lineages</h3>
         <table class="searchable">
             <tr>
+                <th>Status</th>
                 <th>Parent</th>
 
                 <th>Parent Type</th>
@@ -167,7 +168,7 @@
                 <th>Child Sub Type</th>
                 <th>Child Version</th>
                 <th>Child Instance EUID</th>
-  
+
 
                 <th>Relationship Type</th>
                 <th>Lineage EUID</th>
@@ -175,7 +176,14 @@
 
             </tr>
             {% for lineage in oobj.child_of_lineages %}
-                <tr>
+                <tr{% if lineage.is_deleted %} style="background-color: #ffcccc; text-decoration: line-through;"{% endif %}>
+                    <td>
+                        {% if lineage.is_deleted %}
+                            <span style="color: red; font-weight: bold;" title="Soft Deleted">🗑️ DELETED</span>
+                        {% else %}
+                            <span style="color: green;" title="Active">✓ Active</span>
+                        {% endif %}
+                    </td>
                     <td>{{ lineage.parent_instance.super_type }}</td>
 
                     <td>{{ lineage.parent_instance.btype }}</td>
@@ -199,7 +207,7 @@
         <h3>Parent Of Lineages</h3>
         <table class="searchable">
             <tr>
-
+                <th>Status</th>
                 <th>Parent</th>
                 <th>Parent Type</th>
                 <th>Parent Sub Type</th>
@@ -217,15 +225,22 @@
 
             </tr>
             {% for lineage in oobj.parent_of_lineages %}
-                <tr>
+                <tr{% if lineage.is_deleted %} style="background-color: #ffcccc; text-decoration: line-through;"{% endif %}>
+                    <td>
+                        {% if lineage.is_deleted %}
+                            <span style="color: red; font-weight: bold;" title="Soft Deleted">🗑️ DELETED</span>
+                        {% else %}
+                            <span style="color: green;" title="Active">✓ Active</span>
+                        {% endif %}
+                    </td>
                     <td>{{ lineage.parent_instance.super_type }}</td>
-  
+
                     <td>{{ lineage.parent_instance.btype }}</td>
                     <td>{{ lineage.parent_instance.b_sub_type }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
                     <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
 
-                    <td>{{ lineage.child_instance.super_type }}</td> 
+                    <td>{{ lineage.child_instance.super_type }}</td>
                     <td>{{ lineage.child_instance.btype }}</td>
                     <td>{{ lineage.child_instance.b_sub_type }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
