@@ -53,14 +53,14 @@ cd ~/projects/git/bloom/
 
 
  ##
-#  creating the .env file (see the supabase.md doc for details)
+#  creating the .env file (see the cognito.md doc for details)
  ##
 
 # This .env file is created in the bloom root dir.
-# Set up supabase to get the SUPABASE_KEY & SUPABASE_URLUPABASE_* .env variables
-# Specify all domains which users can authenticate into the system by setting the SUPABASE_WHITELIST_DOMAINS .env variable. =all will not filter, google.com,yahoo.com will only allow google and yahoo domains in. No spaces in this string.
+# Set up Cognito to get the COGNITO_CLIENT_ID, COGNITO_USER_POOL_ID, COGNITO_REGION, and COGNITO_DOMAIN variables.
+# Specify all domains which users can authenticate into the system by setting the COGNITO_WHITELIST_DOMAINS .env variable. =all will not filter, google.com,yahoo.com will only allow google and yahoo domains in. No spaces in this string.
 # Specify the S3 bucket prefix to be used to find buckets dewey can use.
-# please read the supabase.md file for more details.
+# please read the cognito.md file for more details.
 
 
 # Install the BLOOM conda environment

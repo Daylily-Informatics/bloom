@@ -14,16 +14,26 @@
             function checkForOauthCode() {
                 const urlFragment = new URLSearchParams(window.location.hash.substring(1)); // Remove the # and parse
                 const accessToken = urlFragment.get('access_token');
+                const idToken = urlFragment.get('id_token');
                 console.log("Access token:", accessToken);
+                console.log("ID token:", idToken);
             
-                if (accessToken) {
+                if (idToken || accessToken) {
+                    const tokenPayload = {};
+                    if (idToken) {
+                        tokenPayload.id_token = idToken;
+                    }
+                    if (accessToken) {
+                        tokenPayload.access_token = accessToken;
+                    }
+
                     // Send the code to the backend
                     fetch('/oauth_callback', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ accessToken: accessToken }),
+                        body: JSON.stringify(tokenPayload),
                     })
                     .then(response => response.text())
                     .then(data => {
@@ -35,10 +45,10 @@
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alert("Failed to process GitHub authentication.");
+                        alert("Failed to process Cognito authentication.");
                     });
                 } else {
-                    console.log("No GitHub code found on home page.");
+                    console.log("No Cognito tokens found on home page.");
                 }
             }
 

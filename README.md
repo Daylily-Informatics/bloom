@@ -40,7 +40,7 @@ _bloom early peeks_
 
 ### Oauth2 Authentication w/All Major Social Providers
 _and flexible whitelisting, etc..._
-* [Bloom supabase config](bloom_lims/docs/supabase.md).
+* [Bloom Cognito SSO config](bloom_lims/docs/cognito.md).
 
 ### Graph Object View (add, remove, edit, take actions, explore)
 
@@ -1006,32 +1006,24 @@ tracking_data = tracker.get_fedex_ops_meta_ds(tracking_number)
 }
 ```
 
-### 12.3 Supabase Integration
+### 12.3 Cognito Authentication
 
-BLOOM uses Supabase for:
-- **Authentication**: User management and JWT tokens
-- **Storage**: File storage (alternative to S3)
-- **Realtime**: (Optional) Real-time updates
+Bloom uses AWS Cognito for single sign-on via the hosted UI. Tokens are validated against the Cognito JWKS before sessions are created.
 
 ```python
-from supabase import create_client
+from auth.cognito.client import get_cognito_auth, CognitoTokenError
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+cognito = get_cognito_auth()
 
-# File upload
-supabase.storage.from_("bloom-files").upload(
-    path=f"files/{euid}/{filename}",
-    file=file_data
-)
+# Redirect users to the hosted UI login page
+login_url = cognito.config.authorize_url
 
-# Authentication
-user = supabase.auth.sign_in_with_password({
-    "email": email,
-    "password": password
-})
+# Validate an incoming ID or access token
+try:
+    claims = cognito.validate_token(id_token)
+    email = claims.get("email")
+except CognitoTokenError as exc:
+    raise ValueError(f"Invalid Cognito token: {exc}")
 ```
 
 ### 12.4 AWS S3 Integration
@@ -1078,12 +1070,17 @@ BLOOM_DB_NAME=bloom_lims
 BLOOM_DB_USER=bloom_user
 BLOOM_DB_PASSWORD=secure_password
 
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-key
+# Cognito (SSO)
+COGNITO_REGION=us-east-1
+COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+COGNITO_CLIENT_ID=your_app_client_id
+COGNITO_DOMAIN=your-custom-domain.auth.us-east-1.amazoncognito.com
+COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
+COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
+COGNITO_WHITELIST_DOMAINS=all  # or comma-separated domains
+COGNITO_SCOPES="openid email profile"
 
-# AWS S3 (optional, alternative to Supabase storage)
+# AWS S3 (optional)
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 S3_BUCKET=bloom-files
@@ -1256,6 +1253,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 bloom_lims.bkend.bkend:app
 _see build test badges above for all supported platforms_
 * Mac (14+)
   * `brew install coreutils` is required for the `gtimeout` command for some rclone functionality. Run `alias timeout=gtimeout` to use the gtimeout w/zsh.
+  * `brew install mkcert` is required for the `mkcert` command to create a local certificate authority for testing with https.
 * Ubuntu 22+
 * Centos 9
 
@@ -1286,8 +1284,26 @@ _see build test badges above for all supported platforms_
 bash  # newly created shells should not auto load the conda (base) env.
 ```
 
-#### Supabase
-* [Please follow the supabase configuration instructions here](bloom_lims/docs/supabase.md).
+#### https certificates
+
+##### local development
+```bash
+
+# Create local CA (one-time)
+mkcert -install
+
+# Generate cert for localhost
+mkdir -p certs
+mkcert -key-file certs/key.pem -cert-file certs/cert.pem localhost 127.0.0.1
+
+```
+
+##### production server
+
+* [Please follow the instructions here](bloom_lims/docs/https.md).
+
+#### Cognito
+* [Please follow the Cognito configuration instructions here](bloom_lims/docs/cognito.md).
 
 ### Very Quickest Start
 _assumes you have completed the prerequisites_
@@ -1613,4 +1629,3 @@ results = bobj.search_objects(
 *Document Version: 2.0*
 *Last Updated: 2024-12-24*
 *BLOOM LIMS - Version dynamically fetched from GitHub releases*
-

@@ -2,7 +2,7 @@
 
 # Default values
 host="0.0.0.0"
-port=8911
+port=8000
 mode="dev"
 
 unset HTTP_PROXY
@@ -63,7 +63,7 @@ if [[ "$mode" == "dev" ]]; then
     --log-level trace \
     --port $port \
     --timeout-keep-alive 15 \
-    --host $host  
+    --host $host --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem 
 
 elif [[ "$mode" == "prod" ]]; then
   num_workers=4

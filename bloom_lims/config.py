@@ -134,10 +134,22 @@ class APISettings(BaseModel):
 class AuthSettings(BaseModel):
     """Authentication configuration."""
     
-    # Supabase
-    supabase_url: str = Field(default="", description="Supabase URL")
-    supabase_key: str = Field(default="", description="Supabase anon key")
-    supabase_service_key: str = Field(default="", description="Supabase service key")
+    # Cognito
+    cognito_user_pool_id: str = Field(default="", description="Cognito user pool ID")
+    cognito_client_id: str = Field(default="", description="Cognito app client ID")
+    cognito_region: str = Field(default="", description="AWS region for Cognito")
+    cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
+    cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
+    cognito_logout_redirect_uri: str = Field(
+        default="", description="Cognito logout redirect URI"
+    )
+    cognito_scopes: List[str] = Field(
+        default_factory=lambda: ["openid", "email", "profile"],
+        description="Cognito OAuth scopes",
+    )
+    cognito_allowed_domains: List[str] = Field(
+        default_factory=list, description="Allowed email domains"
+    )
     
     # JWT
     jwt_secret: str = Field(default="", description="JWT secret key")
@@ -359,8 +371,16 @@ def validate_settings() -> List[str]:
         warnings.append("Database password is not set in production")
 
     # Check auth settings
-    if not settings.auth.supabase_url:
-        warnings.append("Supabase URL is not configured")
+    if not all(
+        [
+            settings.auth.cognito_user_pool_id,
+            settings.auth.cognito_client_id,
+            settings.auth.cognito_region,
+            settings.auth.cognito_domain,
+            settings.auth.cognito_redirect_uri,
+        ]
+    ):
+        warnings.append("Cognito configuration is incomplete")
 
     if not settings.auth.jwt_secret and settings.is_production:
         warnings.append("JWT secret is not set in production")
@@ -384,8 +404,11 @@ def get_database_url() -> str:
     return get_settings().database.connection_string
 
 
-def get_supabase_config() -> tuple:
-    """Get Supabase configuration for backward compatibility."""
+def get_cognito_config() -> tuple:
+    """Get Cognito configuration for backward compatibility."""
     settings = get_settings()
-    return settings.auth.supabase_url, settings.auth.supabase_key
-
+    return (
+        settings.auth.cognito_region,
+        settings.auth.cognito_user_pool_id,
+        settings.auth.cognito_client_id,
+    )

@@ -919,32 +919,24 @@ tracking_data = tracker.get_fedex_ops_meta_ds(tracking_number)
 }
 ```
 
-### 12.3 Supabase Integration
+### 12.3 Cognito Authentication
 
-BLOOM uses Supabase for:
-- **Authentication**: User management and JWT tokens
-- **Storage**: File storage (alternative to S3)
-- **Realtime**: (Optional) Real-time updates
+BLOOM uses AWS Cognito for SSO through the hosted UI. Tokens are validated against Cognito's JWKS before sessions are created.
 
 ```python
-from supabase import create_client
+from auth.cognito.client import get_cognito_auth, CognitoTokenError
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+cognito = get_cognito_auth()
 
-# File upload
-supabase.storage.from_("bloom-files").upload(
-    path=f"files/{euid}/{filename}",
-    file=file_data
-)
+# Hosted UI login URL
+authorize_url = cognito.config.authorize_url
 
-# Authentication
-user = supabase.auth.sign_in_with_password({
-    "email": email,
-    "password": password
-})
+# Validate an ID or access token returned from the hosted UI
+try:
+    claims = cognito.validate_token(id_token)
+    email = claims.get("email")
+except CognitoTokenError as exc:
+    raise ValueError(f"Invalid Cognito token: {exc}")
 ```
 
 ### 12.4 AWS S3 Integration
@@ -991,12 +983,17 @@ BLOOM_DB_NAME=bloom_lims
 BLOOM_DB_USER=bloom_user
 BLOOM_DB_PASSWORD=secure_password
 
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-key
+# Cognito
+COGNITO_REGION=us-east-1
+COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
+COGNITO_CLIENT_ID=your_app_client_id
+COGNITO_DOMAIN=your-custom-domain.auth.us-east-1.amazoncognito.com
+COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
+COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
+COGNITO_WHITELIST_DOMAINS=all
+COGNITO_SCOPES="openid email profile"
 
-# AWS S3 (optional, alternative to Supabase storage)
+# AWS S3 (optional)
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 S3_BUCKET=bloom-files
