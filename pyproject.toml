@@ -1,0 +1,128 @@
+# =============================================================================
+# BLOOM LIMS Project Configuration
+# =============================================================================
+# ENVIRONMENT MANAGEMENT: This project uses CONDA for environment management.
+# The conda environment is named "BLOOM" (all caps).
+#
+# To set up the environment:
+#   conda env create -f bloom_env.yaml
+#   conda activate BLOOM
+#
+# See bloom_env.yaml for the full list of dependencies.
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bloom_lims"
+dynamic = ["version"]
+description = "Templated Abstract Polymorphic LIMS - A Laboratory Information Management System"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+keywords = ["lims", "laboratory", "informatics", "bioinformatics", "sample-management"]
+
+[project.urls]
+Homepage = "https://github.com/Daylily-Informatics/bloom"
+Repository = "https://github.com/Daylily-Informatics/bloom.git"
+Issues = "https://github.com/Daylily-Informatics/bloom/issues"
+
+[project.scripts]
+bloom = "bloom_lims.cli:main"
+bloom-backup = "bloom_lims.backup.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "bloom_lims._version.FALLBACK_VERSION"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bloom_lims*"]
+
+# =============================================================================
+# BLOOM Environment Configuration
+# =============================================================================
+# This section documents the conda environment configuration for tools and 
+# AI assistants that need to understand the project's environment management.
+
+[tool.bloom]
+# Environment management method - DO NOT USE pip/poetry/venv for this project
+environment_manager = "conda"
+
+# The conda environment name (IMPORTANT: all caps)
+conda_environment_name = "BLOOM"
+
+# The conda environment definition file
+conda_environment_file = "bloom_env.yaml"
+
+# Commands to set up the development environment
+setup_commands = [
+    "conda env create -f bloom_env.yaml",
+    "conda activate BLOOM",
+    "pip install -e .",
+]
+
+# Command to run tests (must activate conda environment first)
+test_command = "conda run -n BLOOM pytest"
+
+# =============================================================================
+# Tool Configurations
+# =============================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "api: marks tests as API tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | bloom_lims/database
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+skip_gitignore = true
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
