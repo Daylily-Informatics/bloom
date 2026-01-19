@@ -2,10 +2,19 @@
 
 ## Technical Specification Document
 
-**Version:** 1.0.0
+**Version:** 1.3.0
 **Status:** Draft
 **Date:** 2026-01-19
 **Repository:** `github.com/Daylily-Informatics/daylily-tapdb`
+
+### Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.3.0 | 2026-01-19 | Second ChatGPT review: transaction patterns, audit verbosity, loader semantics, action group naming, auto-created template stubs |
+| 1.2.0 | 2026-01-19 | First ChatGPT review: soft delete fix, pgcrypto, trigger attachment, lineage prefix, cycle detection |
+| 1.1.0 | 2026-01-19 | EUID prefix tiers, action instances as first-class objects |
+| 1.0.0 | 2026-01-19 | Initial specification |
 
 ---
 
@@ -225,6 +234,8 @@ CREATE TABLE generic_template (
 
     -- Instance configuration
     instance_prefix TEXT NOT NULL,             -- EUID prefix for instances, e.g., 'CX'
+    instance_polymorphic_identity TEXT,        -- Explicit instance class, e.g., 'container_instance'
+                                               -- If NULL, derived from polymorphic_discriminator
 
     -- Flexible data storage
     json_addl JSONB NOT NULL,                  -- Template definition and defaults
@@ -271,16 +282,17 @@ ON generic_template(super_type, btype, b_sub_type, version, is_deleted);
 Complete DDL for the instance table:
 
 ```sql
--- Multiple sequences for different EUID prefixes
-CREATE SEQUENCE generic_instance_seq;
-CREATE SEQUENCE cx_instance_seq;   -- Containers
-CREATE SEQUENCE mx_instance_seq;   -- Content/Materials
-CREATE SEQUENCE wx_instance_seq;   -- Workflows
-CREATE SEQUENCE wsx_instance_seq;  -- Workflow Steps
-CREATE SEQUENCE ex_instance_seq;   -- Equipment
-CREATE SEQUENCE ax_instance_seq;   -- Actors
-CREATE SEQUENCE fx_instance_seq;   -- Files
--- ... additional sequences as needed
+-- Core sequences (library provides these)
+CREATE SEQUENCE generic_instance_seq;   -- GX fallback prefix
+CREATE SEQUENCE wx_instance_seq;        -- WX (workflow) - optional
+CREATE SEQUENCE wsx_instance_seq;       -- WSX (workflow_step) - optional
+CREATE SEQUENCE xx_instance_seq;        -- XX (action) - optional
+
+-- Application-specific sequences are NOT part of core schema.
+-- Applications create their own sequences for custom prefixes:
+-- CREATE SEQUENCE cx_instance_seq;     -- CX (container)
+-- CREATE SEQUENCE mx_instance_seq;     -- MX (content)
+-- etc.
 
 CREATE TABLE generic_instance (
     -- Primary identification
@@ -419,6 +431,11 @@ CREATE INDEX idx_generic_instance_lineage_polymorphic_discriminator ON generic_i
 -- Composite index for relationship queries
 CREATE INDEX idx_generic_instance_lineage_composite
 ON generic_instance_lineage(parent_instance_uuid, child_instance_uuid, is_deleted);
+
+-- Prevent duplicate edges (same parent-child-type combination)
+CREATE UNIQUE INDEX idx_generic_instance_lineage_unique_edge
+ON generic_instance_lineage(parent_instance_uuid, child_instance_uuid, lineage_type)
+WHERE is_deleted = FALSE;
 ```
 
 ### 2.5 audit_log Table
@@ -456,6 +473,23 @@ CREATE INDEX idx_audit_log_changed_at ON audit_log(changed_at);
 CREATE INDEX idx_audit_log_changed_by ON audit_log(changed_by);
 CREATE INDEX idx_audit_log_json_addl_gin ON audit_log USING GIN (json_addl);
 ```
+
+**⚠️ Audit Log Verbosity Warning:**
+
+The audit system logs **one row per changed column per UPDATE**. This is intentional for
+regulatory compliance but creates significant volume:
+
+| Operation | Audit Rows Generated |
+|-----------|---------------------|
+| INSERT | 1 row |
+| UPDATE (3 columns changed) | 3 rows |
+| Soft DELETE | 1 DELETE row + 2 UPDATE rows (is_deleted, modified_dt) |
+
+**Implications:**
+- `modified_dt` changes on every UPDATE → always logged
+- A single user edit may produce multiple audit rows
+- Plan for audit table growth: consider partitioning by `changed_at` for large deployments
+- Do **not** assume "one audit row per user action"
 
 ### 2.6 Trigger Functions
 
@@ -660,7 +694,9 @@ class tapdb_core(Base):
 
     # Primary identification
     uuid = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    euid = Column(Text, unique=True, nullable=True)  # Set by trigger
+    # NOTE: euid is nullable in ORM because the database trigger sets it AFTER INSERT.
+    # The DB column is effectively NOT NULL after trigger execution.
+    euid = Column(Text, unique=True, nullable=True)
     name = Column(Text, nullable=False)
 
     # Type hierarchy
@@ -675,12 +711,16 @@ class tapdb_core(Base):
 
     # Status and lifecycle
     bstatus = Column(Text, nullable=False, default='ready')
+    # is_singleton: ORM default=False; templates may override via json_addl.singleton
     is_singleton = Column(Boolean, nullable=False, default=False)
     is_deleted = Column(Boolean, nullable=False, default=False)
 
-    # Timestamps
+    # Timestamps - DB owns these values via triggers
+    # created_dt: set by DB DEFAULT, never modified
+    # modified_dt: set by update_modified_dt() trigger on every UPDATE
+    # Do NOT use SQLAlchemy's onupdate - let the DB trigger handle it
     created_dt = Column(DateTime(timezone=True), server_default=func.now())
-    modified_dt = Column(DateTime(timezone=True), onupdate=func.now())
+    modified_dt = Column(DateTime(timezone=True), server_default=func.now())
 ```
 
 ### 3.2 Template ORM Classes
@@ -693,6 +733,9 @@ class generic_template(tapdb_core):
 
     # Additional template-specific columns
     instance_prefix = Column(Text, nullable=False)
+    # Explicit instance polymorphic identity; if NULL, derived from
+    # polymorphic_discriminator.replace('_template', '_instance')
+    instance_polymorphic_identity = Column(Text, nullable=True)
     json_addl_schema = Column(JSONB, nullable=True)
 
     # Polymorphic configuration
@@ -1024,6 +1067,19 @@ Instantiation layouts define child objects to create automatically when an insta
 | `lineage_type` | string | Relationship type (e.g., 'contains', 'derived_from') |
 | `properties` | object | Default properties for children |
 
+**v1 Placeholder Limitations:**
+
+The `naming_pattern` field supports only these placeholders:
+
+| Placeholder | Value |
+|-------------|-------|
+| `{parent_name}` | Name of the parent instance |
+| `{index}` | 1-based index of the child (1, 2, 3...) |
+
+**NOT YET IMPLEMENTED:** Placeholders like `{row_letter}`, `{column_number}`, `{index:02d}`
+(zero-padded) are reserved for future versions. If used, they will appear literally in
+stored JSON. Applications requiring grid layouts should compute names in custom factory code.
+
 ### 4.4 Action System
 
 Actions are methods that can be executed on instances. They are defined in templates and can be imported from shared action templates.
@@ -1092,6 +1148,23 @@ Actions are methods that can be executed on instances. They are defined in templ
 }
 ```
 
+**⚠️ Action Group Naming Convention:**
+
+The `action_group` key is derived from the action template's `btype` field with `_actions` suffix:
+
+| action_template.btype | action_group key |
+|-----------------------|------------------|
+| `core` | `core_actions` |
+| `workflow` | `workflow_actions` |
+| `custom` | `custom_actions` |
+
+**Canonical Pattern:** `{btype}_actions`
+
+This convention ensures consistent runtime lookup. The dispatcher expects:
+```python
+instance.json_addl["action_groups"][action_group][action_key]
+```
+
 The `InstanceFactory.create_instance()` method calls `materialize_actions()` to copy action definitions from imported action templates into the instance's `action_groups`:
 
 ```python
@@ -1103,14 +1176,15 @@ def materialize_actions(
     Materialize action_imports into action_groups for an instance.
 
     Reads action template definitions and expands them into the format
-    expected by ActionDispatcher.
+    expected by ActionDispatcher. Uses canonical group naming: {btype}_actions.
     """
     action_groups = {}
 
     for action_key, template_code in template.json_addl.get('action_imports', {}).items():
         action_tmpl = template_manager.get_template(template_code)
         if action_tmpl:
-            group_name = action_tmpl.btype  # e.g., 'core'
+            # Canonical group naming: {btype}_actions
+            group_name = f"{action_tmpl.btype}_actions"  # e.g., 'core_actions'
             if group_name not in action_groups:
                 action_groups[group_name] = {}
 
@@ -1205,13 +1279,40 @@ class TAPDBConnection:
             self._session = self.SessionLocal()
         return self._session
 
+    def get_session(self) -> Session:
+        """
+        Get a new session without automatic commit.
+
+        CALLER IS RESPONSIBLE FOR:
+        - Calling session.commit() when ready
+        - Calling session.rollback() on error
+        - Calling session.close() when done
+
+        Use this when:
+        - Application manages its own transaction boundaries
+        - Batch operations need explicit control
+        - Async/workflow systems have external transaction coordination
+        """
+        return self.SessionLocal()
+
     @contextmanager
-    def session_scope(self):
-        """Provide a transactional scope around operations."""
+    def session_scope(self, commit: bool = True):
+        """
+        Provide a transactional scope around operations.
+
+        Args:
+            commit: If True (default), commits on success. If False, caller
+                    must commit explicitly (useful for nested/coordinated txns).
+
+        Use session_scope(commit=True) for simple CRUD operations.
+        Use session_scope(commit=False) or get_session() when the application
+        manages transaction boundaries.
+        """
         session = self.SessionLocal()
         try:
             yield session
-            session.commit()
+            if commit:
+                session.commit()
         except Exception:
             session.rollback()
             raise
@@ -1257,6 +1358,26 @@ class TemplateManager:
     def load_templates_from_config(self) -> int:
         """
         Load all templates from configuration files into database.
+
+        **Loader Semantics (Idempotency Guarantees):**
+
+        1. **Upsert Behavior:** Templates are matched by (super_type, btype, b_sub_type, version).
+           - If exists and unchanged: skipped (no update)
+           - If exists and changed: ERROR (version bump required for changes)
+           - If new: inserted
+
+        2. **Version Bump Rule:** To modify a template, create a new version (1.0 → 1.1).
+           The old version remains for existing instances; new instances use the new version.
+
+        3. **instance_prefix Resolution:**
+           - First from template JSON file's `instance_prefix` field
+           - Fallback to `metadata.json` `default_instance_prefix`
+           - Error if neither present
+
+        4. **Conflict Behavior:**
+           - Duplicate template code: raises ValueError
+           - Invalid JSON: raises JSONDecodeError
+           - Missing required fields: raises ValueError with field list
 
         Returns:
             Number of templates loaded.
@@ -1389,7 +1510,8 @@ class InstanceFactory:
         name: str,
         properties: Optional[Dict[str, Any]] = None,
         create_children: bool = True,
-        _depth: int = 0  # Internal: tracks recursion depth
+        _depth: int = 0,  # Internal: tracks recursion depth
+        _visited: Optional[set] = None  # Internal: tracks visited templates for cycle detection
     ) -> generic_instance:
         """
         Create an instance from a template.
@@ -1404,14 +1526,26 @@ class InstanceFactory:
             The created instance.
 
         Raises:
-            ValueError: If template not found or max depth exceeded.
+            ValueError: If template not found, max depth exceeded, or cycle detected.
         """
-        # Guard against infinite recursion
+        # Initialize visited set on first call
+        if _visited is None:
+            _visited = set()
+
+        # Guard against infinite recursion (depth limit)
         if _depth > self.MAX_INSTANTIATION_DEPTH:
             raise ValueError(
                 f"Max instantiation depth ({self.MAX_INSTANTIATION_DEPTH}) exceeded. "
                 f"Check for cycles in instantiation_layouts."
             )
+
+        # Guard against cycles (same template appearing in its own instantiation tree)
+        if template_code in _visited:
+            raise ValueError(
+                f"Cycle detected in instantiation_layouts: {template_code} "
+                f"appears in its own instantiation tree. Visited: {_visited}"
+            )
+        _visited.add(template_code)
 
         template = self.template_manager.get_template(template_code)
         if not template:
@@ -1428,11 +1562,18 @@ class InstanceFactory:
                 **properties
             }
 
+        # Determine instance polymorphic identity:
+        # Use explicit value if template provides it, otherwise derive from template's discriminator
+        instance_discriminator = (
+            template.instance_polymorphic_identity
+            or template.polymorphic_discriminator.replace('_template', '_instance')
+        )
+
         # Create instance
         instance = instance_class(
             name=name,
             template_uuid=template.uuid,
-            polymorphic_discriminator=template.polymorphic_discriminator.replace('_template', '_instance'),
+            polymorphic_discriminator=instance_discriminator,
             super_type=template.super_type,
             btype=template.btype,
             b_sub_type=template.b_sub_type,
@@ -1446,7 +1587,11 @@ class InstanceFactory:
 
         # Create children if requested
         if create_children:
-            self._create_children(instance, template, _depth + 1)
+            self._create_children(instance, template, _depth + 1, _visited.copy())
+
+        # Remove from visited after successful instantiation (allows same template
+        # in sibling branches, just not in same ancestor chain)
+        _visited.discard(template_code)
 
         return instance
 
@@ -1454,7 +1599,8 @@ class InstanceFactory:
         self,
         parent: generic_instance,
         template: generic_template,
-        depth: int
+        depth: int,
+        visited: set
     ):
         """Create child instances from instantiation_layouts."""
         layouts = template.json_addl.get('instantiation_layouts', [])
@@ -1462,6 +1608,7 @@ class InstanceFactory:
         for layout in layouts:
             child_template_code = layout.get('layout_string')
             count = layout.get('count', 1)
+            # v1 placeholder support: {parent_name} and {index} only
             naming_pattern = layout.get('naming_pattern', '{parent_name}_{index}')
             lineage_type = layout.get('lineage_type', 'contains')
 
@@ -1476,7 +1623,8 @@ class InstanceFactory:
                     name=child_name,
                     properties=layout.get('properties'),
                     create_children=True,  # Recursive
-                    _depth=depth  # Pass depth for cycle detection
+                    _depth=depth,
+                    _visited=visited.copy()  # Copy to allow sibling reuse
                 )
 
                 # Create lineage
@@ -1785,6 +1933,23 @@ class ActionDispatcher(ABC):
         Get or create an action_template for the given action type.
 
         Action templates are auto-created on first use if not pre-defined.
+
+        **⚠️ Auto-Created Templates Are Audit-Only Stubs:**
+
+        Auto-created templates contain only minimal metadata (description, empty properties).
+        They do NOT contain `action_definition` with UI fields, method_name, etc.
+
+        For full action functionality (UI rendering, validation), pre-define action templates
+        in configuration files with complete `action_definition` blocks.
+
+        Auto-created templates are suitable for:
+        - Audit trail linkage (action_instance → template_uuid)
+        - EUID prefix resolution (XX)
+        - Action type categorization queries
+
+        Auto-created templates are NOT suitable for:
+        - UI form rendering (no captured_data fields)
+        - Action execution routing (no method_name)
         """
         template_code = f"action/{action_group}/{action_key}/1.0/"
 
@@ -1799,7 +1964,7 @@ class ActionDispatcher(ABC):
         if existing:
             return existing
 
-        # Auto-create template for this action type
+        # Auto-create AUDIT-ONLY stub template for this action type
         new_template = action_template(
             name=f"{action_group}/{action_key}",
             super_type='action',
@@ -1810,8 +1975,9 @@ class ActionDispatcher(ABC):
             polymorphic_discriminator='action_template',
             bstatus='ready',
             json_addl={
-                'description': f"Auto-created template for {action_group}/{action_key}",
-                'properties': {}
+                'description': f"Auto-created audit stub for {action_group}/{action_key}",
+                'properties': {},
+                # NOTE: No 'action_definition' - this is audit-only
             }
         )
 
