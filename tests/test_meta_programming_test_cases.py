@@ -21,9 +21,15 @@ class BaseTest:
                 )
 
 
-bdb = BLOOMdb3()
-bob = BloomObj(bdb)
-generic_templates = bdb.session.query(bob.Base.classes.generic_template).all()
+# Attempt database connection; skip entire module if unavailable
+try:
+    bdb = BLOOMdb3()
+    bob = BloomObj(bdb)
+    generic_templates = bdb.session.query(bob.Base.classes.generic_template).all()
+except Exception as e:
+    # Mark module as requiring database, skip during collection if unavailable
+    pytestmark = pytest.mark.skip(reason=f"Database unavailable: {e}")
+    generic_templates = []
 
 for template in generic_templates:
     # Dynamically create a test class for each template
