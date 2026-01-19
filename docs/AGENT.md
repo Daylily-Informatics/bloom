@@ -1,25 +1,29 @@
-# TAPDB Development Guidelines (AGENT.md)
+# daylily-tapdb Development Guidelines (AGENT.md)
 
 ## AI Assistant Instructions
 
-This document provides guidelines for AI assistants working on the TAPDB (Templated Abstract Polymorphic Database) library.
+This document provides guidelines for AI assistants working on the **daylily-tapdb** (Templated Abstract Polymorphic Database) library.
+
+**Repository:** `github.com/Daylily-Informatics/daylily-tapdb`
+**Package:** `daylily_tapdb` (underscore for Python imports)
 
 ---
 
 ## Project Overview
 
-TAPDB is a standalone library extracted from BLOOM LIMS that implements a **three-table polymorphic object model** with JSON-driven template configuration. The core innovation is enabling new object types through JSON templates without code changes.
+daylily-tapdb is a standalone library extracted from BLOOM LIMS that implements a **three-table polymorphic object model** with JSON-driven template configuration. The core innovation is enabling new object types through JSON templates without code changes.
 
 ### Key Files
 
 | File/Directory | Purpose |
 |----------------|---------|
-| `tapdb/models/` | SQLAlchemy ORM classes |
-| `tapdb/connection.py` | Database connection manager |
-| `tapdb/templates/` | Template loading and management |
-| `tapdb/factory/` | Instance creation logic |
+| `daylily_tapdb/models/` | SQLAlchemy ORM classes |
+| `daylily_tapdb/connection.py` | Database connection manager |
+| `daylily_tapdb/templates/` | Template loading and management |
+| `daylily_tapdb/factory/` | Instance creation logic |
+| `daylily_tapdb/actions/` | Action dispatcher (abstract base) |
+| `daylily_tapdb/euid.py` | EUID configuration |
 | `schema/tapdb_schema.sql` | PostgreSQL DDL |
-| `config/` | JSON template definitions |
 
 ---
 
@@ -94,8 +98,8 @@ from sqlalchemy import Column, Text
 from sqlalchemy.orm import relationship
 
 # Local
-from tapdb.models import generic_instance
-from tapdb.connection import TAPDBConnection
+from daylily_tapdb.models import generic_instance
+from daylily_tapdb.connection import TAPDBConnection
 ```
 
 ---
@@ -153,7 +157,7 @@ Always include trailing slash.
 
 ### Adding a New Polymorphic Type
 
-1. Add ORM class in `tapdb/models/`:
+1. Add ORM class in `daylily_tapdb/models/`:
 
 ```python
 class new_type_instance(generic_instance):
@@ -173,33 +177,37 @@ class new_type_template(generic_template):
 
 3. Register in `__init__.py` exports
 4. Add EUID sequence in schema if new prefix needed
-5. Create JSON templates in `config/new_type/`
+5. Register prefix in `EUIDConfig`
 
-### Adding a New Action
+### Adding a New Action (Application-Level)
 
-1. Define action template in `config/action/core.json`:
+**Note:** daylily-tapdb provides only the abstract `ActionDispatcher`. Concrete actions are implemented in your application.
+
+1. Extend `ActionDispatcher` in your application:
+
+```python
+from daylily_tapdb import ActionDispatcher
+
+class MyActionHandler(ActionDispatcher):
+    def do_action_new_action(self, instance, action_ds, captured_data):
+        # Implementation
+        return {'status': 'success', 'message': 'Done'}
+```
+
+2. Define action template in your config:
 
 ```json
 {
-  "new_action": {
-    "1.0": {
-      "action_template": {
+  "action_groups": {
+    "my_actions": {
+      "new_action": {
         "action_name": "New Action",
         "method_name": "do_action_new_action",
-        "action_enabled": "1",
-        ...
+        "action_enabled": "1"
       }
     }
   }
 }
-```
-
-2. Implement handler method:
-
-```python
-def do_action_new_action(self, instance, data):
-    # Implementation
-    return {'status': 'success'}
 ```
 
 3. Import in target templates via `action_imports`
@@ -380,6 +388,26 @@ ORDER BY changed_at DESC;
 
 ---
 
-*AGENT.md for TAPDB Library - AI Assistant Development Guidelines*
+## Library Scope Reminder
 
+**daylily-tapdb includes:**
+- 3-table schema (template, instance, lineage) + audit
+- ORM layer (`tapdb_core`, all `generic_*` classes)
+- Template loader and manager
+- Instance factory
+- Lineage management
+- EUID system (mandatory, prefix-configurable)
+- Action dispatcher (abstract base only)
+- Workflow types (polymorphic classes only)
 
+**daylily-tapdb does NOT include:**
+- Concrete action implementations (`do_action_*` methods)
+- Workflow execution logic
+- File/S3 storage
+- External integrations (printers, tracking, auth)
+- Web UI components
+- Domain-specific templates
+
+---
+
+*AGENT.md for daylily-tapdb Library - AI Assistant Development Guidelines*
