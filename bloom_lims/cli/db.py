@@ -48,6 +48,73 @@ def db():
     pass
 
 
+@db.command("init")
+@click.option('--force', '-f', is_flag=True, help='Force re-initialization (removes existing data)')
+def db_init(force):
+    """Initialize PostgreSQL database from scratch.
+
+    This runs the full installation script which:
+    - Initializes PostgreSQL data directory
+    - Creates the bloom database and role
+    - Applies TapDB schema
+    - Applies BLOOM prefix sequences
+    - Seeds the database with templates
+    """
+    install_script = PROJECT_ROOT / "bloom_lims" / "env" / "install_postgres.sh"
+
+    if not install_script.exists():
+        console.print(f"[red]✗[/red] Install script not found: {install_script}")
+        raise SystemExit(1)
+
+    # Check if database already exists
+    if PGDATA.exists():
+        if not force:
+            console.print(f"[yellow]⚠[/yellow] PostgreSQL data directory already exists at:")
+            console.print(f"   {PGDATA}")
+            console.print()
+            console.print("Options:")
+            console.print("  • Use [cyan]bloom db init --force[/cyan] to remove and reinitialize")
+            console.print("  • Use [cyan]bloom db reset[/cyan] to clear data but keep the database")
+            console.print("  • Use [cyan]bloom db start[/cyan] if the database is already set up")
+            raise SystemExit(1)
+        else:
+            console.print("[yellow]⚠[/yellow] Removing existing database...")
+            # Stop PostgreSQL if running
+            if _is_pg_running():
+                subprocess.run(
+                    ["pg_ctl", "-D", str(PGDATA), "stop", "-m", "fast"],
+                    capture_output=True,
+                )
+            # Remove data directory
+            import shutil
+            shutil.rmtree(PGDATA)
+            console.print("[green]✓[/green] Existing database removed")
+
+    console.print("[cyan]Initializing PostgreSQL database...[/cyan]")
+    console.print()
+
+    # Run the install script with 'skip' argument (skips conda env creation)
+    # We need to source it in a bash shell
+    result = subprocess.run(
+        ["bash", "-c", f"source {install_script} skip"],
+        cwd=PROJECT_ROOT,
+        env={**os.environ, "PGDATA": str(PGDATA)},
+    )
+
+    if result.returncode == 0:
+        console.print()
+        console.print("[green]✓[/green] Database initialization complete!")
+        console.print()
+        console.print("Next steps:")
+        console.print("  • [cyan]bloom db status[/cyan]  - Verify database connection")
+        console.print("  • [cyan]bloom gui[/cyan]        - Start the web UI")
+    else:
+        console.print()
+        console.print("[red]✗[/red] Database initialization failed")
+        console.print("Check the output above for errors.")
+        raise SystemExit(1)
+
+
 @db.command("start")
 def db_start():
     """Start PostgreSQL server."""

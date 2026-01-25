@@ -47,7 +47,20 @@ ALTER USER $PGUSER PASSWORD '$PGPASSWORD';
 
 EOF
 
+# Create the bloom database
 createdb --owner $USER $PGDBNAME
+
+# Create bloom role if it doesn't exist (for compatibility with DATABASE_URL using bloom user)
+PGPORT=5445 psql -U $PGUSER -d postgres << EOF
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'bloom') THEN
+        CREATE ROLE bloom WITH LOGIN PASSWORD 'bloom';
+    END IF;
+END
+\$\$;
+GRANT ALL PRIVILEGES ON DATABASE $PGDBNAME TO bloom;
+EOF
 
 # create the schema/db from TapDB schema
 # TAPDB_SCHEMA_SQL can be set to override the default path to the TapDB schema
@@ -68,6 +81,16 @@ if [[ $? -ne 0 ]]; then
 else
     echo "TapDB schema applied successfully."
 fi
+
+# Grant bloom role permissions on all tables and sequences
+echo "Granting permissions to bloom role..."
+PGPORT=5445 psql -U $PGUSER -d $PGDBNAME << EOF
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO bloom;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO bloom;
+GRANT USAGE ON SCHEMA public TO bloom;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bloom;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bloom;
+EOF
 
 # Apply BLOOM-specific prefix sequences for EUID generation
 echo "Applying BLOOM prefix sequences..."
