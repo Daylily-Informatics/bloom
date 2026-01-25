@@ -75,15 +75,76 @@ from daylily_tapdb.models.lineage import (
 # BLOOM uses: super_type, btype, b_sub_type
 # TapDB uses: category, type, subtype
 #
-# We add synonyms to tapdb_core so all subclasses inherit them.
-# This allows existing BLOOM code to use Model.super_type and have it
-# transparently map to the underlying 'category' column.
+# We use hybrid_property to create aliases that work both for:
+# - Instance attribute access: obj.super_type
+# - Query filter expressions: cls.super_type == 'file'
+#
+# Note: synonym() doesn't work for filter expressions - it generates Python
+# boolean comparisons instead of SQL expressions.
 # =============================================================================
+from sqlalchemy.ext.hybrid import hybrid_property
 
-# Add synonyms to the base class - these will be inherited by all subclasses
-tapdb_core.super_type = synonym("category")
-tapdb_core.btype = synonym("type")
-tapdb_core.b_sub_type = synonym("subtype")
+
+def _add_bloom_field_aliases(cls):
+    """
+    Add BLOOM field aliases (super_type, btype, b_sub_type) to a TapDB class.
+
+    Uses hybrid_property so the aliases work both for:
+    - Instance attribute access: obj.super_type (getter/setter)
+    - Query filter expressions: Model.super_type == 'value'
+
+    This must be called on each concrete class (not just the base) because
+    hybrid_property needs to reference the actual Column objects.
+    """
+    # super_type -> category
+    @hybrid_property
+    def super_type(self):
+        return self.category
+
+    @super_type.setter
+    def super_type(self, value):
+        self.category = value
+
+    @super_type.expression
+    def super_type(cls):
+        return cls.category
+
+    # btype -> type
+    @hybrid_property
+    def btype(self):
+        return self.type
+
+    @btype.setter
+    def btype(self, value):
+        self.type = value
+
+    @btype.expression
+    def btype(cls):
+        return cls.type
+
+    # b_sub_type -> subtype
+    @hybrid_property
+    def b_sub_type(self):
+        return self.subtype
+
+    @b_sub_type.setter
+    def b_sub_type(self, value):
+        self.subtype = value
+
+    @b_sub_type.expression
+    def b_sub_type(cls):
+        return cls.subtype
+
+    # Attach to class
+    cls.super_type = super_type
+    cls.btype = btype
+    cls.b_sub_type = b_sub_type
+
+    return cls
+
+
+# Apply BLOOM field aliases to the base class - inherited by all subclasses
+_add_bloom_field_aliases(tapdb_core)
 
 
 # =============================================================================
@@ -107,40 +168,26 @@ def _translate_bloom_kwargs(kwargs: dict) -> dict:
     return result
 
 
-class _BloomCompatibleClassWrapper:
+def _patch_init_for_bloom_compat(cls):
     """
-    Wrapper that intercepts class instantiation to translate BLOOM field names.
+    Patch a TapDB class's __init__ to accept BLOOM field names.
 
-    This allows code like:
-        generic_template(super_type="container", btype="plate", b_sub_type="96-well")
-    to work with TapDB models that expect:
-        generic_template(category="container", type="plate", subtype="96-well")
+    This modifies the class in-place to translate super_type→category,
+    btype→type, b_sub_type→subtype in constructor calls.
 
-    The wrapper delegates all attribute access to the underlying class,
-    but intercepts __call__ to translate kwargs.
+    This approach preserves the class identity so it works with:
+    - session.query(cls)
+    - cls.column_name == value filters
+    - cls(**kwargs) instantiation with BLOOM field names
     """
-    def __init__(self, tapdb_class):
-        self._tapdb_class = tapdb_class
+    original_init = cls.__init__
 
-    def __call__(self, **kwargs):
-        """Create an instance with translated kwargs."""
+    def patched_init(self, **kwargs):
         translated = _translate_bloom_kwargs(kwargs)
-        return self._tapdb_class(**translated)
+        original_init(self, **translated)
 
-    def __getattr__(self, name):
-        """Delegate attribute access to the underlying class."""
-        return getattr(self._tapdb_class, name)
-
-    def __repr__(self):
-        return f"<BloomCompatible({self._tapdb_class.__name__})>"
-
-    @property
-    def __name__(self):
-        return self._tapdb_class.__name__
-
-    @property
-    def __module__(self):
-        return self._tapdb_class.__module__
+    cls.__init__ = patched_init
+    return cls
 
 
 # =============================================================================
@@ -347,17 +394,17 @@ class BLOOMdb3:
         ]
         for cls in classes_to_register:
             class_name = cls.__name__
-            # Wrap with BLOOM-compatible wrapper that translates field names
-            wrapped = _BloomCompatibleClassWrapper(cls)
-            setattr(self.Base.classes, class_name, wrapped)
+            # Patch __init__ to accept BLOOM field names, then register
+            _patch_init_for_bloom_compat(cls)
+            setattr(self.Base.classes, class_name, cls)
 
-        # Register BLOOM-specific aliases (also wrapped)
-        setattr(self.Base.classes, "file_set_template", _BloomCompatibleClassWrapper(file_template))
-        setattr(self.Base.classes, "file_reference_template", _BloomCompatibleClassWrapper(file_template))
-        setattr(self.Base.classes, "file_set_instance", _BloomCompatibleClassWrapper(file_instance))
-        setattr(self.Base.classes, "file_reference_instance", _BloomCompatibleClassWrapper(file_instance))
-        setattr(self.Base.classes, "file_set_instance_lineage", _BloomCompatibleClassWrapper(file_instance_lineage))
-        setattr(self.Base.classes, "file_reference_instance_lineage", _BloomCompatibleClassWrapper(file_instance_lineage))
+        # Register BLOOM-specific aliases (classes already patched above)
+        setattr(self.Base.classes, "file_set_template", file_template)
+        setattr(self.Base.classes, "file_reference_template", file_template)
+        setattr(self.Base.classes, "file_set_instance", file_instance)
+        setattr(self.Base.classes, "file_reference_instance", file_instance)
+        setattr(self.Base.classes, "file_set_instance_lineage", file_instance_lineage)
+        setattr(self.Base.classes, "file_reference_instance_lineage", file_instance_lineage)
 
     def __enter__(self) -> "BLOOMdb3":
         """Context manager entry - returns self."""
