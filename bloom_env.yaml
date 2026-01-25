@@ -39,7 +39,8 @@ dependencies:
   - rclone
   - gunicorn
   - pip:
-    - zebra_day==0.3.4 
+    - -e ../daylily-tapdb
+    - zebra_day==0.3.4
     - fedex_tracking_day==0.2.8
     - black
     - uvicorn==0.28.0
