@@ -684,9 +684,9 @@ class BloomObj:
                 al.changed_at,
                 COALESCE(gt.name, gi.name, gil.name) AS name,
                 COALESCE(gt.polymorphic_discriminator, gi.polymorphic_discriminator, gil.polymorphic_discriminator) AS polymorphic_discriminator,
-                COALESCE(gt.super_type, gi.super_type, gil.super_type) AS super_type,
-                COALESCE(gt.btype, gi.btype, gil.btype) AS btype,
-                COALESCE(gt.b_sub_type, gi.b_sub_type, gil.b_sub_type) AS b_sub_type,
+                COALESCE(gt.category, gi.category, gil.category) AS super_type,
+                COALESCE(gt.type, gi.type, gil.type) AS btype,
+                COALESCE(gt.subtype, gi.subtype, gil.subtype) AS b_sub_type,
                 COALESCE(gt.bstatus, gi.bstatus, gil.bstatus) AS status,
                 al.old_value,
                 al.new_value
@@ -717,9 +717,9 @@ class BloomObj:
             SELECT
                 'Generic Template Summary' as Report,
                 COUNT(*) as Total_Templates,
-                COUNT(DISTINCT btype) as Distinct_Base_Types,
-                COUNT(DISTINCT b_sub_type) as Distinct_Sub_Types,
-                COUNT(DISTINCT super_type) as Distinct_Super_Types,
+                COUNT(DISTINCT type) as Distinct_Base_Types,
+                COUNT(DISTINCT subtype) as Distinct_Sub_Types,
+                COUNT(DISTINCT category) as Distinct_Super_Types,
                 MAX(created_dt) as Latest_Creation_Date,
                 MIN(created_dt) as Earliest_Creation_Date,
                 AVG(AGE(NOW(), created_dt)) as Average_Age,
@@ -756,10 +756,10 @@ class BloomObj:
             -- Summary from generic_instance table
             'Generic Instance Summary' as Report,
             COUNT(*) as Total_Instances,
-            COUNT(DISTINCT btype) as Distinct_Types,
+            COUNT(DISTINCT type) as Distinct_Types,
             COUNT(DISTINCT polymorphic_discriminator) as Distinct_Polymorphic_Discriminators,
-            COUNT(DISTINCT super_type) as Distinct_Super_Types,
-            COUNT(DISTINCT b_sub_type) as Distinct_Sub_Types,
+            COUNT(DISTINCT category) as Distinct_Super_Types,
+            COUNT(DISTINCT subtype) as Distinct_Sub_Types,
             MAX(created_dt) as Latest_Creation_Date,
             MIN(created_dt) as Earliest_Creation_Date,
             AVG(AGE(NOW(), created_dt)) as Average_Age
@@ -767,7 +767,7 @@ class BloomObj:
             generic_instance
         WHERE
             is_deleted = {self.is_deleted}
-            
+
         UNION ALL
 
         SELECT
@@ -777,7 +777,7 @@ class BloomObj:
             COUNT(DISTINCT parent_type) as Distinct_Parent_Types,
             COUNT(DISTINCT child_type) as Distinct_Child_Types,
             COUNT(DISTINCT polymorphic_discriminator) as Distinct_Polymorphic_Discriminators,
-            COUNT(DISTINCT super_type) as Distinct_Super_Types,
+            COUNT(DISTINCT category) as Distinct_Super_Types,
             MAX(created_dt) as Latest_Creation_Date,
             MIN(created_dt) as Earliest_Creation_Date,
             AVG(AGE(NOW(), created_dt)) as Average_Age
@@ -855,7 +855,7 @@ class BloomObj:
         JOIN generic_instance AS gi_parent2 ON gil2.parent_instance_uuid = gi_parent2.uuid
         WHERE
         gi_parent2.euid = '{qx_euid}' AND
-        gi.btype = 'package' AND
+        gi.type = 'package' AND
         jsonb_typeof(gi.json_addl -> 'properties') = 'object' AND
         jsonb_typeof(gi.json_addl -> 'properties' -> 'fedex_tracking_data') = 'array' AND
         jsonb_typeof((gi.json_addl -> 'properties' -> 'fedex_tracking_data' -> 0)) = 'object' AND
@@ -885,15 +885,17 @@ class BloomObj:
             Query result containing node and edge data
         """
         # SQL query with parameterized placeholders for security
+        # Note: TapDB uses 'type' instead of 'btype', 'category' instead of 'super_type',
+        # 'subtype' instead of 'b_sub_type'. We alias them back to BLOOM names for compatibility.
         query = text(
             """WITH RECURSIVE graph_data AS (
                 SELECT
                     gi.euid,
                     gi.uuid,
                     gi.name,
-                    gi.btype,
-                    gi.super_type,
-                    gi.b_sub_type,
+                    gi.type AS btype,
+                    gi.category AS super_type,
+                    gi.subtype AS b_sub_type,
                     gi.version,
                     0 AS depth,
                     NULL::text AS lineage_euid,
@@ -911,9 +913,9 @@ class BloomObj:
                     gi.euid,
                     gi.uuid,
                     gi.name,
-                    gi.btype,
-                    gi.super_type,
-                    gi.b_sub_type,
+                    gi.type AS btype,
+                    gi.category AS super_type,
+                    gi.subtype AS b_sub_type,
                     gi.version,
                     gd.depth + 1,
                     gil.euid AS lineage_euid,

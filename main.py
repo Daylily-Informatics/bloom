@@ -274,7 +274,8 @@ def highlight_json_changes(old_json_str, new_json_str):
     return '\n'.join(old_json_highlighted), '\n'.join(new_json_highlighted)
 
 
-async def get_relationship_data(obj):
+def get_relationship_data(obj):
+    """Get relationship data for an object (parent/child lineages, templates, etc.)."""
     relationship_data = {}
     for relationship in obj.__mapper__.relationships:
         if relationship.uselist:  # If it's a list of items

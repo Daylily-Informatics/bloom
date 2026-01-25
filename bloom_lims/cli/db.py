@@ -215,19 +215,41 @@ def db_migrate(revision):
 def db_seed():
     """Load seed data from template JSON files."""
     console.print("[cyan]Seeding database from templates...[/cyan]")
-    seed_script = PROJECT_ROOT / "bloom_lims" / "env" / "seed_db_containersGeneric.py"
-    
+    seed_script = PROJECT_ROOT / "seed_db_containersGeneric.py"
+
     if not seed_script.exists():
         console.print(f"[red]✗[/red] Seed script not found: {seed_script}")
         raise SystemExit(1)
-    
-    result = subprocess.run([sys.executable, str(seed_script)], cwd=PROJECT_ROOT)
-    
-    if result.returncode == 0:
-        console.print("[green]✓[/green] Seed complete")
-    else:
-        console.print("[red]✗[/red] Seed failed")
-        raise SystemExit(result.returncode)
+
+    # Seed actions first (required by other templates)
+    config_dir = PROJECT_ROOT / "bloom_lims" / "config"
+    action_files = sorted(config_dir.glob("*/action/*.json"))
+    other_files = sorted([f for f in config_dir.glob("*/*.json")
+                          if "/action/" not in str(f) and f.name != "metadata.json"])
+
+    console.print(f"  Seeding {len(action_files)} action templates...")
+    for json_file in action_files:
+        result = subprocess.run(
+            [sys.executable, str(seed_script), str(json_file)],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            console.print(f"[red]✗[/red] Failed to seed: {json_file.name}")
+            raise SystemExit(result.returncode)
+
+    console.print(f"  Seeding {len(other_files)} other templates...")
+    for json_file in other_files:
+        result = subprocess.run(
+            [sys.executable, str(seed_script), str(json_file)],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            console.print(f"[red]✗[/red] Failed to seed: {json_file.name}")
+            raise SystemExit(result.returncode)
+
+    console.print("[green]✓[/green] Seed complete")
 
 
 @db.command("shell")

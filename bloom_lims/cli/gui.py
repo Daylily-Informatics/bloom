@@ -16,17 +16,17 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 @click.command()
 @click.option('--port', '-p', default=8080, type=int, help='Port to run on (default: 8080)')
-@click.option('--host', '-h', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
+@click.option('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
 @click.option('--reload', '-r', is_flag=True, help='Enable auto-reload for development')
 @click.option('--https', is_flag=True, help='Enable HTTPS (requires certs in certs/)')
 def gui(port, host, reload, https):
     """Start the BLOOM web UI."""
     console.print(f"[cyan]Starting BLOOM UI on {host}:{port}...[/cyan]")
-    
+
     # Build uvicorn command
     cmd = [
         sys.executable, "-m", "uvicorn",
-        "bloom_lims.bkend.fastapi_bkend:app",
+        "main:app",
         "--host", host,
         "--port", str(port),
     ]
