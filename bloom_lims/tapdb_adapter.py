@@ -87,6 +87,63 @@ tapdb_core.b_sub_type = synonym("subtype")
 
 
 # =============================================================================
+# Constructor Compatibility: Translate BLOOM field names in __init__
+# =============================================================================
+# SQLAlchemy synonyms only work for attribute access, not constructor kwargs.
+# We need to intercept __init__ to translate super_type→category, etc.
+# =============================================================================
+
+def _translate_bloom_kwargs(kwargs: dict) -> dict:
+    """Translate BLOOM field names to TapDB field names in kwargs."""
+    translations = {
+        "super_type": "category",
+        "btype": "type",
+        "b_sub_type": "subtype",
+    }
+    result = {}
+    for key, value in kwargs.items():
+        translated_key = translations.get(key, key)
+        result[translated_key] = value
+    return result
+
+
+class _BloomCompatibleClassWrapper:
+    """
+    Wrapper that intercepts class instantiation to translate BLOOM field names.
+
+    This allows code like:
+        generic_template(super_type="container", btype="plate", b_sub_type="96-well")
+    to work with TapDB models that expect:
+        generic_template(category="container", type="plate", subtype="96-well")
+
+    The wrapper delegates all attribute access to the underlying class,
+    but intercepts __call__ to translate kwargs.
+    """
+    def __init__(self, tapdb_class):
+        self._tapdb_class = tapdb_class
+
+    def __call__(self, **kwargs):
+        """Create an instance with translated kwargs."""
+        translated = _translate_bloom_kwargs(kwargs)
+        return self._tapdb_class(**translated)
+
+    def __getattr__(self, name):
+        """Delegate attribute access to the underlying class."""
+        return getattr(self._tapdb_class, name)
+
+    def __repr__(self):
+        return f"<BloomCompatible({self._tapdb_class.__name__})>"
+
+    @property
+    def __name__(self):
+        return self._tapdb_class.__name__
+
+    @property
+    def __module__(self):
+        return self._tapdb_class.__module__
+
+
+# =============================================================================
 # Class Compatibility: Aliases for BLOOM-specific class names
 # =============================================================================
 # BLOOM references Base.classes.file_set_instance but TapDB doesn't define it.
@@ -290,15 +347,17 @@ class BLOOMdb3:
         ]
         for cls in classes_to_register:
             class_name = cls.__name__
-            setattr(self.Base.classes, class_name, cls)
+            # Wrap with BLOOM-compatible wrapper that translates field names
+            wrapped = _BloomCompatibleClassWrapper(cls)
+            setattr(self.Base.classes, class_name, wrapped)
 
-        # Register BLOOM-specific aliases
-        setattr(self.Base.classes, "file_set_template", file_template)
-        setattr(self.Base.classes, "file_reference_template", file_template)
-        setattr(self.Base.classes, "file_set_instance", file_instance)
-        setattr(self.Base.classes, "file_reference_instance", file_instance)
-        setattr(self.Base.classes, "file_set_instance_lineage", file_instance_lineage)
-        setattr(self.Base.classes, "file_reference_instance_lineage", file_instance_lineage)
+        # Register BLOOM-specific aliases (also wrapped)
+        setattr(self.Base.classes, "file_set_template", _BloomCompatibleClassWrapper(file_template))
+        setattr(self.Base.classes, "file_reference_template", _BloomCompatibleClassWrapper(file_template))
+        setattr(self.Base.classes, "file_set_instance", _BloomCompatibleClassWrapper(file_instance))
+        setattr(self.Base.classes, "file_reference_instance", _BloomCompatibleClassWrapper(file_instance))
+        setattr(self.Base.classes, "file_set_instance_lineage", _BloomCompatibleClassWrapper(file_instance_lineage))
+        setattr(self.Base.classes, "file_reference_instance_lineage", _BloomCompatibleClassWrapper(file_instance_lineage))
 
     def __enter__(self) -> "BLOOMdb3":
         """Context manager entry - returns self."""
