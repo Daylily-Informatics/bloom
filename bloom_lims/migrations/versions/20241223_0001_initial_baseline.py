@@ -1,7 +1,7 @@
 """Initial baseline migration - stamps existing schema
 
 This migration does NOT create tables - it establishes a baseline
-for the existing BLOOM LIMS schema created by postgres_schema_v3.sql.
+for the existing BLOOM LIMS schema created by TapDB schema (tapdb_schema.sql).
 
 Run this migration on an existing database to register the current
 schema state with Alembic before making any new migrations.
@@ -28,7 +28,7 @@ def upgrade() -> None:
     Baseline migration - no schema changes.
     
     This migration assumes the database was created using:
-    bloom_lims/env/postgres_schema_v3.sql
+    TapDB schema (tapdb_schema.sql) + bloom_prefix_sequences.sql
     
     Tables that should exist:
     - generic_template
@@ -57,7 +57,7 @@ def upgrade() -> None:
     if missing:
         raise RuntimeError(
             f"Baseline migration failed: missing tables {missing}. "
-            f"Please run postgres_schema_v3.sql first to initialize the database."
+            f"Please run install_postgres.sh first to initialize the database with TapDB schema."
         )
     
     # Log baseline establishment
@@ -71,10 +71,10 @@ def downgrade() -> None:
     
     The baseline migration cannot be downgraded because it doesn't
     create any schema - it only establishes a reference point.
-    To fully reset, drop the database and recreate with postgres_schema_v3.sql.
+    To fully reset, drop the database and recreate with install_postgres.sh (TapDB schema).
     """
     raise RuntimeError(
         "Cannot downgrade baseline migration. "
-        "To reset, drop the database and recreate with postgres_schema_v3.sql"
+        "To reset, drop the database and recreate with install_postgres.sh"
     )
 

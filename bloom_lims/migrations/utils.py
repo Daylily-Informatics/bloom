@@ -111,7 +111,7 @@ def stamp_baseline() -> None:
     Stamp the database with the baseline revision.
     
     Use this on an existing database that was created with
-    postgres_schema_v3.sql to register it with Alembic.
+    TapDB schema (tapdb_schema.sql) to register it with Alembic.
     """
     config = get_alembic_config()
     logger.info("Stamping database with baseline revision")

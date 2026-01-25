@@ -20,6 +20,6 @@ Usage:
     alembic history
 
 Note: BLOOM uses a hybrid approach where the initial schema is defined
-in SQL (postgres_schema_v3.sql) and Alembic is used for subsequent changes.
+in SQL (TapDB schema: tapdb_schema.sql) and Alembic is used for subsequent changes.
 """
 
