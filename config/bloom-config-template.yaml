@@ -14,7 +14,7 @@
 # =============================================================================
 
 # AWS SETTINGS
-aws_profile: daylily
+aws_profile: <profile_name>  # Leave empty to use default profile
 aws_default_region: us-east-1
 
 # Application settings
