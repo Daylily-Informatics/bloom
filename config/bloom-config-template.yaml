@@ -1,0 +1,194 @@
+# =============================================================================
+# BLOOM LIMS Configuration Template
+# =============================================================================
+# Copy this file to ~/.config/bloom/bloom-config.yaml and customize as needed.
+#
+# Configuration precedence (highest to lowest):
+#   1. Environment variables (BLOOM_* prefix)
+#   2. User config file (~/.config/bloom/bloom-config.yaml)
+#   3. Template defaults (this file)
+#
+# Environment variable format:
+#   - Simple: BLOOM_DEBUG=true
+#   - Nested: BLOOM_DATABASE__HOST=localhost
+# =============================================================================
+
+# AWS SETTINGS
+aws_profile: daylily
+aws_default_region: us-east-1
+
+# Application settings
+app_name: "BLOOM LIMS"
+environment: "development"  # development, staging, production, testing
+debug: false
+
+# -----------------------------------------------------------------------------
+# Database Configuration
+# -----------------------------------------------------------------------------
+database:
+  host: "localhost"
+  port: 5445                    # Default BLOOM PostgreSQL port
+  database: "bloom"             # Database name
+  user: "bloom"                 # Database user
+  password: ""                  # Leave empty for peer authentication
+  pool_size: 5                  # Connection pool size
+  max_overflow: 10              # Maximum pool overflow connections
+  pool_timeout: 30              # Pool connection timeout (seconds)
+  pool_recycle: 1800            # Connection recycle time (seconds)
+  echo: false                   # Echo SQL statements to console
+
+  # Read replica configuration (optional, for scaling)
+  enable_read_replicas: false
+  read_replicas: []             # List of {host, port, weight, max_lag_seconds, enabled}
+  replica_health_check_interval: 30
+
+# -----------------------------------------------------------------------------
+# Storage Configuration
+# -----------------------------------------------------------------------------
+storage:
+  upload_dir: "/var/lib/bloom/uploads"
+  temp_dir: "/tmp/bloom"
+  max_file_size_mb: 100
+  allowed_extensions:
+    - "pdf"
+    - "csv"
+    - "xlsx"
+    - "txt"
+    - "json"
+    - "png"
+    - "jpg"
+    - "jpeg"
+
+  # S3/Object storage (optional)
+  s3_bucket: ""
+  s3_prefix: "bloom-files/"
+  s3_region: "us-east-1"
+  s3_endpoint: ""               # For S3-compatible storage (MinIO, etc.)
+
+# -----------------------------------------------------------------------------
+# API Configuration
+# -----------------------------------------------------------------------------
+api:
+  title: "BLOOM LIMS API"
+  prefix: "/api/v1"
+
+  # Pagination
+  pagination_default_size: 50
+  pagination_max_size: 1000
+
+  # Rate limiting
+  rate_limit_enabled: true
+  rate_limit_requests: 100
+  rate_limit_window_seconds: 60
+
+  # Timeouts
+  request_timeout_seconds: 30
+  long_running_timeout_seconds: 300
+
+  # CORS
+  cors_origins:
+    - "*"
+  cors_allow_credentials: true
+
+# -----------------------------------------------------------------------------
+# Authentication Configuration
+# -----------------------------------------------------------------------------
+auth:
+  # AWS Cognito (optional)
+  cognito_user_pool_id: ""
+  cognito_client_id: ""
+  cognito_region: ""
+  cognito_domain: ""
+  cognito_redirect_uri: ""
+  cognito_logout_redirect_uri: ""
+  cognito_scopes:
+    - "openid"
+    - "email"
+    - "profile"
+  cognito_allowed_domains: []
+
+  # JWT settings
+  jwt_secret: ""                # REQUIRED for production
+  jwt_algorithm: "HS256"
+  jwt_expiry_hours: 24
+
+  # Session settings
+  session_timeout_minutes: 30
+  max_sessions_per_user: 5
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"                 # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  json_format: false            # Use JSON structured logging
+  log_file: ""                  # Empty for stdout only
+  max_file_size_mb: 10
+  backup_count: 5
+
+# -----------------------------------------------------------------------------
+# Feature Flags
+# -----------------------------------------------------------------------------
+features:
+  enable_audit_logging: true
+  enable_workflow_notifications: true
+  enable_file_versioning: true
+  enable_advanced_search: true
+  enable_api_caching: false
+  maintenance_mode: false
+
+# -----------------------------------------------------------------------------
+# Cache Configuration
+# -----------------------------------------------------------------------------
+cache:
+  enabled: true
+  backend: "memory"             # memory, redis, memcached
+  max_size: 5000                # Max entries (memory backend)
+  default_ttl: 300              # Default TTL in seconds
+
+  # TTL by object type
+  template_ttl: 3600            # Templates: 1 hour
+  instance_ttl: 300             # Instances: 5 minutes
+  lineage_ttl: 300              # Lineage: 5 minutes
+  query_ttl: 60                 # Query results: 1 minute
+
+  # Redis settings (if backend: redis)
+  redis_host: "localhost"
+  redis_port: 6379
+  redis_db: 0
+  redis_password: null
+  redis_ssl: false
+  redis_cluster: false
+
+  # Memcached settings (if backend: memcached)
+  memcached_servers:
+    - "localhost:11211"
+
+# -----------------------------------------------------------------------------
+# Business Constants (rarely need to change)
+# -----------------------------------------------------------------------------
+constants:
+  default_version: "1.0"
+  wildcard_version: "*"
+
+  # Status values
+  status_created: "created"
+  status_in_progress: "in_progress"
+  status_complete: "complete"
+  status_failed: "failed"
+  status_abandoned: "abandoned"
+  status_active: "active"
+
+  # Graph/lineage settings
+  max_lineage_depth: 10
+  max_children_per_query: 10000
+
+  # Default printer/lab settings
+  default_label_style: "tube_2inX1in"
+  default_lab_code: "BLOOM"
+  default_timezone: "US/Eastern"
+
+  # Template config paths (relative to bloom_lims)
+  config_base_path: "config"
+
