@@ -1,8 +1,8 @@
-# TAPDB Development Rules
+# daylily-tapdb Development Rules
 
 ## Core Invariants
 
-These rules must NEVER be violated. They are fundamental to the TAPDB architecture.
+These rules must NEVER be violated. They are fundamental to the daylily-tapdb architecture.
 
 ### Rule 1: Three-Table Model
 
@@ -203,5 +203,4 @@ Prefer containment operators for JSON queries:
 
 ---
 
-*TAPDB Development Rules - Enforce via code review and CI checks*
-
+*daylily-tapdb Development Rules - Enforce via code review and CI checks*

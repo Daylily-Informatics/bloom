@@ -293,6 +293,10 @@ def list_subjects_for_object(bob, object_euid: str) -> List[Dict[str, Any]]:
     if not obj:
         return subjects
 
+    # Templates don't have lineage relationships - only instances do
+    if not hasattr(obj, 'child_of_lineages'):
+        return subjects
+
     # Check child_of_lineages to find subjects where this object is a child
     for lineage in obj.child_of_lineages:
         if lineage.is_deleted:
@@ -336,6 +340,10 @@ def list_members_for_subject(bob, subject_euid: str) -> Dict[str, List[Dict[str,
     subject = bob.get_by_euid(subject_euid)
 
     if not subject:
+        return result
+
+    # Templates don't have lineage relationships - only instances do
+    if not hasattr(subject, 'parent_of_lineages'):
         return result
 
     for lineage in subject.parent_of_lineages:

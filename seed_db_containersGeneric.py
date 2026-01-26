@@ -33,23 +33,9 @@ def create_template_from_json(json_file, db):
                 else md_json["euid_prefixes"][btype]
             )
 
-            try:
-                prefix_in_schema = (
-                    os.popen(
-                        f"""grep -s "\'{obj_prefix}\' THEN" bloom_lims/env/postgres_schema_v3.sql | wc -l"""
-                    )
-                    .readline()
-                    .rstrip()
-                    .lstrip()
-                )
-                if prefix_in_schema != "1":
-                    raise Excetpion(
-                        f"Prefix {obj_prefix} not found in schema. Please add it to the schema first.  You should probably clear the database if this was a first seeding attempt"
-                    )
-            except Exception as e:
-                print(f"Error in {json_file}\n\n", e)
-                sys.exit(1)
-            print("xxx", table_prefix)
+            # TapDB uses sequence-based EUID generation via bloom_prefix_sequences.sql
+            # No need to check for CASE expressions in legacy schema
+            print(f"Seeding {table_prefix} with prefix {obj_prefix}")
             # Create new table_template record
             table_template = db.Base.classes.generic_template
             new_table_template = table_template(

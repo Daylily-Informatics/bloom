@@ -1,4 +1,4 @@
-# Template Authoring Rules
+# daylily-tapdb Template Authoring Rules
 
 ## JSON Template Structure
 
@@ -216,11 +216,11 @@ Each super_type directory must have a metadata.json:
 
 ### EUID Prefix Rules
 
-- 2-3 uppercase letters
+- 1-5 uppercase letters (typically 2-3)
 - Must be unique across all super_types
+- Must be registered in `EUIDConfig`
 - Must have corresponding database sequence
 
 ---
 
-*Template Authoring Rules for TAPDB*
-
+*Template Authoring Rules for daylily-tapdb*

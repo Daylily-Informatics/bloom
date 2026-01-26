@@ -2,11 +2,16 @@
 BLOOM LIMS Configuration Management
 
 Centralized configuration using Pydantic Settings with support for environment
-variable overrides. All hardcoded values should be defined here.
+variable overrides and YAML config files.
+
+Configuration precedence (highest to lowest):
+    1. Environment variables (BLOOM_* prefix)
+    2. User config file (~/.config/bloom/bloom-config.yaml)
+    3. Template defaults
 
 Usage:
     from bloom_lims.config import get_settings
-    
+
     settings = get_settings()
     print(settings.database.host)
     print(settings.api.pagination_default_size)
@@ -15,9 +20,67 @@ Usage:
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Config file paths
+USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
+USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
+TEMPLATE_CONFIG_FILE = Path(__file__).parent / "config" / "bloom-config-template.yaml"
+
+
+def _deep_merge(base: Dict, override: Dict) -> Dict:
+    """Deep merge two dictionaries. Override values take precedence."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def _load_yaml_config() -> Dict[str, Any]:
+    """
+    Load configuration from YAML files.
+
+    Returns merged config from template and user config.
+    Creates user config directory if missing.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return {}
+
+    config = {}
+
+    # Load template defaults
+    if TEMPLATE_CONFIG_FILE.exists():
+        try:
+            with open(TEMPLATE_CONFIG_FILE) as f:
+                template_config = yaml.safe_load(f) or {}
+                config = template_config
+        except Exception:
+            pass
+
+    # Create user config dir if missing
+    if not USER_CONFIG_DIR.exists():
+        try:
+            USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    # Load user config and merge
+    if USER_CONFIG_FILE.exists():
+        try:
+            with open(USER_CONFIG_FILE) as f:
+                user_config = yaml.safe_load(f) or {}
+                config = _deep_merge(config, user_config)
+        except Exception:
+            pass
+
+    return config
 
 
 class ReadReplicaSettings(BaseModel):
@@ -288,8 +351,10 @@ class BloomSettings(BaseSettings):
     """
     Main settings class for BLOOM LIMS.
 
-    Configuration is loaded from environment variables with the BLOOM_ prefix.
-    Nested settings use double underscore separator.
+    Configuration precedence (highest to lowest):
+        1. Environment variables (BLOOM_* prefix)
+        2. User config file (~/.config/bloom/bloom-config.yaml)
+        3. Template defaults (bloom_lims/config/bloom-config-template.yaml)
 
     Examples:
         BLOOM_DATABASE__HOST=localhost
@@ -318,6 +383,14 @@ class BloomSettings(BaseSettings):
     features: FeatureFlags = Field(default_factory=FeatureFlags)
     cache: CacheSettings = Field(default_factory=CacheSettings)
     constants: BusinessConstants = Field(default_factory=BusinessConstants)
+
+    def __init__(self, **kwargs):
+        """Initialize settings with YAML config as base."""
+        # Load YAML config first
+        yaml_config = _load_yaml_config()
+        # Merge with any explicit kwargs (kwargs take precedence)
+        merged = _deep_merge(yaml_config, kwargs)
+        super().__init__(**merged)
 
     @field_validator("environment")
     @classmethod
@@ -412,3 +485,37 @@ def get_cognito_config() -> tuple:
         settings.auth.cognito_user_pool_id,
         settings.auth.cognito_client_id,
     )
+
+
+# Config file management utilities
+def get_user_config_path() -> Path:
+    """Get the path to the user's config file."""
+    return USER_CONFIG_FILE
+
+
+def get_template_config_path() -> Path:
+    """Get the path to the template config file."""
+    return TEMPLATE_CONFIG_FILE
+
+
+def ensure_user_config_exists() -> Path:
+    """
+    Ensure user config directory and file exist.
+
+    Creates ~/.config/bloom/ directory if missing.
+    Copies template to user config if user config doesn't exist.
+
+    Returns:
+        Path to user config file
+    """
+    import shutil
+
+    # Create directory
+    if not USER_CONFIG_DIR.exists():
+        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Copy template if user config doesn't exist
+    if not USER_CONFIG_FILE.exists() and TEMPLATE_CONFIG_FILE.exists():
+        shutil.copy(TEMPLATE_CONFIG_FILE, USER_CONFIG_FILE)
+
+    return USER_CONFIG_FILE

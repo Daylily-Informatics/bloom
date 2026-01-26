@@ -39,7 +39,8 @@ dependencies:
   - rclone
   - gunicorn
   - pip:
-    - zebra_day==0.3.4 
+    - -e ../daylily-tapdb
+    - zebra_day==0.3.4
     - fedex_tracking_day==0.2.8
     - black
     - uvicorn==0.28.0
@@ -57,3 +58,6 @@ dependencies:
     - pandas
     - matplotlib
     - pydantic-settings>=2.0.0
+    - pyyaml>=6.0
+    - click>=8.0
+    - rich>=13.0

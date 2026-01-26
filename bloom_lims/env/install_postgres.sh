@@ -47,17 +47,60 @@ ALTER USER $PGUSER PASSWORD '$PGPASSWORD';
 
 EOF
 
+# Create the bloom database
 createdb --owner $USER $PGDBNAME
 
-# create the schema/db from the template
+# Create bloom role if it doesn't exist (for compatibility with DATABASE_URL using bloom user)
+PGPORT=5445 psql -U $PGUSER -d postgres << EOF
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'bloom') THEN
+        CREATE ROLE bloom WITH LOGIN PASSWORD 'bloom';
+    END IF;
+END
+\$\$;
+GRANT ALL PRIVILEGES ON DATABASE $PGDBNAME TO bloom;
+EOF
 
-envsubst < bloom_lims/env/postgres_schema_v3.sql | psql -U "$PGUSER" -d "$PGDBNAME" -w
+# create the schema/db from TapDB schema
+# TAPDB_SCHEMA_SQL can be set to override the default path to the TapDB schema
+TAPDB_SCHEMA_SQL=${TAPDB_SCHEMA_SQL:-../daylily-tapdb/schema/tapdb_schema.sql}
+
+if [[ ! -f "$TAPDB_SCHEMA_SQL" ]]; then
+    echo "\n\n\n\n\n\tERROR\n\t\t TapDB schema not found at: $TAPDB_SCHEMA_SQL\n\t\t Set TAPDB_SCHEMA_SQL to the correct path.\n"
+    sleep 3
+    return 1
+fi
+
+echo "Applying TapDB schema from: $TAPDB_SCHEMA_SQL"
+psql -U "$PGUSER" -d "$PGDBNAME" -w -f "$TAPDB_SCHEMA_SQL"
 if [[ $? -ne 0 ]]; then
-    echo "\n\n\n\n\n\tERROR\n\t\t Failed to create database schema. Please check the error message above and try again.\n"
+    echo "\n\n\n\n\n\tERROR\n\t\t Failed to apply TapDB schema. Please check the error message above and try again.\n"
     sleep 3
     return 1
 else
-    echo "Database schema and tables created successfully."
+    echo "TapDB schema applied successfully."
+fi
+
+# Grant bloom role permissions on all tables and sequences
+echo "Granting permissions to bloom role..."
+PGPORT=5445 psql -U $PGUSER -d $PGDBNAME << EOF
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO bloom;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO bloom;
+GRANT USAGE ON SCHEMA public TO bloom;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bloom;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bloom;
+EOF
+
+# Apply BLOOM-specific prefix sequences for EUID generation
+echo "Applying BLOOM prefix sequences..."
+psql -U "$PGUSER" -d "$PGDBNAME" -w -f bloom_lims/env/bloom_prefix_sequences.sql
+if [[ $? -ne 0 ]]; then
+    echo "\n\n\n\n\n\tERROR\n\t\t Failed to create BLOOM prefix sequences. Please check the error message above and try again.\n"
+    sleep 3
+    return 1
+else
+    echo "BLOOM prefix sequences created successfully."
     echo "You may use the pgsql datastore $PGDATA to connect to the '$PGDBNAME' databse using $PGUSER and pw: $PGPASSWORD and connect to database: $PGDBNAME ."
 fi
 
