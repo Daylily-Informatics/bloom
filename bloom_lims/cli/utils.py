@@ -13,6 +13,7 @@ console = Console()
 # Get project root
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 PGDATA = PROJECT_ROOT / "bloom_lims" / "database"
+SERVER_LOG_DIR = Path.home() / ".bloom" / "logs"
 
 
 @click.command()
@@ -59,11 +60,18 @@ settings = get_settings()
 @click.command()
 @click.option('--lines', '-n', default=50, type=int, help='Number of lines to show')
 @click.option('--follow', '-f', is_flag=True, help='Follow log output')
-@click.option('--service', '-s', type=click.Choice(['postgres', 'all']), default='all', 
+@click.option('--service', '-s', type=click.Choice(['server', 'postgres', 'all']), default='all', 
               help='Service to show logs for')
 def logs(lines, follow, service):
     """View BLOOM service logs."""
     log_files = []
+    
+    # Check for server logs
+    if service in ['server', 'all']:
+        if SERVER_LOG_DIR.exists():
+            server_logs = sorted(SERVER_LOG_DIR.glob("server_*.log"), reverse=True)
+            if server_logs:
+                log_files.append(('Server', server_logs[0]))
     
     if service in ['postgres', 'all']:
         pg_log = PGDATA / "postgresql.log"
@@ -74,6 +82,7 @@ def logs(lines, follow, service):
         console.print("[yellow]No log files found.[/yellow]")
         console.print()
         console.print("Logs are available for:")
+        console.print("  • Server: [cyan]~/.bloom/logs/server_*.log[/cyan]")
         console.print("  • PostgreSQL: [cyan]bloom_lims/database/postgresql.log[/cyan]")
         return
     

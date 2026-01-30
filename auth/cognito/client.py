@@ -99,6 +99,38 @@ class CognitoAuth:
         )
         return cls(config)
 
+    @classmethod
+    def from_settings(cls, auth_settings) -> "CognitoAuth":
+        """Create CognitoAuth from BloomSettings.auth instance.
+        
+        Args:
+            auth_settings: AuthSettings instance from bloom_lims.config
+        """
+        # Validate required settings
+        required = {
+            "cognito_user_pool_id": auth_settings.cognito_user_pool_id,
+            "cognito_client_id": auth_settings.cognito_client_id,
+            "cognito_region": auth_settings.cognito_region,
+            "cognito_domain": auth_settings.cognito_domain,
+            "cognito_redirect_uri": auth_settings.cognito_redirect_uri,
+        }
+        missing = [name for name, value in required.items() if not value]
+        if missing:
+            raise CognitoConfigurationError(
+                f"Missing Cognito configuration in YAML config: {', '.join(sorted(missing))}"
+            )
+
+        config = CognitoConfig(
+            user_pool_id=auth_settings.cognito_user_pool_id,
+            client_id=auth_settings.cognito_client_id,
+            region=auth_settings.cognito_region,
+            domain=auth_settings.cognito_domain,
+            redirect_uri=auth_settings.cognito_redirect_uri,
+            logout_redirect_uri=auth_settings.cognito_logout_redirect_uri or auth_settings.cognito_redirect_uri,
+            scopes=auth_settings.cognito_scopes or ["openid", "email", "profile"],
+        )
+        return cls(config)
+
     def validate_token(self, token: str) -> Dict:
         try:
             signing_key = self._jwks_client.get_signing_key_from_jwt(token)
@@ -115,5 +147,17 @@ class CognitoAuth:
 
 @lru_cache(maxsize=1)
 def get_cognito_auth() -> CognitoAuth:
-    """Create (and cache) a CognitoAuth instance from environment variables."""
+    """Create (and cache) a CognitoAuth instance from YAML config.
+    
+    Falls back to environment variables if YAML config is incomplete.
+    """
+    try:
+        from bloom_lims.config import get_settings
+        settings = get_settings()
+        # Check if YAML config has Cognito settings
+        if settings.auth.cognito_user_pool_id and settings.auth.cognito_client_id:
+            return CognitoAuth.from_settings(settings.auth)
+    except Exception:
+        pass
+    # Fall back to environment variables
     return CognitoAuth.from_env()

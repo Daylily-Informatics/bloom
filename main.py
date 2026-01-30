@@ -207,13 +207,33 @@ class MissingCognitoEnvVarsException(HTTPException):
 
 
 def get_allowed_domains() -> List[str]:
-    """Get allowed email domains from environment.
+    """Get allowed email domains from YAML config or environment.
 
     Returns:
         Empty list [] = allow all domains
         List with domains = only those domains allowed
-        List with ["__BLOCK_ALL__"] = block all domains (when env var is empty string)
+        List with ["__BLOCK_ALL__"] = block all domains (when config is empty)
     """
+    try:
+        from bloom_lims.config import get_settings
+        settings = get_settings()
+        domains = settings.auth.cognito_allowed_domains
+        
+        # If YAML config has domains, use them
+        if domains:
+            # ["*"] = allow all
+            if domains == ["*"]:
+                return []
+            return domains
+        
+        # Empty list in YAML = block all
+        # Check if it was explicitly set (vs default)
+        # For now, empty list blocks all (consistent with atlas/ursa)
+        return ["__BLOCK_ALL__"]
+    except Exception:
+        pass
+    
+    # Fall back to environment variable
     whitelist_domains = os.getenv("COGNITO_WHITELIST_DOMAINS", "all")
 
     # Empty string = block all domains
