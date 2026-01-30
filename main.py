@@ -207,11 +207,23 @@ class MissingCognitoEnvVarsException(HTTPException):
 
 
 def get_allowed_domains() -> List[str]:
+    """Get allowed email domains from environment.
+
+    Returns:
+        Empty list [] = allow all domains
+        List with domains = only those domains allowed
+        List with ["__BLOCK_ALL__"] = block all domains (when env var is empty string)
+    """
     whitelist_domains = os.getenv("COGNITO_WHITELIST_DOMAINS", "all")
-    if len(whitelist_domains) == 0:
-        whitelist_domains = "all"
-    if whitelist_domains.lower() == "all":
+
+    # Empty string = block all domains
+    if whitelist_domains == "":
+        return ["__BLOCK_ALL__"]
+
+    # "all" or "*" = allow all domains
+    if whitelist_domains.lower() in ("all", "*"):
         return []
+
     return [domain.strip() for domain in whitelist_domains.split(",") if domain.strip()]
 
 
@@ -468,10 +480,20 @@ async def oauth_callback(request: Request):
         )
 
     allowed_domains = get_allowed_domains()
+    # Handle block all sentinel (when COGNITO_WHITELIST_DOMAINS="")
+    if allowed_domains == ["__BLOCK_ALL__"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email domain authentication is not enabled"
+        )
+    # Check against whitelist if not empty (empty = allow all)
     if allowed_domains:
         user_domain = primary_email.split("@")[-1]
         if user_domain not in allowed_domains:
-            raise HTTPException(status_code=400, detail="Email domain not allowed")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email domain not allowed"
+            )
 
     user_data = proc_udat(primary_email)
     user_data.update(
@@ -3199,11 +3221,11 @@ def directory_listing(directory: Path, file_path: str) -> HTMLResponse:
     for item in items:
         if item.is_dir():
             files.append(
-                f'<li><a href="/serve_endpoint/{file_path.lstrip('/')}/{item.name}/">{item.name}/</a></li>'
+                f"<li><a href=\"/serve_endpoint/{file_path}/{item.name}/\">{item.name}/</a></li>"
             )
         else:
             files.append(
-                f'<li><a href="/serve_endpoint/{file_path.lstrip('/')}/{item.name}">{item.name}</a></li>'
+                f"<li><a href=\"/serve_endpoint/{file_path}/{item.name}\">{item.name}</a></li>"
             )
     print('PPPPPP', str(parent_path))
     html_content = f"""
