@@ -446,6 +446,52 @@ async def get_login_page(request: Request):
     return HTMLResponse(content=template.render(context))
 
 
+@app.get("/oauth_callback")
+async def oauth_callback_get(request: Request):
+    """Handle OAuth implicit flow callback - parse URL fragment and POST tokens."""
+    html_content = """<!DOCTYPE html>
+<html>
+<head><title>Processing login...</title></head>
+<body>
+    <p>Processing your login...</p>
+    <script>
+        const fragment = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = fragment.get('access_token');
+        const idToken = fragment.get('id_token');
+        const error = fragment.get('error');
+        const errorDescription = fragment.get('error_description');
+        
+        if (error) {
+            window.location.href = '/login?error=' + encodeURIComponent(errorDescription || error);
+        } else if (accessToken || idToken) {
+            fetch('/oauth_callback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({access_token: accessToken, id_token: idToken}),
+                credentials: 'same-origin'
+            }).then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    return response.json().then(data => {
+                        window.location.href = '/login?error=' + encodeURIComponent(data.detail || 'Authentication failed');
+                    });
+                }
+            }).catch(err => {
+                console.error('Error:', err);
+                window.location.href = '/login?error=authentication_failed';
+            });
+        } else {
+            window.location.href = '/login?error=no_tokens';
+        }
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
+
 @app.post("/oauth_callback")
 async def oauth_callback(request: Request):
     body = await request.json()
