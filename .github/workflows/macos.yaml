@@ -17,6 +17,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          path: bloom
+
+      - name: Check out daylily-tapdb (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: Daylily-Informatics/daylily-tapdb
+          path: daylily-tapdb
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -27,15 +35,16 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           miniconda-version: "latest"
-          python-version: 3.12.0  # Update to your required Python version
+          python-version: 3.12.0
           activate-environment: BLOOM
-          environment-file: bloom_env.yaml  # If you have an environment file
+          environment-file: bloom/bloom_env.yaml
           auto-activate-base: false
 
       - name: Run custom PostgreSQL setup script (if applicable)
         shell: bash -l {0}
+        working-directory: bloom
         run: |
-         pip3 install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6
-         source bloom_lims/env/install_postgres.sh skip
-         pytest
+          pip3 install pytest psycopg2-binary sqlalchemy zebra_day==0.3.0.4 pytz fedex_tracking_day==0.2.6
+          source bloom_lims/env/install_postgres.sh skip
+          pytest
 

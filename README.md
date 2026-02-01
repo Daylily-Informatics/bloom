@@ -1127,55 +1127,92 @@ s3_client.download_file(
 
 ## 13. Configuration
 
-### 13.1 Environment Variables
+BLOOM uses a YAML-based configuration system with environment variable overrides.
 
-Create a `.env` file with the following variables:
+### 13.1 Configuration Files
+
+**Configuration precedence** (highest to lowest):
+1. Environment variables with `BLOOM_*` prefix
+2. User config: `~/.config/bloom/bloom-config.yaml`
+3. Template defaults: `config/bloom-config-template.yaml`
+
+**Setup:**
 
 ```bash
-# Database
-BLOOM_DB_HOST=localhost
-BLOOM_DB_PORT=5432
-BLOOM_DB_NAME=bloom_lims
-BLOOM_DB_USER=bloom_user
-BLOOM_DB_PASSWORD=secure_password
+# Copy template to user config directory
+mkdir -p ~/.config/bloom
+cp config/bloom-config-template.yaml ~/.config/bloom/bloom-config.yaml
 
-# Cognito (SSO)
-COGNITO_REGION=us-east-1
-COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
-COGNITO_CLIENT_ID=your_app_client_id
-COGNITO_DOMAIN=your-custom-domain.auth.us-east-1.amazoncognito.com
-COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
-COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
-COGNITO_WHITELIST_DOMAINS=all  # or comma-separated domains
-COGNITO_SCOPES="openid email profile"
-
-# AWS S3 (optional)
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-S3_BUCKET=bloom-files
-S3_REGION=us-east-1
-
-# FedEx API
-FEDEX_API_KEY=your-fedex-key
-FEDEX_SECRET=your-fedex-secret
-
-# Application
-FLASK_SECRET_KEY=your-flask-secret
-DEBUG=false
-LOG_LEVEL=INFO
+# Edit with your settings
+$EDITOR ~/.config/bloom/bloom-config.yaml
 ```
 
-### 13.2 Database Connection String
+### 13.2 Configuration Reference
+
+```yaml
+# ~/.config/bloom/bloom-config.yaml
+
+# Application settings
+environment: "development"  # development, staging, production, testing
+debug: false
+
+# Database
+database:
+  host: "localhost"
+  port: 5445                    # Default BLOOM PostgreSQL port
+  database: "bloom"
+  user: "bloom"
+  password: ""                  # Leave empty for peer authentication
+
+# Authentication (Cognito)
+auth:
+  cognito_region: "us-east-1"
+  cognito_user_pool_id: "us-east-1_XXXXXXXXX"
+  cognito_client_id: "your_app_client_id"
+  cognito_domain: "your-domain.auth.us-east-1.amazoncognito.com"
+  cognito_redirect_uri: "http://127.0.0.1:8000/"
+  cognito_logout_redirect_uri: "http://127.0.0.1:8000/"
+  cognito_allowed_domains: []   # Empty = allow all
+
+# AWS settings
+aws:
+  profile: ""                   # AWS profile name (optional)
+  region: "us-west-2"
+
+# Storage (S3)
+storage:
+  s3_bucket: ""
+  s3_region: "us-east-1"
+
+# Logging
+logging:
+  level: "INFO"
+```
+
+### 13.3 Environment Variable Overrides
+
+Override any YAML setting with environment variables using `BLOOM_` prefix and `__` for nesting:
+
+```bash
+export BLOOM_DATABASE__HOST=localhost
+export BLOOM_DATABASE__PORT=5445
+export BLOOM_AUTH__COGNITO_REGION=us-east-1
+export BLOOM_DEBUG=true
+```
+
+### 13.4 Database Connection
+
+The database URL is constructed automatically from configuration:
 
 ```python
-# Constructed from environment variables
-DATABASE_URL = f"postgresql://{BLOOM_DB_USER}:{BLOOM_DB_PASSWORD}@{BLOOM_DB_HOST}:{BLOOM_DB_PORT}/{BLOOM_DB_NAME}"
+from bloom_lims.config import get_settings
 
-# Or set directly
-DATABASE_URL = os.getenv("DATABASE_URL")
+settings = get_settings()
+db_url = settings.database.connection_string
+# postgresql://bloom@localhost:5445/bloom
 ```
 
-### 13.3 Printer Configuration
+### 13.5 Printer Configuration
 
 Printer configuration is stored in YAML files:
 
@@ -1206,7 +1243,7 @@ labs:
           ^XZ
 ```
 
-### 13.4 Assay Configuration
+### 13.6 Assay Configuration
 
 ```yaml
 # config/assay_config.yaml
@@ -1385,19 +1422,23 @@ cd bloom
 # This will attempt to build the conda env, install postgres, the database, build the schema and start postgres
 source bloom_lims/env/install_postgres.sh
 
-# conda activate BLOOM if it has not happened already.
+# Activate the BLOOM environment (use this for all future sessions)
+source bloom_activate.sh
 
 # Start the Bloom LIMS UI
-source run_bloomui.sh
+bloom gui
 ```
 
 ### (Optional) Install & Run pgadmin4 Database Admin UI
 
 ```bash
+# Ensure environment is activated first
+source bloom_activate.sh
+
 # RUN TESTS
 pytest
 
-# START THE UIs (on localhost:8080)
+# INSTALL pgadmin4 (on localhost:8080)
 source bloom_lims/env/install_pgadmin.sh
 ```
 
@@ -1406,7 +1447,7 @@ source bloom_lims/env/install_pgadmin.sh
 ## 16. Testing
 
 ```bash
-conda activate BLOOM
+source bloom_activate.sh
 pytest
 ```
 
@@ -1482,8 +1523,10 @@ All other relationships are subsets of this, and designing parts of the LIMS whi
 
 ## 19. Dev Tools
 
-__note:__ all commands below are expected to be run from a shell with conda activated.
-`conda activate BLOOM`
+__note:__ all commands below are expected to be run from a shell with the BLOOM environment activated:
+```bash
+source bloom_activate.sh
+```
 
 ### Drop The Entire Database (Loose All Data!) > Rebuild The Database / Re-seed With All Accessible JSON Templates
 
@@ -1495,7 +1538,7 @@ source clear_and_rebuild_postgres.sh
 ```
 
 #### Stop pgsql
-- `source bloom_lims/bin/stop_bloom_db.sh`
+- `bloom db stop` or `source bloom_lims/bin/stop_bloom_db.sh`
 
 #### Remove the db
 - `rm -rf bloom_lims/database/*`
@@ -1509,13 +1552,13 @@ Similar to `pytest`, but more extensive. Useful for development and smoke testin
 - Example: `python smoke_exams/accession_extract_qant.py 2 1` (runs 2 iterations with HLA-typing assay)
 
 #### Run the bloom UI
-- `source run_bloomui.sh`
+- `bloom gui` or `source run_bloomui.sh`
 
 #### Run the pgadmin UI
 - `source bloom_lims/env/install_pgadmin.sh`
 
 #### Start Interactive Shell w/Core Bloom Objects Instantiated
-`python bloom_shell.py`
+`bloom shell` or `python bloom_shell.py`
 
 ### Random Notes
 

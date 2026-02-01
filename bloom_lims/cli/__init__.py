@@ -20,7 +20,7 @@ from rich.table import Table
 
 # Import subcommand groups
 from bloom_lims.cli.db import db
-from bloom_lims.cli.gui import gui
+from bloom_lims.cli.gui import gui, stop
 from bloom_lims.cli.info import info, status, doctor, version
 from bloom_lims.cli.config_cmd import config
 from bloom_lims.cli.utils import shell, logs
@@ -60,6 +60,7 @@ def cli(ctx, verbose, show_version):
 # Register command groups
 cli.add_command(db)
 cli.add_command(gui)
+cli.add_command(stop)
 cli.add_command(info)
 cli.add_command(status)
 cli.add_command(doctor)

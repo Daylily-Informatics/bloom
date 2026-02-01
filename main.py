@@ -22,8 +22,20 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime, timedelta, date
 
-from dotenv import load_dotenv
-load_dotenv(override=True)  
+# Set AWS_PROFILE from config if not already set
+def _init_aws_profile():
+    """Set AWS_PROFILE env var from YAML config if not already set."""
+    if os.environ.get("AWS_PROFILE"):
+        return  # Already set via environment
+    try:
+        from bloom_lims.config import get_settings
+        settings = get_settings()
+        if settings.aws.profile:
+            os.environ["AWS_PROFILE"] = settings.aws.profile
+    except Exception:
+        pass
+
+_init_aws_profile()  
 
 
 # The following three lines allow for dropping embed() in to block and present an IPython shell
@@ -207,13 +219,33 @@ class MissingCognitoEnvVarsException(HTTPException):
 
 
 def get_allowed_domains() -> List[str]:
-    """Get allowed email domains from environment.
+    """Get allowed email domains from YAML config or environment.
 
     Returns:
         Empty list [] = allow all domains
         List with domains = only those domains allowed
-        List with ["__BLOCK_ALL__"] = block all domains (when env var is empty string)
+        List with ["__BLOCK_ALL__"] = block all domains (when config is empty)
     """
+    try:
+        from bloom_lims.config import get_settings
+        settings = get_settings()
+        domains = settings.auth.cognito_allowed_domains
+        
+        # If YAML config has domains, use them
+        if domains:
+            # ["*"] = allow all
+            if domains == ["*"]:
+                return []
+            return domains
+        
+        # Empty list in YAML = block all
+        # Check if it was explicitly set (vs default)
+        # For now, empty list blocks all (consistent with atlas/ursa)
+        return ["__BLOCK_ALL__"]
+    except Exception:
+        pass
+    
+    # Fall back to environment variable
     whitelist_domains = os.getenv("COGNITO_WHITELIST_DOMAINS", "all")
 
     # Empty string = block all domains
@@ -371,7 +403,7 @@ async def require_auth(request: Request):
     try:
         get_cognito_auth()
     except CognitoConfigurationError as exc:
-        msg = f"COGNITO_* env variables not set. Is your .env file missing? ({exc})"
+        msg = f"Cognito configuration missing. Check ~/.config/bloom/bloom-config.yaml or BLOOM_AUTH__* env vars. ({exc})"
         logging.error(msg)
         raise MissingCognitoEnvVarsException(msg)
 
@@ -444,6 +476,52 @@ async def get_login_page(request: Request):
         "cognito_authorize_url": cognito_login_url,
     }
     return HTMLResponse(content=template.render(context))
+
+
+@app.get("/oauth_callback")
+async def oauth_callback_get(request: Request):
+    """Handle OAuth implicit flow callback - parse URL fragment and POST tokens."""
+    html_content = """<!DOCTYPE html>
+<html>
+<head><title>Processing login...</title></head>
+<body>
+    <p>Processing your login...</p>
+    <script>
+        const fragment = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = fragment.get('access_token');
+        const idToken = fragment.get('id_token');
+        const error = fragment.get('error');
+        const errorDescription = fragment.get('error_description');
+        
+        if (error) {
+            window.location.href = '/login?error=' + encodeURIComponent(errorDescription || error);
+        } else if (accessToken || idToken) {
+            fetch('/oauth_callback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({access_token: accessToken, id_token: idToken}),
+                credentials: 'same-origin'
+            }).then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    return response.json().then(data => {
+                        window.location.href = '/login?error=' + encodeURIComponent(data.detail || 'Authentication failed');
+                    });
+                }
+            }).catch(err => {
+                console.error('Error:', err);
+                window.location.href = '/login?error=authentication_failed';
+            });
+        } else {
+            window.location.href = '/login?error=no_tokens';
+        }
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
 
 
 @app.post("/oauth_callback")

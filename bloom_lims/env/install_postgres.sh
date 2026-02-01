@@ -1,5 +1,8 @@
 # Source me
-
+#
+# This script is for INITIAL SETUP only - it creates the BLOOM conda environment.
+# For normal operations, use: source bloom_activate.sh
+#
 # Conda install steps credit: https://gist.github.com/gwangjinkim/f13bf596fefa7db7d31c22efd1627c7a
 
 PGDATA=${PGDATA:-bloom_lims/database/bloom_lims} 

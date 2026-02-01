@@ -53,14 +53,19 @@ cd ~/projects/git/bloom/
 
 
  ##
-#  creating the .env file (see the cognito.md doc for details)
+#  Configuration (see the cognito.md doc for details)
  ##
 
-# This .env file is created in the bloom root dir.
-# Set up Cognito to get the COGNITO_CLIENT_ID, COGNITO_USER_POOL_ID, COGNITO_REGION, and COGNITO_DOMAIN variables.
-# Specify all domains which users can authenticate into the system by setting the COGNITO_WHITELIST_DOMAINS .env variable. =all will not filter, google.com,yahoo.com will only allow google and yahoo domains in. No spaces in this string.
-# Specify the S3 bucket prefix to be used to find buckets dewey can use.
-# please read the cognito.md file for more details.
+# Copy the config template to your user config directory:
+#   mkdir -p ~/.config/bloom
+#   cp config/bloom-config-template.yaml ~/.config/bloom/bloom-config.yaml
+#
+# Edit ~/.config/bloom/bloom-config.yaml to set:
+#   - Cognito settings (auth.cognito_*)
+#   - S3 bucket prefix (storage.s3_prefix)
+#   - Database settings if needed
+#
+# See bloom_lims/docs/cognito.md for detailed configuration instructions.
 
 
 # Install the BLOOM conda environment
@@ -75,8 +80,8 @@ pytest  # You should get mostly successes, and some warnings (which are fine)
 # The DB is running, we can now start the UI
 # Open a tmux session which can be detached and reattached to later.
 tmux new -s bloom
-conda activate bloom
-source run_bloomui.sh # note you'll have to edit the gvicorn command in this script to run on an  IP visivble externally.
+source bloom_activate.sh
+bloom gui  # or: source run_bloomui.sh (edit gunicorn command for external IP)
 # ctrl-b d to detach from the tmux session
 # this will run, logging to stdout.  
 

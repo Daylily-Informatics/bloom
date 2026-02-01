@@ -45,7 +45,6 @@ dependencies:
     - black
     - uvicorn==0.28.0
     - fastapi==0.110.0
-    - python-dotenv==1.0.0
     - httpx==0.27.2
     - itsdangerous==2.1.2
     - pyjwt==2.8.0

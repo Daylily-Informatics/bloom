@@ -331,92 +331,74 @@ For a custom domain like `auth.yourcompany.com`:
 
 ---
 
-## Environment Variable Configuration
+## Configuration
 
-### Complete Environment Variables Reference
+BLOOM uses a YAML-based configuration system. Configuration is loaded from:
 
-Create or update your `.env` file with the following variables:
+1. **Environment variables** (highest priority) — Use `BLOOM_*` prefix with `__` for nesting
+2. **User config file** — `~/.config/bloom/bloom-config.yaml`
+3. **Template defaults** — `config/bloom-config-template.yaml`
+
+### Setting Up Configuration
+
+1. **Copy the template to your user config directory:**
+
+   ```bash
+   mkdir -p ~/.config/bloom
+   cp config/bloom-config-template.yaml ~/.config/bloom/bloom-config.yaml
+   ```
+
+2. **Edit `~/.config/bloom/bloom-config.yaml`** with your Cognito settings:
+
+   ```yaml
+   # -----------------------------------------------------------------------------
+   # Authentication Configuration
+   # -----------------------------------------------------------------------------
+   auth:
+     # AWS Cognito settings
+     cognito_user_pool_id: "us-east-1_AbCdEfGhI"      # Your User Pool ID
+     cognito_client_id: "1abc2defgh3ijklmno4pqrst"    # Your App Client ID
+     cognito_region: "us-east-1"                       # AWS region
+     cognito_domain: "bloom-lims-yourorg.auth.us-east-1.amazoncognito.com"
+     cognito_redirect_uri: "http://127.0.0.1:8000/"
+     cognito_logout_redirect_uri: "http://127.0.0.1:8000/"
+     cognito_scopes:
+       - "openid"
+       - "email"
+       - "profile"
+     cognito_allowed_domains: []  # Empty = allow all; or ["yourcompany.com", "partner.org"]
+   ```
+
+### Environment Variable Override
+
+You can override any YAML setting with environment variables using the `BLOOM_` prefix and `__` for nested keys:
 
 ```bash
-# =============================================================================
-# AWS COGNITO CONFIGURATION
-# =============================================================================
+# Core Cognito settings
+export BLOOM_AUTH__COGNITO_REGION=us-east-1
+export BLOOM_AUTH__COGNITO_USER_POOL_ID=us-east-1_AbCdEfGhI
+export BLOOM_AUTH__COGNITO_CLIENT_ID=1abc2defgh3ijklmno4pqrst
+export BLOOM_AUTH__COGNITO_DOMAIN=bloom-lims-yourorg.auth.us-east-1.amazoncognito.com
+export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
+export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
 
-# Required: Core Cognito Settings
-# -----------------------------------------------------------------------------
-
-# AWS region where your User Pool is located
-# Find this: First part of your User Pool ID (e.g., us-east-1 from us-east-1_AbCdEfGhI)
-COGNITO_REGION=us-east-1
-
-# Your Cognito User Pool ID
-# Find this: Cognito Console → User Pools → [Your Pool] → User pool overview
-# Format: {region}_{alphanumeric}
-COGNITO_USER_POOL_ID=us-east-1_AbCdEfGhI
-
-# Your App Client ID (NOT the client secret)
-# Find this: Cognito Console → User Pools → [Your Pool] → App integration → App clients
-# Format: alphanumeric string (e.g., 1abc2defgh3ijklmno4pqrst)
-COGNITO_CLIENT_ID=1abc2defgh3ijklmno4pqrst
-
-# Your Cognito Hosted UI domain (without https://)
-# Find this: Cognito Console → User Pools → [Your Pool] → App integration → Domain
-# Format for Cognito domain: {prefix}.auth.{region}.amazoncognito.com
-# Format for custom domain: auth.yourdomain.com
-COGNITO_DOMAIN=bloom-lims-yourorg.auth.us-east-1.amazoncognito.com
-
-# Required: Redirect URLs
-# -----------------------------------------------------------------------------
-
-# Where Cognito redirects after successful authentication
-# MUST match exactly one of the "Allowed callback URLs" in your App Client
-# Include the trailing slash if that's how it's configured in Cognito
-COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
-
-# Where Cognito redirects after logout
-# MUST match exactly one of the "Allowed sign-out URLs" in your App Client
-COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
-
-# Optional: OAuth Scopes
-# -----------------------------------------------------------------------------
-
-# Space-separated list of OAuth scopes to request
-# Default: "openid email profile"
-# - openid: Required for OIDC, returns sub claim
-# - email: Returns email and email_verified claims
-# - profile: Returns name, family_name, given_name, etc.
-COGNITO_SCOPES=openid email profile
-
-# Optional: Domain Whitelisting
-# -----------------------------------------------------------------------------
-
-# Restrict login to specific email domains (comma-separated)
-# Set to "all" to allow any email domain
-# Example: "yourcompany.com,partner.org" only allows those domains
-COGNITO_WHITELIST_DOMAINS=all
-
-# =============================================================================
-# OPTIONAL: Disable Authentication (Development Only)
-# =============================================================================
-
-# Set to "no" to bypass authentication entirely (NEVER use in production!)
-# When set to "no", a default user session is created automatically
-# BLOOM_OAUTH=no
+# Disable authentication for development (NEVER use in production!)
+export BLOOM_OAUTH=no
 ```
 
-### Environment Variable Details
+### Configuration Reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `COGNITO_REGION` | ✅ Yes | - | AWS region (e.g., `us-east-1`, `us-west-2`) |
-| `COGNITO_USER_POOL_ID` | ✅ Yes | - | User Pool ID from AWS Console |
-| `COGNITO_CLIENT_ID` | ✅ Yes | - | App Client ID (not secret) |
-| `COGNITO_DOMAIN` | ✅ Yes | - | Hosted UI domain without `https://` |
-| `COGNITO_REDIRECT_URI` | ✅ Yes | - | Post-login redirect URL |
-| `COGNITO_LOGOUT_REDIRECT_URI` | ⚠️ Recommended | Same as redirect URI | Post-logout redirect URL |
-| `COGNITO_SCOPES` | ❌ No | `openid email profile` | OAuth scopes to request |
-| `COGNITO_WHITELIST_DOMAINS` | ❌ No | `all` | Allowed email domains |
-| `BLOOM_OAUTH` | ❌ No | `yes` | Set to `no` to disable auth |
+| YAML Key | Env Variable | Required | Default | Description |
+|----------|--------------|----------|---------|-------------|
+| `auth.cognito_region` | `BLOOM_AUTH__COGNITO_REGION` | ✅ Yes | - | AWS region (e.g., `us-east-1`) |
+| `auth.cognito_user_pool_id` | `BLOOM_AUTH__COGNITO_USER_POOL_ID` | ✅ Yes | - | User Pool ID from AWS Console |
+| `auth.cognito_client_id` | `BLOOM_AUTH__COGNITO_CLIENT_ID` | ✅ Yes | - | App Client ID (not secret) |
+| `auth.cognito_domain` | `BLOOM_AUTH__COGNITO_DOMAIN` | ✅ Yes | - | Hosted UI domain without `https://` |
+| `auth.cognito_redirect_uri` | `BLOOM_AUTH__COGNITO_REDIRECT_URI` | ✅ Yes | - | Post-login redirect URL |
+| `auth.cognito_logout_redirect_uri` | `BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI` | ⚠️ Recommended | Same as redirect | Post-logout redirect URL |
+| `auth.cognito_scopes` | - | ❌ No | `["openid", "email", "profile"]` | OAuth scopes to request |
+| `auth.cognito_allowed_domains` | - | ❌ No | `[]` (allow all) | Allowed email domains |
+| - | `BLOOM_OAUTH` | ❌ No | `yes` | Set to `no` to disable auth |
 
 ---
 
@@ -424,28 +406,17 @@ COGNITO_WHITELIST_DOMAINS=all
 
 ### Quick Start
 
-1. **Create/update your `.env` file** with the values from your Cognito setup:
-
-   ```bash
-   # Copy from your AWS Cognito console
-   COGNITO_REGION=us-west-2
-   COGNITO_USER_POOL_ID=us-west-2_YourPoolId
-   COGNITO_CLIENT_ID=your-client-id-here
-   COGNITO_DOMAIN=your-domain.auth.us-west-2.amazoncognito.com
-   COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
-   COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
-   COGNITO_SCOPES=openid email profile
-   COGNITO_WHITELIST_DOMAINS=all
-   ```
+1. **Set up your configuration** (see [Configuration](#configuration) above)
 
 2. **Verify your Cognito callback URLs** include your local address:
    - `http://127.0.0.1:8000/`
    - `http://localhost:8000/` (optional, add if you use localhost)
 
-3. **Start the application**:
+3. **Activate the environment and start the application**:
 
    ```bash
-   python main.py
+   source bloom_activate.sh
+   bloom gui
    ```
 
 4. **Test authentication**:
@@ -459,8 +430,10 @@ COGNITO_WHITELIST_DOMAINS=all
 For rapid local development, you can bypass Cognito:
 
 ```bash
-# In your .env file
-BLOOM_OAUTH=no
+# Set environment variable
+export BLOOM_OAUTH=no
+
+# Or add to ~/.config/bloom/bloom-config.yaml under a top-level key (not nested)
 ```
 
 > ⚠️ **Warning**: Never use `BLOOM_OAUTH=no` in production. This creates a fake user session without any authentication.
@@ -474,10 +447,17 @@ If you need to test from different hosts (e.g., mobile device on same network):
    http://192.168.1.100:8000/
    ```
 
-2. Update your `.env`:
+2. Update your `~/.config/bloom/bloom-config.yaml`:
+   ```yaml
+   auth:
+     cognito_redirect_uri: "http://192.168.1.100:8000/"
+     cognito_logout_redirect_uri: "http://192.168.1.100:8000/"
+   ```
+
+   Or use environment variables:
    ```bash
-   COGNITO_REDIRECT_URI=http://192.168.1.100:8000/
-   COGNITO_LOGOUT_REDIRECT_URI=http://192.168.1.100:8000/
+   export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://192.168.1.100:8000/
+   export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://192.168.1.100:8000/
    ```
 
 ---
@@ -563,15 +543,15 @@ echo $COGNITO_USER_POOL_ID
 echo $COGNITO_CLIENT_ID
 echo $COGNITO_DOMAIN
 
-# Check .env file is being loaded
-python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(os.getenv('COGNITO_REGION'))"
+# Check configuration is being loaded
+python -c "from bloom_lims.config import get_settings; s = get_settings(); print(s.auth.cognito_region)"
 ```
 
 **Checklist**:
-- [ ] `.env` file exists in project root
-- [ ] No typos in variable names
-- [ ] No extra spaces around `=` in `.env`
-- [ ] Values don't have quotes unless needed
+- [ ] `~/.config/bloom/bloom-config.yaml` exists with auth settings
+- [ ] No typos in YAML keys
+- [ ] YAML syntax is valid (proper indentation, colons, quotes)
+- [ ] Or environment variables are set with `BLOOM_AUTH__` prefix
 
 ---
 
@@ -734,11 +714,12 @@ python main.py
 
 ### Production Checklist
 
-#### ✅ Environment Variables
+#### ✅ Configuration Security
 
-- [ ] Never commit `.env` files to version control
-- [ ] Use secrets management (AWS Secrets Manager, HashiCorp Vault)
+- [ ] Never commit `~/.config/bloom/bloom-config.yaml` to version control
+- [ ] Use secrets management (AWS Secrets Manager, HashiCorp Vault) for sensitive values
 - [ ] Rotate credentials periodically
+- [ ] Set `environment: production` in your config
 
 #### ✅ HTTPS Only
 
@@ -760,12 +741,15 @@ response.set_cookie(
 
 #### ✅ Domain Whitelisting
 
-- [ ] Configure `COGNITO_WHITELIST_DOMAINS` to restrict access
+- [ ] Configure `auth.cognito_allowed_domains` to restrict access
 - [ ] Never use `BLOOM_OAUTH=no` in production
 
-```bash
-# Production example
-COGNITO_WHITELIST_DOMAINS=yourcompany.com,trustedpartner.org
+```yaml
+# Production example in ~/.config/bloom/bloom-config.yaml
+auth:
+  cognito_allowed_domains:
+    - "yourcompany.com"
+    - "trustedpartner.org"
 ```
 
 #### ✅ Cognito Security Settings
@@ -887,18 +871,15 @@ aws cognito-idp describe-user-pool-client \
 
 If you're migrating from the previous Supabase authentication:
 
-1. **Remove Supabase environment variables**:
-   ```bash
-   # Remove these from .env
-   # SUPABASE_URL=...
-   # SUPABASE_KEY=...
-   # SUPABASE_WHITELIST_DOMAINS=...
+1. **Remove Supabase configuration** from `~/.config/bloom/bloom-config.yaml`:
+   ```yaml
+   # Remove any supabase-related keys if present
    ```
 
-2. **Add Cognito environment variables** as documented above
+2. **Add Cognito configuration** as documented in the [Configuration](#configuration) section above
 
 3. **Update any custom integrations** that referenced Supabase
 
 4. **Test thoroughly** before deploying to production
 
-The application automatically detects the auth provider based on environment variables.
+The application automatically detects the auth provider based on configuration.
