@@ -22,8 +22,20 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime, timedelta, date
 
-from dotenv import load_dotenv
-load_dotenv(override=True)  
+# Set AWS_PROFILE from config if not already set
+def _init_aws_profile():
+    """Set AWS_PROFILE env var from YAML config if not already set."""
+    if os.environ.get("AWS_PROFILE"):
+        return  # Already set via environment
+    try:
+        from bloom_lims.config import get_settings
+        settings = get_settings()
+        if settings.aws.profile:
+            os.environ["AWS_PROFILE"] = settings.aws.profile
+    except Exception:
+        pass
+
+_init_aws_profile()  
 
 
 # The following three lines allow for dropping embed() in to block and present an IPython shell
@@ -391,7 +403,7 @@ async def require_auth(request: Request):
     try:
         get_cognito_auth()
     except CognitoConfigurationError as exc:
-        msg = f"COGNITO_* env variables not set. Is your .env file missing? ({exc})"
+        msg = f"Cognito configuration missing. Check ~/.config/bloom/bloom-config.yaml or BLOOM_AUTH__* env vars. ({exc})"
         logging.error(msg)
         raise MissingCognitoEnvVarsException(msg)
 

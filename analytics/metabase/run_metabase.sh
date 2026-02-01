@@ -62,13 +62,8 @@ export MB_JETTY_PORT="$METABASE_PORT"
 export MB_SITE_NAME="BLOOM LIMS Analytics"
 export MB_ENABLE_EMBEDDING=true
 
-# Load .env if present
-if [ -f "$SCRIPT_DIR/../../.env" ]; then
-    echo -e "${YELLOW}Loading environment from .env${NC}"
-    set -a
-    source "$SCRIPT_DIR/../../.env"
-    set +a
-fi
+# Note: Configure Metabase via environment variables before running this script.
+# See analytics/README.md for configuration details.
 
 echo -e "${GREEN}Starting Metabase on port $METABASE_PORT...${NC}"
 echo -e "${YELLOW}First startup may take 1-2 minutes to initialize.${NC}"

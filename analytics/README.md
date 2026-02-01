@@ -51,7 +51,7 @@ docker-compose up -d
 
 ```bash
 # If using conda, Metabase can run alongside BLOOM
-conda activate BLOOM
+source bloom_activate.sh
 ./analytics/metabase/run_metabase.sh
 ```
 
@@ -59,21 +59,23 @@ conda activate BLOOM
 
 ### Environment Variables
 
-Add to your `.env` file:
+Set these environment variables before running Metabase:
 
 ```bash
 # Metabase Configuration
-METABASE_PORT=3000
-METABASE_DB_TYPE=postgres
-METABASE_DB_HOST=localhost
-METABASE_DB_PORT=5432
-METABASE_DB_NAME=bloom_lims
-METABASE_DB_USER=bloom_user
-METABASE_DB_PASS=your_password
+export METABASE_PORT=3000
+export METABASE_DB_TYPE=postgres
+export METABASE_DB_HOST=localhost
+export METABASE_DB_PORT=5445
+export METABASE_DB_NAME=bloom
+export METABASE_DB_USER=bloom
+export METABASE_DB_PASS=your_password
 
 # Optional: Embed dashboards in BLOOM
-METABASE_EMBED_SECRET=your-embed-secret-key
+export METABASE_EMBED_SECRET=your-embed-secret-key
 ```
+
+These can also be added to your shell profile (`~/.zshrc` or `~/.bashrc`).
 
 ## SQL Views for Analytics
 

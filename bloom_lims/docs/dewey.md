@@ -20,8 +20,22 @@ A system to manage intake, storage, query, retrieval of all files RCRF interacts
   * buckets should not be renamed w/out coordinating updating the database for all affected files.
 * When creating the bucket, `enable versioning` and `enable object lock`.  Once the bucket is created, go to the `properties` tab, scroll down to the object lock section, clik `edit` and set the lock type to `Governance` with a default lock time to the desired duration (years ideally?).
 
-### BLOOM_DEWEY_S3_BUCKET_PREFIX= In The .env File
-The S3 prefix all of your buckets will share should be set in the `.env` file as `BLOOM_DEWEY_S3_BUCKET_PREFIX=a-prefix-for-your-s3-bucket`. [More on the .env file](./cognito.md).
+### S3 Bucket Prefix Configuration
+
+The S3 prefix all of your buckets will share should be set in `~/.config/bloom/bloom-config.yaml`:
+
+```yaml
+storage:
+  s3_prefix: "your-bucket-prefix/"
+```
+
+Or via environment variable:
+
+```bash
+export BLOOM_STORAGE__S3_PREFIX=your-bucket-prefix/
+```
+
+See the [Configuration documentation](./cognito.md#configuration) for more details.
 
 # Design
 

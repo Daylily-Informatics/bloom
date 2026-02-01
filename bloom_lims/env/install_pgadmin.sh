@@ -1,15 +1,15 @@
 
 # SOURCE ME FROM BASH
-# This script is meant to be run from the root of the repo
+# This script is meant to be run from the root of the repo after running: source bloom_activate.sh
 # It will install pgadmin4 and create the necessary directories for it to run
 # https://www.pgadmin.org/download/pgadmin-4-python/
 
 echo "Installing pgadmin4 to conda BLOOM env.  You will require sudo access to create the install directories for pgadmin. (i think... double check if this is still true)"
 sleep 2
 
-conda activate BLOOM
-if [[ $? -ne 0 ]]; then
-    echo "\n\n\n\n\n\tERROR\n\t\t conda or mamba not found. OR BLOOM conda environment not found. Please install conda or mamba and try again.\n"
+# Verify BLOOM environment is active
+if [[ "$CONDA_DEFAULT_ENV" != "BLOOM" ]]; then
+    echo "\n\n\n\n\n\tERROR\n\t\t BLOOM conda environment not active. Run 'source bloom_activate.sh' first.\n"
     sleep 3
     return 1
 fi

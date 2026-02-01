@@ -27,7 +27,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
-TEMPLATE_CONFIG_FILE = Path(__file__).parent / "config" / "bloom-config-template.yaml"
+# Template is at repo root: config/bloom-config-template.yaml
+TEMPLATE_CONFIG_FILE = Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
 
 
 def _deep_merge(base: Dict, override: Dict) -> Dict:
@@ -194,12 +195,20 @@ class APISettings(BaseModel):
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
 
 
+class AWSSettings(BaseModel):
+    """AWS configuration."""
+    
+    profile: str = Field(default="", description="AWS profile name (sets AWS_PROFILE env var)")
+    region: str = Field(default="us-west-2", description="Default AWS region")
+
+
 class AuthSettings(BaseModel):
     """Authentication configuration."""
     
     # Cognito
     cognito_user_pool_id: str = Field(default="", description="Cognito user pool ID")
     cognito_client_id: str = Field(default="", description="Cognito app client ID")
+    cognito_client_secret: str = Field(default="", description="Cognito app client secret")
     cognito_region: str = Field(default="", description="AWS region for Cognito")
     cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
     cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
@@ -379,6 +388,7 @@ class BloomSettings(BaseSettings):
     storage: StorageSettings = Field(default_factory=StorageSettings)
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    aws: AWSSettings = Field(default_factory=AWSSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
     cache: CacheSettings = Field(default_factory=CacheSettings)
