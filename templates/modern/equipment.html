@@ -28,7 +28,7 @@
       </div>
       <div class="card-body">
         <div class="equipment-icon">
-          <i class="fas fa-{% if item.b_sub_type == 'sequencer' %}dna{% elif item.b_sub_type == 'centrifuge' %}sync{% elif item.b_sub_type == 'thermocycler' %}temperature-high{% else %}microscope{% endif %}"></i>
+          <i class="fas fa-{% if item.b_sub_type == 'sequencer' %}wave-square{% elif item.b_sub_type == 'centrifuge' %}sync{% elif item.b_sub_type == 'thermocycler' %}temperature-high{% else %}microscope{% endif %}"></i>
         </div>
         <h4 class="equipment-name">{{ item.name | default(item.b_sub_type) }}</h4>
         <p class="text-muted text-sm">{{ item.b_sub_type }}</p>
