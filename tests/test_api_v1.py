@@ -192,3 +192,80 @@ class TestStatsAPI:
         assert "recent_assays" in recent
         assert "recent_workflows" in recent
 
+
+class TestSearchAPI:
+    """Tests for /api/v1/search endpoints."""
+
+    def test_search_requires_query(self, client):
+        """Test search requires a query parameter."""
+        response = client.get("/api/v1/search/")
+        assert response.status_code == 422  # Validation error - missing required param
+
+    def test_search_with_query(self, client):
+        """Test search with a query returns results."""
+        response = client.get("/api/v1/search/?q=test")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+
+    def test_search_with_type_filter(self, client):
+        """Test search with type filter."""
+        response = client.get("/api/v1/search/?q=test&types=container,content")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+
+    def test_search_export_tsv(self, client):
+        """Test search export as TSV."""
+        response = client.get("/api/v1/search/export?q=test&format=tsv")
+        assert response.status_code == 200
+        # TSV should have content-disposition header
+        assert "text/tab-separated-values" in response.headers.get("content-type", "")
+
+    def test_search_export_json(self, client):
+        """Test search export as JSON."""
+        response = client.get("/api/v1/search/export?q=test&format=json")
+        assert response.status_code == 200
+        assert "application/json" in response.headers.get("content-type", "")
+        data = response.json()
+        assert "items" in data
+
+
+class TestBulkContainerAPI:
+    """Tests for /api/v1/containers/bulk-create endpoint."""
+
+    def test_bulk_create_requires_file(self, client):
+        """Test bulk create requires a file upload."""
+        response = client.post("/api/v1/containers/bulk-create")
+        assert response.status_code == 422  # Validation error - missing file
+
+    def test_bulk_create_with_empty_file(self, client):
+        """Test bulk create with empty TSV file."""
+        import io
+        empty_tsv = "container_template_euid\tcontainer_type\tcontainer_name\n"
+        files = {"file": ("test.tsv", io.BytesIO(empty_tsv.encode()), "text/tab-separated-values")}
+        response = client.post("/api/v1/containers/bulk-create", files=files)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["total_rows"] == 0
+        assert data["created_count"] == 0
+
+    def test_bulk_create_returns_correct_structure(self, client):
+        """Test bulk create response has correct structure."""
+        import io
+        tsv_content = "container_template_euid\tcontainer_type\tcontainer_name\n"
+        files = {"file": ("test.tsv", io.BytesIO(tsv_content.encode()), "text/tab-separated-values")}
+        response = client.post("/api/v1/containers/bulk-create", files=files)
+        assert response.status_code == 200
+        data = response.json()
+        assert "success" in data
+        assert "total_rows" in data
+        assert "created_count" in data
+        assert "error_count" in data
+        assert "created" in data
+        assert "errors" in data
+

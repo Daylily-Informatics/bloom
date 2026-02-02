@@ -26,6 +26,7 @@ from .subjects import router as subjects_router
 from .lineages import router as lineages_router
 from .file_sets import router as file_sets_router
 from .stats import router as stats_router
+from .search import router as search_router
 
 
 # Main v1 router
@@ -47,6 +48,7 @@ router.include_router(subjects_router)
 router.include_router(lineages_router)
 router.include_router(file_sets_router)
 router.include_router(stats_router)
+router.include_router(search_router)
 
 
 @router.get("/")
@@ -72,6 +74,7 @@ async def api_v1_info():
             "lineages": "/api/v1/lineages",
             "file_sets": "/api/v1/file-sets",
             "stats": "/api/v1/stats",
+            "search": "/api/v1/search",
         },
     }
 

@@ -1,0 +1,4 @@
+container_template_euid	container_type	container_name	content_template_euid	content_type	content_name	content_properties
+	tube:tube-generic-10ml:1.0	Sample Tube 1		sample:sample-blood:1.0	Blood Sample 1	{"properties": {"volume_ul": 500}}
+	tube:tube-generic-10ml:1.0	Sample Tube 2		sample:sample-blood:1.0	Blood Sample 2	{"properties": {"volume_ul": 250}}
+

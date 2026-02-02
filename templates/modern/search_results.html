@@ -7,11 +7,19 @@
   <div>
     <h1><i class="fas fa-search"></i> Search Results</h1>
     <p class="text-muted">
-      {% if results %}Found {{ results | length }} results for "{{ query }}"{% else %}No results found{% endif %}
+      {% if results %}Found {{ results | length }} results for "{{ query }}"{% else %}Enter a search query{% endif %}
     </p>
   </div>
   <div class="page-actions">
-    <a href="/legacy/search?q={{ query }}" class="btn btn-outline btn-sm" title="Legacy view">
+    {% if results %}
+    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('tsv')" title="Export as TSV">
+      <i class="fas fa-file-csv"></i> Download TSV
+    </button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('json')" title="Export as JSON">
+      <i class="fas fa-file-code"></i> Dump to JSON
+    </button>
+    {% endif %}
+    <a href="/legacy/" class="btn btn-outline btn-sm" title="Legacy view">
       <i class="fas fa-history"></i> Legacy
     </a>
   </div>
@@ -20,28 +28,32 @@
 <!-- Search Form -->
 <div class="card mb-lg">
   <div class="card-body">
-    <form action="/search" method="GET" class="search-form">
-      <div class="grid grid-4">
-        <div class="form-group" style="grid-column: span 2;">
-          <label class="form-label">Search Query</label>
-          <input type="text" class="form-input" name="q" value="{{ query }}" placeholder="Search BLOOM...">
+    <form action="/search" method="GET" class="search-form" id="searchForm">
+      <div class="form-group mb-md">
+        <label class="form-label">Search Query</label>
+        <input type="text" class="form-input" name="q" id="searchQuery" value="{{ query }}" placeholder="Search by EUID, name, type, or metadata...">
+      </div>
+      <div class="form-group mb-md">
+        <label class="form-label">Object Types</label>
+        <div class="type-checkboxes">
+          {% set selected_types = types.split(',') if types else [] %}
+          <label class="checkbox-label"><input type="checkbox" name="types" value="container" {% if 'container' in selected_types %}checked{% endif %}> Containers</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="content" {% if 'content' in selected_types %}checked{% endif %}> Content</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="workflow" {% if 'workflow' in selected_types %}checked{% endif %}> Workflows</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="equipment" {% if 'equipment' in selected_types %}checked{% endif %}> Equipment</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="file" {% if 'file' in selected_types %}checked{% endif %}> Files</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="file_set" {% if 'file_set' in selected_types %}checked{% endif %}> File Sets</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="subject" {% if 'subject' in selected_types %}checked{% endif %}> Subjects</label>
         </div>
-        <div class="form-group">
-          <label class="form-label">Object Type</label>
-          <select class="form-select" name="type">
-            <option value="">All Types</option>
-            <option value="workflow" {% if type_filter == 'workflow' %}selected{% endif %}>Workflows</option>
-            <option value="container" {% if type_filter == 'container' %}selected{% endif %}>Containers</option>
-            <option value="content" {% if type_filter == 'content' %}selected{% endif %}>Content</option>
-            <option value="equipment" {% if type_filter == 'equipment' %}selected{% endif %}>Equipment</option>
-            <option value="file" {% if type_filter == 'file' %}selected{% endif %}>Files</option>
-          </select>
-        </div>
-        <div class="form-group" style="display: flex; align-items: flex-end;">
-          <button type="submit" class="btn btn-primary">
-            <i class="fas fa-search"></i> Search
-          </button>
-        </div>
+        <small class="text-muted">Leave all unchecked to search all types</small>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-search"></i> Search
+        </button>
+        <button type="button" class="btn btn-outline" onclick="clearFilters()">
+          <i class="fas fa-times"></i> Clear
+        </button>
       </div>
     </form>
   </div>
@@ -51,40 +63,46 @@
 {% if results %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-list"></i> Results</h3>
+    <h3 class="card-title"><i class="fas fa-table"></i> Results</h3>
     <div class="result-actions">
       <span class="text-muted text-sm">{{ results | length }} items</span>
     </div>
   </div>
   <div class="card-body">
-    <div class="search-results">
-      {% for result in results %}
-      <a href="/euid_details?euid={{ result.euid }}" class="search-result-item">
-        <div class="result-icon">
-          <i class="fas fa-{% if result.b_type == 'workflow' %}project-diagram{% elif result.b_type == 'container' %}box{% elif result.b_type == 'content' %}vial{% elif result.b_type == 'equipment' %}microscope{% elif result.b_type == 'file' %}file{% else %}cube{% endif %}"></i>
-        </div>
-        <div class="result-content">
-          <div class="result-header">
-            <span class="badge badge-euid">{{ result.euid }}</span>
-            <span class="result-name">{{ result.name | default(result.b_sub_type) }}</span>
-          </div>
-          <div class="result-meta">
-            <span class="badge badge-info">{{ result.b_type }}</span>
-            <span class="text-muted text-sm">{{ result.b_sub_type }}</span>
-            {% if result.created_dt %}
-            <span class="text-muted text-sm">Created {{ result.created_dt.strftime('%Y-%m-%d') }}</span>
-            {% endif %}
-          </div>
-        </div>
-        <div class="result-arrow">
-          <i class="fas fa-chevron-right"></i>
-        </div>
-      </a>
-      {% endfor %}
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>EUID</th>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr>
+            <td><a href="/euid_details?euid={{ result.euid }}" class="badge badge-euid">{{ result.euid }}</a></td>
+            <td>
+              <span class="badge badge-{% if result.super_type == 'workflow' %}info{% elif result.super_type == 'container' %}success{% elif result.super_type == 'content' %}warning{% elif result.super_type == 'equipment' %}error{% else %}info{% endif %}">
+                {{ result.super_type }}
+              </span>
+              <span class="text-muted text-sm">{{ result.btype }}/{{ result.b_sub_type }}</span>
+            </td>
+            <td>{{ result.name | default('-') }}</td>
+            <td><span class="badge badge-{% if result.bstatus == 'active' %}success{% elif result.bstatus == 'complete' %}info{% else %}warning{% endif %}">{{ result.bstatus }}</span></td>
+            <td class="text-muted text-sm">{{ result.created_dt.strftime('%Y-%m-%d %H:%M') if result.created_dt else '-' }}</td>
+            <td><a href="/euid_details?euid={{ result.euid }}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
-{% else %}
+{% elif query %}
 <div class="card">
   <div class="card-body">
     <div class="empty-state">
@@ -94,32 +112,83 @@
     </div>
   </div>
 </div>
+{% else %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="fas fa-search"></i></div>
+      <h3>Enter a Search Query</h3>
+      <p class="text-muted">Search across all BLOOM objects by EUID, name, type, or metadata</p>
+    </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
 
 {% block extra_css %}
 <style>
 .search-form { width: 100%; }
-.search-results { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.search-result-item {
-  display: flex; align-items: center; gap: var(--spacing-md);
-  padding: var(--spacing-md); background: var(--color-gray-700);
-  border-radius: var(--radius-md); text-decoration: none; color: inherit;
-  transition: background-color var(--transition-fast);
+.type-checkboxes {
+  display: flex; flex-wrap: wrap; gap: var(--spacing-md);
+  padding: var(--spacing-sm); background: var(--color-gray-700);
+  border-radius: var(--radius-sm);
 }
-.search-result-item:hover { background: var(--color-gray-600); }
-.result-icon {
-  width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
-  background: var(--color-gray-800); border-radius: var(--radius-sm);
-  font-size: 1.25rem; color: var(--color-highlight);
+.checkbox-label {
+  display: flex; align-items: center; gap: var(--spacing-xs);
+  cursor: pointer; font-size: 0.875rem;
 }
-.result-content { flex: 1; }
-.result-header { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-xs); }
-.result-name { font-weight: 500; }
-.result-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
-.result-arrow { color: var(--color-gray-500); }
+.checkbox-label input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: var(--color-highlight);
+}
+.form-actions { display: flex; gap: var(--spacing-sm); }
+.table-container { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-gray-600); }
+.table th { background: var(--color-gray-700); font-weight: 600; font-size: 0.875rem; text-transform: uppercase; color: var(--color-gray-300); }
+.table tbody tr:hover { background: var(--color-gray-700); }
 .empty-state { text-align: center; padding: var(--spacing-2xl); }
 .empty-state-icon { font-size: 3rem; color: var(--color-gray-500); margin-bottom: var(--spacing-md); }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getSelectedTypes() {
+  const checkboxes = document.querySelectorAll('input[name="types"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value).join(',');
+}
+
+function exportResults(format) {
+  const query = document.getElementById('searchQuery').value;
+  if (!query) {
+    BloomToast.warning('No Query', 'Enter a search query first');
+    return;
+  }
+  const types = getSelectedTypes();
+  let url = `/api/v1/search/export?q=${encodeURIComponent(query)}&format=${format}`;
+  if (types) url += `&types=${encodeURIComponent(types)}`;
+  window.location.href = url;
+}
+
+function clearFilters() {
+  document.getElementById('searchQuery').value = '';
+  document.querySelectorAll('input[name="types"]').forEach(cb => cb.checked = false);
+}
+
+// Convert checkboxes to comma-separated types param on form submit
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+  const checkboxes = document.querySelectorAll('input[name="types"]:checked');
+  if (checkboxes.length > 0) {
+    // Remove individual checkboxes from form submission
+    checkboxes.forEach(cb => cb.removeAttribute('name'));
+    // Add hidden input with comma-separated types
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'types';
+    hidden.value = Array.from(checkboxes).map(cb => cb.value).join(',');
+    this.appendChild(hidden);
+  }
+});
+</script>
 {% endblock %}
 

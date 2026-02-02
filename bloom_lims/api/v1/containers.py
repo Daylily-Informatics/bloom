@@ -4,10 +4,13 @@ BLOOM LIMS API v1 - Containers Endpoints
 CRUD endpoints for container management (plates, racks, boxes, etc.).
 """
 
+import csv
+import io
+import json as json_lib
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from bloom_lims.schemas import (
     ContainerCreateSchema,
@@ -349,5 +352,152 @@ async def get_container_layout(
         raise
     except Exception as e:
         logger.error(f"Error getting container layout {euid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/bulk-create", response_model=Dict[str, Any])
+async def bulk_create_containers(
+    file: UploadFile = File(..., description="TSV file with container/content data"),
+    user: APIUser = Depends(require_api_auth),
+):
+    """
+    Bulk create containers with content from a TSV file.
+
+    TSV columns:
+    - container_template_euid OR container_type (e.g., "tube:tube-generic-10ml:1.0")
+    - container_name (optional)
+    - content_template_euid OR content_type (e.g., "sample:sample-blood:1.0")
+    - content_name (optional)
+    - content_properties (optional, JSON string for json_addl overrides)
+    """
+    try:
+        bdb = get_bdb(user.email)
+        from bloom_lims.bobjs import BloomObj
+
+        bobj = BloomObj(bdb)
+
+        # Read and parse TSV
+        contents = await file.read()
+        text = contents.decode("utf-8")
+        reader = csv.DictReader(io.StringIO(text), delimiter="\t")
+
+        results = {"created": [], "errors": [], "total_rows": 0}
+
+        for row_num, row in enumerate(reader, start=2):
+            results["total_rows"] += 1
+            try:
+                # Get container template
+                cx_euid = row.get("container_template_euid", "").strip()
+                cx_type = row.get("container_type", "").strip()
+
+                if cx_euid:
+                    cx_template = bobj.get_by_euid(cx_euid)
+                    if not cx_template:
+                        raise ValueError(f"Container template not found: {cx_euid}")
+                elif cx_type:
+                    # Parse type string: "btype:b_sub_type:version" or "btype:b_sub_type"
+                    parts = cx_type.split(":")
+                    if len(parts) < 2:
+                        raise ValueError(f"Invalid container_type format: {cx_type}")
+                    btype, b_sub_type = parts[0], parts[1]
+                    version = parts[2] if len(parts) > 2 else "1.0"
+                    templates = bobj.query_template_by_component_v2(
+                        "container", btype, b_sub_type, version
+                    )
+                    if not templates:
+                        raise ValueError(f"No container template found: {cx_type}")
+                    cx_template = templates[0]
+                else:
+                    raise ValueError("container_template_euid or container_type required")
+
+                # Get content template
+                mx_euid = row.get("content_template_euid", "").strip()
+                mx_type = row.get("content_type", "").strip()
+
+                mx_template = None
+                if mx_euid:
+                    mx_template = bobj.get_by_euid(mx_euid)
+                    if not mx_template:
+                        raise ValueError(f"Content template not found: {mx_euid}")
+                elif mx_type:
+                    parts = mx_type.split(":")
+                    if len(parts) < 2:
+                        raise ValueError(f"Invalid content_type format: {mx_type}")
+                    btype, b_sub_type = parts[0], parts[1]
+                    version = parts[2] if len(parts) > 2 else "1.0"
+                    templates = bobj.query_template_by_component_v2(
+                        "content", btype, b_sub_type, version
+                    )
+                    if not templates:
+                        raise ValueError(f"No content template found: {mx_type}")
+                    mx_template = templates[0]
+
+                # Create container
+                container_result = bobj.create_instances(cx_template.euid)
+                container = container_result[0][0] if isinstance(container_result, list) else container_result
+
+                # Set container name if provided
+                cx_name = row.get("container_name", "").strip()
+                if cx_name:
+                    container.name = cx_name
+                    from sqlalchemy.orm.attributes import flag_modified
+                    if container.json_addl and "properties" in container.json_addl:
+                        container.json_addl["properties"]["name"] = cx_name
+                        flag_modified(container, "json_addl")
+
+                content = None
+                if mx_template:
+                    # Parse content properties
+                    props_str = row.get("content_properties", "").strip()
+                    json_overrides = {}
+                    if props_str:
+                        try:
+                            json_overrides = json_lib.loads(props_str)
+                        except json_lib.JSONDecodeError:
+                            raise ValueError(f"Invalid JSON in content_properties: {props_str}")
+
+                    # Create content
+                    content = bobj.create_instance(mx_template.euid, json_overrides)
+
+                    # Set content name if provided
+                    mx_name = row.get("content_name", "").strip()
+                    if mx_name:
+                        content.name = mx_name
+                        if content.json_addl and "properties" in content.json_addl:
+                            content.json_addl["properties"]["name"] = mx_name
+                            flag_modified(content, "json_addl")
+
+                    # Link content to container
+                    from bloom_lims.bobjs import BloomContainer
+                    bc = BloomContainer(bdb)
+                    bc.link_content(container.euid, content.euid)
+
+                bdb.session.commit()
+
+                results["created"].append({
+                    "row": row_num,
+                    "container_euid": container.euid,
+                    "content_euid": content.euid if content else None,
+                })
+
+            except Exception as e:
+                results["errors"].append({
+                    "row": row_num,
+                    "error": str(e),
+                })
+
+        return {
+            "success": True,
+            "total_rows": results["total_rows"],
+            "created_count": len(results["created"]),
+            "error_count": len(results["errors"]),
+            "created": results["created"],
+            "errors": results["errors"],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk container creation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -486,6 +486,69 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
     return HTMLResponse(content=template.render(context), status_code=200)
 
 
+@app.get("/search", response_class=HTMLResponse)
+async def modern_search(
+    request: Request,
+    q: str = Query("", description="Search query"),
+    types: str = Query("", description="Comma-separated types to search"),
+    _=Depends(require_auth),
+):
+    """Modern search page with multi-type search and export."""
+    user_data = request.session.get("user_data", {})
+    results = []
+
+    if q:
+        bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+        from sqlalchemy import or_
+        from sqlalchemy.sql import cast
+        from sqlalchemy.types import String
+
+        gi = bobdb.Base.classes.generic_instance
+        query_obj = bobdb.session.query(gi)
+        query_obj = query_obj.filter(gi.is_deleted == False)
+
+        # Filter by super_types if specified
+        if types:
+            type_list = [t.strip().lower() for t in types.split(",") if t.strip()]
+            if type_list:
+                query_obj = query_obj.filter(gi.super_type.in_(type_list))
+
+        # Search across multiple fields
+        search_pattern = f"%{q}%"
+        query_obj = query_obj.filter(
+            or_(
+                gi.euid.ilike(search_pattern),
+                gi.name.ilike(search_pattern),
+                gi.btype.ilike(search_pattern),
+                gi.b_sub_type.ilike(search_pattern),
+                cast(gi.json_addl, String).ilike(search_pattern),
+            )
+        )
+
+        # Order by created_dt descending, limit to 500
+        query_obj = query_obj.order_by(gi.created_dt.desc()).limit(500)
+        results = query_obj.all()
+
+    template = templates.get_template("modern/search_results.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "query": q,
+        "types": types,
+        "results": results,
+    }
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
+@app.get("/bulk_create_containers", response_class=HTMLResponse)
+async def modern_bulk_create_containers(request: Request, _=Depends(require_auth)):
+    """Modern bulk container creation page."""
+    user_data = request.session.get("user_data", {})
+    template = templates.get_template("modern/bulk_create_containers.html")
+    context = {"request": request, "udat": user_data}
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
 # =============================================================================
 # LEGACY UI ROUTES (preserved for backward compatibility)
 # =============================================================================

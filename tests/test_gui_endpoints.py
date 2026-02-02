@@ -353,3 +353,32 @@ class TestModernUIRoutes:
         content = response.text
         assert "BLOOM" in content
 
+    def test_search_page_renders(self, client):
+        """Test search page renders correctly."""
+        response = client.get("/search")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        content = response.text
+        assert "Search" in content
+
+    def test_search_page_with_query(self, client):
+        """Test search page with query parameter."""
+        response = client.get("/search?q=test")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    def test_search_page_with_type_filter(self, client):
+        """Test search page with type filter."""
+        response = client.get("/search?q=test&types=container,content")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    def test_bulk_create_containers_page_renders(self, client):
+        """Test bulk create containers page renders correctly."""
+        response = client.get("/bulk_create_containers")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        content = response.text
+        assert "Bulk Create" in content
+        assert "TSV" in content
+

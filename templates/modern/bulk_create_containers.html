@@ -1,0 +1,199 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Bulk Create Containers - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-upload"></i> Bulk Create Containers</h1>
+    <p class="text-muted">Create multiple containers with content from a TSV file</p>
+  </div>
+  <div class="page-actions">
+    <a href="/static/template_bulk_container_create.tsv" download class="btn btn-outline btn-sm">
+      <i class="fas fa-download"></i> Download Template
+    </a>
+  </div>
+</div>
+
+<!-- Instructions -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-info-circle"></i> Instructions</h3>
+  </div>
+  <div class="card-body">
+    <p>Upload a TSV (tab-separated values) file with the following columns:</p>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr><th>Column</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>container_template_euid</code></td><td>OR container_type</td><td>EUID of the container template</td></tr>
+          <tr><td><code>container_type</code></td><td>OR template_euid</td><td>Type string: <code>btype:b_sub_type:version</code> (e.g., tube:tube-generic-10ml:1.0)</td></tr>
+          <tr><td><code>container_name</code></td><td>Optional</td><td>Name for the container</td></tr>
+          <tr><td><code>content_template_euid</code></td><td>Optional</td><td>EUID of the content template</td></tr>
+          <tr><td><code>content_type</code></td><td>Optional</td><td>Type string: <code>btype:b_sub_type:version</code> (e.g., sample:sample-blood:1.0)</td></tr>
+          <tr><td><code>content_name</code></td><td>Optional</td><td>Name for the content</td></tr>
+          <tr><td><code>content_properties</code></td><td>Optional</td><td>JSON string with properties to override (e.g., <code>{"properties": {"volume_ul": 500}}</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted mt-md">Note: Either <code>container_template_euid</code> OR <code>container_type</code> is required for each row.</p>
+  </div>
+</div>
+
+<!-- Upload Form -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-file-upload"></i> Upload TSV File</h3>
+  </div>
+  <div class="card-body">
+    <form id="bulkCreateForm" enctype="multipart/form-data">
+      <div class="form-group mb-md">
+        <label class="form-label" for="tsvFile">Select TSV File</label>
+        <input type="file" class="form-input" id="tsvFile" name="file" accept=".tsv,.txt" required>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          <i class="fas fa-play"></i> Create Containers
+        </button>
+        <button type="button" class="btn btn-outline" onclick="previewFile()">
+          <i class="fas fa-eye"></i> Preview
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Preview Section -->
+<div class="card mb-lg" id="previewSection" style="display: none;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-table"></i> File Preview</h3>
+  </div>
+  <div class="card-body">
+    <div class="table-container" id="previewTable"></div>
+  </div>
+</div>
+
+<!-- Results Section -->
+<div class="card" id="resultsSection" style="display: none;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-check-circle"></i> Results</h3>
+  </div>
+  <div class="card-body">
+    <div id="resultsSummary" class="mb-md"></div>
+    <div id="resultsDetails"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.table code { background: var(--color-gray-700); padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+.form-actions { display: flex; gap: var(--spacing-sm); }
+#previewTable table { font-size: 0.875rem; }
+.result-success { color: var(--color-success); }
+.result-error { color: var(--color-error); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewFile() {
+  const fileInput = document.getElementById('tsvFile');
+  if (!fileInput.files.length) {
+    BloomToast.warning('No File', 'Please select a TSV file first');
+    return;
+  }
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length === 0) {
+      BloomToast.error('Empty File', 'The file appears to be empty');
+      return;
+    }
+    const headers = lines[0].split('\t');
+    let html = '<table class="table"><thead><tr>';
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += '</tr></thead><tbody>';
+    for (let i = 1; i < Math.min(lines.length, 11); i++) {
+      const cols = lines[i].split('\t');
+      html += '<tr>';
+      cols.forEach(c => html += `<td>${c || '-'}</td>`);
+      html += '</tr>';
+    }
+    if (lines.length > 11) html += `<tr><td colspan="${headers.length}" class="text-muted">... and ${lines.length - 11} more rows</td></tr>`;
+    html += '</tbody></table>';
+    document.getElementById('previewTable').innerHTML = html;
+    document.getElementById('previewSection').style.display = 'block';
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('bulkCreateForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const fileInput = document.getElementById('tsvFile');
+  if (!fileInput.files.length) {
+    BloomToast.warning('No File', 'Please select a TSV file');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  
+  BloomLoading.show('Creating containers...');
+  document.getElementById('submitBtn').disabled = true;
+  
+  try {
+    const response = await fetch('/api/v1/containers/bulk-create', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await response.json();
+    BloomLoading.hide();
+    document.getElementById('submitBtn').disabled = false;
+    
+    if (response.ok) {
+      showResults(data);
+      BloomToast.success('Complete', `Created ${data.created_count} containers`);
+    } else {
+      BloomToast.error('Error', data.detail || 'Failed to create containers');
+    }
+  } catch (err) {
+    BloomLoading.hide();
+    document.getElementById('submitBtn').disabled = false;
+    BloomToast.error('Error', err.message);
+  }
+});
+
+function showResults(data) {
+  let summaryHtml = `<div class="result-summary">
+    <p class="result-success"><i class="fas fa-check-circle"></i> Created ${data.created_count} containers</p>`;
+  if (data.error_count > 0) {
+    summaryHtml += `<p class="result-error"><i class="fas fa-exclamation-circle"></i> ${data.error_count} errors</p>`;
+  }
+  summaryHtml += `<p class="text-muted">Total rows processed: ${data.total_rows}</p></div>`;
+  document.getElementById('resultsSummary').innerHTML = summaryHtml;
+
+  let detailsHtml = '';
+  if (data.created && data.created.length > 0) {
+    detailsHtml += '<h4 class="mb-sm">Created Items</h4><div class="table-container"><table class="table"><thead><tr><th>Row</th><th>Container EUID</th><th>Content EUID</th></tr></thead><tbody>';
+    data.created.forEach(item => {
+      detailsHtml += `<tr><td>${item.row}</td><td><a href="/euid_details?euid=${item.container_euid}" class="badge badge-euid">${item.container_euid}</a></td><td>${item.content_euid ? `<a href="/euid_details?euid=${item.content_euid}" class="badge badge-euid">${item.content_euid}</a>` : '-'}</td></tr>`;
+    });
+    detailsHtml += '</tbody></table></div>';
+  }
+  if (data.errors && data.errors.length > 0) {
+    detailsHtml += '<h4 class="mb-sm mt-md">Errors</h4><div class="table-container"><table class="table"><thead><tr><th>Row</th><th>Error</th></tr></thead><tbody>';
+    data.errors.forEach(err => {
+      detailsHtml += `<tr><td>${err.row}</td><td class="result-error">${err.error}</td></tr>`;
+    });
+    detailsHtml += '</tbody></table></div>';
+  }
+  document.getElementById('resultsDetails').innerHTML = detailsHtml;
+  document.getElementById('resultsSection').style.display = 'block';
+}
+</script>
+{% endblock %}
+
