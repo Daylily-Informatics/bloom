@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    {% set page_title = 'File Search Results' %}
+    <title>{{ page_title }}</title>
+    {% set bloom_mod = 'dewey' %}
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+</head>
+<body>
+    {% include 'legacy/bloom_header.html' %}
+
+    <h1>{{ num_results }} Results</h1>
+
+    <table id="results-table" border="1">
+        <thead>
+            <tr>
+                <th>Link</th> <!-- New column header for the link -->
+                {% for column in columns %}
+                <th onclick="sortTable({{ loop.index0 }})">{{ column }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_data %}
+            <tr>
+                <td>
+                    {% if row['ref_type'] == 'presigned_url' %}
+                    <a href="/file_set_urls?fs_euid={{ row['EUID'] }}" target="_blank">View Presigned URLSs</a>
+                    {% endif %}
+                </td> <!-- New cell with the link -->
+                {% for column in columns %}
+                <td>
+                    {% if column == 'EUID' %}
+                    <a target="_blank" href="euid_details?euid={{ row[column] }}">{{ row[column] }}</a>
+                    {% else %}
+                    {{ row[column] }}
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="/dewey">Go Back</a>
+
+    <button class="floating-button" onclick="downloadTableAsTSV()">⬇️ Download TSV</button>
+
+    <script>
+        let sortDirections = Array({{ columns | length }}).fill(true); // Track sort direction for each column
+
+        function sortTable(columnIndex) {
+            const table = document.getElementById('results-table');
+            const tbody = table.tBodies[0];
+            const rows = Array.from(tbody.rows);
+
+            const direction = sortDirections[columnIndex] ? 1 : -1;
+
+            const sortedRows = rows.sort((a, b) => {
+                const cellA = a.cells[columnIndex + 1].innerText.toLowerCase(); // +1 because of new first column
+                const cellB = b.cells[columnIndex + 1].innerText.toLowerCase();
+
+                if (cellA < cellB) return -1 * direction;
+                if (cellA > cellB) return 1 * direction;
+                return 0;
+            });
+
+            tbody.append(...sortedRows);
+            sortDirections[columnIndex] = !sortDirections[columnIndex]; // Toggle sort direction
+        }
+
+        function downloadTableAsTSV() {
+            const table = document.getElementById('results-table');
+            const rows = Array.from(table.rows);
+            const tsv = rows.map(row => {
+                const cells = Array.from(row.cells);
+                return cells.map(cell => cell.innerText).join('\t');
+            }).join('\n');
+
+            const tsvFile = new Blob([tsv], { type: 'text/tab-separated-values' });
+            const downloadLink = document.createElement('a');
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            downloadLink.download = `dewey_file_set_${timestamp}.tsv`;
+            downloadLink.href = URL.createObjectURL(tsvFile);
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+    </script>
+
+    <style>
+        .floating-button {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 10px;
+            background-color: #008CBA; /* Blue background */
+            color: white; /* White text */
+            border: none;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        th {
+            cursor: pointer;
+        }
+    </style>
+</body>
+</html>

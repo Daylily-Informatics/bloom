@@ -22,13 +22,13 @@ class TestMobileCSS:
     @pytest.fixture
     def mobile_css_content(self):
         """Load mobile.css content."""
-        css_path = PROJECT_ROOT / "static" / "mobile.css"
+        css_path = PROJECT_ROOT / "static" / "legacy" / "mobile.css"
         assert css_path.exists(), "mobile.css not found"
         return css_path.read_text()
 
     def test_mobile_css_exists(self):
         """Test that mobile.css file exists."""
-        css_path = PROJECT_ROOT / "static" / "mobile.css"
+        css_path = PROJECT_ROOT / "static" / "legacy" / "mobile.css"
         assert css_path.exists()
 
     def test_contains_mobile_breakpoint(self, mobile_css_content):
@@ -74,13 +74,13 @@ class TestMobileJS:
     @pytest.fixture
     def mobile_js_content(self):
         """Load mobile.js content."""
-        js_path = PROJECT_ROOT / "static" / "mobile.js"
+        js_path = PROJECT_ROOT / "static" / "legacy" / "mobile.js"
         assert js_path.exists(), "mobile.js not found"
         return js_path.read_text()
 
     def test_mobile_js_exists(self):
         """Test that mobile.js file exists."""
-        js_path = PROJECT_ROOT / "static" / "mobile.js"
+        js_path = PROJECT_ROOT / "static" / "legacy" / "mobile.js"
         assert js_path.exists()
 
     def test_contains_mobile_detection(self, mobile_js_content):
@@ -118,40 +118,40 @@ class TestTemplatesMobileIntegration:
 
     def test_index2_includes_mobile_css(self):
         """Test that index2.html includes mobile.css."""
-        template_path = PROJECT_ROOT / "templates" / "index2.html"
+        template_path = PROJECT_ROOT / "templates" / "legacy" / "index2.html"
         content = template_path.read_text()
         assert "mobile.css" in content
 
     def test_index2_includes_mobile_js(self):
         """Test that index2.html includes mobile.js."""
-        template_path = PROJECT_ROOT / "templates" / "index2.html"
+        template_path = PROJECT_ROOT / "templates" / "legacy" / "index2.html"
         content = template_path.read_text()
         assert "mobile.js" in content
 
     def test_index2_has_viewport_meta(self):
         """Test that index2.html has viewport meta tag."""
-        template_path = PROJECT_ROOT / "templates" / "index2.html"
+        template_path = PROJECT_ROOT / "templates" / "legacy" / "index2.html"
         content = template_path.read_text()
         assert 'viewport' in content
         assert 'width=device-width' in content
 
     def test_dewey_includes_mobile_assets(self):
         """Test that dewey.html includes mobile assets."""
-        template_path = PROJECT_ROOT / "templates" / "dewey.html"
+        template_path = PROJECT_ROOT / "templates" / "legacy" / "dewey.html"
         content = template_path.read_text()
         assert "mobile.css" in content
         assert "mobile.js" in content
 
     def test_admin_includes_mobile_assets(self):
         """Test that admin.html includes mobile assets."""
-        template_path = PROJECT_ROOT / "templates" / "admin.html"
+        template_path = PROJECT_ROOT / "templates" / "legacy" / "admin.html"
         content = template_path.read_text()
         assert "mobile.css" in content
         assert "mobile.js" in content
 
     def test_templates_have_apple_mobile_web_app_meta(self):
         """Test that templates have Apple mobile web app meta tags."""
-        template_path = PROJECT_ROOT / "templates" / "index2.html"
+        template_path = PROJECT_ROOT / "templates" / "legacy" / "index2.html"
         content = template_path.read_text()
         assert "apple-mobile-web-app-capable" in content
 

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+        {% set page_title = 'Bloom LIMS Workflow Summaries' %}
+        <title>{{ page_title }}</title>
+
+        {% set bloom_mod = 'lims' %}
+
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+        <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+        <script>
+        var currentSortColumn = -1;
+        var sortAscending = true;
+
+        function sortTable(columnIndex) {
+            var table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementById("genericTemplateTable");
+            switching = true;
+
+            if (columnIndex === currentSortColumn) {
+                sortAscending = !sortAscending; // Toggle the sorting direction
+            } else {
+                currentSortColumn = columnIndex;
+                sortAscending = true; // Default to ascending sort for a new column
+            }
+ 
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[columnIndex];
+                    y = rows[i + 1].getElementsByTagName("TD")[columnIndex];
+
+                    if (sortAscending) {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+
+
+        </script>
+    </head>
+    <body>
+        {% include 'legacy/bloom_header.html' %}
+
+        <!-- Display Workflow Statistics -->
+        <div>
+            <h2>Workflow Statistics</h2>
+            <ul>
+                {% for type, stats in workflow_statistics.items() %}
+                    <li>
+                        {{ type }} // ( Oldest: {{ stats.oldest }} // Newest: {{ stats.newest }}  ) : : :
+                        {% for status, count in stats.status_counts.items() %}{{ status }}: {{ count }},{% endfor %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <ul>
+            <!-- Workflow Type Buttons for Filtering -->
+            <div>
+                {% for type in unique_workflow_types %}
+                    <button onclick="toggleWorkflowType('{{ type }}')">+ / - {{ type }}</button>
+                {% endfor %}
+            </div>
+            <hr>
+            <table id="genericTemplateTable">
+                <tr>
+                    <th onclick="sortTable(0, 'genericTemplateTable')">EUID</th>
+                    <th onclick="sortTable(1, 'genericTemplateTable')">Name</th>
+                    <th onclick="sortTable(2, 'genericTemplateTable')">Created</th>
+                    <th onclick="sortTable(3, 'genericTemplateTable')">Modified</th>
+                    <th onclick="sortTable(4, 'genericTemplateTable')">Status</th>
+                    <th onclick="sortTable(5, 'genericTemplateTable')">Type</th>
+                    <th onclick="sortTable(7, 'genericTemplateTable')">Deleted?</th>
+                    <th onclick="sortTable(8, 'genericTemplateTable')">Do Some</th>
+                    <!-- Renamed column -->
+                </tr>
+                {% for workflow in workflows %}
+                    <tr class="workflow-row {{ workflow.btype }}">
+                        <td>
+                            <button onclick="location.href='/euid_details?euid={{ workflow.euid }}'">{{ workflow.euid }}</button>
+                        </td>
+                        <td>{{ workflow.json_addl.get("description",workflow.name) }}</td>
+                        <td>{{ workflow.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }}</td>
+                        <td>{{ workflow.modified_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }}</td>
+                        <td>{{ workflow.bstatus }}</td>
+                        <td>{{ workflow.btype }}</td>
+                        <td>{{ workflow.is_deleted }}</td>
+                        <td>
+                            <button onclick="location.href='/workflow_details?workflow_euid={{ workflow.euid }}'">work</button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </ul>
+        <script>
+    function toggleWorkflowType(type) {
+        var rows = document.querySelectorAll('.workflow-row.' + type);
+        rows.forEach(row => {
+            row.style.display = row.style.display === 'none' ? '' : 'none';
+        });
+    }
+        </script>
+    </body>
+</html>

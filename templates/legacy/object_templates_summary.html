@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+
+        {% set page_title = 'Object Templates' %}
+        <title>{{ page_title }}</title>
+
+        {% set bloom_mod = 'lims' %}
+
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+        <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+        <!-- Include your JavaScript file for sorting here -->
+        <script>
+        var currentSortColumn = -1;
+        var sortAscending = true;
+
+        function sortTable(columnIndex) {
+            var table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementById("genericTemplateTable");
+            switching = true;
+
+            if (columnIndex === currentSortColumn) {
+                sortAscending = !sortAscending; // Toggle the sorting direction
+            } else {
+                currentSortColumn = columnIndex;
+                sortAscending = true; // Default to ascending sort for a new column
+            }
+
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[columnIndex];
+                    y = rows[i + 1].getElementsByTagName("TD")[columnIndex];
+
+                    if (sortAscending) {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+
+
+
+        </script>
+    </head>
+    <body>
+        {% include 'legacy/bloom_header.html' %}
+
+        <h1>            Generic Templates Available For Instantiation        </h1>
+        <ul><h3>it is not advised to create instances from this list unless you know what you are doing</h3></ul>
+        <!-- Buttons for each unique polymorphic_discriminator -->
+        <div>
+            {% for discriminator in unique_discriminators %}
+                <button class="filter-button"
+                        onclick="toggleDiscriminator('{{ discriminator }}')">{{ discriminator }}</button>
+            {% endfor %}
+            <button id="toggleInactiveButton"
+                    class="filter-button"
+                    onclick="toggleInactive()">Toggle Inactive</button>
+        </div>
+        <hr>
+        <table id="genericTemplateTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0, 'genericTemplateTable')">UUID</th>
+                    <th onclick="sortTable(1, 'genericTemplateTable')">EUID</th>
+                    <th onclick="sortTable(3, 'genericTemplateTable')">Status</th>
+                    <th onclick="sortTable(4, 'genericTemplateTable')">Polymorphic Discriminator</th>
+                    <th onclick="sortTable(5, 'genericTemplateTable')">Super Type</th>
+                    <th onclick="sortTable(6, 'genericTemplateTable')">B Type</th>
+                    <th onclick="sortTable(7, 'genericTemplateTable')">B Sub Type</th>
+                    <th onclick="sortTable(8, 'genericTemplateTable')">Version</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for template in generic_templates %}
+                    <tr id="{{ template.polymorphic_discriminator }}"
+                        {% if template.state == 'inactive' %}inactive{% endif %}>
+                        <td>{{ template.uuid }}</td>
+                        <td>
+                            <a href=euid_details?euid={{ template.euid }}>{{ template.euid }}</a>
+                        </td>
+                        <td>{{ template.bstatus }}</td>
+                        <td>{{ template.polymorphic_discriminator }}</td>
+                        <td>{{ template.super_type }}</td>
+                        <td>{{ template.btype }}</td>
+                        <td>{{ template.b_sub_type }}</td>
+                        <td>{{ template.version }}</td>
+                        <td>
+                            <a href="/create_instance/{{ template.euid }}">Create Instance</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <script>
+        function toggleDiscriminator(discriminator) {
+            var rows = document.querySelectorAll('tr[id="' + discriminator + '"]');
+            rows.forEach(row => {
+                row.style.display = row.style.display === 'none' ? '' : 'none';
+            });
+    
+            // Toggle the button's active class
+            var button = document.querySelector('button[onclick="toggleDiscriminator(\'' + discriminator + '\')"]');
+            button.classList.toggle('filter-button-active');
+        }
+        // New function to toggle state
+        function toggleState(euid) {
+            // Implement AJAX call or redirection to server-side script for state toggling
+            console.log("State toggled for EUID:", euid);
+            // For demonstration, we just log to console
+        }
+
+        // Function to initially hide inactive rows
+        function hideInactiveOnLoad() {
+            var rows = document.querySelectorAll('#genericTemplateTable tbody tr');
+            rows.forEach(row => {
+                var stateCell = row.cells[2]; // Assuming state is the third column
+                if (stateCell.textContent.includes('inactive')) {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Call hideInactiveOnLoad when the window loads
+        window.onload = hideInactiveOnLoad;
+        function toggleInactive() {
+            var rows = document.querySelectorAll('#genericTemplateTable tbody tr');
+            rows.forEach(row => {
+                var stateCell = row.cells[2]; // Assuming state is in the third column
+                if (stateCell.textContent.trim().includes('inactive')) {
+                    if (row.style.display === 'none') {
+                        row.style.display = ''; // Set to default display style if it was none
+                    } else {
+                        row.style.display = 'none'; // Hide the row if it was visible
+                    }
+                }
+            });
+        }
+        </script>
+    </body>
+</html>

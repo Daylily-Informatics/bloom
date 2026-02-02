@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    {% set page_title = 'Download Error' %}
+    <title>{{ page_title }}</title>
+
+    {% set bloom_mod = 'admin' %}
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <script src="/static/legacy/action_buttons.js"></script>
+</head>
+<body>
+    {% include 'legacy/bloom_header.html' %}
+
+    <h1>Download Error</h1>
+    <ul>
+    <p>An error occurred while trying to download the file:</p>
+    <p>{{ error }}</p><br>
+    You May Either:
+    <ul>
+    {% if offending_file %}
+    
+       <li> <a href="/delete_temp_file?filename={{ offending_file | replace('./tmp/', '') }}">Click here</a> to delete the offending temporary file and try again.
+    
+    {% endif %}
+    <br>or<br>
+    <li><a href="/dewey">Go Back</a>
+    </ul></ul>
+</body>
+</html>

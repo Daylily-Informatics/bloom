@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% set page_title = atype.get('type', 'Assay') %}
+    <title>{{ atype.get('type', 'Assay') }} </title>
+
+    {% set bloom_mod = 'lims' %}
+
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <script src="/static/action_buttons.js"></script>
+
+
+    <style>
+        .accordion {
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            transition: 0.4s;
+        }
+     
+        .panel {
+            padding: 0 18px;
+            display: none;
+            overflow: hidden;
+        }
+        b {
+            color: gold;        
+        }
+        button .accordion {  
+            background-color: var(--secondary-color);
+        }
+    </style>
+</head>
+<body>
+    {% include 'legacy/bloom_header.html' %}
+</ul>
+<h1>{{ atype.get('type', 'Assay') }}</h1>
+
+    {% for assay in workflow_instances %}
+    <ul>
+
+    <button class="accordion">{{ assay.euid }} - {{ assay.json_addl['properties'].get('name',assay.euid) }} 
+        
+        <hr>
+        <ul>
+         /// QUEUES ( <b>{{ ay_stats.get(assay.euid,{}).get('avail','na') }}</b> : avail )  ( <b>{{ ay_stats.get(assay.euid,{}).get('inprog','na') }}</b> : underway )       ( <b>{{ ay_stats.get(assay.euid,{}).get('complete','na') }}</b> : completed )   ( <b>{{ ay_stats.get(assay.euid,{}).get('exception','na') }}</b> : exception )
+        <br>        
+        /// COMPLETION CONVERSION %  ( <b>{{ ay_stats.get(assay.euid,{}).get('conv','na') }}</b> ) 
+        <br>    
+        /// COGS  ( <b>${{ ay_stats.get(assay.euid,{}).get('wsetp','na') }}</b> per workset ) ( <b>${{ ay_stats.get(assay.euid,{}).get('Instantaneous COGS','na') }}</b> total {{ ay_stats.get(assay.euid,{}).get('tot','na') }} most recent nodes in AY ) 
+        <br>
+        /// WORKSET OCCUPANCY ( <b>{{ ay_stats.get(assay.euid,{}).get('workset_occupancy','%unused capacity') }}</b> ) 
+        
+        {% if atype.get('type', 'Assay') == 'Accessioning' %}
+        <br>
+        /// FEDEX ( <b>{{ ay_stats.get(assay.euid,{}).get('avg_d_fx','na') }}</b> avg package transit days ) 
+        {% endif %}
+    
+    </ul>
+
+
+            </button>
+    <div class="panel">
+        <div>
+                <div id="actionGroupsContent" class="content" style="display:block;">
+
+            {% if assay.json_addl and 'action_groups' in assay.json_addl %}
+            <div class="action-group-group">
+                {% for group_key, group_value in assay.json_addl['action_groups'].items() %}
+                    <div class="action-group">   
+                    {% if group_key == 'accessioning' %}
+                        {% for action_key, action_value in group_value.actions.items() %}
+                            <button class="action_button"
+                                    onclick="showCapturedDataForm(this, {{ action_value }}, '{{ assay.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                                    {% if action_value.action_enabled == "0" %}disabled style="color: gray;"{% endif %}>
+                                {{ action_value.action_name }}
+                            </button>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+        </div>
+        {% endif %}
+        </div>
+        <div>
+        <ul>
+    Assay Queues<ul>
+        {% for queue in assay.parent_of_lineages %}
+        <button class="accordion">   
+            {% if queue.child_instance.b_sub_type == 'plasma-isolation-queue-available' %}
+            
+            <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( available:  {{ ay_stats.get(assay.euid,{}).get('avail','na') }} ) </p>
+           
+            
+            {% elif queue.child_instance.b_sub_type == 'all-purpose' %}
+            <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( in progress:  {{ ay_stats.get(assay.euid,{}).get('inprog','na') }} ) </p>
+
+            {% elif queue.child_instance.b_sub_type == 'plasma-isolation-queue-removed' %}
+            <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( complete:  {{ ay_stats.get(assay.euid,{}).get('complete','na') }} ) </p>
+            
+            {% elif queue.child_instance.b_sub_type == 'plasma-isolation-queue-exception' %}
+            <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( exception:  {{ ay_stats.get(assay.euid,{}).get('exception','na') }} ) </p>
+
+            {% endif %}
+        </button>
+        <div class="panel">
+            {% if queue.child_instance.b_sub_type == 'plasma-isolation-queue-available' %}
+
+                <ul>
+                    <h3>
+                <a target=pq href=workflow_details?workflow_euid={{ queue.child_instance.euid }}>Process Queue</a>
+                    </h3></ul>
+
+            {% elif queue.child_instance.btype == 'queue' %}
+                <ul>Worksets
+                    <ul>
+                        {% if queue.child_instance.parent_of_lineages.all()|length == 0 %}
+                        no worksets in queue.
+                        
+                        {% else %}
+
+                        <a href=queue_details?queue_euid={{ queue.child_instance.euid }}>Queue Details</a>
+                        
+                        {% endif %}
+                        
+
+                    </ul></ul>
+                {% endif %}
+        </div>
+        {% endfor %}
+    </ul>
+    </div>
+</ul></div>
+</div>
+    {% endfor %}
+
+    <script>
+        var acc = document.getElementsByClassName("accordionx");
+        var i;
+
+        for (i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                var panel = this.nextElementSibling;
+                if (panel.style.display === "block") {
+                    panel.style.display = "none";
+                } else {
+                    panel.style.display = "block";
+                }
+            });
+        }
+
+
+document.querySelectorAll('.collapsiblex').forEach(button => {
+    button.addEventListener('click', function() {
+        var contentId = this.getAttribute('data-target');
+        var contentDiv = document.getElementById(contentId);
+        
+        if (contentDiv.style.display === "block") {
+            contentDiv.style.display = "none";
+        } else {
+            contentDiv.style.display = "block";
+        }
+    });
+});
+    </script>
+</body>
+</html>

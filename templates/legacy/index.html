@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {% set page_title = 'Bloom' %}
+        <title>{{ page_title }}</title>
+
+        {% set bloom_mod = 'index' %}
+
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+        <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+        <script src="/static/legacy/action_buttons.js"></script>
+
+        <script>
+            function checkForOauthCode() {
+                const urlFragment = new URLSearchParams(window.location.hash.substring(1)); // Remove the # and parse
+                const accessToken = urlFragment.get('access_token');
+                const idToken = urlFragment.get('id_token');
+                console.log("Access token:", accessToken);
+                console.log("ID token:", idToken);
+            
+                if (idToken || accessToken) {
+                    const tokenPayload = {};
+                    if (idToken) {
+                        tokenPayload.id_token = idToken;
+                    }
+                    if (accessToken) {
+                        tokenPayload.access_token = accessToken;
+                    }
+
+                    // Send the code to the backend
+                    fetch('/oauth_callback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(tokenPayload),
+                    })
+                    .then(response => response.text())
+                    .then(data => {
+                        console.log("Response from server:", data);
+                        if (!sessionStorage.getItem('pageReloaded')) {
+                            sessionStorage.setItem('pageReloaded', 'true');
+                            window.location.reload(); // Force page reload
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert("Failed to process Cognito authentication.");
+                    });
+                } else {
+                    console.log("No Cognito tokens found on home page.");
+                }
+            }
+
+            window.onload = function() {
+                checkForOauthCode();
+            };
+
+
+        </script>
+
+        <style>
+            .accordion {
+                cursor: pointer;
+                padding: 18px;
+                width: 100%;
+                border: none;
+                text-align: left;
+                outline: none;
+                font-size: 15px;
+                transition: 0.4s;
+            }
+         
+            .panel {
+                padding: 0 18px;
+                display: none;
+                overflow: hidden;
+            }
+            b {
+                color: gold;        
+            }
+            button .accordion {  
+                background-color: var(--secondary-color);
+            }
+            .blink {
+                animation: blinker 1s linear infinite;
+                color: red;
+                font-weight: bold;
+            }
+            @keyframes blinker {
+                50% {
+                    opacity: 0;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        {% include 'legacy/bloom_header.html' %}
+
+        <ul style="padding: 0;"><div class="button-container" style="margin-top: 20px; text-align: center;padding: 0;">
+
+            <a href="/index2" style="display: inline-block; margin: 20px; padding: 20px 40px; background-color: #28a745; color: magenta; text-decoration: none; font-size: 24px; border-radius: 8px;">... Please Authenticate To Proceed ...</a>
+
+        </div>
+
+    </body>
+</html>

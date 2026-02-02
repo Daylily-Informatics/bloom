@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    {% set page_title = 'User Audit Log' %}
+    <title>{{ page_title }}</title>
+    
+    {% set bloom_mod = 'lims' %}
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <script src="/static/legacy/action_buttons.js"></script>
+
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            cursor: pointer;
+        }
+        .deleted {
+            background-color: pink;
+        }
+        .added {
+            background-color: aqua;
+        }
+        th.ascending::after {
+            content: ' \25B2'; /* Up arrow */
+        }
+
+        th.descending::after {
+            content: ' \25BC'; /* Down arrow */
+        }
+
+        .floating-button {
+            position: fixed;
+            padding: 10px;
+            z-index: 1000;
+            background-color: var(--primary-color);
+            color: white; /* White text */
+            border: none;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .floating-button.download-tsv {
+            top: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'legacy/bloom_header.html' %}
+
+    <button class="floating-button download-tsv" onclick="downloadTSV()">⬇️</button>
+
+    <h1>Audit Log for {{ username }}</h1>
+    Filters:
+    <input type="text" id="filterInput" onkeyup="filterTable()" placeholder="Filter out rows w/string" style="width: 200px;">
+    <input type="text" id="includeFilterInput" onkeyup="includeFilterTable()" placeholder="Filter out rows w/out strings" style="width: 200px;">
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0)">EUID</th>
+                <th onclick="sortTable(1)">Changed By</th>
+                <th onclick="sortTable(2)">Operation Type</th>
+                <th onclick="sortTable(3)">Changed At</th>
+                <th onclick="sortTable(4)">Name</th>
+                <th onclick="sortTable(5)">Polymorphic Discriminator</th>
+                <th onclick="sortTable(6)">Super Type</th>
+                <th onclick="sortTable(7)">BType</th>
+                <th onclick="sortTable(8)">B Sub Type</th>
+                <th onclick="sortTable(9)">Status</th>
+                <th onclick="sortTable(10)">Old Value</th>
+                <th onclick="sortTable(11)">New Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in results %}
+                <tr>
+                    <td><a href="/euid_details?euid={{ row[0] }}" target="euid_deets">{{ row[0] }}</a></td>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2] }}</td>
+                    <td>{{ row[3] }}</td>
+                    <td>{{ row[4] }}</td>
+                    <td>{{ row[5] }}</td>
+                    <td>{{ row[6] }}</td>
+                    <td>{{ row[7] }}</td>
+                    <td>{{ row[8] }}</td>
+                    <td>{{ row[9] }}</td>
+                    <td>
+                        {% if row[10] and row[10].startswith('{') %}
+                            <button onclick="toggleJSON('old-{{ loop.index }}')">Show JSON</button>
+                            <div id="old-{{ loop.index }}" style="display:none; white-space: pre-wrap;">{{ highlight_json_changes(row[10], row[11])[0]|safe }}</div>
+                        {% else %}
+                            {{ row[10] }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row[11] and row[11].startswith('{') %}
+                            <button onclick="toggleJSON('new-{{ loop.index }}')">Show JSON</button>
+                            <div id="new-{{ loop.index }}" style="display:none; white-space: pre-wrap;">{{ highlight_json_changes(row[10], row[11])[1]|safe }}</div>
+                        {% else %}
+                            {{ row[11] }}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        function toggleJSON(id) {
+            var element = document.getElementById(id);
+            if (element.style.display === "none") {
+                element.style.display = "block";
+            } else {
+                element.style.display = "none";
+            }
+        }
+
+        function filterTable() {
+            var input, filter, table, tr, td, i, j, txtValue;
+            input = document.getElementById("filterInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("resultsTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 1; i < tr.length; i++) {
+                tr[i].style.display = "none";
+                td = tr[i].getElementsByTagName("td");
+                for (j = 0; j < td.length; j++) {
+                    if (td[j]) {
+                        txtValue = td[j].textContent || td[j].innerText;
+                        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                            tr[i].style.display = "";
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        function includeFilterTable() {
+            var input, filter, table, tr, td, i, j, txtValue;
+            input = document.getElementById("includeFilterInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("resultsTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 1; i < tr.length; i++) {
+                tr[i].style.display = "none";
+                td = tr[i].getElementsByTagName("td");
+                var shouldDisplay = true;
+                for (j = 0; j < td.length; j++) {
+                    if (td[j]) {
+                        txtValue = td[j].textContent || td[j].innerText;
+                        if (txtValue.toUpperCase().indexOf(filter) === -1) {
+                            shouldDisplay = false;
+                            break;
+                        }
+                    }
+                }
+                if (shouldDisplay) {
+                    tr[i].style.display = "";
+                }
+            }
+        }
+
+        function downloadTSV() {
+            var table = document.getElementById("resultsTable");
+            var rows = table.querySelectorAll("tr");
+            var tsv = [];
+            for (var i = 0; i < rows.length; i++) {
+                var row = [],
+                    cols = rows[i].querySelectorAll("td, th");
+                for (var j = 0; j < cols.length; j++) {
+                    row.push(cols[j].innerText);
+                }
+                tsv.push(row.join("\t"));
+            }
+            var tsvFile = new Blob([tsv.join("\n")], { type: "text/tsv" });
+            var downloadLink = document.createElement("a");
+            var now = new Date();
+            var timestamp = now.getFullYear().toString() +
+                            (now.getMonth() + 1).toString().padStart(2, '0') +
+                            now.getDate().toString().padStart(2, '0');
+            var username = "{{ username }}";
+            downloadLink.download = `${timestamp}_${username}_audit.log`;
+            downloadLink.href = window.URL.createObjectURL(tsvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+        }
+
+        function sortTable(columnIndex) {
+            const table = document.querySelector('table');
+            const rows = Array.from(table.querySelectorAll('tbody > tr'));
+            const header = table.querySelector(`thead > tr > th:nth-child(${columnIndex + 1})`);
+            const isAscending = header.classList.contains('ascending');
+
+            rows.sort((a, b) => {
+                const aText = a.children[columnIndex].innerText.trim();
+                const bText = b.children[columnIndex].innerText.trim();
+
+                if (!isNaN(aText) && !isNaN(bText)) {
+                    return isAscending ? aText - bText : bText - aText;
+                } else {
+                    return isAscending ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                }
+            });
+
+            rows.forEach(row => table.querySelector('tbody').appendChild(row));
+            table.querySelectorAll('thead > tr > th').forEach(th => th.classList.remove('ascending', 'descending'));
+
+            header.classList.toggle('ascending', !isAscending);
+            header.classList.toggle('descending', isAscending);
+        }
+    </script>
+</body>
+</html>

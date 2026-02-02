@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    {% set page_title = 'Queue Details' %}
+    <title>{{ page_title }}</title>
+
+    {% set bloom_mod = 'lims' %}
+
+    <link rel="stylesheet" href="{{ style.skin_css }}">
+    <link rel="stylesheet" href="/static/legacy/style.css">
+    <script src="/static/legacy/action_buttons.js"></script>
+    <script>
+        var currentSortColumn = -1;
+        var sortAscending = true;
+
+        function sortTable(columnIndex) {
+            var table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementById("genericTemplateTable");
+            switching = true;
+
+            if (columnIndex === currentSortColumn) {
+                sortAscending = !sortAscending; // Toggle the sorting direction
+            } else {
+                currentSortColumn = columnIndex;
+                sortAscending = true; // Default to ascending sort for a new column
+            }
+
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[columnIndex];
+                    y = rows[i + 1].getElementsByTagName("TD")[columnIndex];
+
+                    if (sortAscending) {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+
+
+
+        </script>
+</head>
+<body>
+
+    {% include 'legacy/bloom_header.html' %}
+
+
+            <small> <a href=dindex2?globalStartNodeEUID={{ pagination.euid }}>( graph )</a> </small> 
+
+    <h1>Queue {{pagination.euid}} Details</h1>
+    <table border="1" id="genericTemplateTable">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0, 'genericTemplateTable')" >EUID</th>
+                <th onclick="sortTable(1, 'genericTemplateTable')" >Status</th>
+                <th onclick="sortTable(2, 'genericTemplateTable')" >Created Date</th>
+                <th onclick="sortTable(3, 'genericTemplateTable')" >Modified Date</th>
+                <th onclick="sortTable(4, 'genericTemplateTable')" >Name</th>
+                <th onclick="sortTable(5, 'genericTemplateTable')" >Lab Code</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detail in queue_details %}
+            <tr>
+                <td><a href=/workflow_details?workflow_euid={{detail.euid}}>{{ detail.euid }}</a></td>
+                <td>{{ detail.bstatus }}</td>    
+                <td>{{ detail.created_dt.strftime('%Y-%m-%d %H:%M:%S %Z') }}</td>
+                <td>{{ detail.modified_dt.strftime('%Y-%m-%d %H:%M:%S %Z') }}</td>
+
+                <td>{{ detail.json_addl['properties'].get('name', 'N/A') }}</td>
+                <td>{{ detail.json_addl['properties'].get('lab_code', 'N/A') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div>
+           <a href="/queue_details?queue_euid={{pagination.euid}}&page={{pagination.prev }}">Previous 500</a> /// 
+            <a href="/queue_details?queue_euid={{pagination.euid}}&page={{pagination.next }}">Next 500</a>
+    </div>
+</body>
+</html>
