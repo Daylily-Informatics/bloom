@@ -167,8 +167,9 @@ app.add_middleware(
 
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
 
-# Add rate limiting middleware for API endpoints
-app.add_middleware(RateLimitMiddleware)
+# Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
+if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":
+    app.add_middleware(RateLimitMiddleware)
 
 # Include API v1 router
 app.include_router(api_v1_router)

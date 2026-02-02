@@ -8,7 +8,7 @@
     <nav class="breadcrumb">
       <a href="/">Dashboard</a>
       <span class="separator">/</span>
-      <span>{{ obj.b_type | capitalize }}</span>
+      <span>{{ obj.btype | capitalize }}</span>
       <span class="separator">/</span>
       <span class="current">{{ obj.euid }}</span>
     </nav>
@@ -18,6 +18,9 @@
     </h1>
   </div>
   <div class="page-actions">
+    <a href="/dindex2?globalStartNodeEUID={{ obj.euid }}" class="btn btn-primary btn-sm" title="View in DAG Explorer">
+      <i class="fas fa-project-diagram"></i> Graph
+    </a>
     <button class="btn btn-outline btn-sm" onclick="copyToClipboard('{{ obj.euid }}')" title="Copy EUID">
       <i class="fas fa-copy"></i>
     </button>
@@ -40,35 +43,68 @@
           <div class="detail-value font-mono">{{ obj.euid }}</div>
         </div>
         <div class="detail-item">
+          <div class="detail-label">Super Type</div>
+          <div class="detail-value">{{ obj.super_type }}</div>
+        </div>
+        <div class="detail-item">
           <div class="detail-label">Type</div>
-          <div class="detail-value">{{ obj.b_type }}</div>
+          <div class="detail-value">{{ obj.btype }}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Sub Type</div>
           <div class="detail-value">{{ obj.b_sub_type }}</div>
         </div>
         <div class="detail-item">
+          <div class="detail-label">Version</div>
+          <div class="detail-value">{{ obj.version }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Status</div>
+          <div class="detail-value">{{ obj.bstatus }}</div>
+        </div>
+        <div class="detail-item">
           <div class="detail-label">Name</div>
-          <div class="detail-value">{{ obj.name | default('-') }}</div>
+          <div class="detail-value">{{ obj.json_addl.properties.name | default(obj.name) | default('-') }}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Created</div>
           <div class="detail-value">{{ obj.created_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.created_dt else '-' }}</div>
         </div>
         <div class="detail-item">
-          <div class="detail-label">Modified</div>
-          <div class="detail-value">{{ obj.modified_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.modified_dt else '-' }}</div>
+          <div class="detail-label">Is Deleted?</div>
+          <div class="detail-value">
+            {% if obj.is_deleted %}
+            <span class="badge badge-error">Yes</span>
+            {% else %}
+            <span class="badge badge-success">No</span>
+            {% endif %}
+          </div>
         </div>
-        {% if obj.is_singleton %}
         <div class="detail-item">
-          <div class="detail-label">Singleton</div>
-          <div class="detail-value"><span class="badge badge-info">Yes</span></div>
+          <div class="detail-label">Template EUID</div>
+          <div class="detail-value">
+            {% if obj.template %}
+            <a href="/euid_details?euid={{ obj.template.euid }}" class="link-euid">{{ obj.template.euid }}</a>
+            {% elif obj_dict.parent_template_euid %}
+            <a href="/euid_details?euid={{ obj_dict.parent_template_euid }}" class="link-euid">{{ obj_dict.parent_template_euid }}</a>
+            {% else %}
+            <span class="badge badge-info">TEMPLATE</span>
+            <a href="/admin_template?euid={{ obj.euid }}" class="btn btn-outline btn-sm" style="margin-left: var(--spacing-xs);">
+              <i class="fas fa-edit"></i> Admin Edit
+            </a>
+            {% endif %}
+          </div>
         </div>
-        {% endif %}
+        <div class="detail-item" style="grid-column: span 2;">
+          <div class="detail-label">UUID</div>
+          <div class="detail-value font-mono" style="font-size: 0.8rem;">
+            <a href="/uuid_details?uuid={{ obj.uuid }}" class="link-uuid">{{ obj.uuid }}</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-  
+
   <!-- Quick Actions -->
   <div class="card">
     <div class="card-header">
@@ -76,9 +112,12 @@
     </div>
     <div class="card-body">
       <div class="action-list">
-        {% if obj.b_type == 'workflow' %}
+        <a href="/dindex2?globalStartNodeEUID={{ obj.euid }}" class="btn btn-primary btn-block">
+          <i class="fas fa-project-diagram"></i> View Graph
+        </a>
+        {% if obj.btype == 'workflow' %}
         <a href="/workflow_details?workflow_euid={{ obj.euid }}" class="btn btn-outline btn-block">
-          <i class="fas fa-project-diagram"></i> View Workflow
+          <i class="fas fa-stream"></i> View Workflow
         </a>
         {% endif %}
         <a href="/search?q={{ obj.euid }}" class="btn btn-outline btn-block">
@@ -92,13 +131,281 @@
   </div>
 </div>
 
-<!-- JSON Properties -->
+<!-- Collapsible Sections -->
+<div class="collapsible-nav" style="margin-top: var(--spacing-lg);">
+  <button class="collapsible-btn" data-target="relationshipsSection">
+    <i class="fas fa-link"></i> Relationships
+  </button>
+  {% if subjects_for_object %}
+  <button class="collapsible-btn" data-target="subjectsSection">
+    <i class="fas fa-users"></i> Subjects ({{ subjects_for_object|length }})
+  </button>
+  {% endif %}
+  <button class="collapsible-btn" data-target="auditLogSection">
+    <i class="fas fa-history"></i> Audit Log
+  </button>
+  <button class="collapsible-btn" data-target="editPropertiesSection">
+    <i class="fas fa-edit"></i> Edit Properties
+  </button>
+  {% if not obj.template %}
+  <button class="collapsible-btn" data-target="editTemplateSection">
+    <i class="fas fa-cogs"></i> Edit Template Form
+  </button>
+  {% endif %}
+</div>
+
+<!-- Relationships Section -->
+<div id="relationshipsSection" class="collapsible-content" style="display: none;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-link"></i> Relationships</h3>
+    </div>
+    <div class="card-body">
+      <!-- Child Of Lineages (Parents) -->
+      <h4 class="section-subtitle"><i class="fas fa-arrow-up"></i> Parent Relationships (Child Of)</h4>
+      {% if obj.child_of_lineages %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Parent EUID</th>
+              <th>Type</th>
+              <th>Sub Type</th>
+              <th>Version</th>
+              <th>Relationship</th>
+              <th>Lineage EUID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lineage in obj.child_of_lineages %}
+            <tr class="{% if lineage.is_deleted %}row-deleted{% endif %}">
+              <td>
+                {% if lineage.is_deleted %}
+                <span class="badge badge-error"><i class="fas fa-trash"></i> Deleted</span>
+                {% else %}
+                <span class="badge badge-success"><i class="fas fa-check"></i> Active</span>
+                {% endif %}
+              </td>
+              <td><a href="/euid_details?euid={{ lineage.parent_instance.euid }}" class="link-euid">{{ lineage.parent_instance.euid }}</a></td>
+              <td>{{ lineage.parent_instance.btype }}</td>
+              <td>{{ lineage.parent_instance.b_sub_type }}</td>
+              <td>{{ lineage.parent_instance.version }}</td>
+              <td>{{ lineage.relationship_type | default(lineage.btype) }}</td>
+              <td><a href="/euid_details?euid={{ lineage.euid }}" class="link-euid-secondary">{{ lineage.euid }}</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted">No parent relationships found.</p>
+      {% endif %}
+
+      <!-- Parent Of Lineages (Children) -->
+      <h4 class="section-subtitle" style="margin-top: var(--spacing-lg);"><i class="fas fa-arrow-down"></i> Child Relationships (Parent Of)</h4>
+      {% if obj.parent_of_lineages %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Child EUID</th>
+              <th>Type</th>
+              <th>Sub Type</th>
+              <th>Version</th>
+              <th>Relationship</th>
+              <th>Lineage EUID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lineage in obj.parent_of_lineages %}
+            <tr class="{% if lineage.is_deleted %}row-deleted{% endif %}">
+              <td>
+                {% if lineage.is_deleted %}
+                <span class="badge badge-error"><i class="fas fa-trash"></i> Deleted</span>
+                {% else %}
+                <span class="badge badge-success"><i class="fas fa-check"></i> Active</span>
+                {% endif %}
+              </td>
+              <td><a href="/euid_details?euid={{ lineage.child_instance.euid }}" class="link-euid">{{ lineage.child_instance.euid }}</a></td>
+              <td>{{ lineage.child_instance.btype }}</td>
+              <td>{{ lineage.child_instance.b_sub_type }}</td>
+              <td>{{ lineage.child_instance.version }}</td>
+              <td>{{ lineage.relationship_type | default(lineage.btype) }}</td>
+              <td><a href="/euid_details?euid={{ lineage.euid }}" class="link-euid-secondary">{{ lineage.euid }}</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted">No child relationships found.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Subjects Section -->
+{% if subjects_for_object %}
+<div id="subjectsSection" class="collapsible-content" style="display: none;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-users"></i> Subjects (Decision Scopes)</h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted" style="margin-bottom: var(--spacing-md);"><em>This object is part of the following subjects:</em></p>
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Subject EUID</th>
+              <th>Kind</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Subject Key</th>
+              <th>Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for subject in subjects_for_object %}
+            <tr>
+              <td><a href="/euid_details?euid={{ subject.euid }}" class="link-euid">{{ subject.euid }}</a></td>
+              <td>{{ subject.kind }}</td>
+              <td>
+                {% if subject.role == 'anchor' %}
+                <span class="badge badge-info"><i class="fas fa-anchor"></i> Anchor</span>
+                {% elif subject.role == 'member' %}
+                <span class="badge badge-success"><i class="fas fa-paperclip"></i> Member</span>
+                {% else %}
+                {{ subject.role }}
+                {% endif %}
+              </td>
+              <td>{{ subject.status }}</td>
+              <td><code class="code-inline">{{ subject.subject_key }}</code></td>
+              <td>{{ subject.name }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Audit Log Section -->
+<div id="auditLogSection" class="collapsible-content" style="display: none;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-history"></i> Audit Log</h3>
+    </div>
+    <div class="card-body">
+      {% if audit_logs %}
+      <div class="table-container">
+        <table class="table" id="auditLogTable">
+          <thead>
+            <tr>
+              <th onclick="sortAuditTable(0)" style="cursor: pointer;">Column Name <i class="fas fa-sort"></i></th>
+              <th onclick="sortAuditTable(1)" style="cursor: pointer;">Old Value <i class="fas fa-sort"></i></th>
+              <th onclick="sortAuditTable(2)" style="cursor: pointer;">New Value <i class="fas fa-sort"></i></th>
+              <th onclick="sortAuditTable(3)" style="cursor: pointer;">Changed By <i class="fas fa-sort"></i></th>
+              <th onclick="sortAuditTable(4)" style="cursor: pointer;">Changed At <i class="fas fa-sort"></i></th>
+              <th onclick="sortAuditTable(5)" style="cursor: pointer;">Operation <i class="fas fa-sort"></i></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in audit_logs %}
+            <tr>
+              <td>{{ log.column_name }}</td>
+              {% if log.column_name == 'json_addl' %}
+              <td>
+                <button class="btn btn-outline btn-sm" onclick="toggleJsonDiff({{ loop.index }})">
+                  <i class="fas fa-code"></i> Show JSON
+                </button>
+                <div id="jsonOld-{{ loop.index }}" class="json-diff-content" style="display: none;">
+                  <pre class="json-display-sm">{{ log.old_value }}</pre>
+                </div>
+              </td>
+              <td>
+                <div id="jsonNew-{{ loop.index }}" class="json-diff-content" style="display: none;">
+                  <pre class="json-display-sm">{{ log.new_value }}</pre>
+                </div>
+              </td>
+              {% else %}
+              <td class="text-truncate" title="{{ log.old_value }}">{{ log.old_value | truncate(50) if log.old_value else '-' }}</td>
+              <td class="text-truncate" title="{{ log.new_value }}">{{ log.new_value | truncate(50) if log.new_value else '-' }}</td>
+              {% endif %}
+              <td>{{ log.changed_by }}</td>
+              <td>{{ log.changed_at }}</td>
+              <td>
+                {% if log.operation_type == 'UPDATE' %}
+                <span class="badge badge-warning">{{ log.operation_type }}</span>
+                {% elif log.operation_type == 'INSERT' %}
+                <span class="badge badge-success">{{ log.operation_type }}</span>
+                {% elif log.operation_type == 'DELETE' %}
+                <span class="badge badge-error">{{ log.operation_type }}</span>
+                {% else %}
+                <span class="badge badge-info">{{ log.operation_type }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted">No audit log entries found.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Edit Object Properties Section -->
+<div id="editPropertiesSection" class="collapsible-content" style="display: none;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-edit"></i> Edit Object Properties</h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted" style="margin-bottom: var(--spacing-md);">Edit the <code>json_addl['properties']</code> for this object.</p>
+      <div id="json-editor-properties" class="json-editor-container"></div>
+      <div style="margin-top: var(--spacing-md);">
+        <button class="btn btn-primary" onclick="saveProperties()">
+          <i class="fas fa-save"></i> Save Properties
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Template Form Properties Section (only for templates) -->
+{% if not obj.template %}
+<div id="editTemplateSection" class="collapsible-content" style="display: none;">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-cogs"></i> Edit Template Form Properties</h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted" style="margin-bottom: var(--spacing-md);">Edit the <code>json_addl['controlled_properties']</code> for this template.</p>
+      <div id="json-editor-template" class="json-editor-container"></div>
+      <div style="margin-top: var(--spacing-md);">
+        <button class="btn btn-primary" onclick="saveTemplateProperties()">
+          <i class="fas fa-save"></i> Save Template Properties
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- JSON Properties Display -->
 {% if obj.json_addl %}
 <div class="card" style="margin-top: var(--spacing-lg);">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-code"></i> Properties (json_addl)</h3>
-    <button class="btn btn-outline btn-sm" onclick="toggleJsonView()">
-      <i class="fas fa-expand"></i> Expand
+    <h3 class="card-title"><i class="fas fa-code"></i> Full JSON (json_addl)</h3>
+    <button class="btn btn-outline btn-sm" onclick="toggleFullJsonView()">
+      <i class="fas fa-expand" id="json-toggle-icon"></i> <span id="json-toggle-text">Expand</span>
     </button>
   </div>
   <div class="card-body">
@@ -109,6 +416,8 @@
 {% endblock %}
 
 {% block extra_css %}
+<!-- JSONEditor CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.css">
 <style>
 .breadcrumb {
   font-size: 0.875rem;
@@ -133,6 +442,89 @@
 .action-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .btn-block { width: 100%; justify-content: flex-start; }
 
+.link-euid {
+  color: var(--color-euid);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.link-euid:hover { text-decoration: underline; }
+.link-euid-secondary {
+  color: var(--color-gray-400);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+.link-euid-secondary:hover { color: var(--color-highlight); text-decoration: underline; }
+.link-uuid { color: var(--color-gray-400); text-decoration: none; }
+.link-uuid:hover { color: var(--color-highlight); text-decoration: underline; }
+
+.collapsible-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-gray-800);
+  border-radius: var(--radius-md);
+}
+.collapsible-btn {
+  background: var(--color-gray-700);
+  color: var(--color-gray-200);
+  border: 1px solid var(--color-gray-600);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-normal);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+.collapsible-btn:hover {
+  background: var(--color-secondary);
+  border-color: var(--color-highlight);
+}
+.collapsible-btn.active {
+  background: var(--color-highlight);
+  color: var(--color-white);
+  border-color: var(--color-highlight);
+}
+
+.collapsible-content {
+  margin-top: var(--spacing-md);
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-subtitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-gray-200);
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+.section-subtitle i { color: var(--color-gray-400); }
+
+.row-deleted {
+  background: rgba(239, 68, 68, 0.1) !important;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.code-inline {
+  font-family: var(--font-mono);
+  background: var(--color-gray-700);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+}
+
 .json-display {
   background: var(--color-gray-900);
   padding: var(--spacing-md);
@@ -143,20 +535,261 @@
   color: var(--color-gray-300);
   max-height: 300px;
   margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.json-display-sm {
+  background: var(--color-gray-900);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-gray-300);
+  max-height: 200px;
+  overflow: auto;
+  margin-top: var(--spacing-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.json-editor-container {
+  min-height: 400px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.jsoneditor {
+  border: 1px solid var(--color-gray-600) !important;
+}
+.jsoneditor-menu {
+  background-color: var(--color-gray-700) !important;
+  border-bottom: 1px solid var(--color-gray-600) !important;
+}
+.jsoneditor-navigation-bar {
+  background-color: var(--color-gray-700) !important;
+  border-bottom: 1px solid var(--color-gray-600) !important;
+}
+
+.text-muted { color: var(--color-gray-400); }
+.text-truncate {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
 {% endblock %}
 
+
 {% block extra_js %}
+<!-- JSONEditor JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.js"></script>
 <script>
+// JSONEditor instances
+var editorProperties = null;
+var editorTemplate = null;
+
+// Collapsible section toggle
+document.querySelectorAll('.collapsible-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var targetId = this.getAttribute('data-target');
+    var targetEl = document.getElementById(targetId);
+
+    // Toggle active class on button
+    this.classList.toggle('active');
+
+    // Toggle visibility of content
+    if (targetEl.style.display === 'none') {
+      targetEl.style.display = 'block';
+    } else {
+      targetEl.style.display = 'none';
+    }
+  });
+});
+
+// Toggle full JSON view
+function toggleFullJsonView() {
+  var el = document.getElementById('json-display');
+  var icon = document.getElementById('json-toggle-icon');
+  var text = document.getElementById('json-toggle-text');
+
+  if (el.style.maxHeight === 'none') {
+    el.style.maxHeight = '300px';
+    icon.className = 'fas fa-expand';
+    text.textContent = 'Expand';
+  } else {
+    el.style.maxHeight = 'none';
+    icon.className = 'fas fa-compress';
+    text.textContent = 'Collapse';
+  }
+}
+
+// Toggle JSON diff display in audit log
+function toggleJsonDiff(index) {
+  var oldEl = document.getElementById('jsonOld-' + index);
+  var newEl = document.getElementById('jsonNew-' + index);
+
+  if (oldEl.style.display === 'none') {
+    oldEl.style.display = 'block';
+    newEl.style.display = 'block';
+  } else {
+    oldEl.style.display = 'none';
+    newEl.style.display = 'none';
+  }
+}
+
+// Sort audit log table
+var auditSortColumn = -1;
+var auditSortAsc = true;
+
+function sortAuditTable(columnIndex) {
+  var table = document.getElementById('auditLogTable');
+  if (!table) return;
+
+  if (columnIndex === auditSortColumn) {
+    auditSortAsc = !auditSortAsc;
+  } else {
+    auditSortColumn = columnIndex;
+    auditSortAsc = true;
+  }
+
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+
+  rows.sort(function(a, b) {
+    var aVal = a.cells[columnIndex].textContent.trim().toLowerCase();
+    var bVal = b.cells[columnIndex].textContent.trim().toLowerCase();
+
+    if (auditSortAsc) {
+      return aVal.localeCompare(bVal);
+    } else {
+      return bVal.localeCompare(aVal);
+    }
+  });
+
+  rows.forEach(function(row) {
+    tbody.appendChild(row);
+  });
+}
+
+// Save object properties
+function saveProperties() {
+  if (!editorProperties) {
+    BloomToast.error('Error', 'Editor not initialized');
+    return;
+  }
+
+  try {
+    var jsonData = editorProperties.get();
+
+    fetch('/save_json_addl_key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        euid: '{{ obj.euid }}',
+        json_data: jsonData,
+        json_addl_key: 'properties'
+      })
+    })
+    .then(function(response) {
+      if (response.ok || response.status === 303) {
+        BloomToast.success('Saved', 'Properties saved successfully');
+        setTimeout(function() {
+          window.location.href = '/euid_details?euid={{ obj.euid }}';
+        }, 1000);
+      } else {
+        return response.text().then(function(text) {
+          throw new Error(text);
+        });
+      }
+    })
+    .catch(function(error) {
+      BloomToast.error('Error', 'Failed to save properties: ' + error.message);
+    });
+  } catch (e) {
+    BloomToast.error('Invalid JSON', e.message);
+  }
+}
+
+// Save template properties
+function saveTemplateProperties() {
+  if (!editorTemplate) {
+    BloomToast.error('Error', 'Template editor not initialized');
+    return;
+  }
+
+  try {
+    var jsonData = editorTemplate.get();
+
+    fetch('/save_json_addl_key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        euid: '{{ obj.euid }}',
+        json_data: jsonData,
+        json_addl_key: 'controlled_properties'
+      })
+    })
+    .then(function(response) {
+      if (response.ok || response.status === 303) {
+        BloomToast.success('Saved', 'Template properties saved successfully');
+        setTimeout(function() {
+          window.location.href = '/euid_details?euid={{ obj.euid }}';
+        }, 1000);
+      } else {
+        return response.text().then(function(text) {
+          throw new Error(text);
+        });
+      }
+    })
+    .catch(function(error) {
+      BloomToast.error('Error', 'Failed to save template properties: ' + error.message);
+    });
+  } catch (e) {
+    BloomToast.error('Invalid JSON', e.message);
+  }
+}
+
+// Print label
 function printLabel(euid) {
   BloomToast.info('Print Label', 'Printing label for ' + euid);
-  // TODO: Implement print functionality
 }
-function toggleJsonView() {
-  const el = document.getElementById('json-display');
-  el.style.maxHeight = el.style.maxHeight === 'none' ? '300px' : 'none';
+
+// Initialize JSONEditors on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Properties editor
+  var propsContainer = document.getElementById('json-editor-properties');
+  if (propsContainer) {
+    editorProperties = new JSONEditor(propsContainer, {
+      mode: 'tree',
+      modes: ['tree', 'code', 'view'],
+      search: true
+    });
+    editorProperties.set({{ jaddl_prop | tojson }});
+  }
+
+  // Template properties editor
+  var templateContainer = document.getElementById('json-editor-template');
+  if (templateContainer) {
+    editorTemplate = new JSONEditor(templateContainer, {
+      mode: 'tree',
+      modes: ['tree', 'code', 'view'],
+      search: true
+    });
+    editorTemplate.set({{ jaddl_controlled_prop | tojson }});
+  }
+});
+
+// Copy to clipboard utility
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(function() {
+    BloomToast.success('Copied', 'EUID copied to clipboard');
+  }).catch(function() {
+    BloomToast.error('Error', 'Failed to copy to clipboard');
+  });
 }
 </script>
 {% endblock %}
-

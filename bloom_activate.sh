@@ -45,11 +45,23 @@ echo -e "${_BLUE}Activating BLOOM LIMS environment...${_NC}"
 # 1. Activate conda environment (install if needed)
 if command -v conda &> /dev/null; then
     # Ensure conda is properly initialized for this shell
-    source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
+    # Use eval with shell hook (works reliably in VS Code terminals)
+    if [[ -n "$ZSH_VERSION" ]]; then
+        eval "$(conda shell.zsh hook)" 2>/dev/null || true
+    elif [[ -n "$BASH_VERSION" ]]; then
+        eval "$(conda shell.bash hook)" 2>/dev/null || true
+    else
+        source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
+    fi
 
     if conda info --envs | grep -q "^BLOOM "; then
         echo -e "  ${_GREEN}✓${_NC} Activating conda environment: BLOOM"
         conda activate BLOOM
+        # Workaround: VS Code terminals may not update PATH correctly after conda activate
+        # Explicitly prepend the conda env bin directory to PATH
+        if [[ -n "$CONDA_PREFIX" ]] && [[ ":$PATH:" != *":$CONDA_PREFIX/bin:"* ]]; then
+            export PATH="$CONDA_PREFIX/bin:$PATH"
+        fi
     else
         echo -e "  ${_YELLOW}⚠${_NC} Conda environment 'BLOOM' not found."
 
