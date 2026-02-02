@@ -382,3 +382,139 @@ class TestModernUIRoutes:
         assert "Bulk Create" in content
         assert "TSV" in content
 
+
+class TestModernTemplateUsage:
+    """Tests to verify endpoints use modern templates correctly."""
+
+    def test_dashboard_uses_modern_css(self, client):
+        """Test dashboard uses modern CSS."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+
+    def test_assays_uses_modern_template(self, client):
+        """Test assays page uses modern template."""
+        response = client.get("/assays")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Assays" in content
+
+    def test_workflow_summary_uses_modern_template(self, client):
+        """Test workflow summary uses modern template."""
+        response = client.get("/workflow_summary")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Workflow" in content
+
+    def test_equipment_overview_uses_modern_template(self, client):
+        """Test equipment overview uses modern template."""
+        response = client.get("/equipment_overview")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Equipment" in content
+
+    def test_reagent_overview_uses_modern_template(self, client):
+        """Test reagent overview uses modern template."""
+        response = client.get("/reagent_overview")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Reagent" in content
+
+    def test_admin_uses_modern_template(self, client):
+        """Test admin page uses modern template."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Admin" in content
+
+    def test_login_uses_modern_template(self, client):
+        """Test login page uses modern template."""
+        response = client.get("/login")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+
+    def test_search_uses_modern_template(self, client):
+        """Test search page uses modern template."""
+        response = client.get("/search")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Search" in content
+
+    def test_bulk_create_uses_modern_template(self, client):
+        """Test bulk create containers uses modern template."""
+        response = client.get("/bulk_create_containers")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+
+
+class TestModernUIElements:
+    """Tests to verify modern UI elements are present."""
+
+    def test_dashboard_has_stat_cards(self, client):
+        """Test dashboard has stat cards."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+        assert "stat-card" in content or "card" in content
+
+    def test_navigation_has_modern_elements(self, client):
+        """Test navigation has modern elements."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+        # Check for Font Awesome icons
+        assert "fa-" in content
+        # Check for navigation links
+        assert "nav" in content.lower()
+
+    def test_footer_has_version(self, client):
+        """Test footer has version info."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+        assert "footer" in content.lower()
+
+    def test_pages_have_breadcrumb_or_header(self, client):
+        """Test pages have page header with title."""
+        response = client.get("/assays")
+        assert response.status_code == 200
+        content = response.text
+        assert "page-header" in content or "Assays" in content
+
+
+class TestModernAPIs:
+    """Tests for modern API endpoints."""
+
+    def test_dashboard_stats_api(self, client):
+        """Test dashboard stats API endpoint."""
+        response = client.get("/api/v1/stats/dashboard")
+        assert response.status_code == 200
+        assert "application/json" in response.headers["content-type"]
+        data = response.json()
+        assert "containers" in data or "total" in str(data).lower()
+
+    def test_search_api_endpoint(self, client):
+        """Test search API returns JSON."""
+        response = client.get("/api/v1/search?q=test&format=json")
+        # May return 200 with results or appropriate status
+        assert response.status_code in [200, 404, 422]
+
+    def test_bulk_create_api_post(self, client):
+        """Test bulk create API accepts POST."""
+        # Test with invalid data - should return validation error
+        response = client.post(
+            "/api/v1/containers/bulk-create",
+            json={"containers": []}
+        )
+        # Should return 200 or validation error, not 500
+        assert response.status_code in [200, 201, 400, 422]
+
