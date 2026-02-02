@@ -324,3 +324,32 @@ class TestScriptsEndpoint:
         except Exception:
             pytest.skip("list-scripts endpoint raised exception")
 
+
+class TestLegacyRoutes:
+    """Tests for legacy UI routes."""
+
+    def test_legacy_index(self, client):
+        """Test legacy index page is accessible."""
+        response = client.get("/legacy/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    def test_legacy_login(self, client):
+        """Test legacy login page is accessible."""
+        response = client.get("/legacy/login")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+
+class TestModernUIRoutes:
+    """Tests for modern UI routes (GUI modernization)."""
+
+    def test_modern_dashboard(self, client):
+        """Test modern dashboard at root renders correctly."""
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Check for modern UI indicators
+        content = response.text
+        assert "BLOOM" in content
+
