@@ -147,14 +147,109 @@ function initMobileMenu() {
   }
 }
 
+// ==================== Keyboard Navigation ====================
+const BloomKeyboard = {
+  init() {
+    document.addEventListener('keydown', (e) => {
+      // ESC key closes modals, dropdowns, loading overlay
+      if (e.key === 'Escape') {
+        BloomLoading.hide();
+        document.querySelectorAll('.modal.active, .dropdown.active').forEach(el => {
+          el.classList.remove('active');
+        });
+      }
+
+      // Slash key focuses search input
+      if (e.key === '/' && !this.isInputFocused()) {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[type="search"], input[placeholder*="Search"]');
+        if (searchInput) searchInput.focus();
+      }
+
+      // Question mark shows keyboard shortcuts (if modal exists)
+      if (e.key === '?' && !this.isInputFocused()) {
+        this.showShortcuts();
+      }
+    });
+
+    // Make clickable elements keyboard accessible
+    document.querySelectorAll('[onclick]:not(button):not(a):not(input)').forEach(el => {
+      if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+      if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          el.click();
+        }
+      });
+    });
+  },
+
+  isInputFocused() {
+    const active = document.activeElement;
+    return active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+  },
+
+  showShortcuts() {
+    BloomToast.info('Keyboard Shortcuts',
+      '/ - Focus search | Esc - Close dialogs | ? - Show shortcuts', 5000);
+  }
+};
+
+// ==================== Accessibility Helpers ====================
+const BloomA11y = {
+  // Announce message to screen readers
+  announce(message, priority = 'polite') {
+    const announcer = document.getElementById('sr-announcer') || this.createAnnouncer();
+    announcer.setAttribute('aria-live', priority);
+    announcer.textContent = message;
+    setTimeout(() => { announcer.textContent = ''; }, 1000);
+  },
+
+  createAnnouncer() {
+    const announcer = document.createElement('div');
+    announcer.id = 'sr-announcer';
+    announcer.className = 'sr-only';
+    announcer.setAttribute('aria-live', 'polite');
+    announcer.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(announcer);
+    return announcer;
+  },
+
+  // Trap focus within an element (for modals)
+  trapFocus(element) {
+    const focusable = element.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    element.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    first?.focus();
+  }
+};
+
 // ==================== Initialize ====================
 document.addEventListener('DOMContentLoaded', () => {
   initMobileMenu();
+  BloomKeyboard.init();
 });
 
 // Export for global access
 window.BloomToast = BloomToast;
 window.BloomLoading = BloomLoading;
+window.BloomKeyboard = BloomKeyboard;
+window.BloomA11y = BloomA11y;
 window.copyToClipboard = copyToClipboard;
 window.debounce = debounce;
 

@@ -1,0 +1,125 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Search Results - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-search"></i> Search Results</h1>
+    <p class="text-muted">
+      {% if results %}Found {{ results | length }} results for "{{ query }}"{% else %}No results found{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/search?q={{ query }}" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Search Form -->
+<div class="card mb-lg">
+  <div class="card-body">
+    <form action="/search" method="GET" class="search-form">
+      <div class="grid grid-4">
+        <div class="form-group" style="grid-column: span 2;">
+          <label class="form-label">Search Query</label>
+          <input type="text" class="form-input" name="q" value="{{ query }}" placeholder="Search BLOOM...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Object Type</label>
+          <select class="form-select" name="type">
+            <option value="">All Types</option>
+            <option value="workflow" {% if type_filter == 'workflow' %}selected{% endif %}>Workflows</option>
+            <option value="container" {% if type_filter == 'container' %}selected{% endif %}>Containers</option>
+            <option value="content" {% if type_filter == 'content' %}selected{% endif %}>Content</option>
+            <option value="equipment" {% if type_filter == 'equipment' %}selected{% endif %}>Equipment</option>
+            <option value="file" {% if type_filter == 'file' %}selected{% endif %}>Files</option>
+          </select>
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end;">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Search
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Results -->
+{% if results %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-list"></i> Results</h3>
+    <div class="result-actions">
+      <span class="text-muted text-sm">{{ results | length }} items</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="search-results">
+      {% for result in results %}
+      <a href="/euid_details?euid={{ result.euid }}" class="search-result-item">
+        <div class="result-icon">
+          <i class="fas fa-{% if result.b_type == 'workflow' %}project-diagram{% elif result.b_type == 'container' %}box{% elif result.b_type == 'content' %}vial{% elif result.b_type == 'equipment' %}microscope{% elif result.b_type == 'file' %}file{% else %}cube{% endif %}"></i>
+        </div>
+        <div class="result-content">
+          <div class="result-header">
+            <span class="badge badge-euid">{{ result.euid }}</span>
+            <span class="result-name">{{ result.name | default(result.b_sub_type) }}</span>
+          </div>
+          <div class="result-meta">
+            <span class="badge badge-info">{{ result.b_type }}</span>
+            <span class="text-muted text-sm">{{ result.b_sub_type }}</span>
+            {% if result.created_dt %}
+            <span class="text-muted text-sm">Created {{ result.created_dt.strftime('%Y-%m-%d') }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="result-arrow">
+          <i class="fas fa-chevron-right"></i>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="fas fa-search"></i></div>
+      <h3>No Results Found</h3>
+      <p class="text-muted">Try adjusting your search query or filters</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.search-form { width: 100%; }
+.search-results { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.search-result-item {
+  display: flex; align-items: center; gap: var(--spacing-md);
+  padding: var(--spacing-md); background: var(--color-gray-700);
+  border-radius: var(--radius-md); text-decoration: none; color: inherit;
+  transition: background-color var(--transition-fast);
+}
+.search-result-item:hover { background: var(--color-gray-600); }
+.result-icon {
+  width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+  background: var(--color-gray-800); border-radius: var(--radius-sm);
+  font-size: 1.25rem; color: var(--color-highlight);
+}
+.result-content { flex: 1; }
+.result-header { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-xs); }
+.result-name { font-weight: 500; }
+.result-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+.result-arrow { color: var(--color-gray-500); }
+.empty-state { text-align: center; padding: var(--spacing-2xl); }
+.empty-state-icon { font-size: 3rem; color: var(--color-gray-500); margin-bottom: var(--spacing-md); }
+</style>
+{% endblock %}
+
