@@ -140,10 +140,74 @@ class SuccessResponse(BloomBaseSchema):
 
 class ErrorResponse(BloomBaseSchema):
     """Standard error response."""
-    
+
     success: bool = Field(default=False, description="Operation success flag")
     error_code: str = Field(description="Error code for programmatic handling")
     message: str = Field(description="Human-readable error message")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+
+
+# =============================================================================
+# Dashboard Statistics Schemas
+# =============================================================================
+
+
+class DashboardStatsSchema(BloomBaseSchema):
+    """Dashboard statistics response schema."""
+
+    assays_total: int = Field(default=0, description="Total number of assays")
+    assays_in_progress: int = Field(default=0, description="Assays in progress")
+    assays_complete: int = Field(default=0, description="Completed assays")
+    assays_exception: int = Field(default=0, description="Assays with exceptions")
+
+    workflows_total: int = Field(default=0, description="Total number of workflows")
+    workflows_active: int = Field(default=0, description="Active workflows")
+    workflows_complete: int = Field(default=0, description="Completed workflows")
+
+    equipment_total: int = Field(default=0, description="Total equipment items")
+    equipment_active: int = Field(default=0, description="Active equipment")
+    equipment_maintenance: int = Field(default=0, description="Equipment in maintenance")
+
+    reagents_total: int = Field(default=0, description="Total reagent lots")
+    reagents_low_stock: int = Field(default=0, description="Reagents with low stock")
+    reagents_expired: int = Field(default=0, description="Expired reagents")
+
+    samples_total: int = Field(default=0, description="Total samples")
+    containers_total: int = Field(default=0, description="Total containers")
+
+
+class RecentActivityItem(BloomBaseSchema):
+    """Single recent activity item."""
+
+    euid: str = Field(description="Enterprise Unique Identifier")
+    name: Optional[str] = Field(None, description="Object name")
+    b_type: str = Field(description="Object type")
+    b_sub_type: Optional[str] = Field(None, description="Object sub-type")
+    status: Optional[str] = Field(None, description="Current status")
+    created_dt: Optional[datetime] = Field(None, description="Creation timestamp")
+
+
+class RecentActivitySchema(BloomBaseSchema):
+    """Recent activity response schema."""
+
+    recent_assays: List[RecentActivityItem] = Field(
+        default_factory=list, description="Recent assay activities"
+    )
+    recent_workflows: List[RecentActivityItem] = Field(
+        default_factory=list, description="Recent workflow activities"
+    )
+    recent_samples: List[RecentActivityItem] = Field(
+        default_factory=list, description="Recent sample activities"
+    )
+
+
+class DashboardResponseSchema(BloomBaseSchema):
+    """Complete dashboard response combining stats and recent activity."""
+
+    stats: DashboardStatsSchema = Field(description="Dashboard statistics")
+    recent_activity: RecentActivitySchema = Field(description="Recent activity data")
+    generated_at: datetime = Field(
+        default_factory=datetime.utcnow, description="Response generation timestamp"
+    )
 

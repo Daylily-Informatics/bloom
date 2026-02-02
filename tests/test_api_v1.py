@@ -152,7 +152,7 @@ class TestSubjectsAPI:
 
 class TestLineagesAPI:
     """Tests for /api/v1/lineages endpoints."""
-    
+
     def test_list_lineages(self, client):
         """Test listing lineages."""
         response = client.get("/api/v1/lineages/")
@@ -160,4 +160,35 @@ class TestLineagesAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+
+
+class TestStatsAPI:
+    """Tests for /api/v1/stats endpoints."""
+
+    def test_dashboard_stats(self, client):
+        """Test dashboard stats endpoint."""
+        response = client.get("/api/v1/stats/dashboard")
+        assert response.status_code == 200
+        data = response.json()
+        assert "stats" in data
+        assert "recent_activity" in data
+        assert "generated_at" in data
+
+    def test_dashboard_stats_structure(self, client):
+        """Test dashboard stats response structure."""
+        response = client.get("/api/v1/stats/dashboard")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Validate stats structure
+        stats = data["stats"]
+        assert "assays_total" in stats
+        assert "workflows_total" in stats
+        assert "equipment_total" in stats
+        assert "reagents_total" in stats
+
+        # Validate recent_activity structure
+        recent = data["recent_activity"]
+        assert "recent_assays" in recent
+        assert "recent_workflows" in recent
 
