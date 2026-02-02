@@ -1,0 +1,107 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Reagents - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Reagents</h1>
+    <p class="text-muted">Laboratory reagents and consumables inventory</p>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/reagent_overview" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Reagents Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-vial"></i> Reagent Inventory</h3>
+    <div class="filter-search">
+      <input type="text" class="form-input" placeholder="Search..." id="search-input" onkeyup="searchTable(this.value)">
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table" id="reagents-table">
+        <thead>
+          <tr>
+            <th>EUID</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Lot Number</th>
+            <th>Expiration</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for reagent in reagents %}
+          <tr>
+            <td><a href="/euid_details?euid={{ reagent.euid }}" class="badge badge-euid">{{ reagent.euid }}</a></td>
+            <td>{{ reagent.name | default('-') }}</td>
+            <td>{{ reagent.b_sub_type }}</td>
+            <td class="font-mono text-sm">{{ reagent.json_addl.get('lot_number', '-') }}</td>
+            <td class="text-sm {% if reagent.json_addl.get('expired') %}text-error{% endif %}">
+              {{ reagent.json_addl.get('expiration_date', '-') }}
+            </td>
+            <td>
+              {% if reagent.json_addl.get('expired') %}
+              <span class="badge badge-error">Expired</span>
+              {% elif reagent.json_addl.get('quantity', 0) <= reagent.json_addl.get('reorder_level', 0) %}
+              <span class="badge badge-warning">Low Stock</span>
+              {% else %}
+              <span class="badge badge-success">In Stock</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="/euid_details?euid={{ reagent.euid }}" class="btn btn-outline btn-sm" title="View details">
+                <i class="fas fa-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">No reagents found</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.filter-search {
+  max-width: 250px;
+}
+
+.text-error {
+  color: var(--color-error);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function searchTable(query) {
+  const table = document.getElementById('reagents-table');
+  const rows = table.querySelectorAll('tbody tr');
+  const q = query.toLowerCase();
+  
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
+

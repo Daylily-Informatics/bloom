@@ -17,7 +17,7 @@
           crossorigin="anonymous" referrerpolicy="no-referrer">
     
     <!-- BLOOM Modern CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', path='modern/css/bloom_modern.css') }}">
+    <link rel="stylesheet" href="/static/modern/css/bloom_modern.css">
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -108,14 +108,14 @@
     </div>
     
     <!-- BLOOM Modern JS -->
-    <script src="{{ url_for('static', path='modern/js/bloom_modern.js') }}"></script>
-    
+    <script src="/static/modern/js/bloom_modern.js"></script>
+
     <!-- Global configuration -->
     <script>
         window.BloomConfig = {
             apiBase: '/api/v1',
-            user: {{ user | tojson | safe if user else 'null' }},
-            version: '{{ version if version else "dev" }}'
+            user: {{ udat | tojson | safe if udat else 'null' }},
+            version: '{{ version | default("dev") }}'
         };
     </script>
     

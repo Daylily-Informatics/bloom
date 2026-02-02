@@ -1,0 +1,155 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Assays - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Assays</h1>
+    <p class="text-muted">Manage laboratory assays and workflows</p>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/assays" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar mb-lg">
+  <div class="filter-group">
+    <label class="filter-label">Type:</label>
+    <select class="form-select" id="filter-type" onchange="filterAssays()">
+      <option value="all" {% if show_type == 'all' %}selected{% endif %}>All Types</option>
+      {% for atype in assay_types %}
+      <option value="{{ atype }}" {% if show_type == atype %}selected{% endif %}>{{ atype }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label">Status:</label>
+    <select class="form-select" id="filter-status" onchange="filterAssays()">
+      <option value="all">All Statuses</option>
+      <option value="active">Active</option>
+      <option value="complete">Complete</option>
+      <option value="exception">Exception</option>
+    </select>
+  </div>
+  <div class="filter-search">
+    <input type="text" class="form-input" placeholder="Search assays..." id="search-input" onkeyup="searchAssays(this.value)">
+    <i class="fas fa-search"></i>
+  </div>
+</div>
+
+<!-- Assays Grid -->
+<div class="grid grid-3" id="assays-grid">
+  {% if assays %}
+    {% for assay in assays %}
+    <div class="card assay-card" data-type="{{ assay.json_addl.get('assay_type', 'unknown') }}" data-status="{{ assay.json_addl.get('status', 'active') }}">
+      <div class="card-header">
+        <span class="badge badge-euid">{{ assay.euid }}</span>
+        <span class="badge badge-{% if assay.json_addl.get('status') == 'complete' %}success{% elif assay.json_addl.get('status') == 'exception' %}error{% else %}info{% endif %}">
+          {{ assay.json_addl.get('status', 'active') }}
+        </span>
+      </div>
+      <div class="card-body">
+        <h4 class="assay-name">{{ assay.name | default(assay.b_sub_type) }}</h4>
+        <p class="text-muted text-sm">{{ assay.json_addl.get('assay_type', 'General') }}</p>
+        {% if assay.json_addl.get('sample_count') %}
+        <div class="assay-meta">
+          <span><i class="fas fa-vials"></i> {{ assay.json_addl.get('sample_count', 0) }} samples</span>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-footer">
+        <a href="/euid_details?euid={{ assay.euid }}" class="btn btn-outline btn-sm">
+          <i class="fas fa-eye"></i> View
+        </a>
+        <a href="/workflow_details?workflow_euid={{ assay.euid }}" class="btn btn-primary btn-sm">
+          <i class="fas fa-project-diagram"></i> Workflow
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state" style="grid-column: 1 / -1;">
+      <div class="empty-state-icon"><i class="fas fa-flask"></i></div>
+      <p>No assays found</p>
+      <p class="text-muted text-sm">Create a new assay to get started</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.assay-card .card-footer {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+.assay-name {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.assay-meta {
+  margin-top: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--color-gray-400);
+}
+
+.assay-meta i {
+  margin-right: var(--spacing-xs);
+}
+
+.filter-search {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+}
+
+.filter-search input {
+  padding-left: 2.5rem;
+}
+
+.filter-search i {
+  position: absolute;
+  left: var(--spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-gray-500);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterAssays() {
+  const type = document.getElementById('filter-type').value;
+  const status = document.getElementById('filter-status').value;
+  const cards = document.querySelectorAll('.assay-card');
+  
+  cards.forEach(card => {
+    const cardType = card.dataset.type;
+    const cardStatus = card.dataset.status;
+    const typeMatch = type === 'all' || cardType === type;
+    const statusMatch = status === 'all' || cardStatus === status;
+    card.style.display = (typeMatch && statusMatch) ? '' : 'none';
+  });
+}
+
+function searchAssays(query) {
+  const cards = document.querySelectorAll('.assay-card');
+  const q = query.toLowerCase();
+  
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
+

@@ -423,6 +423,82 @@ async def auth_exception_handler(_request: Request, _exc: RequireAuthException):
 #
 
 
+# =============================================================================
+# MODERN UI ROUTES
+# =============================================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def modern_dashboard(request: Request, _=Depends(require_auth)):
+    """Modern dashboard - main entry point for the application."""
+    user_data = request.session.get("user_data", {})
+    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+
+    # Gather dashboard statistics
+    try:
+        assays_total = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False, is_singleton=True
+        ).count()
+
+        workflows_active = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False
+        ).count()
+
+        equipment_total = bobdb.session.query(bobdb.Base.classes.equipment_instance).filter_by(
+            is_deleted=False
+        ).count()
+
+        reagents_total = bobdb.session.query(bobdb.Base.classes.content_instance).filter(
+            bobdb.Base.classes.content_instance.is_deleted == False,
+            bobdb.Base.classes.content_instance.b_sub_type.like('%reagent%')
+        ).count()
+    except Exception:
+        assays_total = workflows_active = equipment_total = reagents_total = 0
+
+    stats = {
+        "assays_total": assays_total,
+        "workflows_active": workflows_active,
+        "equipment_total": equipment_total,
+        "reagents_total": reagents_total,
+    }
+
+    # Get recent items
+    try:
+        recent_assays = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False, is_singleton=True
+        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
+
+        active_workflows = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False
+        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
+    except Exception:
+        recent_assays = []
+        active_workflows = []
+
+    template = templates.get_template("modern/dashboard.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "stats": stats,
+        "recent_assays": recent_assays,
+        "active_workflows": active_workflows,
+    }
+
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
+# =============================================================================
+# LEGACY UI ROUTES (preserved for backward compatibility)
+# =============================================================================
+
+@app.get("/legacy/", response_class=HTMLResponse)
+async def legacy_index(request: Request):
+    """Legacy index page."""
+    template = templates.get_template("legacy/index.html")
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+    context = {"request": request, "style": style, "udat": user_data}
+    return HTMLResponse(content=template.render(context), status_code=200)
+
 
 @app.get("/index2", response_class=HTMLResponse)
 async def index2(request: Request, _=Depends(require_auth)):
@@ -438,25 +514,31 @@ async def index2(request: Request, _=Depends(require_auth)):
     return HTMLResponse(content=template.render(context), status_code=200)
 
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(
-    request: Request,
-):
-    count = request.session.get("count", 0)
-    count += 1
-    request.session["count"] = count
-
-    template = templates.get_template("legacy/index.html")
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-    context = {"request": request, "style": style, "udat": user_data}
-
-    return HTMLResponse(content=template.render(context), status_code=200)
-
-
 @app.get("/login", include_in_schema=False)
 async def get_login_page(request: Request):
+    """Modern login page."""
+    user_data = request.session.get("user_data", {})
 
+    try:
+        cognito = get_cognito_auth()
+        cognito_login_url = cognito.config.authorize_url
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
+
+    # Use modern login template
+    template = templates.get_template("modern/login.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "cognito_login_url": cognito_login_url,
+        "version": "1.0.0",
+    }
+    return HTMLResponse(content=template.render(context))
+
+
+@app.get("/legacy/login", include_in_schema=False)
+async def get_legacy_login_page(request: Request):
+    """Legacy login page."""
     user_data = request.session.get("user_data", {})
     style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
@@ -466,9 +548,7 @@ async def get_login_page(request: Request):
     except CognitoConfigurationError as exc:
         raise MissingCognitoEnvVarsException(str(exc)) from exc
 
-    # Ensure you have this function defined, and it returns the expected style information
     template = templates.get_template("legacy/login.html")
-    # Pass the 'style' variable in the context
     context = {
         "request": request,
         "style": style,

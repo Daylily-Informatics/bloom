@@ -872,3 +872,70 @@ pre {
   border: 0;
 }
 
+/* ==========================================================================
+   List Group
+   ========================================================================== */
+
+.list-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-gray-700);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color var(--transition-fast);
+}
+
+.list-item:hover {
+  background: var(--color-gray-600);
+}
+
+.list-item-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.list-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Quick Actions Grid
+   ========================================================================== */
+
+.quick-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.quick-actions .btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* ==========================================================================
+   EUID Badge (special styling for enterprise unique identifiers)
+   ========================================================================== */
+
+.badge-euid {
+  background-color: rgba(129, 140, 248, 0.15);
+  color: var(--color-bloom-euid);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+

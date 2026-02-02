@@ -1,0 +1,148 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Dashboard - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p class="text-muted">Welcome{% if udat.email %}, {{ udat.email.split('@')[0] }}{% endif %}</p>
+</div>
+
+<!-- Quick Stats -->
+<div class="grid grid-4 mb-lg">
+  <a href="/assays" class="stat-card">
+    <div class="card-icon success">
+      <i class="fas fa-flask"></i>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.assays_total | default(0) }}</div>
+      <div class="stat-label">Active Assays</div>
+    </div>
+  </a>
+  
+  <a href="/workflow_summary" class="stat-card">
+    <div class="card-icon highlight">
+      <i class="fas fa-project-diagram"></i>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.workflows_active | default(0) }}</div>
+      <div class="stat-label">Active Workflows</div>
+    </div>
+  </a>
+  
+  <a href="/equipment_overview" class="stat-card">
+    <div class="card-icon info">
+      <i class="fas fa-microscope"></i>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.equipment_total | default(0) }}</div>
+      <div class="stat-label">Equipment</div>
+    </div>
+  </a>
+  
+  <a href="/reagent_overview" class="stat-card">
+    <div class="card-icon warning">
+      <i class="fas fa-vial"></i>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.reagents_total | default(0) }}</div>
+      <div class="stat-label">Reagents</div>
+    </div>
+  </a>
+</div>
+
+<!-- Two Column Layout -->
+<div class="grid grid-2 mb-lg">
+  <!-- Recent Assays -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-flask"></i> Recent Assays</h3>
+      <a href="/assays" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div class="card-body">
+      {% if recent_assays %}
+        <div class="list-group">
+          {% for assay in recent_assays[:5] %}
+          <a href="/euid_details?euid={{ assay.euid }}" class="list-item">
+            <div class="list-item-content">
+              <span class="badge badge-euid">{{ assay.euid }}</span>
+              <span class="list-item-title">{{ assay.name | default(assay.euid) }}</span>
+            </div>
+            <span class="badge badge-{% if assay.status == 'complete' %}success{% elif assay.status == 'exception' %}error{% else %}info{% endif %}">
+              {{ assay.status | default('active') }}
+            </span>
+          </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon"><i class="fas fa-flask"></i></div>
+          <p>No recent assays</p>
+          <a href="/assays" class="btn btn-primary btn-sm">Create Assay</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- Recent Workflows -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-project-diagram"></i> Active Workflows</h3>
+      <a href="/workflow_summary" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div class="card-body">
+      {% if active_workflows %}
+        <div class="list-group">
+          {% for wf in active_workflows[:5] %}
+          <a href="/workflow_details?workflow_euid={{ wf.euid }}" class="list-item">
+            <div class="list-item-content">
+              <span class="badge badge-euid">{{ wf.euid }}</span>
+              <span class="list-item-title">{{ wf.name | default(wf.b_sub_type) }}</span>
+            </div>
+            <span class="badge badge-{% if wf.status == 'complete' %}success{% elif wf.status == 'in_progress' %}warning{% else %}info{% endif %}">
+              {{ wf.status | default('queued') }}
+            </span>
+          </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon"><i class="fas fa-project-diagram"></i></div>
+          <p>No active workflows</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-bolt"></i> Quick Actions</h3>
+  </div>
+  <div class="card-body">
+    <div class="quick-actions">
+      <a href="/assays" class="btn btn-outline"><i class="fas fa-flask"></i> Assays</a>
+      <a href="/workflow_summary" class="btn btn-outline"><i class="fas fa-project-diagram"></i> Workflows</a>
+      <a href="/equipment_overview" class="btn btn-outline"><i class="fas fa-microscope"></i> Equipment</a>
+      <a href="/reagent_overview" class="btn btn-outline"><i class="fas fa-vial"></i> Reagents</a>
+      <a href="/dewey" class="btn btn-outline"><i class="fas fa-file-alt"></i> Files</a>
+      <a href="/object_templates_summary" class="btn btn-outline"><i class="fas fa-cubes"></i> Templates</a>
+      <a href="/database_statistics" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Statistics</a>
+      <a href="/admin" class="btn btn-outline"><i class="fas fa-cog"></i> Admin</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh dashboard data every 60 seconds
+if (typeof BloomConfig !== 'undefined' && BloomConfig.refreshInterval) {
+  setInterval(() => {
+    location.reload();
+  }, BloomConfig.refreshInterval);
+}
+</script>
+{% endblock %}
+

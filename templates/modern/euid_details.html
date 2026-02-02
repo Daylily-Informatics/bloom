@@ -1,0 +1,162 @@
+{% extends "modern/base.html" %}
+
+{% block title %}{{ obj.euid }} - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <nav class="breadcrumb">
+      <a href="/">Dashboard</a>
+      <span class="separator">/</span>
+      <span>{{ obj.b_type | capitalize }}</span>
+      <span class="separator">/</span>
+      <span class="current">{{ obj.euid }}</span>
+    </nav>
+    <h1>
+      <span class="badge badge-euid" style="font-size: 1.25rem;">{{ obj.euid }}</span>
+      {{ obj.name | default(obj.b_sub_type) }}
+    </h1>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-outline btn-sm" onclick="copyToClipboard('{{ obj.euid }}')" title="Copy EUID">
+      <i class="fas fa-copy"></i>
+    </button>
+    <a href="/legacy/euid_details?euid={{ obj.euid }}" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-3">
+  <!-- Main Info -->
+  <div class="card" style="grid-column: span 2;">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-info-circle"></i> Object Details</h3>
+    </div>
+    <div class="card-body">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <div class="detail-label">EUID</div>
+          <div class="detail-value font-mono">{{ obj.euid }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Type</div>
+          <div class="detail-value">{{ obj.b_type }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Sub Type</div>
+          <div class="detail-value">{{ obj.b_sub_type }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Name</div>
+          <div class="detail-value">{{ obj.name | default('-') }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Created</div>
+          <div class="detail-value">{{ obj.created_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.created_dt else '-' }}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Modified</div>
+          <div class="detail-value">{{ obj.modified_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.modified_dt else '-' }}</div>
+        </div>
+        {% if obj.is_singleton %}
+        <div class="detail-item">
+          <div class="detail-label">Singleton</div>
+          <div class="detail-value"><span class="badge badge-info">Yes</span></div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  
+  <!-- Quick Actions -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-bolt"></i> Actions</h3>
+    </div>
+    <div class="card-body">
+      <div class="action-list">
+        {% if obj.b_type == 'workflow' %}
+        <a href="/workflow_details?workflow_euid={{ obj.euid }}" class="btn btn-outline btn-block">
+          <i class="fas fa-project-diagram"></i> View Workflow
+        </a>
+        {% endif %}
+        <a href="/search?q={{ obj.euid }}" class="btn btn-outline btn-block">
+          <i class="fas fa-search"></i> Related Objects
+        </a>
+        <button class="btn btn-outline btn-block" onclick="printLabel('{{ obj.euid }}')">
+          <i class="fas fa-print"></i> Print Label
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JSON Properties -->
+{% if obj.json_addl %}
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-code"></i> Properties (json_addl)</h3>
+    <button class="btn btn-outline btn-sm" onclick="toggleJsonView()">
+      <i class="fas fa-expand"></i> Expand
+    </button>
+  </div>
+  <div class="card-body">
+    <pre class="json-display" id="json-display">{{ obj.json_addl | tojson(indent=2) }}</pre>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.breadcrumb {
+  font-size: 0.875rem;
+  color: var(--color-gray-400);
+  margin-bottom: var(--spacing-sm);
+}
+.breadcrumb a { color: var(--color-highlight); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb .separator { margin: 0 var(--spacing-xs); }
+.breadcrumb .current { color: var(--color-gray-300); }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+.detail-item { padding: var(--spacing-sm); background: var(--color-gray-700); border-radius: var(--radius-sm); }
+.detail-label { font-size: 0.75rem; color: var(--color-gray-400); text-transform: uppercase; margin-bottom: var(--spacing-xs); }
+.detail-value { font-weight: 500; }
+.font-mono { font-family: var(--font-mono); }
+
+.action-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.btn-block { width: 100%; justify-content: flex-start; }
+
+.json-display {
+  background: var(--color-gray-900);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-gray-300);
+  max-height: 300px;
+  margin: 0;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function printLabel(euid) {
+  BloomToast.info('Print Label', 'Printing label for ' + euid);
+  // TODO: Implement print functionality
+}
+function toggleJsonView() {
+  const el = document.getElementById('json-display');
+  el.style.maxHeight = el.style.maxHeight === 'none' ? '300px' : 'none';
+}
+</script>
+{% endblock %}
+
