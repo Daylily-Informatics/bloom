@@ -2449,23 +2449,25 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
 
 
-    content = templates.get_template("legacy/dewey.html").render(
-        request=request,
-        accordion_states=accordion_states,
-        style=style,
-        upload_group_key=upload_group_key,
-        udat=user_data,
-        ui_fields=ui_form_fields,
-        ui_search_fields=ui_form_fields_query,
-        controlled_properties=f_template.json_addl.get("controlled_properties", {}),
-        has_ui_form_properties=bool(ui_form_properties),
-        searchable_properties=sorted(f_template.json_addl['properties'].keys()),   
-        s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
-        ui_fields_fset=ui_form_fields_fset,
-        ui_search_fields_fset=ui_form_fields_query_fset,
-    )
-
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/dewey.html")
+    context = {
+        "request": request,
+        "accordion_states": accordion_states,
+        "style": style,
+        "upload_group_key": upload_group_key,
+        "udat": user_data,
+        "user": user_data,
+        "ui_fields": ui_form_fields,
+        "ui_search_fields": ui_form_fields_query,
+        "controlled_properties": f_template.json_addl.get("controlled_properties", {}),
+        "has_ui_form_properties": bool(ui_form_properties),
+        "searchable_properties": sorted(f_template.json_addl['properties'].keys()),
+        "s3_bucket_prefix": os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
+        "ui_fields_fset": ui_form_fields_fset,
+        "ui_search_fields_fset": ui_form_fields_query_fset,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 

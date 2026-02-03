@@ -1,0 +1,264 @@
+{% extends "modern/base.html" %}
+
+{% block title %}File Tools - BLOOM LIMS{% endblock %}
+
+{% block extra_css %}
+<!-- Bootstrap 5 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.bootstrap5.css" />
+<style>
+    .accordion-button:not(.collapsed) {
+        background-color: var(--color-highlight);
+        color: white;
+    }
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: var(--color-highlight);
+    }
+    .option-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin-top: 0.5rem;
+    }
+    .option-button {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid var(--color-gray-600);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 0.875rem;
+        background: var(--color-gray-700);
+        transition: all 0.2s ease;
+    }
+    .option-button:hover {
+        background: var(--color-gray-600);
+    }
+    .option-button.selected {
+        background-color: var(--color-highlight);
+        color: white;
+        border-color: var(--color-highlight);
+    }
+    .selectize-input {
+        background-color: var(--color-gray-700) !important;
+        border-color: var(--color-gray-600) !important;
+    }
+    .selectize-dropdown {
+        background-color: var(--color-gray-800) !important;
+        border-color: var(--color-gray-600) !important;
+    }
+    .form-section {
+        background: var(--color-gray-800);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-file-alt"></i> File Tools</h1>
+    <p class="text-muted">Manage files, file sets, and file operations</p>
+</div>
+
+<div class="accordion" id="deweyAccordion">
+    <!-- Register File(s) Section -->
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#registerFileSection" aria-expanded="false">
+                <i class="fas fa-upload me-2"></i> Register File(s)
+            </button>
+        </h2>
+        <div id="registerFileSection" class="accordion-collapse collapse" data-bs-parent="#deweyAccordion">
+            <div class="accordion-body" data-form="register">
+                {% include 'modern/partials/dewey_register_file.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Download File Section -->
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#downloadFileSection" aria-expanded="false">
+                <i class="fas fa-download me-2"></i> Download File
+            </button>
+        </h2>
+        <div id="downloadFileSection" class="accordion-collapse collapse" data-bs-parent="#deweyAccordion">
+            <div class="accordion-body">
+                {% include 'modern/partials/dewey_download_file.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- File Search Section -->
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#fileSearchSection" aria-expanded="false">
+                <i class="fas fa-search me-2"></i> File Search
+            </button>
+        </h2>
+        <div id="fileSearchSection" class="accordion-collapse collapse" data-bs-parent="#deweyAccordion">
+            <div class="accordion-body" data-form="search">
+                {% include 'modern/partials/dewey_file_search.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Create File Set Section -->
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#createFileSetSection" aria-expanded="false">
+                <i class="fas fa-folder-plus me-2"></i> Create File Set
+            </button>
+        </h2>
+        <div id="createFileSetSection" class="accordion-collapse collapse" data-bs-parent="#deweyAccordion">
+            <div class="accordion-body" data-form="create-fs">
+                {% include 'modern/partials/dewey_create_file_set.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Search File Sets Section -->
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#searchFileSetsSection" aria-expanded="false">
+                <i class="fas fa-folder-open me-2"></i> Search File Sets
+            </button>
+        </h2>
+        <div id="searchFileSetsSection" class="accordion-collapse collapse" data-bs-parent="#deweyAccordion">
+            <div class="accordion-body">
+                {% include 'modern/partials/dewey_search_file_sets.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/js/standalone/selectize.min.js"></script>
+
+<script>
+const controlledProperties = {{ controlled_properties | tojson | safe }};
+
+// Initialize option buttons for multi-select fields
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.option-buttons').forEach(container => {
+        const select = container.querySelector('select');
+        if (!select) return;
+
+        select.querySelectorAll('option').forEach(option => {
+            if (!option.value) return;
+            const button = document.createElement('div');
+            button.className = 'option-button';
+            button.textContent = option.text;
+            button.dataset.value = option.value;
+            button.addEventListener('click', () => {
+                button.classList.toggle('selected');
+                updateSelectFromButtons(select, container);
+            });
+            container.appendChild(button);
+        });
+    });
+
+    function updateSelectFromButtons(select, container) {
+        const selectedValues = [];
+        container.querySelectorAll('.option-button.selected').forEach(btn => {
+            selectedValues.push(btn.dataset.value);
+        });
+        Array.from(select.options).forEach(opt => {
+            opt.selected = selectedValues.includes(opt.value);
+        });
+    }
+
+    // Initialize selectize for specific fields
+    $('[data-form=register] #patient_id, [data-form=register] #clinician_id, [data-form=register] #study_id, [data-form=register] #lab_code').selectize({
+        create: true,
+        sortField: [{ field: 'value', direction: 'asc' }],
+        placeholder: 'Select or type to add...',
+        persist: false
+    });
+
+    $('[data-form=create-fs] #tag').selectize({
+        create: true,
+        sortField: [{ field: 'value', direction: 'asc' }],
+        placeholder: 'Select or type to add...',
+        persist: false
+    });
+});
+
+// File download functions
+async function triggerDownload(url) {
+    return new Promise((resolve) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        resolve();
+    });
+}
+
+async function downloadFile(euid, downloadType, createMetadataFile) {
+    const formData = new URLSearchParams();
+    formData.append('euid', euid);
+    formData.append('download_type', downloadType);
+    formData.append('create_metadata_file', createMetadataFile);
+    formData.append('ret_json', 'True');
+
+    const response = await fetch('/download_file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+    });
+
+    if (response.ok) {
+        const jsonResponse = await response.json();
+        await triggerDownload(jsonResponse.file_download_path);
+        if (jsonResponse.metadata_download_path) {
+            await triggerDownload(jsonResponse.metadata_download_path);
+        }
+    } else {
+        console.error(`Failed to download file for EUID: ${euid}`);
+    }
+}
+
+async function downloadSelectedFiles() {
+    const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+    const euids = Array.from(checkboxes).map(cb => cb.value);
+    const downloadType = document.getElementById('download-type').value;
+    const createMetadataFile = document.getElementById('create-metadata').value;
+
+    if (euids.length === 0) {
+        alert("Please select files to download.");
+        return;
+    }
+
+    for (const euid of euids) {
+        await downloadFile(euid, downloadType, createMetadataFile);
+    }
+}
+
+// Reset forms on page load
+function resetForms() {
+    ['createFileForm', 'downloadFileForm', 'searchFileForm', 'searchFileSetForm', 'queryByEuidsForm'].forEach(id => {
+        const form = document.getElementById(id);
+        if (form) form.reset();
+    });
+}
+window.onload = resetForms;
+</script>
+{% endblock %}
+
