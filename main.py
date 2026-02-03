@@ -1037,6 +1037,86 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
 
     printer_info["style_css"] = csss
 
+    # Fetch version information for external dependencies
+    from bloom_lims._version import get_version
+    bloom_version = get_version()
+
+    # Get package versions using importlib.metadata (more reliable than pip freeze)
+    import importlib.metadata
+    dependency_info = {}
+
+    # zebra_day
+    try:
+        zebra_version = importlib.metadata.version("zebra_day")
+        dependency_info["zebra_day"] = {
+            "version": zebra_version,
+            "admin_url": "http://localhost:8118",
+            "description": "Zebra printer fleet management and ZPL label printing",
+            "status": "available"
+        }
+    except importlib.metadata.PackageNotFoundError:
+        dependency_info["zebra_day"] = {
+            "version": "Not installed",
+            "admin_url": None,
+            "description": "Zebra printer fleet management and ZPL label printing",
+            "status": "missing"
+        }
+
+    # daylily-carrier-tracking
+    try:
+        carrier_version = importlib.metadata.version("daylily-carrier-tracking")
+        dependency_info["carrier_tracking"] = {
+            "version": carrier_version,
+            "description": "FedEx and multi-carrier package tracking",
+            "status": "available"
+        }
+    except importlib.metadata.PackageNotFoundError:
+        dependency_info["carrier_tracking"] = {
+            "version": "Not installed",
+            "description": "FedEx and multi-carrier package tracking",
+            "status": "missing"
+        }
+
+    # daylily-tapdb
+    try:
+        tapdb_version = importlib.metadata.version("daylily-tapdb")
+        dependency_info["tapdb"] = {
+            "version": tapdb_version,
+            "description": "Templated Abstract Polymorphic Database library",
+            "status": "available"
+        }
+    except importlib.metadata.PackageNotFoundError:
+        dependency_info["tapdb"] = {
+            "version": "editable install",
+            "description": "Templated Abstract Polymorphic Database library",
+            "status": "available"
+        }
+
+    # Cognito information (non-sensitive)
+    cognito_info = {}
+    try:
+        cognito = get_cognito_auth()
+        cognito_info = {
+            "region": cognito.config.region,
+            "user_pool_id": cognito.config.user_pool_id,
+            "client_id": cognito.config.client_id[:8] + "...",  # Truncate for security
+            "domain": cognito.config.domain,
+            "status": "configured"
+        }
+    except Exception:
+        cognito_info = {
+            "status": "not_configured",
+            "message": "Cognito auth not configured"
+        }
+
+    # Database info
+    db_info = {
+        "host": os.environ.get("POSTGRES_HOST", "localhost"),
+        "port": os.environ.get("POSTGRES_PORT", "5445"),
+        "database": os.environ.get("POSTGRES_DB", "bloom_lims"),
+        "user": os.environ.get("POSTGRES_USER", "bloom_user"),
+    }
+
     # Use modern template
     template = templates.get_template("modern/admin.html")
     context = {
@@ -1045,6 +1125,10 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "user_data": user_data,
         "printer_info": printer_info,
         "dest_section": dest_section,
+        "bloom_version": bloom_version,
+        "dependency_info": dependency_info,
+        "cognito_info": cognito_info,
+        "db_info": db_info,
     }
     return HTMLResponse(content=template.render(context))
 

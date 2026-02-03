@@ -518,3 +518,50 @@ class TestModernAPIs:
         # Should return 200 or validation error, not 500
         assert response.status_code in [200, 201, 400, 422]
 
+
+class TestAdminDependencyInfo:
+    """Tests for admin page dependency information display."""
+
+    def test_admin_shows_external_integrations(self, client):
+        """Test admin page shows External Integrations section."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "External Integrations" in content
+
+    def test_admin_shows_zebra_day(self, client):
+        """Test admin page shows zebra_day integration."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "zebra_day" in content
+        assert "Zebra printer" in content.lower() or "printer" in content.lower()
+
+    def test_admin_shows_carrier_tracking(self, client):
+        """Test admin page shows carrier tracking integration."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "carrier-tracking" in content or "carrier_tracking" in content
+
+    def test_admin_shows_tapdb(self, client):
+        """Test admin page shows daylily-tapdb integration."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "tapdb" in content.lower()
+
+    def test_admin_shows_cognito(self, client):
+        """Test admin page shows Cognito auth info."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "Cognito" in content
+
+    def test_admin_shows_bloom_version(self, client):
+        """Test admin page shows BLOOM version."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "BLOOM Version" in content or "bloom_version" in content.lower()
+
