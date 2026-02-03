@@ -188,6 +188,62 @@
         background: var(--color-highlight);
         color: white;
     }
+    /* Child Contents Styles */
+    .child-contents {
+        background: var(--color-gray-700);
+        border-radius: var(--radius-sm);
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        border-left: 3px solid var(--color-success);
+    }
+    .child-contents-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    .child-contents-title {
+        font-weight: 600;
+        color: var(--color-gray-300);
+        font-size: 0.875rem;
+    }
+    .child-content-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--color-gray-800);
+        border-radius: var(--radius-sm);
+        margin-bottom: 0.25rem;
+    }
+    .child-content-item:last-child {
+        margin-bottom: 0;
+    }
+    .child-content-type {
+        font-size: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        background: var(--color-success);
+        border-radius: var(--radius-sm);
+        color: white;
+    }
+    .child-content-euid {
+        color: var(--color-highlight);
+        text-decoration: none;
+    }
+    .child-content-euid:hover {
+        color: var(--color-white);
+    }
+    .content-meta {
+        font-size: 0.75rem;
+        color: var(--color-gray-400);
+        display: flex;
+        gap: 0.5rem;
+    }
+    .content-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
     .action-group {
         display: flex;
         flex-wrap: wrap;
@@ -404,15 +460,20 @@
 {% set step_id = "step-" ~ step.euid %}
 {% set is_open = accordion_states.get(step.euid, 'closed') == 'open' %}
 
-{# Separate workflow step children from container children #}
+{# Separate workflow step children from container and content children #}
 {% set workflow_children = [] %}
 {% set container_children = [] %}
+{% set content_children = [] %}
 {% if step.parent_of_lineages %}
     {% for child_lineage in step.get_sorted_parent_of_lineages(['container_instance']) %}
-        {% if child_lineage.child_instance.category == 'workflow_step' %}
-            {% set _ = workflow_children.append(child_lineage.child_instance) %}
+        {% set child = child_lineage.child_instance %}
+        {% if child.category == 'workflow_step' %}
+            {% set _ = workflow_children.append(child) %}
+        {% elif child.category == 'content' %}
+            {% set _ = content_children.append(child) %}
         {% else %}
-            {% set _ = container_children.append(child_lineage.child_instance) %}
+            {# container category or other #}
+            {% set _ = container_children.append(child) %}
         {% endif %}
     {% endfor %}
 {% endif %}
@@ -443,8 +504,13 @@
                     {% endif %}
 
                     {% if container_children|length > 0 %}
-                    <span class="badge bg-info ms-2" title="Linked containers/contents">
+                    <span class="badge bg-info ms-2" title="Linked containers">
                         <i class="fas fa-box"></i> {{ container_children|length }}
+                    </span>
+                    {% endif %}
+                    {% if content_children|length > 0 %}
+                    <span class="badge bg-success ms-2" title="Linked contents (samples, reagents, etc.)">
+                        <i class="fas fa-vial"></i> {{ content_children|length }}
                     </span>
                     {% endif %}
                 </div>
@@ -514,12 +580,12 @@
                     </form>
                 </details>
 
-                <!-- Child Containers/Contents (collapsible) -->
+                <!-- Child Containers (collapsible) -->
                 {% if container_children|length > 0 %}
                 <div class="child-containers" id="containers-{{ step.euid }}">
                     <div class="child-containers-header">
                         <span class="child-containers-title">
-                            <i class="fas fa-box"></i> Linked Containers/Contents ({{ container_children|length }})
+                            <i class="fas fa-box"></i> Linked Containers ({{ container_children|length }})
                         </span>
                         <button class="show-children-btn" onclick="toggleChildContainers('{{ step.euid }}')" data-expanded="false">
                             <i class="fas fa-chevron-down"></i> Show All
@@ -535,6 +601,42 @@
                             {% if child.type == 'plate' or child.type == 'rack' %}
                             <a href="/plate_visualization?plate_euid={{ child.euid }}" title="View plate" style="color: var(--color-highlight);"><i class="fas fa-th"></i></a>
                             {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Child Contents (samples, reagents, etc. - collapsible) -->
+                {% if content_children|length > 0 %}
+                <div class="child-contents" id="contents-{{ step.euid }}">
+                    <div class="child-contents-header">
+                        <span class="child-contents-title">
+                            <i class="fas fa-vial"></i> Linked Contents ({{ content_children|length }})
+                        </span>
+                        <button class="show-children-btn" onclick="toggleChildContents('{{ step.euid }}')" data-expanded="false">
+                            <i class="fas fa-chevron-down"></i> Show All
+                        </button>
+                    </div>
+                    <div class="child-content-list" id="content-list-{{ step.euid }}" style="display: none;">
+                        {% for child in content_children %}
+                        <div class="child-content-item" data-child-euid="{{ child.euid }}">
+                            <span class="child-content-type">{{ child.type }}</span>
+                            <a href="/euid_details?euid={{ child.euid }}" class="child-content-euid">{{ child.euid }}</a>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ child.json_addl.get('properties', {}).get('name', '') }}</span>
+                            <span class="content-meta">
+                                {% if child.json_addl.get('properties', {}).get('volume') %}
+                                <span class="content-meta-item" title="Volume">
+                                    <i class="fas fa-tint"></i> {{ child.json_addl.get('properties', {}).get('volume') }}
+                                </span>
+                                {% endif %}
+                                {% if child.json_addl.get('properties', {}).get('concentration') %}
+                                <span class="content-meta-item" title="Concentration">
+                                    <i class="fas fa-flask"></i> {{ child.json_addl.get('properties', {}).get('concentration') }}
+                                </span>
+                                {% endif %}
+                            </span>
+                            <a href="/dindex2?globalStartNodeEUID={{ child.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
                         </div>
                         {% endfor %}
                     </div>
@@ -613,30 +715,66 @@ function toggleChildContainers(stepEuid) {
     }
 }
 
-// Expand all child containers
-function expandAllContainers() {
+// Toggle child contents visibility for a step
+function toggleChildContents(stepEuid) {
+    const list = document.getElementById('content-list-' + stepEuid);
+    const btn = document.querySelector('#contents-' + stepEuid + ' .show-children-btn');
+    if (!list || !btn) return;
+
+    const isExpanded = btn.getAttribute('data-expanded') === 'true';
+    if (isExpanded) {
+        list.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show All';
+        btn.setAttribute('data-expanded', 'false');
+    } else {
+        list.style.display = 'block';
+        btn.innerHTML = '<i class="fas fa-chevron-up"></i> Hide';
+        btn.setAttribute('data-expanded', 'true');
+    }
+}
+
+// Expand all child containers and contents
+function expandAllChildren() {
+    // Expand containers
     document.querySelectorAll('.child-container-list').forEach(function(list) {
         list.style.display = 'block';
     });
-    document.querySelectorAll('.show-children-btn').forEach(function(btn) {
+    document.querySelectorAll('.child-containers .show-children-btn').forEach(function(btn) {
+        btn.innerHTML = '<i class="fas fa-chevron-up"></i> Hide';
+        btn.setAttribute('data-expanded', 'true');
+    });
+    // Expand contents
+    document.querySelectorAll('.child-content-list').forEach(function(list) {
+        list.style.display = 'block';
+    });
+    document.querySelectorAll('.child-contents .show-children-btn').forEach(function(btn) {
         btn.innerHTML = '<i class="fas fa-chevron-up"></i> Hide';
         btn.setAttribute('data-expanded', 'true');
     });
 }
 
-// Collapse all child containers
-function collapseAllContainers() {
+// Collapse all child containers and contents
+function collapseAllChildren() {
+    // Collapse containers
     document.querySelectorAll('.child-container-list').forEach(function(list) {
         list.style.display = 'none';
     });
-    document.querySelectorAll('.show-children-btn').forEach(function(btn) {
+    document.querySelectorAll('.child-containers .show-children-btn').forEach(function(btn) {
+        btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show All';
+        btn.setAttribute('data-expanded', 'false');
+    });
+    // Collapse contents
+    document.querySelectorAll('.child-content-list').forEach(function(list) {
+        list.style.display = 'none';
+    });
+    document.querySelectorAll('.child-contents .show-children-btn').forEach(function(btn) {
         btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show All';
         btn.setAttribute('data-expanded', 'false');
     });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Expand All - expands all accordions AND all child containers
+    // Expand All - expands all accordions AND all child containers/contents
     document.getElementById('expandAllBtn').addEventListener('click', function() {
         // Expand all accordions
         document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
@@ -646,11 +784,11 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.classList.remove('collapsed');
             btn.setAttribute('aria-expanded', 'true');
         });
-        // Expand all child containers
-        expandAllContainers();
+        // Expand all child containers and contents
+        expandAllChildren();
     });
 
-    // Collapse All - collapses all accordions AND all child containers
+    // Collapse All - collapses all accordions AND all child containers/contents
     document.getElementById('collapseAllBtn').addEventListener('click', function() {
         // Collapse all accordions
         document.querySelectorAll('.accordion-collapse.show').forEach(function(collapse) {
@@ -660,8 +798,8 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.classList.add('collapsed');
             btn.setAttribute('aria-expanded', 'false');
         });
-        // Collapse all child containers
-        collapseAllContainers();
+        // Collapse all child containers and contents
+        collapseAllChildren();
     });
 
     // Track accordion state changes
