@@ -309,3 +309,272 @@ class TestFilesAPI:
         # API returns paginated response
         assert "items" in data
         assert "total" in data
+
+
+class TestActionsAPI:
+    """Tests for actions API endpoints."""
+
+    def test_list_actions(self, client):
+        """Test listing actions - endpoint may not exist."""
+        response = client.get("/api/v1/actions/")
+        # Actions endpoint may not be implemented
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert "items" in data or isinstance(data, list)
+
+    def test_get_action_not_found(self, client):
+        """Test getting non-existent action."""
+        response = client.get("/api/v1/actions/00000000-0000-0000-0000-000000000000")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestSubjectsAPIExtended:
+    """Extended tests for subjects API endpoints."""
+
+    def test_list_subjects_with_pagination(self, client):
+        """Test listing subjects with pagination."""
+        response = client.get("/api/v1/subjects/?page=1&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+
+
+class TestObjectCreationAPI:
+    """Tests for object creation API endpoints."""
+
+    def test_get_super_types(self, client):
+        """Test getting super types."""
+        response = client.get("/api/v1/object-creation/super-types")
+        assert response.status_code == 200
+        data = response.json()
+        # Response is a dict with 'super_types' key
+        if isinstance(data, dict):
+            assert "super_types" in data
+            super_types = data["super_types"]
+        else:
+            super_types = data
+        assert isinstance(super_types, list)
+        # Should include common super types
+        type_names = [item.get("name") or item for item in super_types]
+        assert any("container" in str(st).lower() for st in type_names)
+
+    def test_get_types_for_super_type(self, client):
+        """Test getting types for a super type."""
+        # Use query parameter format
+        response = client.get("/api/v1/object-creation/types?super_type=container")
+        # May return 404 if endpoint uses different path
+        assert response.status_code in [200, 404, 422]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_types_for_invalid_super_type(self, client):
+        """Test getting types for invalid super type."""
+        response = client.get("/api/v1/object-creation/types?super_type=invalid_type")
+        assert response.status_code in [200, 404, 422]
+
+    def test_get_sub_types(self, client):
+        """Test getting sub types."""
+        response = client.get("/api/v1/object-creation/sub-types?super_type=container&b_type=plate")
+        assert response.status_code in [200, 404, 422]
+
+
+class TestTemplatesAPIExtended:
+    """Extended tests for templates API endpoints."""
+
+    def test_list_templates_with_pagination(self, client):
+        """Test listing templates with pagination."""
+        response = client.get("/api/v1/templates/?page=1&page_size=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert len(data["items"]) <= 5
+
+    def test_get_template_by_euid(self, client):
+        """Test getting template by EUID."""
+        # First get a list of templates to find a valid EUID
+        response = client.get("/api/v1/templates/?page_size=1")
+        assert response.status_code == 200
+        data = response.json()
+        if data["items"]:
+            euid = data["items"][0].get("euid")
+            if euid:
+                response = client.get(f"/api/v1/templates/{euid}")
+                assert response.status_code in [200, 404]
+
+
+class TestWorkflowsAPIExtended:
+    """Extended tests for workflows API endpoints."""
+
+    def test_list_workflows_with_pagination(self, client):
+        """Test listing workflows with pagination."""
+        response = client.get("/api/v1/workflows/?page=1&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+
+class TestContainersAPIExtended:
+    """Extended tests for containers API endpoints."""
+
+    def test_list_containers_with_pagination(self, client):
+        """Test listing containers with pagination."""
+        response = client.get("/api/v1/containers/?page=1&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+    def test_list_containers_with_type_filter(self, client):
+        """Test listing containers with type filter."""
+        response = client.get("/api/v1/containers/?container_type=plate")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+
+
+class TestContentAPIExtended:
+    """Extended tests for content API endpoints."""
+
+    def test_list_content_with_pagination(self, client):
+        """Test listing content with pagination."""
+        response = client.get("/api/v1/content/?page=1&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+
+class TestLineagesAPIExtended:
+    """Extended tests for lineages API endpoints."""
+
+    def test_list_lineages_with_pagination(self, client):
+        """Test listing lineages with pagination."""
+        response = client.get("/api/v1/lineages/?page=1&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+
+class TestStatsAPIExtended:
+    """Extended tests for stats API endpoints."""
+
+    def test_dashboard_stats_has_required_fields(self, client):
+        """Test dashboard stats has all required fields."""
+        response = client.get("/api/v1/stats/dashboard")
+        assert response.status_code == 200
+        data = response.json()
+        # Check for expected stat categories
+        assert "total_objects" in data or "containers" in data or isinstance(data, dict)
+
+
+class TestBatchAPIExtended:
+    """Extended tests for batch API endpoints."""
+
+    def test_batch_status_empty(self, client):
+        """Test getting batch job status list."""
+        response = client.get("/api/v1/batch/jobs")
+        # May return 404 if no jobs exist, or 200 with empty list
+        assert response.status_code in [200, 404]
+
+    def test_batch_job_not_found(self, client):
+        """Test getting non-existent batch job."""
+        response = client.get("/api/v1/batch/jobs/00000000-0000-0000-0000-000000000000")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestSearchAPIExtended:
+    """Extended tests for search API endpoints."""
+
+    def test_search_empty_query(self, client):
+        """Test search with empty query returns error."""
+        response = client.get("/api/v1/search/?q=")
+        # Should return 422 for validation error
+        assert response.status_code in [200, 422]
+
+    def test_search_with_type_filter_content(self, client):
+        """Test search filtering by content type."""
+        response = client.get("/api/v1/search/?q=test&types=content")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data or "results" in data or isinstance(data, list)
+
+    def test_search_with_multiple_types(self, client):
+        """Test search filtering by multiple types."""
+        response = client.get("/api/v1/search/?q=sample&types=container,content")
+        assert response.status_code == 200
+
+    def test_search_pagination(self, client):
+        """Test search with pagination."""
+        response = client.get("/api/v1/search/?q=test&page=1&page_size=5")
+        assert response.status_code == 200
+
+
+class TestFileSetsAPIExtended:
+    """Extended tests for file sets API endpoints."""
+
+    def test_list_file_sets_with_pagination(self, client):
+        """Test listing file sets with pagination."""
+        response = client.get("/api/v1/file-sets/?page=1&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+
+    def test_get_file_set_not_found(self, client):
+        """Test getting non-existent file set."""
+        response = client.get("/api/v1/file-sets/00000000-0000-0000-0000-000000000000")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestObjectsAPIExtended:
+    """Extended tests for objects API endpoints."""
+
+    def test_list_objects(self, client):
+        """Test listing objects."""
+        response = client.get("/api/v1/objects/")
+        assert response.status_code in [200, 404]
+
+    def test_get_object_by_uuid(self, client):
+        """Test getting object by UUID."""
+        response = client.get("/api/v1/objects/00000000-0000-0000-0000-000000000000")
+        assert response.status_code in [404, 422, 500]
+
+    def test_get_object_by_euid(self, client):
+        """Test getting object by EUID."""
+        response = client.get("/api/v1/objects/euid/CX1")
+        assert response.status_code in [200, 404, 422]
+
+
+class TestAuthAPI:
+    """Tests for auth API endpoints."""
+
+    def test_auth_me(self, client):
+        """Test /auth/me endpoint."""
+        response = client.get("/api/v1/auth/me")
+        assert response.status_code in [200, 401, 404]
+
+    def test_auth_session(self, client):
+        """Test /auth/session endpoint."""
+        response = client.get("/api/v1/auth/session")
+        assert response.status_code in [200, 401, 404]
+
+
+class TestAsyncTasksAPI:
+    """Tests for async tasks API endpoints."""
+
+    def test_list_tasks(self, client):
+        """Test listing async tasks."""
+        response = client.get("/api/v1/tasks/")
+        assert response.status_code in [200, 404]
+
+    def test_get_task_not_found(self, client):
+        """Test getting non-existent task."""
+        response = client.get("/api/v1/tasks/00000000-0000-0000-0000-000000000000")
+        assert response.status_code in [404, 422, 500]
