@@ -154,6 +154,8 @@ DEFAULT_USER_PREFERENCES = {
 
 # Initialize Jinja2 environment
 templates = Environment(loader=FileSystemLoader("templates"))
+# Add tojson filter for JSON serialization in templates
+templates.filters['tojson'] = lambda x: json.dumps(x)
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -1241,6 +1243,52 @@ async def generic_templates(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(grouped_templates)
 
 
+# ==================== URL Aliases (Redirects) ====================
+# Short URL aliases for common pages
+
+@app.get("/workflows")
+async def workflows_redirect():
+    """Redirect /workflows to /workflow_summary."""
+    return RedirectResponse(url="/workflow_summary", status_code=307)
+
+
+@app.get("/equipment")
+async def equipment_redirect():
+    """Redirect /equipment to /equipment_overview."""
+    return RedirectResponse(url="/equipment_overview", status_code=307)
+
+
+@app.get("/reagents")
+async def reagents_redirect():
+    """Redirect /reagents to /reagent_overview."""
+    return RedirectResponse(url="/reagent_overview", status_code=307)
+
+
+@app.get("/controls")
+async def controls_redirect():
+    """Redirect /controls to /control_overview."""
+    return RedirectResponse(url="/control_overview", status_code=307)
+
+
+@app.get("/dag")
+async def dag_redirect(request: Request):
+    """Redirect /dag to /dindex2 with query params preserved."""
+    query_params = str(request.query_params)
+    url = "/dindex2" + ("?" + query_params if query_params else "")
+    return RedirectResponse(url=url, status_code=307)
+
+
+@app.get("/dag_explorer")
+async def dag_explorer_redirect(request: Request):
+    """Redirect /dag_explorer to /dindex2 with query params preserved."""
+    query_params = str(request.query_params)
+    url = "/dindex2" + ("?" + query_params if query_params else "")
+    return RedirectResponse(url=url, status_code=307)
+
+
+# ==================== End URL Aliases ====================
+
+
 @app.get("/workflow_summary", response_class=HTMLResponse)
 async def workflow_summary(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -1592,6 +1640,46 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     stats_7d = get_stats(7)
     stats_30d = get_stats(30)
 
+    # Use modern template
+    template = templates.get_template("modern/database_statistics.html")
+    context = {
+        "request": request,
+        "stats_1d": stats_1d,
+        "stats_7d": stats_7d,
+        "stats_30d": stats_30d,
+        "udat": user_data,
+    }
+    return HTMLResponse(content=template.render(**context))
+
+
+@app.get("/legacy/database_statistics", response_class=HTMLResponse)
+async def legacy_database_statistics(request: Request, _auth=Depends(require_auth)):
+    """Legacy database statistics page."""
+    user_data = request.session.get("user_data", {})
+    if not user_data:
+        return RedirectResponse(url="/login")
+
+    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+
+    def get_stats(days):
+        cutoff_date = datetime.now() - timedelta(days=days)
+        return (
+            bobdb.session.query(
+                bobdb.Base.classes.generic_instance.b_sub_type,
+                func.count(bobdb.Base.classes.generic_instance.uuid),
+            )
+            .filter(
+                bobdb.Base.classes.generic_instance.created_dt >= cutoff_date,
+                bobdb.Base.classes.generic_instance.is_deleted == False,
+            )
+            .group_by(bobdb.Base.classes.generic_instance.b_sub_type)
+            .all()
+        )
+
+    stats_1d = get_stats(1)
+    stats_7d = get_stats(7)
+    stats_30d = get_stats(30)
+
     style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
     content = templates.get_template("legacy/database_statistics.html").render(
@@ -1603,6 +1691,7 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
         udat=user_data,
     )
     return HTMLResponse(content=content)
+
 
 @app.post("/save_json_addl_key")
 async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
@@ -1874,6 +1963,27 @@ async def workflow_details(
     workflow = bwfdb.get_sorted_euid(workflow_euid)
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
+
+    # Use modern template
+    template = templates.get_template("modern/workflow_details.html")
+    context = {
+        "request": request,
+        "workflow": workflow,
+        "accordion_states": accordion_states,
+        "udat": user_data,
+    }
+    return HTMLResponse(content=template.render(**context))
+
+
+@app.get("/legacy/workflow_details", response_class=HTMLResponse)
+async def legacy_workflow_details(
+    request: Request, workflow_euid, _auth=Depends(require_auth)
+):
+    """Legacy workflow details page."""
+    bwfdb = BloomWorkflow(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    workflow = bwfdb.get_sorted_euid(workflow_euid)
+    accordion_states = dict(request.session)
+    user_data = request.session.get("user_data", {})
     style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
     content = templates.get_template("legacy/workflow_details.html").render(
@@ -1881,7 +1991,7 @@ async def workflow_details(
         workflow=workflow,
         accordion_states=accordion_states,
         style=style,
-        udat=request.session["user_data"],
+        udat=user_data,
     )
     return HTMLResponse(content=content)
 
@@ -2015,6 +2125,34 @@ async def dindex2(
     globalStartNodeEUID=None,
     auth=Depends(require_auth),
 ):
+    """DAG Explorer - Interactive graph visualization of object relationships."""
+    dag_data = generate_dag_json_from_all_objects_v2(
+        request=request, euid=globalStartNodeEUID, depth=globalFilterLevel
+    )
+    user_data = request.session.get("user_data", {})
+
+    # Use modern template
+    template = templates.get_template("modern/dag_explorer.html")
+    context = {
+        "request": request,
+        "globalFilterLevel": globalFilterLevel,
+        "globalZoom": globalZoom,
+        "globalStartNodeEUID": globalStartNodeEUID,
+        "dag_data": dag_data,
+        "udat": user_data,
+    }
+    return HTMLResponse(content=template.render(**context))
+
+
+@app.get("/legacy/dindex2", response_class=HTMLResponse)
+async def legacy_dindex2(
+    request: Request,
+    globalFilterLevel=6,
+    globalZoom=0,
+    globalStartNodeEUID=None,
+    auth=Depends(require_auth),
+):
+    """Legacy DAG Explorer page."""
     dag_data = generate_dag_json_from_all_objects_v2(
         request=request, euid=globalStartNodeEUID, depth=globalFilterLevel
     )
@@ -2028,7 +2166,7 @@ async def dindex2(
         globalZoom=globalZoom,
         globalStartNodeEUID=globalStartNodeEUID,
         dag_data=dag_data,
-        udat=request.session["user_data"],
+        udat=user_data,
     )
     return HTMLResponse(content=content)
 
@@ -2485,25 +2623,6 @@ async def bulk_create_files(request: Request, _auth=Depends(require_auth)):
         style=style,
         udat=user_data,
         page_title="Bulk Create Files",
-    )
-
-    return HTMLResponse(content=content)
-
-
-@app.get("/dewey0_DELETEME", response_class=HTMLResponse)
-async def dewey0(request: Request, _auth=Depends(require_auth)):
-    request.session.pop("form_data", None)
-
-    accordion_states = dict(request.session)
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-    upload_group_key = generate_unique_upload_key()
-    content = templates.get_template("legacy/dewey.html").render(
-        request=request,
-        accordion_states=accordion_states,
-        style=style,
-        upload_group_key=upload_group_key,
-        udat=user_data,
     )
 
     return HTMLResponse(content=content)

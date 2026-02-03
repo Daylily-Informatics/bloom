@@ -1,0 +1,423 @@
+{% extends "modern/base.html" %}
+
+{% block title %}DAG Explorer - BLOOM LIMS{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* DAG Explorer specific styles */
+    .dag-container {
+        display: flex;
+        gap: var(--spacing-md);
+        height: calc(100vh - 180px);
+        min-height: 500px;
+    }
+    
+    .dag-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--color-gray-800);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+    
+    .dag-sidebar {
+        width: 180px;
+        background: var(--color-gray-800);
+        border-radius: var(--radius-md);
+        padding: var(--spacing-md);
+        overflow-y: auto;
+    }
+    
+    #cy {
+        flex: 1;
+        width: 100%;
+        min-height: 400px;
+        background: var(--color-gray-900);
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+    
+    .dag-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-md);
+        background: var(--color-gray-700);
+        border-radius: 0 0 var(--radius-md) var(--radius-md);
+        align-items: center;
+    }
+    
+    .dag-control-group {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        padding: var(--spacing-xs) var(--spacing-sm);
+        background: var(--color-gray-800);
+        border-radius: var(--radius-sm);
+    }
+    
+    .dag-control-group label {
+        font-size: 0.75rem;
+        color: var(--color-gray-400);
+        white-space: nowrap;
+    }
+    
+    .dag-control-group input[type="range"] {
+        width: 80px;
+    }
+    
+    .dag-control-group select {
+        font-size: 0.75rem;
+        padding: var(--spacing-xs);
+        background: var(--color-gray-700);
+        border: 1px solid var(--color-gray-600);
+        border-radius: var(--radius-sm);
+        color: var(--color-gray-200);
+    }
+    
+    .dag-control-group input[type="text"] {
+        width: 100px;
+        font-size: 0.75rem;
+        padding: var(--spacing-xs);
+        background: var(--color-gray-700);
+        border: 1px solid var(--color-gray-600);
+        border-radius: var(--radius-sm);
+        color: var(--color-gray-200);
+    }
+    
+    .dag-control-group .btn {
+        font-size: 0.75rem;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    /* Filter checkboxes */
+    #btypeCheckboxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-xs);
+    }
+    
+    #btypeCheckboxes label {
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        color: var(--color-gray-300);
+    }
+    
+    /* Sidebar buttons */
+    .subtype-button {
+        display: block;
+        width: 100%;
+        padding: var(--spacing-xs) var(--spacing-sm);
+        margin-bottom: var(--spacing-xs);
+        font-size: 0.7rem;
+        background: var(--color-gray-700);
+        border: 1px solid var(--color-gray-600);
+        border-radius: var(--radius-sm);
+        color: var(--color-gray-300);
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.2s ease;
+    }
+    
+    .subtype-button:hover {
+        background: var(--color-gray-600);
+        border-color: var(--color-highlight);
+    }
+    
+    .subtype-button-clicked {
+        background: var(--color-highlight);
+        color: var(--color-white);
+        border-color: var(--color-highlight);
+    }
+    
+    /* Node dialog */
+    .node-dialog {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--color-gray-800);
+        border: 1px solid var(--color-gray-600);
+        border-radius: var(--radius-md);
+        padding: var(--spacing-lg);
+        z-index: 1000;
+        min-width: 300px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    
+    .node-dialog p {
+        margin-bottom: var(--spacing-sm);
+        color: var(--color-gray-200);
+    }
+    
+    .node-dialog a {
+        color: var(--color-highlight);
+        margin-right: var(--spacing-md);
+    }
+    
+    .close-dialog-btn {
+        margin-top: var(--spacing-md);
+    }
+    
+    /* Info box */
+    .info-box {
+        margin-top: var(--spacing-md);
+        padding: var(--spacing-md);
+        background: var(--color-gray-800);
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        color: var(--color-gray-300);
+    }
+
+    /* Help modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1001;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.7);
+    }
+
+    .modal-content {
+        background: var(--color-gray-800);
+        margin: 10% auto;
+        padding: var(--spacing-lg);
+        border: 1px solid var(--color-gray-600);
+        border-radius: var(--radius-md);
+        width: 80%;
+        max-width: 600px;
+        color: var(--color-gray-300);
+    }
+
+    .closeBtn {
+        color: var(--color-gray-400);
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .closeBtn:hover {
+        color: var(--color-white);
+    }
+
+    /* COGS labels */
+    .cogs-value-label {
+        z-index: 100;
+        font-size: 12px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Hidden utility */
+    .hidden {
+        display: none !important;
+    }
+
+    /* Responsive */
+    @media screen and (max-width: 768px) {
+        .dag-container {
+            flex-direction: column;
+            height: auto;
+        }
+
+        .dag-sidebar {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+        }
+
+        .subtype-button {
+            width: auto;
+        }
+
+        #cy {
+            height: 400px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="fas fa-project-diagram"></i> DAG Explorer</h1>
+        <p class="page-subtitle">Interactive graph visualization of object relationships</p>
+    </div>
+    <div>
+        <a href="/legacy/dindex2?globalStartNodeEUID={{ globalStartNodeEUID }}&globalFilterLevel={{ globalFilterLevel }}"
+           class="btn btn-outline btn-sm">
+            <i class="fas fa-history"></i> Legacy View
+        </a>
+    </div>
+</div>
+
+<div class="dag-container">
+    <div class="dag-main">
+        <!-- Cytoscape container -->
+        <div id="cy"></div>
+
+        <!-- Controls bar -->
+        <div class="dag-controls">
+            <div class="dag-control-group">
+                <label>Filter Class:</label>
+                <div id="btypeCheckboxes"></div>
+            </div>
+
+            <div class="dag-control-group">
+                <label for="layoutSelect">Layout:</label>
+                <select id="layoutSelect" onchange="changeLayout(this.value)">
+                    <option value="dagre">Hierarchical</option>
+                    <option value="cose">Cose</option>
+                    <option value="breadthfirst">Breadthfirst</option>
+                    <option value="grid">Grid</option>
+                    <option value="circle">Circle</option>
+                    <option value="random">Random</option>
+                    <option value="concentric">Concentric</option>
+                </select>
+            </div>
+
+            <div class="dag-control-group">
+                <label>Edges ≤</label>
+                <span id="transparencyDisplay">1</span>
+                <input type="range" id="transparencySlider" min="0" max="15" value="1"
+                       oninput="updateNodeTransparency()">
+            </div>
+
+            <div class="dag-control-group">
+                <input type="text" id="euidInput" placeholder="Find EUID...">
+                <button class="btn btn-sm btn-primary" onclick="centerOnEuid()">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+
+            <div class="dag-control-group">
+                <label>Distance:</label>
+                <span id="distanceDisplay">0</span>
+                <input type="range" id="distanceSlider" min="0" max="15" value="0"
+                       oninput="filterNodes(this.value)">
+            </div>
+
+            <button id="helpBtn" class="btn btn-outline btn-sm" title="Help">
+                <i class="fas fa-question"></i>
+            </button>
+
+            <button id="saveButton" class="btn btn-outline btn-sm" title="Save Changes">
+                <i class="fas fa-save"></i> Save
+            </button>
+        </div>
+    </div>
+
+    <div class="dag-sidebar">
+        <label style="font-size: 0.75rem; color: var(--color-gray-400); margin-bottom: var(--spacing-sm); display: block;">
+            Filter by Type:
+        </label>
+        <div id="bsubtypeButtons"></div>
+    </div>
+</div>
+
+<!-- Node info box -->
+<div class="info-box" id="node-info"></div>
+
+<!-- Node Dialog -->
+<div id="nodeDialog" class="node-dialog" style="display: none;">
+    <p id="nodeEuid">EUID: <span></span></p>
+    <p id="nodeName">Name: <span></span></p>
+    <div style="display: none;">
+        <a id="actionALink" href="">Calculate COGS To Produce</a>
+        $ <span id="actionAOutput"></span>
+    </div>
+    <br>
+    <a id="actionBLink" href="">Calculate COGS Of Children</a>
+    $ <span id="actionBOutput"></span>
+    <br>
+    <a id="euidInfoLink" href="" target="euid">EUID Info</a>
+    <button id="closeDialogButton" class="btn btn-outline close-dialog-btn">Close</button>
+</div>
+
+<!-- Help Modal -->
+<div id="helpModal" class="modal">
+    <div class="modal-content">
+        <span class="closeBtn">&times;</span>
+        <h3 style="margin-bottom: var(--spacing-md);">DAG Explorer Help</h3>
+        <div style="line-height: 1.8;">
+            <p><strong>NODE INFO:</strong> Click node 1x for info box, click node 3x for popup dialog</p>
+            <p><strong>DELETE:</strong> Right click 2x on an edge to delete it; right click 3x on a node to delete it (reflects in database!)</p>
+            <p><strong>CREATE EDGES:</strong> Hold 'L', select a node, continue holding 'L', click a new node to create an edge</p>
+            <p><strong>NEIGHBORS:</strong> Hold 'N' and click a node to highlight its neighbors; each additional click expands the neighborhood</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Cytoscape.js and dagre layout -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.19.0/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre"></script>
+
+<!-- DAG Explorer Modular JavaScript -->
+<script src="/static/js/dag-explorer/config.js"></script>
+<script src="/static/js/dag-explorer/utils.js"></script>
+<script src="/static/js/dag-explorer/api.js"></script>
+<script src="/static/js/dag-explorer/graph.js"></script>
+<script src="/static/js/dag-explorer/filters.js"></script>
+<script src="/static/js/dag-explorer/events.js"></script>
+<script src="/static/js/dag-explorer/search.js"></script>
+<script src="/static/js/dag-explorer/layout-persistence.js"></script>
+<script src="/static/js/dag-explorer/index.js"></script>
+
+<script>
+// Server-side configuration passed to client
+var globalFilterLevel = parseFloat('{{ globalFilterLevel }}') || 4;
+var globalZoom = parseFloat('{{ globalZoom }}') || 4;
+var globalStartNodeEUID = '{{ globalStartNodeEUID }}' || 'AY1';
+
+// DAG data embedded from server (avoids extra API call)
+var embeddedDagData = {{ dag_data | tojson | safe if dag_data else '{"elements": {"nodes": [], "edges": []}}' }};
+
+// Initialize DAG Explorer when document is ready
+$(document).ready(function() {
+    DAGExplorer.initWithData({
+        filterLevel: globalFilterLevel,
+        zoom: globalZoom,
+        startNodeEUID: globalStartNodeEUID,
+        data: embeddedDagData
+    });
+
+    // Help modal handlers
+    $('#helpBtn').click(function() {
+        $('#helpModal').show();
+    });
+
+    $('.closeBtn').click(function() {
+        $('#helpModal').hide();
+    });
+
+    $(window).click(function(e) {
+        if ($(e.target).is('#helpModal')) {
+            $('#helpModal').hide();
+        }
+    });
+});
+
+// Backward compatibility: expose cy globally for any legacy code
+var cy = null;
+var clickCount = {};
+var currentLayoutName = 'dagre';
+
+// Update cy reference when DAGGraph initializes
+$(document).ready(function() {
+    setTimeout(function() {
+        if (typeof DAGGraph !== 'undefined') {
+            cy = DAGGraph.getInstance();
+        }
+    }, 1000);
+});
+</script>
+{% endblock %}

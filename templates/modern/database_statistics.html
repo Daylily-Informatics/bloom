@@ -1,0 +1,158 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Database Statistics - BLOOM LIMS{% endblock %}
+
+{% block extra_css %}
+<style>
+  .stats-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .stats-table th,
+  .stats-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-gray-600);
+  }
+  .stats-table th {
+    background: var(--color-gray-800);
+    font-weight: 600;
+    color: var(--color-white);
+    cursor: pointer;
+    user-select: none;
+  }
+  .stats-table th:hover {
+    background: var(--color-gray-700);
+  }
+  .stats-table th.sort-asc::after {
+    content: ' ▲';
+    font-size: 0.75rem;
+  }
+  .stats-table th.sort-desc::after {
+    content: ' ▼';
+    font-size: 0.75rem;
+  }
+  .stats-table tbody tr:hover {
+    background: var(--color-gray-800);
+  }
+  .stats-table td:not(:first-child) {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat-zero {
+    color: var(--color-gray-500);
+  }
+  .stat-positive {
+    color: var(--color-success);
+  }
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .summary-card {
+    background: var(--color-gray-800);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .summary-card .value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-highlight);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .summary-card .label {
+    color: var(--color-gray-300);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-chart-bar"></i> Database Statistics</h1>
+    <p class="text-muted">Records created in the last 1, 7, and 30 days</p>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/database_statistics" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+    <button onclick="location.reload()" class="btn btn-outline btn-sm">
+      <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="summary-cards">
+  <div class="summary-card">
+    <div class="value">{{ stats_1d | sum(attribute=1) if stats_1d else 0 }}</div>
+    <div class="label">Records (Last 24h)</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ stats_7d | sum(attribute=1) if stats_7d else 0 }}</div>
+    <div class="label">Records (Last 7 Days)</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ stats_30d | sum(attribute=1) if stats_30d else 0 }}</div>
+    <div class="label">Records (Last 30 Days)</div>
+  </div>
+  <div class="summary-card">
+    <div class="value">{{ stats_1d | length if stats_1d else 0 }}</div>
+    <div class="label">Active Object Types</div>
+  </div>
+</div>
+
+<!-- Statistics Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-table"></i> Records by Object Type</h3>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    <div class="table-container">
+      <table class="stats-table" id="statsTable">
+        <thead>
+          <tr>
+            <th data-sort="string">Object Type (b_sub_type)</th>
+            <th data-sort="int">Last 1 Day</th>
+            <th data-sort="int">Last 7 Days</th>
+            <th data-sort="int">Last 30 Days</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set stats_7d_dict = dict(stats_7d) if stats_7d else {} %}
+          {% set stats_30d_dict = dict(stats_30d) if stats_30d else {} %}
+          {% for sub_type, count_1d in stats_1d %}
+          {% set count_7d = stats_7d_dict.get(sub_type, 0) %}
+          {% set count_30d = stats_30d_dict.get(sub_type, 0) %}
+          <tr>
+            <td><a href="/search?query={{ sub_type }}&type=b_sub_type">{{ sub_type }}</a></td>
+            <td class="{{ 'stat-positive' if count_1d > 0 else 'stat-zero' }}">{{ count_1d }}</td>
+            <td class="{{ 'stat-positive' if count_7d > 0 else 'stat-zero' }}">{{ count_7d }}</td>
+            <td class="{{ 'stat-positive' if count_30d > 0 else 'stat-zero' }}">{{ count_30d }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted" style="padding: 2rem;">
+              No records created in the last 30 days
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  new Tablesort(document.getElementById('statsTable'));
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,455 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Workflow Details - BLOOM LIMS{% endblock %}
+
+{% block extra_css %}
+<!-- Bootstrap 5 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+    .workflow-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .workflow-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+    .workflow-meta .badge {
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+    }
+    .accordion-button:not(.collapsed) {
+        background-color: var(--color-highlight);
+        color: white;
+    }
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: var(--color-highlight);
+    }
+    .accordion-button.step-type-workflow_step_instance,
+    .accordion-button.step-type-workflow_instance {
+        background: var(--color-gray-700);
+    }
+    .accordion-button.step-type-plate,
+    .accordion-button.step-type-rack {
+        background: var(--color-secondary);
+    }
+    .accordion-button.step-type-package {
+        background: var(--color-accent);
+    }
+    .step-info {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .step-type-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--color-gray-600);
+        border-radius: var(--radius-sm);
+    }
+    .step-links {
+        display: flex;
+        gap: 0.25rem;
+        margin-left: 0.5rem;
+    }
+    .step-links a {
+        color: var(--color-highlight);
+        text-decoration: none;
+        padding: 0.125rem 0.25rem;
+    }
+    .step-links a:hover {
+        color: var(--color-white);
+    }
+    .action-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: var(--color-gray-800);
+        border-radius: var(--radius-sm);
+        margin-bottom: 0.5rem;
+    }
+    .action-group-name {
+        width: 100%;
+        font-weight: 600;
+        color: var(--color-gray-300);
+        margin-bottom: 0.25rem;
+        font-size: 0.875rem;
+    }
+    .action-btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        border-radius: var(--radius-sm);
+        background: var(--color-highlight);
+        color: white;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .action-btn:hover:not(:disabled) {
+        background: #4f46e5;
+    }
+    .action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .action-form {
+        background: var(--color-gray-700);
+        padding: 1rem;
+        border-radius: var(--radius-sm);
+        margin-top: 0.5rem;
+    }
+    .action-form input[type="text"] {
+        background: var(--color-gray-800);
+        border: 1px solid var(--color-gray-600);
+        color: var(--color-white);
+        padding: 0.375rem 0.75rem;
+        border-radius: var(--radius-sm);
+        width: 100%;
+    }
+    .properties-form {
+        background: var(--color-gray-700);
+        padding: 1rem;
+        border-radius: var(--radius-sm);
+        margin-top: 0.5rem;
+    }
+    .properties-form .form-group {
+        margin-bottom: 0.75rem;
+    }
+    .properties-form label {
+        font-size: 0.875rem;
+        color: var(--color-gray-300);
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+    .fedex-info {
+        background: var(--color-info);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        margin-left: 0.5rem;
+    }
+    .floating-controls {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        z-index: 1000;
+    }
+    .floating-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: none;
+        background: var(--color-highlight);
+        color: white;
+        font-size: 1.25rem;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        transition: all 0.2s ease;
+    }
+    .floating-btn:hover {
+        transform: scale(1.1);
+        background: #4f46e5;
+    }
+    .nested-steps {
+        margin-left: 1.5rem;
+        border-left: 2px solid var(--color-gray-600);
+        padding-left: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Workflow Header -->
+<div class="page-header">
+    <div>
+        <h1>
+            <a href="/euid_details?euid={{ workflow.euid }}" class="text-highlight">{{ workflow.euid }}</a>:
+            {{ workflow.json_addl.get('properties', {}).get('name', 'Unnamed Workflow') }}
+        </h1>
+        <div class="workflow-meta">
+            <span class="badge bg-{{ 'success' if workflow.bstatus == 'active' else 'secondary' }}">
+                <i class="fas fa-circle"></i> {{ workflow.bstatus }}
+            </span>
+            <span class="badge bg-info">
+                <i class="fas fa-tag"></i> {{ workflow.btype }} :: {{ workflow.b_sub_type }} :: {{ workflow.version }}
+            </span>
+            <span class="badge bg-secondary">
+                <i class="fas fa-clock"></i> {{ workflow.created_dt.strftime("%Y-%m-%d %H:%M:%S") if workflow.created_dt else 'N/A' }}
+            </span>
+        </div>
+    </div>
+    <div class="page-actions">
+        <button id="toggleFilterBtn" class="btn btn-outline btn-sm" title="Toggle minimal recursion">
+            <i class="fas fa-filter"></i> Filter: {{ udat.get('wf_filter', 'off') }}
+        </button>
+        <a href="/dindex2?globalStartNodeEUID={{ workflow.euid }}" target="bloom_dag" class="btn btn-outline btn-sm" title="View DAG">
+            <i class="fas fa-project-diagram"></i> DAG
+        </a>
+        <a href="/legacy/workflow_details?workflow_euid={{ workflow.euid }}" class="btn btn-outline btn-sm" title="Legacy view">
+            <i class="fas fa-history"></i> Legacy
+        </a>
+    </div>
+</div>
+
+<!-- Workflow Action Groups -->
+{% if workflow.json_addl and 'action_groups' in workflow.json_addl %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-play-circle"></i> Workflow Actions</h3>
+    </div>
+    <div class="card-body">
+        {% for group_key, group_value in workflow.json_addl['action_groups'].items() %}
+        <div class="action-group">
+            <div class="action-group-name">{{ group_value.group_name }}</div>
+            {% for action_key, action_value in group_value.actions.items() %}
+            <button class="action-btn"
+                    onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ workflow.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                    {% if action_value.action_enabled == "0" %}disabled{% endif %}>
+                {{ action_value.action_name }}
+            </button>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Define recursive step rendering macro -->
+{% macro render_step(step, accordion_states, depth=0) %}
+{% set is_workflow_step = step.polymorphic_discriminator in ['workflow_step_instance', 'workflow_instance'] %}
+{% set step_type = step.btype %}
+{% set step_id = "step-" ~ step.euid %}
+{% set is_open = accordion_states.get(step.euid, 'closed') == 'open' %}
+
+<div class="accordion mb-2" id="accordion-{{ step.euid }}">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button {{ '' if is_open else 'collapsed' }} step-type-{{ step_type }}"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#{{ step_id }}"
+                    aria-expanded="{{ 'true' if is_open else 'false' }}"
+                    data-euid="{{ step.euid }}">
+                <div class="step-info">
+                    <span class="step-type-badge">{{ step_type }}</span>
+                    <span class="step-links">
+                        <a href="/euid_details?euid={{ step.euid }}" title="View details">{{ step.euid }}</a>
+                        <a href="/dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag" title="View DAG">🕸️</a>
+                    </span>
+                    <strong>{{ step.json_addl.get('properties', {}).get('name', 'NONAME') }}</strong>
+                    <span class="badge bg-{{ 'success' if step.bstatus == 'active' else 'secondary' }} ms-2">{{ step.bstatus }}</span>
+                    <span class="text-muted ms-2" style="font-size: 0.75rem;">{{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S") if step.created_dt else '' }}</span>
+
+                    {% if step_type == 'package' %}
+                    {% set fedex_data = step.json_addl.get('properties', {}).get('fedex_tracking_data', []) %}
+                    {% if fedex_data|length > 0 %}
+                    <span class="fedex-info">
+                        <i class="fas fa-truck"></i> {{ fedex_data[0].get('Delivery_Status', 'N/A') }}
+                        - {{ ((fedex_data[0].get('Transit_Time_sec', 0) | float) / 60 / 60 / 24) | round(1) }} days
+                    </span>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if step_type == 'plate' or step_type == 'rack' %}
+                    <a href="/plate_visualization?plate_euid={{ step.euid }}" class="btn btn-sm btn-outline ms-2" title="View plate">
+                        <i class="fas fa-th"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </button>
+        </h2>
+        <div id="{{ step_id }}" class="accordion-collapse collapse {{ 'show' if is_open else '' }}"
+             data-bs-parent="#accordion-{{ step.euid }}">
+            <div class="accordion-body">
+                <!-- Action Groups for this step -->
+                {% if step.json_addl and 'action_groups' in step.json_addl %}
+                <div class="mb-3">
+                    {% for group_key, group_value in step.json_addl['action_groups'].items() %}
+                    <div class="action-group">
+                        <div class="action-group-name">{{ group_value.group_name }}</div>
+                        {% for action_key, action_value in group_value.actions.items() %}
+                        <button class="action-btn"
+                                onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ step.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                                {% if action_value.action_enabled == "0" %}disabled{% endif %}>
+                            {{ action_value.action_name }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Properties Edit Form -->
+                <details class="mb-3">
+                    <summary class="btn btn-outline btn-sm"><i class="fas fa-edit"></i> Edit Properties</summary>
+                    <form class="properties-form" method="post" action="/update_obj_json_addl_properties">
+                        <input type="hidden" name="obj_euid" value="{{ step.euid }}">
+                        {% for key, value in step.json_addl.get('properties', {}).items() %}
+                        <div class="form-group">
+                            <label>{{ key }}</label>
+                            {% if value is string %}
+                            <input type="text" class="form-control" name="{{ key }}" value="{{ value }}">
+                            {% elif value is iterable and value is not mapping %}
+                            <div id="list-{{ step.euid }}-{{ key }}">
+                                {% for item in value %}
+                                <input type="text" class="form-control mb-1" name="{{ key }}[]" value="{{ item }}">
+                                {% endfor %}
+                            </div>
+                            <div class="btn-group btn-group-sm mt-1">
+                                <button type="button" class="btn btn-outline" onclick="addListItem('{{ step.euid }}', '{{ key }}')">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                                <button type="button" class="btn btn-outline" onclick="removeListItem('{{ step.euid }}', '{{ key }}')">
+                                    <i class="fas fa-minus"></i> Remove
+                                </button>
+                            </div>
+                            {% else %}
+                            <input type="text" class="form-control" name="{{ key }}" value="{{ value }}">
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary btn-sm mt-2">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </form>
+                </details>
+
+                <!-- Child Steps (Recursive) -->
+                {% if step.parent_of_lineages %}
+                <div class="nested-steps">
+                    {% for child_step in step.get_sorted_parent_of_lineages(['container_instance']) %}
+                    {% set show_child = child_step.child_instance.super_type == 'workflow_step' or udat.get('wf_filter', 'off') == 'off' %}
+                    {% if show_child %}
+                    {{ render_step(child_step.child_instance, accordion_states, depth + 1) }}
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<!-- Workflow Steps -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-list-ol"></i> Workflow Steps</h3>
+    </div>
+    <div class="card-body">
+        {% for step in workflow.get_sorted_parent_of_lineages(['workflow_instance']) %}
+        {{ render_step(step.child_instance, accordion_states) }}
+        {% else %}
+        <p class="text-muted text-center py-4">No workflow steps found.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Back Link -->
+<div class="mt-4">
+    <a href="/workflow_summary" class="btn btn-outline">
+        <i class="fas fa-arrow-left"></i> Back to Workflow Summary
+    </a>
+</div>
+
+<!-- Floating Controls -->
+<div class="floating-controls">
+    <button id="expandAllBtn" class="floating-btn" title="Expand All">
+        <i class="fas fa-plus"></i>
+    </button>
+    <button id="collapseAllBtn" class="floating-btn" title="Collapse All">
+        <i class="fas fa-minus"></i>
+    </button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Action Buttons (shared functionality) -->
+<script src="/static/legacy/action_buttons.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Expand All
+    document.getElementById('expandAllBtn').addEventListener('click', function() {
+        document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
+            new bootstrap.Collapse(collapse, { show: true });
+        });
+        document.querySelectorAll('.accordion-button').forEach(function(btn) {
+            btn.classList.remove('collapsed');
+            btn.setAttribute('aria-expanded', 'true');
+        });
+    });
+
+    // Collapse All
+    document.getElementById('collapseAllBtn').addEventListener('click', function() {
+        document.querySelectorAll('.accordion-collapse.show').forEach(function(collapse) {
+            new bootstrap.Collapse(collapse, { hide: true });
+        });
+        document.querySelectorAll('.accordion-button').forEach(function(btn) {
+            btn.classList.add('collapsed');
+            btn.setAttribute('aria-expanded', 'false');
+        });
+    });
+
+    // Track accordion state changes
+    document.querySelectorAll('.accordion-button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const euid = this.getAttribute('data-euid');
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            const state = isExpanded ? 'closed' : 'open'; // Will toggle
+
+            fetch('/update_accordion_state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step_euid: euid, state: state })
+            }).catch(err => console.error('Error updating accordion state:', err));
+        });
+    });
+
+    // Filter Toggle
+    document.getElementById('toggleFilterBtn').addEventListener('click', function() {
+        const currentVal = '{{ udat.get("wf_filter", "off") }}';
+        fetch('/set_filter?curr_val=' + currentVal)
+            .then(response => response.json())
+            .then(data => {
+                this.innerHTML = '<i class="fas fa-filter"></i> Filter: ' + data.new_filter_value;
+                window.location.reload();
+            })
+            .catch(error => console.error('Error:', error));
+    });
+});
+
+// List item management for property forms
+function addListItem(stepEuid, key) {
+    const list = document.getElementById('list-' + stepEuid + '-' + key);
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'form-control mb-1';
+    input.name = key + '[]';
+    list.appendChild(input);
+}
+
+function removeListItem(stepEuid, key) {
+    const list = document.getElementById('list-' + stepEuid + '-' + key);
+    if (list.childElementCount > 1) {
+        list.removeChild(list.lastChild);
+    }
+}
+</script>
+{% endblock %}
