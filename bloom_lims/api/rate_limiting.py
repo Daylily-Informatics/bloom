@@ -6,17 +6,22 @@ and ensure fair resource allocation.
 
 Usage:
     from bloom_lims.api.rate_limiting import RateLimiter, rate_limit
-    
+
     # As decorator
     @rate_limit(requests_per_minute=60)
     def my_endpoint():
         pass
-    
+
     # As middleware
     limiter = RateLimiter(requests_per_minute=100)
     app.add_middleware(limiter.middleware)
+
+Environment Variables:
+    BLOOM_DISABLE_RATE_LIMITING: Set to "1" or "true" to disable rate limiting
+                                  (useful for testing and CI environments)
 """
 
+import os
 import time
 import logging
 from collections import defaultdict
@@ -265,6 +270,12 @@ def rate_limit(
     return decorator
 
 
+def is_rate_limiting_disabled() -> bool:
+    """Check if rate limiting is disabled via environment variable."""
+    disabled = os.environ.get("BLOOM_DISABLE_RATE_LIMITING", "").lower()
+    return disabled in ("1", "true", "yes")
+
+
 class RateLimitMiddleware:
     """
     ASGI middleware for rate limiting FastAPI/Starlette applications.
@@ -273,6 +284,9 @@ class RateLimitMiddleware:
         from bloom_lims.api.rate_limiting import RateLimitMiddleware
 
         app.add_middleware(RateLimitMiddleware)
+
+    To disable rate limiting for testing:
+        os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
     """
 
     def __init__(
@@ -291,6 +305,11 @@ class RateLimitMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Check if rate limiting is disabled via environment variable
+        if is_rate_limiting_disabled():
             await self.app(scope, receive, send)
             return
 
