@@ -1,0 +1,540 @@
+{% extends "modern/base.html" %}
+{% block title %}Create Object - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-plus-circle"></i> Create Object</h1>
+        <p class="text-muted">Create a new LIMS object using the wizard</p>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="wizard-progress">
+        <div class="wizard-step active" data-step="1">
+            <div class="step-number">1</div>
+            <div class="step-label">Super Type</div>
+        </div>
+        <div class="wizard-step" data-step="2">
+            <div class="step-number">2</div>
+            <div class="step-label">Type</div>
+        </div>
+        <div class="wizard-step" data-step="3">
+            <div class="step-number">3</div>
+            <div class="step-label">Sub-Type</div>
+        </div>
+        <div class="wizard-step" data-step="4">
+            <div class="step-number">4</div>
+            <div class="step-label">Create</div>
+        </div>
+    </div>
+
+    <!-- Step 1: Select Super Type -->
+    <div class="wizard-panel" id="step-1">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-layer-group"></i> Select Super Type</h2>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Choose the category of object you want to create:</p>
+                <div class="super-type-grid" id="super-type-grid">
+                    <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Select Type -->
+    <div class="wizard-panel hidden" id="step-2">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-cubes"></i> Select Type</h2>
+                <span class="badge badge-info" id="selected-super-type-badge"></span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Choose the specific type within <strong id="selected-super-type-name"></strong>:</p>
+                <div class="type-grid" id="type-grid">
+                    <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-outline" onclick="goToStep(1)"><i class="fas fa-arrow-left"></i> Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Select Sub-Type & Version -->
+    <div class="wizard-panel hidden" id="step-3">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-tag"></i> Select Sub-Type & Version</h2>
+                <span class="badge badge-info" id="selected-type-badge"></span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Choose the sub-type and version:</p>
+                <div class="sub-type-list" id="sub-type-list">
+                    <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-outline" onclick="goToStep(2)"><i class="fas fa-arrow-left"></i> Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 4: Create Form -->
+    <div class="wizard-panel hidden" id="step-4">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title"><i class="fas fa-edit"></i> Create Object</h2>
+                <span class="badge badge-success" id="selected-template-badge"></span>
+            </div>
+            <div class="card-body">
+                <div id="template-info" class="mb-4"></div>
+                <form id="create-form">
+                    <div class="form-group">
+                        <label for="object-name">Object Name (optional)</label>
+                        <input type="text" id="object-name" name="name" class="form-control" placeholder="Enter a name for this object">
+                    </div>
+                    <div id="properties-form"></div>
+                </form>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-outline" onclick="goToStep(3)"><i class="fas fa-arrow-left"></i> Back</button>
+                <button class="btn btn-primary" onclick="createObject()" id="create-btn">
+                    <i class="fas fa-plus"></i> Create Object
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Panel -->
+    <div class="wizard-panel hidden" id="step-success">
+        <div class="card">
+            <div class="card-header bg-success">
+                <h2 class="card-title text-white"><i class="fas fa-check-circle"></i> Object Created Successfully</h2>
+            </div>
+            <div class="card-body text-center">
+                <div class="success-icon"><i class="fas fa-check-circle text-success"></i></div>
+                <h3 id="created-euid"></h3>
+                <p id="created-message" class="text-muted"></p>
+                <div class="mt-4">
+                    <a href="#" id="view-object-link" class="btn btn-primary"><i class="fas fa-eye"></i> View Object</a>
+                    <button class="btn btn-outline" onclick="resetWizard()"><i class="fas fa-plus"></i> Create Another</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Wizard Progress */
+.wizard-progress {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    gap: 0;
+}
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 0 2rem;
+}
+.wizard-step::after {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: calc(50% + 20px);
+    width: calc(100% - 40px);
+    height: 2px;
+    background: var(--color-gray-600);
+}
+.wizard-step:last-child::after { display: none; }
+.wizard-step.active .step-number,
+.wizard-step.completed .step-number {
+    background: var(--color-highlight);
+    color: white;
+}
+.wizard-step.completed .step-number::after {
+    content: '✓';
+    position: absolute;
+}
+.step-number {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-gray-600);
+    color: var(--color-gray-300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+.step-label {
+    font-size: 0.875rem;
+    color: var(--color-gray-400);
+}
+.wizard-step.active .step-label {
+    color: var(--color-highlight);
+    font-weight: 500;
+}
+
+/* Grids */
+.super-type-grid, .type-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+.type-card, .super-type-card {
+    background: var(--color-gray-700);
+    border: 2px solid var(--color-gray-600);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+.type-card:hover, .super-type-card:hover {
+    border-color: var(--color-highlight);
+    background: var(--color-gray-600);
+}
+.type-card.selected, .super-type-card.selected {
+    border-color: var(--color-highlight);
+    background: var(--color-accent);
+}
+.type-card i, .super-type-card i {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-highlight);
+}
+.type-card .type-name, .super-type-card .type-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+.type-card .type-count, .super-type-card .type-count {
+    font-size: 0.75rem;
+    color: var(--color-gray-400);
+}
+
+/* Sub-type list */
+.sub-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.sub-type-item {
+    background: var(--color-gray-700);
+    border: 2px solid var(--color-gray-600);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+}
+.sub-type-item:hover {
+    border-color: var(--color-highlight);
+    background: var(--color-gray-600);
+}
+.sub-type-item .sub-type-name {
+    font-weight: 500;
+}
+.sub-type-item .sub-type-desc {
+    font-size: 0.875rem;
+    color: var(--color-gray-400);
+}
+.version-select {
+    min-width: 80px;
+}
+
+/* Form styles */
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+.form-control {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-gray-700);
+    border: 1px solid var(--color-gray-600);
+    border-radius: var(--radius-sm);
+    color: var(--color-gray-200);
+}
+.form-control:focus {
+    border-color: var(--color-highlight);
+    outline: none;
+}
+
+/* Success */
+.success-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+.success-icon i { color: var(--color-success); }
+.bg-success { background: var(--color-success) !important; }
+
+/* Utilities */
+.hidden { display: none !important; }
+.loading-spinner { text-align: center; padding: 2rem; color: var(--color-gray-400); }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+.mt-4 { margin-top: 1.5rem; }
+.text-center { text-align: center; }
+</style>
+
+<script>
+// Wizard state
+const state = {
+    currentStep: 1,
+    superType: null,
+    type: null,
+    subType: null,
+    version: null,
+    template: null
+};
+
+// Icon mapping for super types
+const superTypeIcons = {
+    'container': 'fa-box',
+    'content': 'fa-flask',
+    'equipment': 'fa-microscope',
+    'workflow': 'fa-project-diagram',
+    'workflow_step': 'fa-tasks',
+    'actor': 'fa-user',
+    'action': 'fa-bolt',
+    'subject': 'fa-user-tag',
+    'file': 'fa-file',
+    'file_set': 'fa-folder',
+    'data': 'fa-database',
+    'test_requisition': 'fa-clipboard-list',
+    'health_event': 'fa-heartbeat',
+    'generic': 'fa-cube'
+};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', loadSuperTypes);
+
+async function loadSuperTypes() {
+    try {
+        const resp = await fetch('/api/v1/object-creation/super-types');
+        const data = await resp.json();
+        const grid = document.getElementById('super-type-grid');
+
+        if (data.super_types && data.super_types.length > 0) {
+            grid.innerHTML = data.super_types.map(st => `
+                <div class="super-type-card" onclick="selectSuperType('${st.name}', '${st.display_name}')">
+                    <i class="fas ${superTypeIcons[st.name] || 'fa-cube'}"></i>
+                    <div class="type-name">${st.display_name}</div>
+                    <div class="type-count">${st.type_count} types</div>
+                </div>
+            `).join('');
+        } else {
+            grid.innerHTML = '<p class="text-muted">No super types found</p>';
+        }
+    } catch (e) {
+        console.error('Error loading super types:', e);
+        document.getElementById('super-type-grid').innerHTML = '<p class="text-error">Error loading super types</p>';
+    }
+}
+
+async function selectSuperType(name, displayName) {
+    state.superType = name;
+    document.getElementById('selected-super-type-badge').textContent = displayName;
+    document.getElementById('selected-super-type-name').textContent = displayName;
+    goToStep(2);
+    await loadTypes();
+}
+
+async function loadTypes() {
+    const grid = document.getElementById('type-grid');
+    grid.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+    try {
+        const resp = await fetch(`/api/v1/object-creation/types?super_type=${state.superType}`);
+        const data = await resp.json();
+
+        if (data.types && data.types.length > 0) {
+            grid.innerHTML = data.types.map(t => `
+                <div class="type-card" onclick="selectType('${t.name}', '${t.display_name}')">
+                    <i class="fas fa-file-code"></i>
+                    <div class="type-name">${t.display_name}</div>
+                    <div class="type-count">${t.sub_type_count} sub-types</div>
+                </div>
+            `).join('');
+        } else {
+            grid.innerHTML = '<p class="text-muted">No types found</p>';
+        }
+    } catch (e) {
+        console.error('Error loading types:', e);
+        grid.innerHTML = '<p class="text-error">Error loading types</p>';
+    }
+}
+
+async function selectType(name, displayName) {
+    state.type = name;
+    document.getElementById('selected-type-badge').textContent = `${state.superType} / ${displayName}`;
+    goToStep(3);
+    await loadSubTypes();
+}
+
+async function loadSubTypes() {
+    const list = document.getElementById('sub-type-list');
+    list.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+    try {
+        const resp = await fetch(`/api/v1/object-creation/sub-types?super_type=${state.superType}&btype=${state.type}`);
+        const data = await resp.json();
+
+        if (data.sub_types && data.sub_types.length > 0) {
+            list.innerHTML = data.sub_types.map(st => `
+                <div class="sub-type-item" onclick="selectSubType('${st.name}', '${st.versions[0] || '1.0'}')">
+                    <div>
+                        <div class="sub-type-name">${st.display_name}</div>
+                        <div class="sub-type-desc">${st.description || st.name}</div>
+                    </div>
+                    <select class="version-select" onclick="event.stopPropagation()" onchange="selectSubType('${st.name}', this.value)">
+                        ${st.versions.map(v => `<option value="${v}">${v}</option>`).join('')}
+                    </select>
+                </div>
+            `).join('');
+        } else {
+            list.innerHTML = '<p class="text-muted">No sub-types found</p>';
+        }
+    } catch (e) {
+        console.error('Error loading sub-types:', e);
+        list.innerHTML = '<p class="text-error">Error loading sub-types</p>';
+    }
+}
+
+async function selectSubType(name, version) {
+    state.subType = name;
+    state.version = version;
+    document.getElementById('selected-template-badge').textContent = `${state.superType}/${state.type}/${name}/${version}`;
+    goToStep(4);
+    await loadTemplate();
+}
+
+async function loadTemplate() {
+    const info = document.getElementById('template-info');
+    const form = document.getElementById('properties-form');
+    info.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading template...</div>';
+
+    try {
+        const resp = await fetch(`/api/v1/object-creation/template?super_type=${state.superType}&btype=${state.type}&b_sub_type=${state.subType}&version=${state.version}`);
+        const data = await resp.json();
+        state.template = data;
+
+        info.innerHTML = `
+            <div class="alert alert-info">
+                <strong>Template:</strong> ${data.b_sub_type} (v${data.version})<br>
+                <strong>Description:</strong> ${data.description || 'No description'}
+            </div>
+        `;
+
+        // Build properties form
+        const props = data.properties || {};
+        if (Object.keys(props).length > 0) {
+            form.innerHTML = '<h4>Properties</h4>' + Object.entries(props).map(([key, val]) => `
+                <div class="form-group">
+                    <label for="prop-${key}">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                    <input type="text" id="prop-${key}" name="${key}" class="form-control" value="${val || ''}" placeholder="${key}">
+                </div>
+            `).join('');
+        } else {
+            form.innerHTML = '<p class="text-muted">No additional properties to configure.</p>';
+        }
+    } catch (e) {
+        console.error('Error loading template:', e);
+        info.innerHTML = '<p class="text-error">Error loading template</p>';
+    }
+}
+
+async function createObject() {
+    const btn = document.getElementById('create-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+    try {
+        // Gather form data
+        const name = document.getElementById('object-name').value;
+        const properties = {};
+        document.querySelectorAll('#properties-form input').forEach(input => {
+            if (input.value) properties[input.name] = input.value;
+        });
+
+        const resp = await fetch('/api/v1/object-creation/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                super_type: state.superType,
+                btype: state.type,
+                b_sub_type: state.subType,
+                version: state.version,
+                name: name || null,
+                properties: properties
+            })
+        });
+
+        const data = await resp.json();
+
+        if (resp.ok) {
+            document.getElementById('created-euid').textContent = data.euid;
+            document.getElementById('created-message').textContent = data.message;
+            document.getElementById('view-object-link').href = `/euid_details?euid=${data.euid}`;
+            goToStep('success');
+        } else {
+            alert('Error: ' + (data.detail || 'Failed to create object'));
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plus"></i> Create Object';
+        }
+    } catch (e) {
+        console.error('Error creating object:', e);
+        alert('Error creating object: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus"></i> Create Object';
+    }
+}
+
+function goToStep(step) {
+    // Hide all panels
+    document.querySelectorAll('.wizard-panel').forEach(p => p.classList.add('hidden'));
+
+    // Show target panel
+    document.getElementById(`step-${step}`).classList.remove('hidden');
+
+    // Update progress
+    document.querySelectorAll('.wizard-step').forEach(s => {
+        const stepNum = parseInt(s.dataset.step);
+        s.classList.remove('active', 'completed');
+        if (step === 'success') {
+            s.classList.add('completed');
+        } else if (stepNum < step) {
+            s.classList.add('completed');
+        } else if (stepNum === step) {
+            s.classList.add('active');
+        }
+    });
+
+    state.currentStep = step;
+}
+
+function resetWizard() {
+    state.superType = null;
+    state.type = null;
+    state.subType = null;
+    state.version = null;
+    state.template = null;
+    document.getElementById('object-name').value = '';
+    document.getElementById('create-btn').disabled = false;
+    document.getElementById('create-btn').innerHTML = '<i class="fas fa-plus"></i> Create Object';
+    goToStep(1);
+    loadSuperTypes();
+}
+</script>
+{% endblock %}
+

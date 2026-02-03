@@ -487,6 +487,21 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
     return HTMLResponse(content=template.render(context), status_code=200)
 
 
+@app.get("/create_object", response_class=HTMLResponse)
+async def create_object_wizard(request: Request, _auth=Depends(require_auth)):
+    """Object creation wizard page - multi-step workflow for creating LIMS objects."""
+    user_data = request.session.get("user_data", {})
+
+    template = templates.get_template("modern/create_object_wizard.html")
+    context = {
+        "request": request,
+        "user_data": user_data,
+        "user": user_data,
+        "page_title": "Create Object",
+    }
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
 @app.get("/search", response_class=HTMLResponse)
 async def modern_search(
     request: Request,

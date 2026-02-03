@@ -565,3 +565,103 @@ class TestAdminDependencyInfo:
         content = response.text
         assert "BLOOM Version" in content or "bloom_version" in content.lower()
 
+
+class TestObjectCreationWizard:
+    """Tests for object creation wizard functionality."""
+
+    def test_create_object_page_returns_html(self, client):
+        """Test create object page returns HTML."""
+        response = client.get("/create_object")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+    def test_create_object_page_uses_modern_template(self, client):
+        """Test create object page uses modern template."""
+        response = client.get("/create_object")
+        assert response.status_code == 200
+        content = response.text
+        assert "bloom_modern.css" in content
+        assert "Create Object" in content
+
+    def test_create_object_page_has_wizard_steps(self, client):
+        """Test create object page has wizard steps."""
+        response = client.get("/create_object")
+        assert response.status_code == 200
+        content = response.text
+        assert "Super Type" in content
+        assert "wizard-step" in content
+
+    def test_create_object_navigation_link(self, client):
+        """Test create object link is in navigation."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+        assert "/create_object" in content or "Create" in content
+
+
+class TestObjectCreationAPI:
+    """Tests for object creation API endpoints."""
+
+    def test_super_types_api(self, client):
+        """Test super types API endpoint."""
+        response = client.get("/api/v1/object-creation/super-types")
+        assert response.status_code == 200
+        data = response.json()
+        assert "super_types" in data
+        assert len(data["super_types"]) > 0
+        # Should include common super types
+        names = [st["name"] for st in data["super_types"]]
+        assert "container" in names
+        assert "content" in names
+
+    def test_types_api(self, client):
+        """Test types API endpoint for container super type."""
+        response = client.get("/api/v1/object-creation/types?super_type=container")
+        assert response.status_code == 200
+        data = response.json()
+        assert "types" in data
+        assert data["super_type"] == "container"
+        assert len(data["types"]) > 0
+        # Should include common container types
+        names = [t["name"] for t in data["types"]]
+        assert "tube" in names or "plate" in names
+
+    def test_types_api_invalid_super_type(self, client):
+        """Test types API returns 404 for invalid super type."""
+        response = client.get("/api/v1/object-creation/types?super_type=nonexistent")
+        assert response.status_code == 404
+
+    def test_sub_types_api(self, client):
+        """Test sub-types API endpoint."""
+        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=tube")
+        assert response.status_code == 200
+        data = response.json()
+        assert "sub_types" in data
+        assert data["super_type"] == "container"
+        assert data["btype"] == "tube"
+        assert len(data["sub_types"]) > 0
+        # Each sub-type should have versions
+        for st in data["sub_types"]:
+            assert "versions" in st
+            assert len(st["versions"]) > 0
+
+    def test_template_api(self, client):
+        """Test template details API endpoint."""
+        # First get a sub-type
+        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=tube")
+        assert response.status_code == 200
+        sub_types = response.json()["sub_types"]
+        if sub_types:
+            sub_type = sub_types[0]["name"]
+            version = sub_types[0]["versions"][0]
+
+            # Get template details
+            response = client.get(
+                f"/api/v1/object-creation/template?super_type=container&btype=tube&b_sub_type={sub_type}&version={version}"
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert "template" in data
+            assert data["super_type"] == "container"
+            assert data["btype"] == "tube"
+            assert data["b_sub_type"] == sub_type
