@@ -3,6 +3,38 @@ from bloom_lims.db import BLOOMdb3
 from bloom_lims.bobjs import BloomObj
 import sys
 import os
+from sqlalchemy import text
+
+
+def ensure_sequence_exists(db, prefix: str) -> None:
+    """
+    Ensure the EUID sequence exists for a given prefix.
+
+    The set_generic_instance_euid() trigger requires a sequence named
+    {lowercase_prefix}_instance_seq for each template prefix. This function
+    creates the sequence if it doesn't exist, making the seeding process
+    resilient to new prefixes being added to metadata.json files.
+
+    Args:
+        db: BLOOMdb3 database instance
+        prefix: The instance_prefix (e.g., 'DAT', 'LM', 'HEV')
+    """
+    seq_name = f"{prefix.lower()}_instance_seq"
+
+    # Check if sequence exists
+    result = db.session.execute(text("""
+        SELECT 1 FROM information_schema.sequences
+        WHERE sequence_schema = 'public' AND sequence_name = :seq_name
+    """), {"seq_name": seq_name})
+
+    if result.fetchone() is None:
+        # Create the sequence
+        db.session.execute(text(f"CREATE SEQUENCE IF NOT EXISTS {seq_name} START 1"))
+        db.session.execute(text(
+            f"COMMENT ON SEQUENCE {seq_name} IS 'Auto-created EUID sequence for prefix {prefix}'"
+        ))
+        db.session.commit()
+        print(f"  ✓ Created missing sequence: {seq_name}")
 
 
 def create_template_from_json(json_file, db):
@@ -32,6 +64,10 @@ def create_template_from_json(json_file, db):
                 if btype not in md_json["euid_prefixes"]
                 else md_json["euid_prefixes"][btype]
             )
+
+            # Ensure the EUID sequence exists for this prefix
+            # This auto-creates sequences for new prefixes added to metadata.json
+            ensure_sequence_exists(db, obj_prefix)
 
             # TapDB uses sequence-based EUID generation via bloom_prefix_sequences.sql
             # No need to check for CASE expressions in legacy schema
