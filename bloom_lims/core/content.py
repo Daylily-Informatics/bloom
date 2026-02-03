@@ -31,11 +31,11 @@ class BloomContentMixin:
     
     @property
     def sample_type(self) -> Optional[str]:
-        """Get sample type from btype or b_sub_type."""
-        if hasattr(self, 'b_sub_type') and self.b_sub_type:
-            return self.b_sub_type
-        if hasattr(self, 'btype'):
-            return self.btype
+        """Get sample type from type or subtype."""
+        if hasattr(self, 'subtype') and self.subtype:
+            return self.subtype
+        if hasattr(self, 'type'):
+            return self.type
         return None
     
     @property
@@ -93,11 +93,11 @@ def create_sample(
         
         sample = sample_class(
             name=name,
-            btype=sample_type.lower(),
-            b_sub_type=sample_subtype.lower() if sample_subtype else None,
+            type=sample_type.lower(),
+            subtype=sample_subtype.lower() if sample_subtype else None,
             json_addl=json_addl or {},
             bstatus='active',
-            super_type='content',
+            category='content',
             polymorphic_discriminator='content_instance',
             **kwargs,
         )
@@ -200,8 +200,8 @@ def create_aliquot(
         session=session,
         base=base,
         name=aliquot_name,
-        sample_type=parent_sample.btype,
-        sample_subtype=parent_sample.b_sub_type,
+        sample_type=parent_sample.type,
+        sample_subtype=parent_sample.subtype,
         json_addl=aliquot_json,
     )
 

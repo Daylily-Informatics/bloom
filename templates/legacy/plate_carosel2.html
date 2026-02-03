@@ -191,7 +191,7 @@
                         {% endfor %}
                         {% for lineage in plate.parent_of_lineages %}
                             {% set well = lineage.child_instance %}
-                            {% if well.btype == 'well' %}
+                            {% if well.type == 'well' %}
                                 {% set cont_address = well.json_addl.get('cont_address', {}) %}
                                 {% set col_idx = cont_address.get('col_idx', 'Unknown') %}
                                 {% set row_idx = cont_address.get('row_idx', 'Unknown') %}

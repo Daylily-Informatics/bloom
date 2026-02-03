@@ -80,7 +80,7 @@
           {% for wf in workflows %}
           <tr>
             <td><a href="/euid_details?euid={{ wf.euid }}" class="badge badge-euid">{{ wf.euid }}</a></td>
-            <td>{{ wf.b_sub_type }}</td>
+            <td>{{ wf.subtype }}</td>
             <td>{{ wf.name | default('-') }}</td>
             <td>
               <span class="badge badge-{% if wf.json_addl.get('status') == 'complete' %}success{% elif wf.json_addl.get('status') == 'exception' %}error{% elif wf.json_addl.get('status') == 'in_progress' %}warning{% else %}info{% endif %}">

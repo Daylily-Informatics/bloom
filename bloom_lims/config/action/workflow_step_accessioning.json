@@ -87,10 +87,10 @@
         "action_enabled": "1",
         "capture_data": "yes",
         "captured_data": {
-          "Collection Date": "",
+          "_collection_date": "Collection Date: <input type=&quot;date&quot; name=&quot;collection_date&quot; required />",
           "MRN": "",
-          "DOB": "",
-          "QC Pass": "",
+          "_dob": "DOB: <input type=&quot;date&quot; name=&quot;dob&quot; required />",
+          "_qc_pass": "QC Pass: <select name=&quot;qc_pass&quot; required><option value=&quot;Pass&quot;>Pass</option><option value=&quot;Fail&quot;>Fail</option><option value=&quot;Hold&quot;>Hold</option></select>",
           "Comment": ""
         },
         "deactivate_actions_when_executed": [],

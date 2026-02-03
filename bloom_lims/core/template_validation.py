@@ -43,9 +43,9 @@ class ValidationResult:
 class TemplateDefinition:
     """Parsed template definition."""
     file_path: Path
-    super_type: str
-    btype: str
-    b_sub_type: str
+    category: str
+    type: str
+    subtype: str
     version: str
     data: Dict[str, Any]
     action_imports: Dict[str, Any] = field(default_factory=dict)
@@ -133,23 +133,23 @@ class TemplateValidator:
             try:
                 with open(json_file) as f:
                     data = json.load(f)
-                
-                # Determine super_type from directory structure
+
+                # Determine category from directory structure
                 relative_path = json_file.relative_to(self._config_path)
-                super_type = relative_path.parts[0] if relative_path.parts else "generic"
-                
-                for btype, versions in data.items():
+                category = relative_path.parts[0] if relative_path.parts else "generic"
+
+                for type_name, versions in data.items():
                     if not isinstance(versions, dict):
                         result.errors.append(
-                            f"{json_file}: '{btype}' must be a dict of versions"
+                            f"{json_file}: '{type_name}' must be a dict of versions"
                         )
                         continue
-                    
+
                     for version, template_data in versions.items():
                         result.templates_checked += 1
-                        
+
                         self._validate_template_structure(
-                            json_file, super_type, btype, version, 
+                            json_file, category, type_name, version,
                             template_data, result
                         )
                         
@@ -161,14 +161,14 @@ class TemplateValidator:
     def _validate_template_structure(
         self,
         file_path: Path,
-        super_type: str,
-        btype: str,
+        category: str,
+        type_name: str,
         version: str,
         data: Dict[str, Any],
         result: ValidationResult
     ) -> None:
         """Validate individual template structure."""
-        template_id = f"{super_type}/{btype}/{version}"
+        template_id = f"{category}/{type_name}/{version}"
 
         # Check if template data is a dict
         if not isinstance(data, dict):
@@ -176,12 +176,12 @@ class TemplateValidator:
             return
 
         # Store template for reference checking
-        b_sub_type = btype  # In the file structure, btype contains the sub_type
+        subtype = type_name  # In the file structure, type contains the subtype
         template = TemplateDefinition(
             file_path=file_path,
-            super_type=super_type,
-            btype=btype,
-            b_sub_type=b_sub_type,
+            category=category,
+            type=type_name,
+            subtype=subtype,
             version=version,
             data=data,
             action_imports=data.get("action_imports", {}),
@@ -190,8 +190,8 @@ class TemplateValidator:
         self._templates[template_id] = template
 
         # Check required fields for specific types
-        if super_type in self.REQUIRED_FIELDS:
-            for field in self.REQUIRED_FIELDS[super_type]:
+        if category in self.REQUIRED_FIELDS:
+            for field in self.REQUIRED_FIELDS[category]:
                 if field not in data:
                     result.warnings.append(
                         f"{file_path}: {template_id} missing recommended field '{field}'"

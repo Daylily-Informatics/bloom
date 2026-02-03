@@ -108,7 +108,7 @@ def get_container_layout(container: Any) -> Dict[str, Any]:
     return {
         'rows': layout.get('rows', 8),
         'columns': layout.get('columns', 12),
-        'type': container.b_sub_type or container.btype,
+        'type': container.subtype or container.type,
         'total_positions': layout.get('rows', 8) * layout.get('columns', 12),
     }
 
@@ -154,7 +154,7 @@ def get_container_contents(
                     'euid': obj_info.get('euid'),
                     'uuid': obj_info.get('uuid'),
                     'name': obj_info.get('name'),
-                    'btype': obj_info.get('btype'),
+                    'type': obj_info.get('type'),
                 })
         
         return contents
@@ -239,7 +239,7 @@ def place_in_container(
             'euid': obj.euid,
             'uuid': str(obj.uuid),
             'name': obj.name,
-            'btype': obj.btype,
+            'type': obj.type,
             'placed_at': __import__('datetime').datetime.utcnow().isoformat(),
         }
 

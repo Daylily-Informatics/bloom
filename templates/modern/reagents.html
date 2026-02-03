@@ -42,7 +42,7 @@
           <tr>
             <td><a href="/euid_details?euid={{ reagent.euid }}" class="badge badge-euid">{{ reagent.euid }}</a></td>
             <td>{{ reagent.name | default('-') }}</td>
-            <td>{{ reagent.b_sub_type }}</td>
+            <td>{{ reagent.subtype }}</td>
             <td class="font-mono text-sm">{{ reagent.json_addl.get('lot_number', '-') }}</td>
             <td class="text-sm {% if reagent.json_addl.get('expired') %}text-error{% endif %}">
               {{ reagent.json_addl.get('expiration_date', '-') }}

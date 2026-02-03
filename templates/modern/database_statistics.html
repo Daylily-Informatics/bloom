@@ -117,7 +117,7 @@
       <table class="stats-table" id="statsTable">
         <thead>
           <tr>
-            <th data-sort="string">Object Type (b_sub_type)</th>
+            <th data-sort="string">Object Type (subtype)</th>
             <th data-sort="int">Last 1 Day</th>
             <th data-sort="int">Last 7 Days</th>
             <th data-sort="int">Last 30 Days</th>
@@ -130,7 +130,7 @@
           {% set count_7d = stats_7d_dict.get(sub_type, 0) %}
           {% set count_30d = stats_30d_dict.get(sub_type, 0) %}
           <tr>
-            <td><a href="/search?query={{ sub_type }}&type=b_sub_type">{{ sub_type }}</a></td>
+            <td><a href="/search?query={{ sub_type }}&type=subtype">{{ sub_type }}</a></td>
             <td class="{{ 'stat-positive' if count_1d > 0 else 'stat-zero' }}">{{ count_1d }}</td>
             <td class="{{ 'stat-positive' if count_7d > 0 else 'stat-zero' }}">{{ count_7d }}</td>
             <td class="{{ 'stat-positive' if count_30d > 0 else 'stat-zero' }}">{{ count_30d }}</td>

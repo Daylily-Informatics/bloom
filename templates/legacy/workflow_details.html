@@ -32,34 +32,34 @@
                 <button class="accordion"
                         data-state="{{ accordion_states[step.euid] }}"
                         id="{{ step.euid }}">
-                    <small style="color:var(--accordion-prefix);"> {{ step.btype }} </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a> <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a>  {{ step.json_addl['properties'].get('name', 'NONAME') }}  :: {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
+                    <small style="color:var(--accordion-prefix);"> {{ step.type }} </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a> <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a>  {{ step.json_addl['properties'].get('name', 'NONAME') }}  :: {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
                 </button>
                 <div class="workflow-step"
                      style="display: {{ 'block' if accordion_states[step.euid] == 'open' else 'none' }}">
                 {% else %}
-                    {% if step.btype == 'plate' or step.btype == 'rack' %}
+                    {% if step.type == 'plate' or step.type == 'rack' %}
                         <button style="width: inherit;
                                        background-color: var(--workflow-non-step-bg-color)"
                                 class="accordion non-wf-step"
                                 data-state="{{ accordion_states[step.euid] }}"
                                 id="{{ step.euid }}">
-                            <small><a href=plate_visualization?plate_euid={{ step.euid }}> {{ step.b_sub_type }}</a> </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>  <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a>  {{ step.json_addl['properties']['name'] }} ::  & {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
+                            <small><a href=plate_visualization?plate_euid={{ step.euid }}> {{ step.subtype }}</a> </small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>  <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a>  {{ step.json_addl['properties']['name'] }} ::  & {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
                         </button>
                         <div class="workflow-step"
                              style="font-size: 2px;
                                     display: {{ 'block' if accordion_states[step.euid] == 'open' else 'none' }}">
                         {% else %}
-                            {% if step.btype == 'package' %}
+                            {% if step.type == 'package' %}
                                 <button style="width: inherit;
                                                background-color: var( --workflow-non-step-bg-color)"
                                         class="accordion non-wf-step"
                                         data-state="{{ accordion_states[step.euid] }}"
                                         id="{{ step.euid }}">
-                                    <small style="color: var(--accordion-prefix);">{{ step.btype }}</small>
+                                    <small style="color: var(--accordion-prefix);">{{ step.type }}</small>
                                     <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>
                                     <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a>
 				    {{ step.json_addl['properties']['name'] }}
-				    WW{{ step.b_sub_type }} {{ step.version }}
+				    WW{{ step.subtype }} {{ step.version }}
                                     :: ({{ step.bstatus }})
                                     ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
                                     {% set fedex_data = step.json_addl['properties'].get('fedex_tracking_data', []) %}
@@ -79,7 +79,7 @@
                                             class="accordion non-wf-step"
                                             data-state="{{ accordion_states[step.euid] }}"
                                             id="{{ step.euid }}">
-                                        <small style="color: var(--accordion-prefix);">{{ step.btype }}</small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>  <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a> {{ step.btype }}  {{ step.json_addl['properties']['name'] }} :: ({{ step.bstate }} & {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
+                                        <small style="color: var(--accordion-prefix);">{{ step.type }}</small>  <a href=euid_details?euid={{ step.euid }}>{{ step.euid }}</a>  <a href="dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag">🕸️</a> {{ step.type }}  {{ step.json_addl['properties']['name'] }} :: ({{ step.bstate }} & {{ step.bstatus }})  ({{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }})
                                     </button>
                                     <div class="workflow-step"
                                          style="font-size: 2px;
@@ -158,18 +158,18 @@
                                         {% if step.parent_of_lineages %}
                                             <div>
                                                 {% for child_step in step.get_sorted_parent_of_lineages(['container_instance']) %}
-                                                {% if child_step.child_instance.super_type != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
+                                                {% if child_step.child_instance.category != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
                                                         <ul>
                                                         {% else %}
                                                         {% endif %}
-                                                        {% if child_step.child_instance.super_type == 'workflow_step' %}
+                                                        {% if child_step.child_instance.category == 'workflow_step' %}
 
                                                         {{ render_step(child_step.child_instance, accordion_states) }}
 
-                                                        {% elif  child_step.child_instance.super_type != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
+                                                        {% elif  child_step.child_instance.category != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
                                                         {{ render_step(child_step.child_instance, accordion_states) }}
                                                         {% endif %}
-                                                        {% if child_step.child_instance.super_type != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
+                                                        {% if child_step.child_instance.category != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
                                                         </ul>
                                                     {% else %}
                                                     {% endif %}
@@ -208,7 +208,7 @@
                                 <li>
                                     <strong>Status:</strong> {{ workflow.bstatus }}
                                     <li>
-                                        <strong>Type:</strong> {{ workflow.btype }} :: {{ workflow.b_sub_type }} :: {{ workflow.version }}
+                                        <strong>Type:</strong> {{ workflow.type }} :: {{ workflow.subtype }} :: {{ workflow.version }}
                                         <li>
                                             <strong>Created at:</strong> {{ workflow.created_dt }}
                                         </ul>

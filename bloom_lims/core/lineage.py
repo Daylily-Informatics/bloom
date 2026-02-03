@@ -97,7 +97,7 @@ def create_lineage(
         
         lineage = lineage_class(
             name=name,
-            btype=lineage_type.lower(),
+            type=lineage_type.lower(),
             json_addl=lineage_json,
             **kwargs,
         )
@@ -250,7 +250,7 @@ def get_lineage_tree(
     tree = {
         'euid': lineage.euid,
         'name': lineage.name,
-        'type': lineage.btype,
+        'type': lineage.type,
         'members': [],
         'root': None,
     }

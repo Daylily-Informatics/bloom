@@ -60,7 +60,7 @@ def find_subject_by_key(bob, subject_key: str):
     """
     try:
         results = bob.session.query(bob.Base.classes.generic_instance).filter(
-            bob.Base.classes.generic_instance.super_type == "subject",
+            bob.Base.classes.generic_instance.category == "subject",
             bob.Base.classes.generic_instance.is_deleted == False,
         ).all()
         
@@ -92,13 +92,13 @@ def get_subject_template_euid(bob, subject_kind: str) -> Optional[str]:
         logger.error(f"Invalid template path: {template_path}")
         return None
     
-    super_type, btype, b_sub_type, version = parts
-    
+    category, type_name, subtype, version = parts
+
     try:
         templates = bob.query_template_by_component_v2(
-            super_type=super_type,
-            btype=btype,
-            b_sub_type=b_sub_type,
+            category=category,
+            type=type_name,
+            subtype=subtype,
             version=version
         )
         if templates:
@@ -303,7 +303,7 @@ def list_subjects_for_object(bob, object_euid: str) -> List[Dict[str, Any]]:
             continue
 
         parent = lineage.parent_instance
-        if parent.super_type != "subject":
+        if parent.category != "subject":
             continue
 
         role = "unknown"
@@ -354,9 +354,9 @@ def list_members_for_subject(bob, subject_euid: str) -> Dict[str, List[Dict[str,
         obj_info = {
             "euid": child.euid,
             "name": child.json_addl.get("properties", {}).get("name", child.name),
-            "btype": child.btype,
-            "b_sub_type": child.b_sub_type,
-            "super_type": child.super_type,
+            "type": child.type,
+            "subtype": child.subtype,
+            "category": child.category,
         }
 
         if lineage.relationship_type == RELATIONSHIP_SUBJECT_ANCHOR:

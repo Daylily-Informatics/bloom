@@ -6,6 +6,54 @@
 <!-- Bootstrap 5 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
+    /* Bootstrap overrides to match BLOOM design system */
+    .accordion {
+        --bs-accordion-bg: var(--color-gray-800);
+        --bs-accordion-border-color: var(--color-gray-600);
+        --bs-accordion-btn-bg: var(--color-gray-700);
+        --bs-accordion-btn-color: var(--color-gray-200);
+        --bs-accordion-active-bg: var(--color-highlight);
+        --bs-accordion-active-color: var(--color-white);
+        --bs-accordion-btn-focus-box-shadow: none;
+    }
+    .accordion-item {
+        background-color: var(--color-gray-800);
+        border-color: var(--color-gray-600);
+    }
+    .accordion-body {
+        background-color: var(--color-gray-800);
+        color: var(--color-gray-200);
+    }
+    .accordion-button {
+        background-color: var(--color-gray-700);
+        color: var(--color-gray-200);
+    }
+    .accordion-button::after {
+        filter: invert(1);
+    }
+    .accordion-button:not(.collapsed)::after {
+        filter: invert(1);
+    }
+    .card {
+        background-color: var(--color-gray-800);
+        border-color: var(--color-gray-600);
+        color: var(--color-gray-200);
+    }
+    .card-header {
+        background-color: var(--color-gray-700);
+        border-color: var(--color-gray-600);
+        color: var(--color-white);
+    }
+    .card-body {
+        background-color: var(--color-gray-800);
+    }
+    .badge.bg-success { background-color: var(--color-success) !important; }
+    .badge.bg-warning { background-color: var(--color-warning) !important; }
+    .badge.bg-danger { background-color: var(--color-error) !important; }
+    .badge.bg-info { background-color: var(--color-info) !important; }
+    .badge.bg-secondary { background-color: var(--color-gray-600) !important; }
+    .badge.bg-primary { background-color: var(--color-highlight) !important; }
+
     .workflow-header {
         display: flex;
         justify-content: space-between;
@@ -35,13 +83,16 @@
     .accordion-button.step-type-workflow_step_instance,
     .accordion-button.step-type-workflow_instance {
         background: var(--color-gray-700);
+        color: var(--color-gray-200);
     }
     .accordion-button.step-type-plate,
     .accordion-button.step-type-rack {
         background: var(--color-secondary);
+        color: var(--color-gray-200);
     }
     .accordion-button.step-type-package {
         background: var(--color-accent);
+        color: var(--color-gray-200);
     }
     .step-info {
         display: flex;
@@ -58,15 +109,84 @@
     .step-links {
         display: flex;
         gap: 0.25rem;
-        margin-left: 0.5rem;
+        margin-left: auto;
+        padding-right: 1rem;
+        z-index: 10;
     }
     .step-links a {
         color: var(--color-highlight);
         text-decoration: none;
-        padding: 0.125rem 0.25rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--color-gray-800);
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
     }
     .step-links a:hover {
         color: var(--color-white);
+        background: var(--color-highlight);
+    }
+    .accordion-header {
+        display: flex;
+        align-items: center;
+    }
+    .accordion-header .accordion-button {
+        flex: 1;
+    }
+    .child-containers {
+        background: var(--color-gray-700);
+        border-radius: var(--radius-sm);
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+    }
+    .child-containers-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    .child-containers-title {
+        font-weight: 600;
+        color: var(--color-gray-300);
+        font-size: 0.875rem;
+    }
+    .child-container-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: var(--color-gray-800);
+        border-radius: var(--radius-sm);
+        margin-bottom: 0.25rem;
+    }
+    .child-container-item:last-child {
+        margin-bottom: 0;
+    }
+    .child-container-type {
+        font-size: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        background: var(--color-gray-600);
+        border-radius: var(--radius-sm);
+        color: var(--color-gray-300);
+    }
+    .child-container-euid {
+        color: var(--color-highlight);
+        text-decoration: none;
+    }
+    .child-container-euid:hover {
+        color: var(--color-white);
+    }
+    .show-children-btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--color-gray-600);
+        border: none;
+        border-radius: var(--radius-sm);
+        color: var(--color-gray-200);
+        cursor: pointer;
+    }
+    .show-children-btn:hover {
+        background: var(--color-highlight);
+        color: white;
     }
     .action-group {
         display: flex;
@@ -114,6 +234,56 @@
         padding: 0.375rem 0.75rem;
         border-radius: var(--radius-sm);
         width: 100%;
+    }
+    /* Dynamic action forms created by action_buttons.js */
+    .action-group > div[id*="-form"] {
+        background: var(--color-gray-700);
+        padding: 1rem;
+        border-radius: var(--radius-sm);
+        margin-top: 0.5rem;
+        border: 1px solid var(--color-gray-600);
+    }
+    .action-group > div[id*="-form"] form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .action-group > div[id*="-form"] input[type="text"],
+    .action-group > div[id*="-form"] textarea,
+    .action-group > div[id*="-form"] select {
+        background: var(--color-gray-800);
+        border: 1px solid var(--color-gray-600);
+        color: var(--color-white);
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.875rem;
+        width: 100%;
+        max-width: 400px;
+    }
+    .action-group > div[id*="-form"] select {
+        cursor: pointer;
+    }
+    .action-group > div[id*="-form"] select option {
+        background: var(--color-gray-800);
+        color: var(--color-white);
+    }
+    .action-group > div[id*="-form"] textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+    .action-group > div[id*="-form"] .actionSubmit {
+        background: var(--color-highlight);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+        width: fit-content;
+    }
+    .action-group > div[id*="-form"] .actionSubmit:hover {
+        background: #4f46e5;
     }
     .properties-form {
         background: var(--color-gray-700);
@@ -184,7 +354,7 @@
                 <i class="fas fa-circle"></i> {{ workflow.bstatus }}
             </span>
             <span class="badge bg-info">
-                <i class="fas fa-tag"></i> {{ workflow.btype }} :: {{ workflow.b_sub_type }} :: {{ workflow.version }}
+                <i class="fas fa-tag"></i> {{ workflow.type }} :: {{ workflow.subtype }} :: {{ workflow.version }}
             </span>
             <span class="badge bg-secondary">
                 <i class="fas fa-clock"></i> {{ workflow.created_dt.strftime("%Y-%m-%d %H:%M:%S") if workflow.created_dt else 'N/A' }}
@@ -216,7 +386,7 @@
             <div class="action-group-name">{{ group_value.group_name }}</div>
             {% for action_key, action_value in group_value.actions.items() %}
             <button class="action-btn"
-                    onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ workflow.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                    onclick="showCapturedDataForm(this, {{ action_value }}, '{{ workflow.euid }}', '{{ action_key }}', '{{ group_key }}')"
                     {% if action_value.action_enabled == "0" %}disabled{% endif %}>
                 {{ action_value.action_name }}
             </button>
@@ -230,9 +400,22 @@
 <!-- Define recursive step rendering macro -->
 {% macro render_step(step, accordion_states, depth=0) %}
 {% set is_workflow_step = step.polymorphic_discriminator in ['workflow_step_instance', 'workflow_instance'] %}
-{% set step_type = step.btype %}
+{% set step_type = step.type %}
 {% set step_id = "step-" ~ step.euid %}
 {% set is_open = accordion_states.get(step.euid, 'closed') == 'open' %}
+
+{# Separate workflow step children from container children #}
+{% set workflow_children = [] %}
+{% set container_children = [] %}
+{% if step.parent_of_lineages %}
+    {% for child_lineage in step.get_sorted_parent_of_lineages(['container_instance']) %}
+        {% if child_lineage.child_instance.category == 'workflow_step' %}
+            {% set _ = workflow_children.append(child_lineage.child_instance) %}
+        {% else %}
+            {% set _ = container_children.append(child_lineage.child_instance) %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
 
 <div class="accordion mb-2" id="accordion-{{ step.euid }}">
     <div class="accordion-item">
@@ -245,10 +428,6 @@
                     data-euid="{{ step.euid }}">
                 <div class="step-info">
                     <span class="step-type-badge">{{ step_type }}</span>
-                    <span class="step-links">
-                        <a href="/euid_details?euid={{ step.euid }}" title="View details">{{ step.euid }}</a>
-                        <a href="/dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag" title="View DAG">🕸️</a>
-                    </span>
                     <strong>{{ step.json_addl.get('properties', {}).get('name', 'NONAME') }}</strong>
                     <span class="badge bg-{{ 'success' if step.bstatus == 'active' else 'secondary' }} ms-2">{{ step.bstatus }}</span>
                     <span class="text-muted ms-2" style="font-size: 0.75rem;">{{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S") if step.created_dt else '' }}</span>
@@ -263,13 +442,21 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if step_type == 'plate' or step_type == 'rack' %}
-                    <a href="/plate_visualization?plate_euid={{ step.euid }}" class="btn btn-sm btn-outline ms-2" title="View plate">
-                        <i class="fas fa-th"></i>
-                    </a>
+                    {% if container_children|length > 0 %}
+                    <span class="badge bg-info ms-2" title="Linked containers/contents">
+                        <i class="fas fa-box"></i> {{ container_children|length }}
+                    </span>
                     {% endif %}
                 </div>
             </button>
+            <!-- Links OUTSIDE the button so they work independently -->
+            <span class="step-links">
+                <a href="/euid_details?euid={{ step.euid }}" title="View details">{{ step.euid }}</a>
+                <a href="/dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag" title="View DAG">🕸️</a>
+                {% if step_type == 'plate' or step_type == 'rack' %}
+                <a href="/plate_visualization?plate_euid={{ step.euid }}" title="View plate"><i class="fas fa-th"></i></a>
+                {% endif %}
+            </span>
         </h2>
         <div id="{{ step_id }}" class="accordion-collapse collapse {{ 'show' if is_open else '' }}"
              data-bs-parent="#accordion-{{ step.euid }}">
@@ -282,7 +469,7 @@
                         <div class="action-group-name">{{ group_value.group_name }}</div>
                         {% for action_key, action_value in group_value.actions.items() %}
                         <button class="action-btn"
-                                onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ step.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                                onclick="showCapturedDataForm(this, {{ action_value }}, '{{ step.euid }}', '{{ action_key }}', '{{ group_key }}')"
                                 {% if action_value.action_enabled == "0" %}disabled{% endif %}>
                             {{ action_value.action_name }}
                         </button>
@@ -327,14 +514,38 @@
                     </form>
                 </details>
 
-                <!-- Child Steps (Recursive) -->
-                {% if step.parent_of_lineages %}
+                <!-- Child Containers/Contents (collapsible) -->
+                {% if container_children|length > 0 %}
+                <div class="child-containers" id="containers-{{ step.euid }}">
+                    <div class="child-containers-header">
+                        <span class="child-containers-title">
+                            <i class="fas fa-box"></i> Linked Containers/Contents ({{ container_children|length }})
+                        </span>
+                        <button class="show-children-btn" onclick="toggleChildContainers('{{ step.euid }}')" data-expanded="false">
+                            <i class="fas fa-chevron-down"></i> Show All
+                        </button>
+                    </div>
+                    <div class="child-container-list" id="container-list-{{ step.euid }}" style="display: none;">
+                        {% for child in container_children %}
+                        <div class="child-container-item" data-child-euid="{{ child.euid }}">
+                            <span class="child-container-type">{{ child.type }}</span>
+                            <a href="/euid_details?euid={{ child.euid }}" class="child-container-euid">{{ child.euid }}</a>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ child.json_addl.get('properties', {}).get('name', '') }}</span>
+                            <a href="/dindex2?globalStartNodeEUID={{ child.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+                            {% if child.type == 'plate' or child.type == 'rack' %}
+                            <a href="/plate_visualization?plate_euid={{ child.euid }}" title="View plate" style="color: var(--color-highlight);"><i class="fas fa-th"></i></a>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Child Workflow Steps (Recursive - always shown) -->
+                {% if workflow_children|length > 0 %}
                 <div class="nested-steps">
-                    {% for child_step in step.get_sorted_parent_of_lineages(['container_instance']) %}
-                    {% set show_child = child_step.child_instance.super_type == 'workflow_step' or udat.get('wf_filter', 'off') == 'off' %}
-                    {% if show_child %}
-                    {{ render_step(child_step.child_instance, accordion_states, depth + 1) }}
-                    {% endif %}
+                    {% for child_step in workflow_children %}
+                    {{ render_step(child_step, accordion_states, depth + 1) }}
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -384,9 +595,50 @@
 <script src="/static/legacy/action_buttons.js"></script>
 
 <script>
+// Toggle child containers visibility for a step
+function toggleChildContainers(stepEuid) {
+    const list = document.getElementById('container-list-' + stepEuid);
+    const btn = document.querySelector('#containers-' + stepEuid + ' .show-children-btn');
+    if (!list || !btn) return;
+
+    const isExpanded = btn.getAttribute('data-expanded') === 'true';
+    if (isExpanded) {
+        list.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show All';
+        btn.setAttribute('data-expanded', 'false');
+    } else {
+        list.style.display = 'block';
+        btn.innerHTML = '<i class="fas fa-chevron-up"></i> Hide';
+        btn.setAttribute('data-expanded', 'true');
+    }
+}
+
+// Expand all child containers
+function expandAllContainers() {
+    document.querySelectorAll('.child-container-list').forEach(function(list) {
+        list.style.display = 'block';
+    });
+    document.querySelectorAll('.show-children-btn').forEach(function(btn) {
+        btn.innerHTML = '<i class="fas fa-chevron-up"></i> Hide';
+        btn.setAttribute('data-expanded', 'true');
+    });
+}
+
+// Collapse all child containers
+function collapseAllContainers() {
+    document.querySelectorAll('.child-container-list').forEach(function(list) {
+        list.style.display = 'none';
+    });
+    document.querySelectorAll('.show-children-btn').forEach(function(btn) {
+        btn.innerHTML = '<i class="fas fa-chevron-down"></i> Show All';
+        btn.setAttribute('data-expanded', 'false');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Expand All
+    // Expand All - expands all accordions AND all child containers
     document.getElementById('expandAllBtn').addEventListener('click', function() {
+        // Expand all accordions
         document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
             new bootstrap.Collapse(collapse, { show: true });
         });
@@ -394,10 +646,13 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.classList.remove('collapsed');
             btn.setAttribute('aria-expanded', 'true');
         });
+        // Expand all child containers
+        expandAllContainers();
     });
 
-    // Collapse All
+    // Collapse All - collapses all accordions AND all child containers
     document.getElementById('collapseAllBtn').addEventListener('click', function() {
+        // Collapse all accordions
         document.querySelectorAll('.accordion-collapse.show').forEach(function(collapse) {
             new bootstrap.Collapse(collapse, { hide: true });
         });
@@ -405,11 +660,13 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.classList.add('collapsed');
             btn.setAttribute('aria-expanded', 'false');
         });
+        // Collapse all child containers
+        collapseAllContainers();
     });
 
     // Track accordion state changes
     document.querySelectorAll('.accordion-button').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
             const euid = this.getAttribute('data-euid');
             const isExpanded = this.getAttribute('aria-expanded') === 'true';
             const state = isExpanded ? 'closed' : 'open'; // Will toggle

@@ -232,9 +232,9 @@ class BatchProcessor:
                         instance_class = getattr(self._Base.classes, 'generic_instance')
                         instance = instance_class(
                             name=name,
-                            btype=template.btype,
-                            b_sub_type=template.b_sub_type,
-                            super_type=template.super_type,
+                            type=template.type,
+                            subtype=template.subtype,
+                            category=template.category,
                             json_addl=json_addl,
                             parent_template_uuid=template.uuid,
                         )

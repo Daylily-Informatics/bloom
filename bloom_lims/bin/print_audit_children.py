@@ -4,8 +4,8 @@ def get_children_history(euid, session, bloom_core):
         return {
             "EUID": orm_instance.euid,
             "Created Date": orm_instance.created_dt,
-            "Type": orm_instance.btype,
-            "Subtype": orm_instance.b_sub_type,
+            "Type": orm_instance.type,
+            "Subtype": orm_instance.subtype,
             "Version": orm_instance.version,
         }
 

@@ -199,13 +199,13 @@ class BloomObj:
         cname = template.polymorphic_discriminator.replace("_template", "_instance")
         parent_instance = getattr(self.Base.classes, f"{cname}")(
             name=template.name,
-            btype=template.btype,
-            b_sub_type=template.b_sub_type,
+            type=template.type,
+            subtype=template.subtype,
             version=template.version,
             json_addl=template.json_addl,
             template_uuid=template.uuid,
             bstatus=template.bstatus,
-            super_type=template.super_type,
+            category=template.category,
             is_singleton=is_singleton,
             polymorphic_discriminator=template.polymorphic_discriminator.replace(
                 "_template", "_instance"
@@ -249,7 +249,7 @@ class BloomObj:
             bloom_lims/config/{container,content,workflow,workflow_step,equipment,data,test_requisition,...}/*.json
             These are only used to seed the templates... the idea is to allow users to add subtypes as they see fit. (TBD)
 
-            ~ TABLE_template/{btype}/{b_sub_type}/{version} is the pattern used to for the template table name
+            ~ TABLE_template/{type}/{subtype}/{version} is the pattern used to for the template table name
         This is a recursive function that will only create one level of children instances.
 
         Args:
@@ -290,20 +290,20 @@ class BloomObj:
             ret_ds[group]["group_name"] = action_imports[group]["group_name"]
             for ai in action_imports[group]["actions"]:
                 sl = ai.lstrip("/").split("/")
-                super_type = None if sl[0] == "*" else sl[0]
-                btype = None if sl[1] == "*" else sl[1]
-                b_sub_type = None if sl[2] == "*" else sl[2]
+                category = None if sl[0] == "*" else sl[0]
+                type_name = None if sl[1] == "*" else sl[1]
+                subtype = None if sl[2] == "*" else sl[2]
                 version = None if sl[3] == "*" else sl[3]
 
                 res = self.query_template_by_component_v2(
-                    super_type, btype, b_sub_type, version
+                    category, type_name, subtype, version
                 )
                 print(ai)
                 if len(res) == 0:
                     raise Exception(f"Action import {ai} not found in database")
 
                 for r in res:
-                    action_key = f"{r.super_type}/{r.btype}/{r.b_sub_type}/{r.version}"
+                    action_key = f"{r.category}/{r.type}/{r.subtype}/{r.version}"
 
                     ret_ds[group]["actions"][action_key] = r.json_addl[
                         "action_template"
@@ -339,15 +339,15 @@ class BloomObj:
                         parent_instance_uuid=parent_instance.uuid,
                         child_instance_uuid=child_instance.uuid,
                         name=f"{parent_instance.name} :: {child_instance.name}",
-                        btype=parent_instance.btype,
-                        b_sub_type=parent_instance.b_sub_type,
+                        type=parent_instance.type,
+                        subtype=parent_instance.subtype,
                         version=parent_instance.version,
                         json_addl=parent_instance.json_addl,
                         bstatus=parent_instance.bstatus,
-                        super_type=parent_instance.super_type,
+                        category=parent_instance.category,
                         parent_type=parent_instance.polymorphic_discriminator,
                         child_type=child_instance.polymorphic_discriminator,
-                        polymorphic_discriminator=f"{parent_instance.super_type}_instance_lineage",
+                        polymorphic_discriminator=f"{parent_instance.category}_instance_lineage",
                     )
                     self.session.add(lineage_record)
                     ##self.session.flush()
@@ -364,14 +364,14 @@ class BloomObj:
             parent_instance_uuid=parent_instance.uuid,
             child_instance_uuid=child_instance.uuid,
             name=f"{parent_instance.name} :: {child_instance.name}",
-            btype=parent_instance.btype,
-            b_sub_type=parent_instance.b_sub_type,
+            type=parent_instance.type,
+            subtype=parent_instance.subtype,
             version=parent_instance.version,
             json_addl=parent_instance.json_addl,
             bstatus=parent_instance.bstatus,
-            super_type="generic",
-            parent_type=f"{parent_instance.super_type}:{parent_instance.btype}:{parent_instance.b_sub_type}:{parent_instance.version}",
-            child_type=f"{child_instance.super_type}:{child_instance.btype}:{child_instance.b_sub_type}:{child_instance.version}",
+            category="generic",
+            parent_type=f"{parent_instance.category}:{parent_instance.type}:{parent_instance.subtype}:{parent_instance.version}",
+            child_type=f"{child_instance.category}:{child_instance.type}:{child_instance.subtype}:{child_instance.version}",
             polymorphic_discriminator=f"generic_instance_lineage",
             relationship_type=relationship_type,
         )
@@ -388,9 +388,9 @@ class BloomObj:
 
     def _create_child_instance(self, layout_str, layout_ds):
         (
-            super_type,
-            btype,
-            b_sub_type,
+            category,
+            type_name,
+            subtype,
             version,
             defaults,
         ) = self._parse_layout_string(layout_str)
@@ -407,7 +407,7 @@ class BloomObj:
             version = "1.0"
 
         template = self.query_template_by_component_v2(
-            super_type, btype, b_sub_type, version
+            category, type_name, subtype, version
         )[0]
 
         new_instance = self.create_instance(template.euid)
@@ -420,16 +420,16 @@ class BloomObj:
 
     def _parse_layout_string(self, layout_str):
         parts = layout_str.split("/")
-        table_name = parts[0]  # table name now called 'super_type'
-        btype = parts[1] if len(parts) > 1 else "*"
-        b_sub_type = parts[2] if len(parts) > 2 else "*"
+        category = parts[0]  # table name now called 'category'
+        type_name = parts[1] if len(parts) > 1 else "*"
+        subtype = parts[2] if len(parts) > 2 else "*"
         version = (
             parts[3] if len(parts) > 3 else "*"
         )  # Assuming the version is always the third part
         defaults = (
             parts[4] if len(parts) > 4 else ""
         )  # Assuming the defaults is always the fourth part
-        return table_name, btype, b_sub_type, version, defaults
+        return category, type_name, subtype, version, defaults
 
     # json additional information validators
     def validate_object_vs_pattern(self, obj, pattern):
@@ -453,7 +453,7 @@ class BloomObj:
             .replace("'", "")
         )
 
-        obj_type_info = f"{classn}/{obj.btype}/{obj.b_sub_type}/{obj.version}"
+        obj_type_info = f"{classn}/{obj.type}/{obj.subtype}/{obj.version}"
 
         # Check if the object matches the pattern
         compiled_pattern = re.compile(pattern)
@@ -577,20 +577,20 @@ class BloomObj:
     # This is the mechanism for finding the database object(s) which match the template reference pattern
     # V2... why?
     def query_instance_by_component_v2(
-        self, super_type=None, btype=None, b_sub_type=None, version=None
+        self, category=None, type=None, subtype=None, version=None
     ):
         query = self.session.query(self.Base.classes.generic_instance)
 
         # Apply filters conditionally
-        if super_type is not None:
+        if category is not None:
             query = query.filter(
-                self.Base.classes.generic_instance.super_type == super_type
+                self.Base.classes.generic_instance.category == category
             )
-        if btype is not None:
-            query = query.filter(self.Base.classes.generic_instance.btype == btype)
-        if b_sub_type is not None:
+        if type is not None:
+            query = query.filter(self.Base.classes.generic_instance.type == type)
+        if subtype is not None:
             query = query.filter(
-                self.Base.classes.generic_instance.b_sub_type == b_sub_type
+                self.Base.classes.generic_instance.subtype == subtype
             )
         if version is not None:
             query = query.filter(self.Base.classes.generic_instance.version == version)
@@ -601,11 +601,11 @@ class BloomObj:
 
         # Execute the query
         return query.all()
-    
-    
+
+
     # should abstract to not assume properties key
-    def get_unique_property_values(self, property_key, super_type=None, btype=None, b_sub_type=None, version=None):
-               
+    def get_unique_property_values(self, property_key, category=None, type=None, subtype=None, version=None):
+
         json_path = property_key.split("->")
 
         # Start building the query with the base table
@@ -614,12 +614,12 @@ class BloomObj:
         )
 
         # Add filters based on the provided arguments
-        if super_type:
-            query = query.filter(self.Base.classes.generic_instance.super_type == super_type)
-        if btype:
-            query = query.filter(self.Base.classes.generic_instance.btype == btype)
-        if b_sub_type:
-            query = query.filter(self.Base.classes.generic_instance.b_sub_type == b_sub_type)
+        if category:
+            query = query.filter(self.Base.classes.generic_instance.category == category)
+        if type:
+            query = query.filter(self.Base.classes.generic_instance.type == type)
+        if subtype:
+            query = query.filter(self.Base.classes.generic_instance.subtype == subtype)
         if version:
             query = query.filter(self.Base.classes.generic_instance.version == version)
 
@@ -646,21 +646,21 @@ class BloomObj:
 
 
     def query_template_by_component_v2(
-        self, super_type=None, btype=None, b_sub_type=None, version=None
+        self, category=None, type=None, subtype=None, version=None
     ):
         query = self.session.query(self.Base.classes.generic_template)
 
         # Apply filters conditionally
-        if super_type is not None:
+        if category is not None:
             query = query.filter(
-                self.Base.classes.generic_template.super_type == super_type
+                self.Base.classes.generic_template.category == category
             )
-        if btype is not None:
-            query = query.filter(self.Base.classes.generic_template.btype == btype)
-            
-        if b_sub_type is not None:
+        if type is not None:
+            query = query.filter(self.Base.classes.generic_template.type == type)
+
+        if subtype is not None:
             query = query.filter(
-                self.Base.classes.generic_template.b_sub_type == b_sub_type
+                self.Base.classes.generic_template.subtype == subtype
             )
         if version is not None:
             query = query.filter(self.Base.classes.generic_template.version == version)
@@ -684,9 +684,9 @@ class BloomObj:
                 al.changed_at,
                 COALESCE(gt.name, gi.name, gil.name) AS name,
                 COALESCE(gt.polymorphic_discriminator, gi.polymorphic_discriminator, gil.polymorphic_discriminator) AS polymorphic_discriminator,
-                COALESCE(gt.category, gi.category, gil.category) AS super_type,
-                COALESCE(gt.type, gi.type, gil.type) AS btype,
-                COALESCE(gt.subtype, gi.subtype, gil.subtype) AS b_sub_type,
+                COALESCE(gt.category, gi.category, gil.category) AS category,
+                COALESCE(gt.type, gi.type, gil.type) AS type,
+                COALESCE(gt.subtype, gi.subtype, gil.subtype) AS subtype,
                 COALESCE(gt.bstatus, gi.bstatus, gil.bstatus) AS status,
                 al.old_value,
                 al.new_value
@@ -885,17 +885,16 @@ class BloomObj:
             Query result containing node and edge data
         """
         # SQL query with parameterized placeholders for security
-        # Note: TapDB uses 'type' instead of 'btype', 'category' instead of 'super_type',
-        # 'subtype' instead of 'b_sub_type'. We alias them back to BLOOM names for compatibility.
+        # Note: Uses TapDB column names (type, category, subtype) directly
         query = text(
             """WITH RECURSIVE graph_data AS (
                 SELECT
                     gi.euid,
                     gi.uuid,
                     gi.name,
-                    gi.type AS btype,
-                    gi.category AS super_type,
-                    gi.subtype AS b_sub_type,
+                    gi.type,
+                    gi.category,
+                    gi.subtype,
                     gi.version,
                     0 AS depth,
                     NULL::text AS lineage_euid,
@@ -913,9 +912,9 @@ class BloomObj:
                     gi.euid,
                     gi.uuid,
                     gi.name,
-                    gi.type AS btype,
-                    gi.category AS super_type,
-                    gi.subtype AS b_sub_type,
+                    gi.type,
+                    gi.category,
+                    gi.subtype,
                     gi.version,
                     gd.depth + 1,
                     gil.euid AS lineage_euid,
@@ -948,10 +947,10 @@ class BloomObj:
         return result
 
     def create_instance_by_template_components(
-        self, super_type, btype, b_sub_type, version
+        self, category, type, subtype, version
     ):
         return self.create_instances(
-            self.query_template_by_component_v2(super_type, btype, b_sub_type, version)[
+            self.query_template_by_component_v2(category, type, subtype, version)[
                 0
             ].euid
         )
@@ -1133,12 +1132,12 @@ class BloomObj:
     def ret_plate_wells_dict(self, plate):
         plate_wells = {}
         for lin in plate.parent_of_lineages:
-            if lin.child_instance.btype == "well":
+            if lin.child_instance.type == "well":
 
                 well = lin.child_instance
                 content_arr = []
                 for c in well.parent_of_lineages:
-                    if c.child_instance.super_type == "content":
+                    if c.child_instance.category == "content":
                         content_arr.append(c.child_instance)
                 content = None
                 if len(content_arr) == 0:
@@ -1205,7 +1204,7 @@ class BloomObj:
         # For all plates being stamped into the destination, link all source plate wells to the destination plate wells, and the contensts of source wells to destination wells.
         # Further, if a dest well is empty, create a new content instance for it and link appropriately.
         for dest_well in dest_plate.parent_of_lineages:
-            if dest_well.child_instance.btype == "well":
+            if dest_well.child_instance.type == "well":
                 well_name = dest_well.child_instance.json_addl["cont_address"]["name"]
                 for spod in source_plates_well_digested:
                     if well_name in spod:
@@ -1214,7 +1213,7 @@ class BloomObj:
                         )
                         if spod[well_name][1] != None:
                             for dwc in dest_well.child_instance.parent_of_lineages:
-                                if dwc.child_instance.super_type == "content":
+                                if dwc.child_instance.category == "content":
                                     self.create_generic_instance_lineage_by_euids(
                                         spod[well_name][1].euid, dwc.child_instance.euid
                                     )
@@ -1246,7 +1245,7 @@ class BloomObj:
 
         # EXTRAORDINARILY SLOPPY.  I AM IN A REAL RUSH FOR FEATURES THO :-/
         destination_q = ""
-        (super_type, btype, b_sub_type, version) = (
+        (category, type_name, subtype, version) = (
             action_ds["captured_data"]["q_selection"].lstrip("/").rstrip("/").split("/")
         )
 
@@ -1267,8 +1266,8 @@ class BloomObj:
             if q.is_deleted:
                 continue
             if (
-                q.child_instance.btype == btype
-                and q.child_instance.b_sub_type == b_sub_type
+                q.child_instance.type == type_name
+                and q.child_instance.subtype == subtype
             ):
                 destination_q = q.child_instance
                 break
@@ -1292,7 +1291,7 @@ class BloomObj:
         #'workflow_step_to_attach_as_child': {'workflow_step/queue/all-purpose/1.0/': {'json_addl': {'properties': {'name': 'hey user, SET THIS NAME ',
 
         active_workset_q_wfs = ""
-        (super_type, btype, b_sub_type, version) = (
+        (category, type_name, subtype, version) = (
             list(action_ds["workflow_step_to_attach_as_child"].keys())[0]
             .lstrip("/")
             .rstrip("/")
@@ -1300,8 +1299,8 @@ class BloomObj:
         )
         for pwf_child_lin in wf.parent_of_lineages:
             if (
-                pwf_child_lin.child_instance.btype == btype
-                and pwf_child_lin.child_instance.b_sub_type == b_sub_type
+                pwf_child_lin.child_instance.type == type_name
+                and pwf_child_lin.child_instance.subtype == subtype
             ):
                 active_workset_q_wfs = pwf_child_lin.child_instance
                 break
@@ -1395,7 +1394,7 @@ class BloomObj:
         alt_a = (
             action_ds.get("alt_a", "")
             if not PGLOBAL
-            else f"{bobj.b_sub_type}-{bobj.version}"
+            else f"{bobj.subtype}-{bobj.version}"
         )
         alt_b = (
             action_ds.get("alt_b", "")
@@ -1562,19 +1561,22 @@ class BloomObj:
             .all()
         )
 
-    def check_lineages_for_btype(self, lineages, btype, parent_or_child=None):
+    def check_lineages_for_type(self, lineages, type_name, parent_or_child=None):
         if parent_or_child == "parent":
             for lin in lineages:
-                if lin.parent_instance.btype == btype:
+                if lin.parent_instance.type == type_name:
                     return True
         elif parent_or_child == "child":
             for lin in lineages:
-                if lin.child_instance.btype == btype:
+                if lin.child_instance.type == type_name:
                     return True
         else:
             raise Exception("Must specify parent or child")
 
         return False
+
+    # Backward compatibility alias
+    check_lineages_for_btype = check_lineages_for_type
 
     def get_cost_of_euid_children(self, euid):
         tot_cost = 0
@@ -1658,9 +1660,9 @@ class BloomObj:
         self,
         file_search_criteria,
         search_greedy=True,
-        btype=None,
-        b_sub_type=None,
-        super_type=None,
+        type=None,
+        subtype=None,
+        category=None,
     ):
         query = self.session.query(self.Base.classes.generic_instance)
         
@@ -1753,17 +1755,17 @@ class BloomObj:
             if and_conditions:
                 query = query.filter(and_(*and_conditions))
 
-        if btype is not None:
-            query = query.filter(self.Base.classes.generic_instance.btype == btype)
+        if type is not None:
+            query = query.filter(self.Base.classes.generic_instance.type == type)
 
-        if b_sub_type is not None:
+        if subtype is not None:
             query = query.filter(
-                self.Base.classes.generic_instance.b_sub_type == b_sub_type
+                self.Base.classes.generic_instance.subtype == subtype
             )
 
-        if super_type is not None:
+        if category is not None:
             query = query.filter(
-                self.Base.classes.generic_instance.super_type == super_type
+                self.Base.classes.generic_instance.category == category
             )
 
         logging.info(f"Generated SQL: {str(query.statement)}")
@@ -1775,9 +1777,9 @@ class BloomObj:
         self,
         file_search_criteria,
         search_greedy=True,
-        btype=None,
-        b_sub_type=None,
-        super_type=None,
+        type=None,
+        subtype=None,
+        category=None,
     ):
         query = self.session.query(self.Base.classes.generic_instance)
         
@@ -1852,17 +1854,17 @@ class BloomObj:
             if and_conditions:
                 query = query.filter(and_(*and_conditions))
 
-        if btype is not None:
-            query = query.filter(self.Base.classes.generic_instance.btype == btype)
+        if type is not None:
+            query = query.filter(self.Base.classes.generic_instance.type == type)
 
-        if b_sub_type is not None:
+        if subtype is not None:
             query = query.filter(
-                self.Base.classes.generic_instance.b_sub_type == b_sub_type
+                self.Base.classes.generic_instance.subtype == subtype
             )
 
-        if super_type is not None:
+        if category is not None:
             query = query.filter(
-                self.Base.classes.generic_instance.super_type == super_type
+                self.Base.classes.generic_instance.category == category
             )
 
         logging.info(f"Generated SQL: {str(query.statement)}")

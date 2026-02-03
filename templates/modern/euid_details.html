@@ -8,13 +8,13 @@
     <nav class="breadcrumb">
       <a href="/">Dashboard</a>
       <span class="separator">/</span>
-      <span>{{ obj.btype | capitalize }}</span>
+      <span>{{ obj.type | capitalize }}</span>
       <span class="separator">/</span>
       <span class="current">{{ obj.euid }}</span>
     </nav>
     <h1>
       <span class="badge badge-euid" style="font-size: 1.25rem;">{{ obj.euid }}</span>
-      {{ obj.name | default(obj.b_sub_type) }}
+      {{ obj.name | default(obj.subtype) }}
     </h1>
   </div>
   <div class="page-actions">
@@ -43,16 +43,16 @@
           <div class="detail-value font-mono">{{ obj.euid }}</div>
         </div>
         <div class="detail-item">
-          <div class="detail-label">Super Type</div>
-          <div class="detail-value">{{ obj.super_type }}</div>
+          <div class="detail-label">Category</div>
+          <div class="detail-value">{{ obj.category }}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Type</div>
-          <div class="detail-value">{{ obj.btype }}</div>
+          <div class="detail-value">{{ obj.type }}</div>
         </div>
         <div class="detail-item">
-          <div class="detail-label">Sub Type</div>
-          <div class="detail-value">{{ obj.b_sub_type }}</div>
+          <div class="detail-label">Subtype</div>
+          <div class="detail-value">{{ obj.subtype }}</div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Version</div>
@@ -115,7 +115,7 @@
         <a href="/dindex2?globalStartNodeEUID={{ obj.euid }}" class="btn btn-primary btn-block">
           <i class="fas fa-project-diagram"></i> View Graph
         </a>
-        {% if obj.btype == 'workflow' %}
+        {% if obj.type == 'workflow' %}
         <a href="/workflow_details?workflow_euid={{ obj.euid }}" class="btn btn-outline btn-block">
           <i class="fas fa-stream"></i> View Workflow
         </a>
@@ -188,10 +188,10 @@
                 {% endif %}
               </td>
               <td><a href="/euid_details?euid={{ lineage.parent_instance.euid }}" class="link-euid">{{ lineage.parent_instance.euid }}</a></td>
-              <td>{{ lineage.parent_instance.btype }}</td>
-              <td>{{ lineage.parent_instance.b_sub_type }}</td>
+              <td>{{ lineage.parent_instance.type }}</td>
+              <td>{{ lineage.parent_instance.subtype }}</td>
               <td>{{ lineage.parent_instance.version }}</td>
-              <td>{{ lineage.relationship_type | default(lineage.btype) }}</td>
+              <td>{{ lineage.relationship_type | default(lineage.type) }}</td>
               <td><a href="/euid_details?euid={{ lineage.euid }}" class="link-euid-secondary">{{ lineage.euid }}</a></td>
             </tr>
             {% endfor %}
@@ -229,10 +229,10 @@
                 {% endif %}
               </td>
               <td><a href="/euid_details?euid={{ lineage.child_instance.euid }}" class="link-euid">{{ lineage.child_instance.euid }}</a></td>
-              <td>{{ lineage.child_instance.btype }}</td>
-              <td>{{ lineage.child_instance.b_sub_type }}</td>
+              <td>{{ lineage.child_instance.type }}</td>
+              <td>{{ lineage.child_instance.subtype }}</td>
               <td>{{ lineage.child_instance.version }}</td>
-              <td>{{ lineage.relationship_type | default(lineage.btype) }}</td>
+              <td>{{ lineage.relationship_type | default(lineage.type) }}</td>
               <td><a href="/euid_details?euid={{ lineage.euid }}" class="link-euid-secondary">{{ lineage.euid }}</a></td>
             </tr>
             {% endfor %}
@@ -409,7 +409,7 @@
     </button>
   </div>
   <div class="card-body">
-    <pre class="json-display" id="json-display">{{ obj.json_addl | tojson(indent=2) }}</pre>
+    <pre class="json-display" id="json-display">{{ obj.json_addl | tojson }}</pre>
   </div>
 </div>
 {% endif %}
@@ -604,6 +604,19 @@ document.querySelectorAll('.collapsible-btn').forEach(function(btn) {
       targetEl.style.display = 'none';
     }
   });
+});
+
+// Format JSON on page load
+document.addEventListener('DOMContentLoaded', function() {
+  var jsonEl = document.getElementById('json-display');
+  if (jsonEl) {
+    try {
+      var jsonData = JSON.parse(jsonEl.textContent);
+      jsonEl.textContent = JSON.stringify(jsonData, null, 2);
+    } catch (e) {
+      // JSON is already formatted or invalid, leave as-is
+    }
+  }
 });
 
 // Toggle full JSON view

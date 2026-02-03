@@ -153,9 +153,9 @@ def validate_json_addl(value: Any, field_name: str = "json_addl") -> bool:
     return True
 
 
-def validate_btype(value: Any, field_name: str = "btype") -> bool:
+def validate_type(value: Any, field_name: str = "type") -> bool:
     """
-    Validate btype field.
+    Validate type field.
 
     Args:
         value: Value to validate
@@ -168,15 +168,19 @@ def validate_btype(value: Any, field_name: str = "btype") -> bool:
         ValidationError: If validation fails
     """
     if value is None:
-        raise ValidationError(field_name, value, "btype cannot be None")
+        raise ValidationError(field_name, value, "type cannot be None")
 
     if not isinstance(value, str):
-        raise ValidationError(field_name, value, f"btype must be a string, got {type(value).__name__}")
+        raise ValidationError(field_name, value, f"type must be a string, got {type(value).__name__}")
 
     if not value:
-        raise ValidationError(field_name, value, "btype cannot be empty")
+        raise ValidationError(field_name, value, "type cannot be empty")
 
     return True
+
+
+# Backward compatibility alias
+validate_btype = validate_type
 
 
 def validate_not_empty(value: Any, field_name: str = "value") -> bool:

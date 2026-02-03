@@ -355,7 +355,7 @@ async function loadTypes() {
     grid.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
 
     try {
-        const resp = await fetch(`/api/v1/object-creation/types?super_type=${state.superType}`);
+        const resp = await fetch(`/api/v1/object-creation/types?category=${state.superType}`);
         const data = await resp.json();
 
         if (data.types && data.types.length > 0) {
@@ -387,7 +387,7 @@ async function loadSubTypes() {
     list.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
 
     try {
-        const resp = await fetch(`/api/v1/object-creation/sub-types?super_type=${state.superType}&btype=${state.type}`);
+        const resp = await fetch(`/api/v1/object-creation/sub-types?category=${state.superType}&type=${state.type}`);
         const data = await resp.json();
 
         if (data.sub_types && data.sub_types.length > 0) {
@@ -425,13 +425,13 @@ async function loadTemplate() {
     info.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading template...</div>';
 
     try {
-        const resp = await fetch(`/api/v1/object-creation/template?super_type=${state.superType}&btype=${state.type}&b_sub_type=${state.subType}&version=${state.version}`);
+        const resp = await fetch(`/api/v1/object-creation/template?category=${state.superType}&type=${state.type}&subtype=${state.subType}&version=${state.version}`);
         const data = await resp.json();
         state.template = data;
 
         info.innerHTML = `
             <div class="alert alert-info">
-                <strong>Template:</strong> ${data.b_sub_type} (v${data.version})<br>
+                <strong>Template:</strong> ${data.subtype} (v${data.version})<br>
                 <strong>Description:</strong> ${data.description || 'No description'}
             </div>
         `;
@@ -471,9 +471,9 @@ async function createObject() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                super_type: state.superType,
-                btype: state.type,
-                b_sub_type: state.subType,
+                category: state.superType,
+                type: state.type,
+                subtype: state.subType,
                 version: state.version,
                 name: name || null,
                 properties: properties

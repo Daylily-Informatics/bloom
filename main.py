@@ -2578,13 +2578,13 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     f_template = f_templates[0]
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
     ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
-    ui_form_fields_query = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file", version=None)
+    ui_form_fields_query = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", category="file", type_name="file", version=None)
 
     
     fset_template = fset_templates[0]
     ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
     ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
-    ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
+    ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", category="file", type_name="file_set", version=None)
 
 
     # Use modern template
@@ -3095,7 +3095,7 @@ async def search_files(
         fset_template = fset_templates[0]
         ui_form_properties_fset = fset_template.json_addl.get("ui_form_properties", [])
         ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
-        ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
+        ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", category="file", type_name="file_set", version=None)
 
         content = templates.get_template("legacy/search_results.html").render(
             request=request,
@@ -3463,7 +3463,7 @@ def generate_form_fields(template_data: Dict) -> List[FormField]:
 
 
 
-def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict,  form_type: str = 'create',  bobject=None, super_type: str = None, btype: str = None, b_type: str = None, b_sub_type: str = None, version: str = None  ) -> List[FormField]:
+def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_properties: Dict,  form_type: str = 'create',  bobject=None, category: str = None, type_name: str = None, subtype: str = None, version: str = None  ) -> List[FormField]:
     form_fields = []
 
     for prop in ui_form_properties:
@@ -3492,7 +3492,7 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
                         required=required
                     ))
             else:
-                unique_values = sorted(bobject.get_unique_property_values(property_key, super_type=super_type, btype=btype, b_sub_type=b_sub_type, version=version))
+                unique_values = sorted(bobject.get_unique_property_values(property_key, category=category, type=type_name, subtype=subtype, version=version))
                 if '' not in unique_values:
                     unique_values.insert(0, '')
         

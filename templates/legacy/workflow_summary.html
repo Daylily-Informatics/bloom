@@ -93,7 +93,7 @@
                     <!-- Renamed column -->
                 </tr>
                 {% for workflow in workflows %}
-                    <tr class="workflow-row {{ workflow.btype }}">
+                    <tr class="workflow-row {{ workflow.type }}">
                         <td>
                             <button onclick="location.href='/euid_details?euid={{ workflow.euid }}'">{{ workflow.euid }}</button>
                         </td>
@@ -101,7 +101,7 @@
                         <td>{{ workflow.created_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }}</td>
                         <td>{{ workflow.modified_dt.strftime("%Y-%m-%d %H:%M:%S").split('.')[0] }}</td>
                         <td>{{ workflow.bstatus }}</td>
-                        <td>{{ workflow.btype }}</td>
+                        <td>{{ workflow.type }}</td>
                         <td>{{ workflow.is_deleted }}</td>
                         <td>
                             <button onclick="location.href='/workflow_details?workflow_euid={{ workflow.euid }}'">work</button>

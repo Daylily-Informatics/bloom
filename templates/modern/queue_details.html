@@ -91,7 +91,7 @@
             <td><input type="checkbox" class="item-checkbox" value="{{ item.euid }}"></td>
             <td class="text-center">{{ loop.index }}</td>
             <td><a href="/euid_details?euid={{ item.euid }}" class="badge badge-euid">{{ item.euid }}</a></td>
-            <td>{{ item.b_sub_type | default('-') }}</td>
+            <td>{{ item.subtype | default('-') }}</td>
             <td>
               <span class="badge badge-{% if item.status == 'complete' %}success{% elif item.status == 'processing' %}warning{% elif item.status == 'error' %}error{% else %}info{% endif %}">
                 {{ item.status | default('pending') }}

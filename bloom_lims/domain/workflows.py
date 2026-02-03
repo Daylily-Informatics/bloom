@@ -36,7 +36,7 @@ class BloomWorkflow(BloomObj):
 
         for lineage in wfobj.parent_of_lineages:
             child_instance = lineage.child_instance
-            if child_instance.super_type == "workflow_step":
+            if child_instance.category == "workflow_step":
                 workflow_steps.append(child_instance)
         workflow_steps.sort(key=sort_key)
         wfobj.workflow_steps_sorted = workflow_steps
@@ -63,7 +63,7 @@ class BloomWorkflow(BloomObj):
 
         for lineage in wfobj.parent_of_lineages:
             child_instance = lineage.child_instance
-            if child_instance.super_type == "workflow_step":
+            if child_instance.category == "workflow_step":
                 workflow_steps.append(child_instance)
         workflow_steps.sort(key=sort_key)
         wfobj.workflow_steps_sorted = workflow_steps
@@ -249,12 +249,12 @@ class BloomWorkflowStep(BloomObj):
         in_plt = self.get_by_euid(action_ds["captured_data"]["plate_euid"])
         wells_ds = {}
         for w in in_plt.parent_of_lineages:
-            if w.child_instance.btype == "well":
+            if w.child_instance.type == "well":
                 wells_ds[w.child_instance.json_addl["cont_address"]["name"]] = [
                     w.child_instance
                 ]
                 for wsl in w.child_instance.parent_of_lineages:
-                    if wsl.child_instance.super_type in [
+                    if wsl.child_instance.category in [
                         "content",
                         "sample",
                         "control",
@@ -318,7 +318,7 @@ class BloomWorkflowStep(BloomObj):
         # Think this through more... I should move to more explicit inheritance from checks?
         self.create_generic_instance_lineage_by_euids(child_wfs.euid, child_data.euid)
         for ch in wfs.parent_of_lineages:
-            if ch.child_instance.btype == "plate":
+            if ch.child_instance.type == "plate":
                 self.create_generic_instance_lineage_by_euids(
                     ch.child_instance.euid, child_data.euid
                 )
@@ -341,25 +341,25 @@ class BloomWorkflowStep(BloomObj):
             cxo = self.get_by_euid(cx)
             child_specimens = []
             for mx in cxo.parent_of_lineages:
-                if mx.child_instance.btype == "specimen":
+                if mx.child_instance.type == "specimen":
                     cx_ds[cx] = mx.child_instance
 
-        super_type = "content"
-        btype = "sample"
-        b_sub_type = "blood-plasma"
+        category = "content"
+        type_name = "sample"
+        subtype = "blood-plasma"
         version = "1.0"
         results = self.query_template_by_component_v2(
-            super_type, btype, b_sub_type, version
+            category, type_name, subtype, version
         )
 
         gdna_template = results[0]
 
-        cx_super_type = "container"
-        cx_btype = "tube"
-        cx_b_sub_type = "tube-generic-10ml"
+        cx_category = "container"
+        cx_type = "tube"
+        cx_subtype = "tube-generic-10ml"
         cx_version = "1.0"
         cx_results = self.query_template_by_component_v2(
-            cx_super_type, cx_btype, cx_b_sub_type, cx_version
+            cx_category, cx_type, cx_subtype, cx_version
         )
 
         cx_tube_template = cx_results[0]
@@ -367,7 +367,7 @@ class BloomWorkflowStep(BloomObj):
         parent_wf = wfs.child_of_lineages[0].parent_instance
 
         active_workset_q_wfs = ""
-        (super_type, btype, b_sub_type, version) = (
+        (category, type_name, subtype, version) = (
             list(action_ds["attach_under_root_workflow_queue"].keys())[0]
             .lstrip("/")
             .rstrip("/")
@@ -375,8 +375,8 @@ class BloomWorkflowStep(BloomObj):
         )
         for pwf_child_lin in parent_wf.parent_of_lineages:
             if (
-                pwf_child_lin.child_instance.btype == btype
-                and pwf_child_lin.child_instance.b_sub_type == b_sub_type
+                pwf_child_lin.child_instance.type == type_name
+                and pwf_child_lin.child_instance.subtype == subtype
             ):
                 active_workset_q_wfs = pwf_child_lin.child_instance
                 break
@@ -453,15 +453,15 @@ class BloomWorkflowStep(BloomObj):
                 continue
             cxo = self.get_by_euid(cx)
             for mx in cxo.parent_of_lineages:
-                if mx.child_instance.btype == "sample":
+                if mx.child_instance.type == "sample":
                     cx_ds[cx] = mx.child_instance
 
-        super_type = "container"
-        btype = "plate"
-        b_sub_type = "fixed-plate-24"
+        category = "container"
+        type_name = "plate"
+        subtype = "fixed-plate-24"
         version = "1.0"
         results = self.query_template_by_component_v2(
-            super_type, btype, b_sub_type, version
+            category, type_name, subtype, version
         )
 
         plt_template = results[0]
@@ -473,13 +473,13 @@ class BloomWorkflowStep(BloomObj):
         for c in containers:
             if len(c) == 0:
                 continue
-            super_type = "content"
-            btype = "sample"
-            b_sub_type = "gdna"
+            category = "content"
+            type_name = "sample"
+            subtype = "gdna"
             version = "1.0"
 
             results = self.query_template_by_component_v2(
-                super_type, btype, b_sub_type, version
+                category, type_name, subtype, version
             )
 
             sample_template = results[0]
@@ -512,16 +512,16 @@ class BloomWorkflowStep(BloomObj):
     def do_action_add_container_to_assay_q(self, obj_euid, action_ds):
         # This action should be coming to us from a TRI ... kind of breaking my model... how to deal with this?
 
-        super_type = action_ds["captured_data"]["assay_selection"].split("/")[0]
-        btype = action_ds["captured_data"]["assay_selection"].split("/")[1]
-        b_sub_type = action_ds["captured_data"]["assay_selection"].split("/")[2]
+        category = action_ds["captured_data"]["assay_selection"].split("/")[0]
+        type_name = action_ds["captured_data"]["assay_selection"].split("/")[1]
+        subtype = action_ds["captured_data"]["assay_selection"].split("/")[2]
         version = action_ds["captured_data"]["assay_selection"].split("/")[3]
 
         cont_euid = action_ds["captured_data"]["Container EUID"]
 
         try:
             cx = self.get_by_euid(cont_euid)
-            if not self.check_lineages_for_btype(
+            if not self.check_lineages_for_type(
                 cx.child_of_lineages, "clinical", parent_or_child="parent"
             ):
                 raise Exception(
@@ -534,18 +534,18 @@ class BloomWorkflowStep(BloomObj):
             raise e
 
         results = self.query_instance_by_component_v2(
-            super_type, btype, b_sub_type, version
+            category, type_name, subtype, version
         )
 
         if len(results) != 1:
             self.logger.exception(
-                f"Could not find SINGLE assay instance for {super_type}/{btype}/{b_sub_type}/{version}"
+                f"Could not find SINGLE assay instance for {category}/{type_name}/{subtype}/{version}"
             )
             self.logger.exception(
-                f"Could not find SINGLE assay instance for {super_type}/{btype}/{b_sub_type}/{version}"
+                f"Could not find SINGLE assay instance for {category}/{type_name}/{subtype}/{version}"
             )
             self.logger.exception(
-                f"Could not find SINGLE assay instance for {super_type}/{btype}/{b_sub_type}/{version}"
+                f"Could not find SINGLE assay instance for {category}/{type_name}/{subtype}/{version}"
             )
 
         # Weak. using step number as a proxy for the ready step.
@@ -598,7 +598,7 @@ class BloomWorkflowStep(BloomObj):
         parent_cont = ""
         parent_conts_n = 0
         for i in wfs.parent_of_lineages:
-            if i.child_instance.super_type == "container":
+            if i.child_instance.category == "container":
                 parent_cont = i.child_instance
                 parent_conts_n += 1
         if parent_conts_n != 1:
@@ -673,7 +673,7 @@ class BloomWorkflowStep(BloomObj):
         prior_cont_euid = ""
         prior_cont_euid_n = 0
         for i in wfs.parent_of_lineages:
-            if i.child_instance.btype == "tube":
+            if i.child_instance.type == "tube":
                 prior_cont_euid = i.child_instance.euid
                 prior_cont_euid_n += 1
         if prior_cont_euid_n != 1:

@@ -92,32 +92,32 @@
         <ul>
     Assay Queues<ul>
         {% for queue in assay.parent_of_lineages %}
-        <button class="accordion">   
-            {% if queue.child_instance.b_sub_type == 'plasma-isolation-queue-available' %}
-            
+        <button class="accordion">
+            {% if queue.child_instance.subtype == 'plasma-isolation-queue-available' %}
+
             <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( available:  {{ ay_stats.get(assay.euid,{}).get('avail','na') }} ) </p>
-           
-            
-            {% elif queue.child_instance.b_sub_type == 'all-purpose' %}
+
+
+            {% elif queue.child_instance.subtype == 'all-purpose' %}
             <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( in progress:  {{ ay_stats.get(assay.euid,{}).get('inprog','na') }} ) </p>
 
-            {% elif queue.child_instance.b_sub_type == 'plasma-isolation-queue-removed' %}
+            {% elif queue.child_instance.subtype == 'plasma-isolation-queue-removed' %}
             <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( complete:  {{ ay_stats.get(assay.euid,{}).get('complete','na') }} ) </p>
-            
-            {% elif queue.child_instance.b_sub_type == 'plasma-isolation-queue-exception' %}
+
+            {% elif queue.child_instance.subtype == 'plasma-isolation-queue-exception' %}
             <p> <a href=/euid_details?euid={{ queue.child_instance.euid }}>{{ queue.child_instance.euid }}</a> {{ queue.child_instance.json_addl.get('properties',{}).get('name','na') }} ( exception:  {{ ay_stats.get(assay.euid,{}).get('exception','na') }} ) </p>
 
             {% endif %}
         </button>
         <div class="panel">
-            {% if queue.child_instance.b_sub_type == 'plasma-isolation-queue-available' %}
+            {% if queue.child_instance.subtype == 'plasma-isolation-queue-available' %}
 
                 <ul>
                     <h3>
                 <a target=pq href=workflow_details?workflow_euid={{ queue.child_instance.euid }}>Process Queue</a>
                     </h3></ul>
 
-            {% elif queue.child_instance.btype == 'queue' %}
+            {% elif queue.child_instance.type == 'queue' %}
                 <ul>Worksets
                     <ul>
                         {% if queue.child_instance.parent_of_lineages.all()|length == 0 %}

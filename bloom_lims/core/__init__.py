@@ -83,7 +83,8 @@ from .validation import (
     validate_euid,
     validate_uuid,
     validate_json_addl,
-    validate_btype,
+    validate_type,
+    validate_btype,  # Backward compatibility alias
     validate_not_empty,
     validate_positive_int,
     validated,
@@ -213,7 +214,8 @@ __all__ = [
     "validate_euid",
     "validate_uuid",
     "validate_json_addl",
-    "validate_btype",
+    "validate_type",
+    "validate_btype",  # Backward compatibility alias
     "validate_not_empty",
     "validate_positive_int",
     "validated",

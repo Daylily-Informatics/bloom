@@ -90,16 +90,16 @@
             <td>{{ object.polymorphic_discriminator }}</td>
         </tr>
         <tr>
-            <td>Super Type</td>
-            <td>{{ object.super_type }}</td>
+            <td>Category</td>
+            <td>{{ object.category }}</td>
         </tr>
         <tr>
             <td>Type</td>
-            <td>{{ object.btype }}</td>
+            <td>{{ object.type }}</td>
         </tr>
         <tr>
-            <td>Sub Type</td>
-            <td>{{ object.b_sub_type }}</td>
+            <td>Subtype</td>
+            <td>{{ object.subtype }}</td>
         </tr>
         <tr>
             <td>Version</td>
@@ -187,16 +187,16 @@
                             <span style="color: green;" title="Active">✓ Active</span>
                         {% endif %}
                     </td>
-                    <td>{{ lineage.parent_instance.super_type }}</td>
+                    <td>{{ lineage.parent_instance.category }}</td>
 
-                    <td>{{ lineage.parent_instance.btype }}</td>
-                    <td>{{ lineage.parent_instance.b_sub_type }}</td>
+                    <td>{{ lineage.parent_instance.type }}</td>
+                    <td>{{ lineage.parent_instance.subtype }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
                     <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
 
-                    <td>{{ lineage.child_instance.super_type }}</td>
-                    <td>{{ lineage.child_instance.btype }}</td>
-                    <td>{{ lineage.child_instance.b_sub_type }}</td>
+                    <td>{{ lineage.child_instance.category }}</td>
+                    <td>{{ lineage.child_instance.type }}</td>
+                    <td>{{ lineage.child_instance.subtype }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
                     <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
 
@@ -236,16 +236,16 @@
                             <span style="color: green;" title="Active">✓ Active</span>
                         {% endif %}
                     </td>
-                    <td>{{ lineage.parent_instance.super_type }}</td>
+                    <td>{{ lineage.parent_instance.category }}</td>
 
-                    <td>{{ lineage.parent_instance.btype }}</td>
-                    <td>{{ lineage.parent_instance.b_sub_type }}</td>
+                    <td>{{ lineage.parent_instance.type }}</td>
+                    <td>{{ lineage.parent_instance.subtype }}</td>
                     <td>{{ lineage.parent_instance.version }}</td>
                     <td><a href="euid_details?euid={{ lineage.parent_instance.euid }}">{{ lineage.parent_instance.euid }}</a></td>
 
-                    <td>{{ lineage.child_instance.super_type }}</td>
-                    <td>{{ lineage.child_instance.btype }}</td>
-                    <td>{{ lineage.child_instance.b_sub_type }}</td>
+                    <td>{{ lineage.child_instance.category }}</td>
+                    <td>{{ lineage.child_instance.type }}</td>
+                    <td>{{ lineage.child_instance.subtype }}</td>
                     <td>{{ lineage.child_instance.version }}</td>
                     <td><a href="euid_details?euid={{ lineage.child_instance.euid }}">{{ lineage.child_instance.euid }}</a></td>
 

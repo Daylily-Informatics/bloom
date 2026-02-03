@@ -13,21 +13,21 @@ from .base import BloomBaseSchema, TimestampMixin, validate_euid
 
 class ContentBaseSchema(BloomBaseSchema):
     """Base schema for content objects (samples, specimens, reagents, etc.)."""
-    
+
     name: str = Field(..., min_length=1, max_length=500, description="Content name")
     content_type: str = Field(..., description="Content type (sample, specimen, reagent, control, pool)")
-    b_sub_type: Optional[str] = Field(None, description="Content subtype")
+    subtype: Optional[str] = Field(None, description="Content subtype")
     barcode: Optional[str] = Field(None, max_length=100, description="Physical barcode")
-    
+
     # Scientific properties
     volume_ul: Optional[float] = Field(None, ge=0, description="Volume in microliters")
     concentration_ng_ul: Optional[float] = Field(None, ge=0, description="Concentration in ng/µL")
     mass_ng: Optional[float] = Field(None, ge=0, description="Mass in nanograms")
-    
+
     # Metadata
     json_addl: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata")
-    
-    @field_validator("content_type", "b_sub_type", mode="before")
+
+    @field_validator("content_type", "subtype", mode="before")
     @classmethod
     def normalize_types(cls, v):
         """Normalize type fields to lowercase."""

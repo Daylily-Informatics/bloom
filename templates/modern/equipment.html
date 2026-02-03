@@ -28,10 +28,10 @@
       </div>
       <div class="card-body">
         <div class="equipment-icon">
-          <i class="fas fa-{% if item.b_sub_type == 'sequencer' %}wave-square{% elif item.b_sub_type == 'centrifuge' %}sync{% elif item.b_sub_type == 'thermocycler' %}temperature-high{% else %}microscope{% endif %}"></i>
+          <i class="fas fa-{% if item.subtype == 'sequencer' %}wave-square{% elif item.subtype == 'centrifuge' %}sync{% elif item.subtype == 'thermocycler' %}temperature-high{% else %}microscope{% endif %}"></i>
         </div>
-        <h4 class="equipment-name">{{ item.name | default(item.b_sub_type) }}</h4>
-        <p class="text-muted text-sm">{{ item.b_sub_type }}</p>
+        <h4 class="equipment-name">{{ item.name | default(item.subtype) }}</h4>
+        <p class="text-muted text-sm">{{ item.subtype }}</p>
         {% if item.json_addl.get('location') %}
         <div class="equipment-meta">
           <i class="fas fa-map-marker-alt"></i> {{ item.json_addl.get('location') }}

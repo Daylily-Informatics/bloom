@@ -121,31 +121,31 @@ class CachedRepository:
     
     def query_templates_by_type(
         self,
-        super_type: Optional[str] = None,
-        btype: Optional[str] = None,
-        b_sub_type: Optional[str] = None,
+        category: Optional[str] = None,
+        type: Optional[str] = None,
+        subtype: Optional[str] = None,
         version: Optional[str] = None,
     ) -> List[Any]:
         """Query templates by type components with caching."""
         # Build cache key from query parameters
-        cache_key = f"{self._settings.cache.query_prefix}tmpl:{super_type}:{btype}:{b_sub_type}:{version}"
-        
+        cache_key = f"{self._settings.cache.query_prefix}tmpl:{category}:{type}:{subtype}:{version}"
+
         cached_value = self._cache.get(cache_key)
         if cached_value is not None:
             logger.debug(f"Cache hit for template query")
             return cached_value
-        
+
         query = self._session.query(self._Base.classes.generic_template)
-        
-        if super_type is not None:
+
+        if category is not None:
             query = query.filter(
-                self._Base.classes.generic_template.super_type == super_type
+                self._Base.classes.generic_template.category == category
             )
-        if btype is not None:
-            query = query.filter(self._Base.classes.generic_template.btype == btype)
-        if b_sub_type is not None:
+        if type is not None:
+            query = query.filter(self._Base.classes.generic_template.type == type)
+        if subtype is not None:
             query = query.filter(
-                self._Base.classes.generic_template.b_sub_type == b_sub_type
+                self._Base.classes.generic_template.subtype == subtype
             )
         if version is not None:
             query = query.filter(self._Base.classes.generic_template.version == version)

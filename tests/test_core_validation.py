@@ -225,13 +225,13 @@ class TestTemplateDefinition:
         """Test creating a template definition."""
         td = TemplateDefinition(
             file_path=Path("/test/template.json"),
-            super_type="workflow",
-            btype="dna_extraction",
-            b_sub_type="dna_extraction_v1",
+            category="workflow",
+            type="dna_extraction",
+            subtype="dna_extraction_v1",
             version="1.0",
             data={"singleton": "0"},
         )
-        assert td.super_type == "workflow"
+        assert td.category == "workflow"
         assert td.version == "1.0"
         assert td.action_imports == {}
 

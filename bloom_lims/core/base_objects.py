@@ -110,44 +110,44 @@ def create_bloom_obj(
     base,
     obj_class: str,
     name: str,
-    btype: str,
-    b_sub_type: Optional[str] = None,
+    type: str,
+    subtype: Optional[str] = None,
     json_addl: Optional[Dict[str, Any]] = None,
     template_uuid: Optional[str] = None,
     **kwargs,
 ) -> Any:
     """
     Create a new BloomObj instance.
-    
+
     Args:
         session: SQLAlchemy session
         base: SQLAlchemy automap base
         obj_class: Object class name (e.g., 'content_instance')
         name: Object name
-        btype: Object type
-        b_sub_type: Object subtype (optional)
+        type: Object type
+        subtype: Object subtype (optional)
         json_addl: Additional JSON data (optional)
         template_uuid: Template UUID if creating from template (optional)
         **kwargs: Additional fields to set
-        
+
     Returns:
         The created object
-        
+
     Raises:
         ValidationError: If required fields are missing
         DatabaseError: If database operation fails
     """
-    logger.debug(f"Creating {obj_class} with name={name}, btype={btype}")
-    
-    if not name or not btype:
-        raise ValidationError("name and btype are required", field="name,btype")
-    
+    logger.debug(f"Creating {obj_class} with name={name}, type={type}")
+
+    if not name or not type:
+        raise ValidationError("name and type are required", field="name,type")
+
     try:
         obj_class_ref = getattr(base.classes, obj_class)
         obj = obj_class_ref(
             name=name,
-            btype=btype,
-            b_sub_type=b_sub_type,
+            type=type,
+            subtype=subtype,
             json_addl=json_addl or {},
             template_uuid=template_uuid,
             **kwargs,
@@ -247,9 +247,9 @@ def get_bloom_obj_by_uuid(
 def query_objects(
     session: Session,
     base,
-    btype: Optional[str] = None,
-    b_sub_type: Optional[str] = None,
-    super_type: Optional[str] = None,
+    type: Optional[str] = None,
+    subtype: Optional[str] = None,
+    category: Optional[str] = None,
     status: Optional[str] = None,
     include_deleted: bool = False,
     limit: int = 100,
@@ -261,9 +261,9 @@ def query_objects(
     Args:
         session: SQLAlchemy session
         base: SQLAlchemy automap base
-        btype: Filter by type
-        b_sub_type: Filter by subtype
-        super_type: Filter by super type
+        type: Filter by type
+        subtype: Filter by subtype
+        category: Filter by category
         status: Filter by status
         include_deleted: Include soft-deleted objects
         limit: Maximum results
@@ -272,19 +272,19 @@ def query_objects(
     Returns:
         List of matching objects
     """
-    logger.debug(f"Querying objects: btype={btype}, b_sub_type={b_sub_type}")
+    logger.debug(f"Querying objects: type={type}, subtype={subtype}")
 
     try:
         query = session.query(base.classes.generic_instance)
 
-        if btype:
-            query = query.filter(base.classes.generic_instance.btype == btype.lower())
+        if type:
+            query = query.filter(base.classes.generic_instance.type == type.lower())
 
-        if b_sub_type:
-            query = query.filter(base.classes.generic_instance.b_sub_type == b_sub_type.lower())
+        if subtype:
+            query = query.filter(base.classes.generic_instance.subtype == subtype.lower())
 
-        if super_type:
-            query = query.filter(base.classes.generic_instance.super_type == super_type)
+        if category:
+            query = query.filter(base.classes.generic_instance.category == category)
 
         if status:
             query = query.filter(base.classes.generic_instance.bstatus == status)

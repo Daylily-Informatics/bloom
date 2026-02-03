@@ -86,10 +86,10 @@
           <tr>
             <td><a href="/euid_details?euid={{ result.euid }}" class="badge badge-euid">{{ result.euid }}</a></td>
             <td>
-              <span class="badge badge-{% if result.super_type == 'workflow' %}info{% elif result.super_type == 'container' %}success{% elif result.super_type == 'content' %}warning{% elif result.super_type == 'equipment' %}error{% else %}info{% endif %}">
-                {{ result.super_type }}
+              <span class="badge badge-{% if result.category == 'workflow' %}info{% elif result.category == 'container' %}success{% elif result.category == 'content' %}warning{% elif result.category == 'equipment' %}error{% else %}info{% endif %}">
+                {{ result.category }}
               </span>
-              <span class="text-muted text-sm">{{ result.btype }}/{{ result.b_sub_type }}</span>
+              <span class="text-muted text-sm">{{ result.type }}/{{ result.subtype }}</span>
             </td>
             <td>{{ result.name | default('-') }}</td>
             <td><span class="badge badge-{% if result.bstatus == 'active' %}success{% elif result.bstatus == 'complete' %}info{% else %}warning{% endif %}">{{ result.bstatus }}</span></td>

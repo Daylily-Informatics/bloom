@@ -109,10 +109,10 @@ def create_workflow(
         
         workflow = workflow_class(
             name=name,
-            btype=workflow_type.lower(),
+            type=workflow_type.lower(),
             json_addl=json_addl or {},
             bstatus='pending',
-            super_type='workflow',
+            category='workflow',
             polymorphic_discriminator='workflow_instance',
             **kwargs,
         )
@@ -171,13 +171,13 @@ def create_workflow_step(
 
         step = step_class(
             name=name,
-            btype=step_type.lower(),
+            type=step_type.lower(),
             json_addl={
                 'step_number': step_number,
                 **(json_addl or {}),
             },
             bstatus='pending',
-            super_type='workflow_step',
+            category='workflow_step',
             polymorphic_discriminator='workflow_step_instance',
             parent_workflow_uuid=workflow.uuid,
             **kwargs,

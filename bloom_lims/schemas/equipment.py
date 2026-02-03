@@ -36,27 +36,27 @@ class CalibrationRecordSchema(BloomBaseSchema):
 
 class EquipmentBaseSchema(BloomBaseSchema):
     """Base schema for equipment objects."""
-    
+
     name: str = Field(..., min_length=1, max_length=500, description="Equipment name")
     equipment_type: str = Field(..., description="Equipment type (sequencer, liquid_handler, etc.)")
-    b_sub_type: Optional[str] = Field(None, description="Equipment subtype")
-    
+    subtype: Optional[str] = Field(None, description="Equipment subtype")
+
     # Identification
     serial_number: Optional[str] = Field(None, max_length=100, description="Serial number")
     model: Optional[str] = Field(None, max_length=200, description="Model name/number")
     manufacturer: Optional[str] = Field(None, max_length=200, description="Manufacturer")
-    
+
     # Location
     location: Optional[str] = Field(None, max_length=200, description="Physical location")
     room: Optional[str] = Field(None, max_length=100, description="Room/area")
-    
+
     # Status
     operational_status: str = Field(default="operational", description="Operational status")
-    
+
     # Metadata
     json_addl: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional data")
-    
-    @field_validator("equipment_type", "b_sub_type", mode="before")
+
+    @field_validator("equipment_type", "subtype", mode="before")
     @classmethod
     def normalize_types(cls, v):
         if v:

@@ -52,7 +52,7 @@ class ContainerPositionSchema(BloomBaseSchema):
     euid: Optional[str] = Field(None, description="EUID of object at this position")
     uuid: Optional[str] = Field(None, description="UUID of object at this position")
     name: Optional[str] = Field(None, description="Name of object at this position")
-    btype: Optional[str] = Field(None, description="Type of object at this position")
+    type: Optional[str] = Field(None, description="Type of object at this position")
     placed_at: Optional[datetime] = Field(None, description="When object was placed")
     
     @field_validator("position", mode="before")
@@ -66,10 +66,10 @@ class ContainerPositionSchema(BloomBaseSchema):
 
 class ContainerBaseSchema(BloomBaseSchema):
     """Base schema for container objects."""
-    
+
     name: str = Field(..., min_length=1, max_length=500, description="Container name")
     container_type: str = Field(..., description="Container type (plate, rack, box, etc.)")
-    b_sub_type: Optional[str] = Field(None, description="Container subtype (e.g., 96-well, 384-well)")
+    subtype: Optional[str] = Field(None, description="Container subtype (e.g., 96-well, 384-well)")
     barcode: Optional[str] = Field(None, max_length=100, description="Physical barcode")
     layout: Optional[ContainerLayoutSchema] = Field(None, description="Container layout")
     json_addl: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata")
