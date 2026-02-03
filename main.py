@@ -42,7 +42,16 @@ _init_aws_profile()
 from IPython import embed
 import nest_asyncio
 
-nest_asyncio.apply()
+# Only apply nest_asyncio if not running under uvloop (which uvicorn uses by default)
+try:
+    import asyncio
+    loop = asyncio.get_event_loop()
+    # Check if uvloop is being used - if so, skip nest_asyncio
+    if "uvloop" not in type(loop).__module__:
+        nest_asyncio.apply()
+except RuntimeError:
+    # No event loop running yet, safe to apply
+    nest_asyncio.apply()
 
 import difflib
 
