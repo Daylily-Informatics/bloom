@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - BLOOM LIMS</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/static/modern/css/bloom_modern.css">
+  
+  <style>
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: var(--color-gray-900);
+      padding: var(--spacing-lg);
+    }
+    
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+    }
+    
+    .login-header {
+      text-align: center;
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .login-logo {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--color-highlight);
+      margin-bottom: var(--spacing-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .login-logo i {
+      color: var(--color-bloom-template);
+    }
+    
+    .login-subtitle {
+      color: var(--color-gray-400);
+      font-size: 0.875rem;
+    }
+    
+    .login-card {
+      background: var(--color-gray-800);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-xl);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .login-btn {
+      width: 100%;
+      padding: var(--spacing-md);
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .login-divider {
+      display: flex;
+      align-items: center;
+      margin: var(--spacing-lg) 0;
+      color: var(--color-gray-500);
+      font-size: 0.875rem;
+    }
+    
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-gray-600);
+    }
+    
+    .login-divider span {
+      padding: 0 var(--spacing-md);
+    }
+    
+    .login-info {
+      margin-top: var(--spacing-lg);
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--color-gray-400);
+    }
+    
+    .login-footer {
+      margin-top: var(--spacing-xl);
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--color-gray-500);
+    }
+    
+    .login-footer a {
+      color: var(--color-gray-400);
+    }
+    
+    .login-footer a:hover {
+      color: var(--color-highlight);
+    }
+  </style>
+</head>
+<body>
+  <div class="bloom-stripe-bar"></div>
+  
+  <div class="login-page">
+    <div class="login-container">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="fas fa-spa"></i>
+          BLOOM
+        </div>
+        <p class="login-subtitle">Laboratory Information Management System</p>
+      </div>
+      
+      <div class="login-card">
+        <a href="{{ cognito_login_url }}" class="btn btn-primary login-btn">
+          <i class="fas fa-sign-in-alt"></i>
+          Sign in with AWS Cognito
+        </a>
+        
+        <div class="login-info">
+          <p><i class="fas fa-lock"></i> Secure authentication via AWS Cognito</p>
+        </div>
+      </div>
+      
+      <div class="login-footer">
+        <p>BLOOM LIMS v{{ version | default('1.0.0') }}</p>
+        <p><a href="/legacy/login">Legacy Login</a></p>
+      </div>
+    </div>
+  </div>
+  
+  <script src="/static/modern/js/bloom_modern.js"></script>
+</body>
+</html>
+

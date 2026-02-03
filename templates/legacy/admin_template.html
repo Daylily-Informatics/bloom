@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    {% set page_title = 'Admin Edit Template Controlled Properties' %}
+    <title>{{ page_title }}</title>
+    
+    {% set bloom_mod = 'admin' %}
+
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" > </script>
+
+
+    <style>
+        textarea {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    
+    {% include 'legacy/bloom_header.html' %}
+
+
+    <h1>Admin Template for EUID: <a href=/euid_details?euid={{ euid }}>{{ euid }}</a></h1>
+    <h2> DEMO CAPABILITY, NOT PROPERLY REVERSIONING PRESENTLY </h2>
+
+
+    <form method="post">
+        <label for="controlled_properties">Controlled Properties JSON:</label><br>
+        <textarea name="controlled_properties">{{ controlled_properties }}</textarea><br><br>
+        <input type="hidden" name="euid" value="{{ euid }}">
+        <input type="submit" value="Save">
+    </form>
+</body>
+</html>

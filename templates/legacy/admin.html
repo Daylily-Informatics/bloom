@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    {% set page_title = 'Admin' %}
+    <title>{{ page_title }}</title>
+
+    {% set bloom_mod = 'admin' %}
+
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/legacy/mobile.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" > </script>
+    <script src="/static/legacy/mobile.js" defer></script>
+
+    <style> 
+    </style>
+    <script>
+        $(document).ready(function() {
+            // Assuming 'dest_section.sec' is a variable available in your templating engine
+            {% if dest_section.section == 'skin' %}
+                $('#skin-css-section').addClass('flash-effect');
+            {% elif  dest_section.section == 'zebra' %}
+                $('#zebra-css-section').addClass('flash-effect');
+            {% elif  dest_section.section == 'template' %}
+                $('#template-css-section').addClass('flash-effect');
+            {% endif %}
+        });
+    </script>
+</head>
+<body>
+
+    {% include 'legacy/bloom_header.html' %}
+    <br>
+<ul>
+    <h2>Dewey Administration</h2>
+    <ul><small><a href="/user_home">user preferences may be edited here</a></small></ul>
+        <hr>
+        <ul>
+
+    <h2><a href="/bloom_schema_report"> Schema Summary Statistics</a> </h2>
+
+    
+
+    <h2> <a href="/object_templates_summary">All Instantiable Templates Loaded Into The Database (not for operational use)</h2></a>
+
+
+    <h2>
+        <a style="display: none;" href="/workflow_summary">Original Raw Workflow View (not intended for operational use)</a>
+    </h2>
+
+
+     <script>    
+    function updatePreferenceAndReload(key, value) {
+        console.log('Updating', key, 'to', value);
+        $.ajax({
+            url: '/update_preference',
+            type: 'POST',
+            contentType: 'application/json', // Specify the content type
+            data: JSON.stringify({ key: key, value: value }), // Convert the data to a JSON string
+            success: function(response) {
+                console.log('Update successful:', response);
+                window.location.reload();
+            },
+            error: function(xhr, status, error) {
+                console.error('Update failed:', status, error);
+            }
+        });
+        
+    }
+    </script>
+</body>

@@ -167,8 +167,9 @@ app.add_middleware(
 
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
 
-# Add rate limiting middleware for API endpoints
-app.add_middleware(RateLimitMiddleware)
+# Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
+if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":
+    app.add_middleware(RateLimitMiddleware)
 
 # Include API v1 router
 app.include_router(api_v1_router)
@@ -263,7 +264,7 @@ def proc_udat(email):
     with open(UDAT_FILE, "r+") as f:
         user_data = json.load(f)
         if email not in user_data:
-            user_data[email] = {"style_css": "static/skins/bloom.css", "email": email}
+            user_data[email] = {"style_css": "/static/legacy/skins/bloom.css", "email": email}
 
             f.seek(0)
             json.dump(user_data, f, indent=4)
@@ -423,6 +424,145 @@ async def auth_exception_handler(_request: Request, _exc: RequireAuthException):
 #
 
 
+# =============================================================================
+# MODERN UI ROUTES
+# =============================================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def modern_dashboard(request: Request, _=Depends(require_auth)):
+    """Modern dashboard - main entry point for the application."""
+    user_data = request.session.get("user_data", {})
+    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+
+    # Gather dashboard statistics
+    try:
+        assays_total = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False, is_singleton=True
+        ).count()
+
+        workflows_active = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False
+        ).count()
+
+        equipment_total = bobdb.session.query(bobdb.Base.classes.equipment_instance).filter_by(
+            is_deleted=False
+        ).count()
+
+        reagents_total = bobdb.session.query(bobdb.Base.classes.content_instance).filter(
+            bobdb.Base.classes.content_instance.is_deleted == False,
+            bobdb.Base.classes.content_instance.b_sub_type.like('%reagent%')
+        ).count()
+    except Exception:
+        assays_total = workflows_active = equipment_total = reagents_total = 0
+
+    stats = {
+        "assays_total": assays_total,
+        "workflows_active": workflows_active,
+        "equipment_total": equipment_total,
+        "reagents_total": reagents_total,
+    }
+
+    # Get recent items
+    try:
+        recent_assays = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False, is_singleton=True
+        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
+
+        active_workflows = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
+            is_deleted=False
+        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
+    except Exception:
+        recent_assays = []
+        active_workflows = []
+
+    template = templates.get_template("modern/dashboard.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "stats": stats,
+        "recent_assays": recent_assays,
+        "active_workflows": active_workflows,
+    }
+
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
+@app.get("/search", response_class=HTMLResponse)
+async def modern_search(
+    request: Request,
+    q: str = Query("", description="Search query"),
+    types: str = Query("", description="Comma-separated types to search"),
+    _=Depends(require_auth),
+):
+    """Modern search page with multi-type search and export."""
+    user_data = request.session.get("user_data", {})
+    results = []
+
+    if q:
+        bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+        from sqlalchemy import or_
+        from sqlalchemy.sql import cast
+        from sqlalchemy.types import String
+
+        gi = bobdb.Base.classes.generic_instance
+        query_obj = bobdb.session.query(gi)
+        query_obj = query_obj.filter(gi.is_deleted == False)
+
+        # Filter by super_types if specified
+        if types:
+            type_list = [t.strip().lower() for t in types.split(",") if t.strip()]
+            if type_list:
+                query_obj = query_obj.filter(gi.super_type.in_(type_list))
+
+        # Search across multiple fields
+        search_pattern = f"%{q}%"
+        query_obj = query_obj.filter(
+            or_(
+                gi.euid.ilike(search_pattern),
+                gi.name.ilike(search_pattern),
+                gi.btype.ilike(search_pattern),
+                gi.b_sub_type.ilike(search_pattern),
+                cast(gi.json_addl, String).ilike(search_pattern),
+            )
+        )
+
+        # Order by created_dt descending, limit to 500
+        query_obj = query_obj.order_by(gi.created_dt.desc()).limit(500)
+        results = query_obj.all()
+
+    template = templates.get_template("modern/search_results.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "query": q,
+        "types": types,
+        "results": results,
+    }
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
+@app.get("/bulk_create_containers", response_class=HTMLResponse)
+async def modern_bulk_create_containers(request: Request, _=Depends(require_auth)):
+    """Modern bulk container creation page."""
+    user_data = request.session.get("user_data", {})
+    template = templates.get_template("modern/bulk_create_containers.html")
+    context = {"request": request, "udat": user_data}
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
+# =============================================================================
+# LEGACY UI ROUTES (preserved for backward compatibility)
+# =============================================================================
+
+@app.get("/legacy/", response_class=HTMLResponse)
+async def legacy_index(request: Request):
+    """Legacy index page."""
+    template = templates.get_template("legacy/index.html")
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+    context = {"request": request, "style": style, "udat": user_data}
+    return HTMLResponse(content=template.render(context), status_code=200)
+
 
 @app.get("/index2", response_class=HTMLResponse)
 async def index2(request: Request, _=Depends(require_auth)):
@@ -430,25 +570,9 @@ async def index2(request: Request, _=Depends(require_auth)):
     count += 1
     request.session["count"] = count
 
-    template = templates.get_template("index2.html")
+    template = templates.get_template("legacy/index2.html")
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-    context = {"request": request, "style": style, "udat": user_data}
-
-    return HTMLResponse(content=template.render(context), status_code=200)
-
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root(
-    request: Request,
-):
-    count = request.session.get("count", 0)
-    count += 1
-    request.session["count"] = count
-
-    template = templates.get_template("index.html")
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     context = {"request": request, "style": style, "udat": user_data}
 
     return HTMLResponse(content=template.render(context), status_code=200)
@@ -456,9 +580,8 @@ async def read_root(
 
 @app.get("/login", include_in_schema=False)
 async def get_login_page(request: Request):
-
+    """Modern login page."""
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
     try:
         cognito = get_cognito_auth()
@@ -466,9 +589,30 @@ async def get_login_page(request: Request):
     except CognitoConfigurationError as exc:
         raise MissingCognitoEnvVarsException(str(exc)) from exc
 
-    # Ensure you have this function defined, and it returns the expected style information
-    template = templates.get_template("login.html")
-    # Pass the 'style' variable in the context
+    # Use modern login template
+    template = templates.get_template("modern/login.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "cognito_login_url": cognito_login_url,
+        "version": "1.0.0",
+    }
+    return HTMLResponse(content=template.render(context))
+
+
+@app.get("/legacy/login", include_in_schema=False)
+async def get_legacy_login_page(request: Request):
+    """Legacy login page."""
+    user_data = request.session.get("user_data", {})
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+
+    try:
+        cognito = get_cognito_auth()
+        cognito_login_url = cognito.config.authorize_url
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
+
+    template = templates.get_template("legacy/login.html")
     context = {
         "request": request,
         "style": style,
@@ -648,9 +792,9 @@ async def lims(request: Request, _=Depends(require_auth)):
     count += 1
     request.session["count"] = count
 
-    template = templates.get_template("lims_main.html")
+    template = templates.get_template("legacy/lims_main.html")
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     context = {"request": request, "style": style, "udat": user_data}
 
     return HTMLResponse(content=template.render(context), status_code=200)
@@ -766,20 +910,20 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
             if ay_dss[i]["tot"] > 0
             else "na"
         )
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    # Get unique assay types for filter dropdown
+    assay_types = list(set(a.json_addl.get("assay_type", "unknown") for a in assays))
 
-    # Rendering the template with the dynamic content
-    content = templates.get_template("assay.html").render(
-        style=style,
-        user_logged_in=True,
-        assays_data=ay_ds,
-        atype=atype,
-        workflow_instances=assays,  # Assuming this is needed based on your template logic
-        ay_stats=ay_dss,  # Assuming this is needed based on your template logic
-        udat=user_data,
-    )
-
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/assays.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "assays": assays,
+        "assay_types": assay_types,
+        "show_type": show_type,
+        "ay_stats": ay_dss,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 @app.get("/calculate_cogs_children")
@@ -817,9 +961,9 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-        content = templates.get_template("search_results.html").render(
+        content = templates.get_template("legacy/search_results.html").render(
             request=request,
             columns=columns,
             table_data=table_data,
@@ -831,8 +975,8 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
     except Exception as e:
         logging.error(f"Error querying files: {e}", exc_info=True)
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("search_error.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/search_error.html").render(
             request=request,
             error=f"An error occurred: {e}",
             style=style,
@@ -878,7 +1022,7 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         bobdb.get_lab_printers(user_data["print_lab"])
 
     csss = []
-    for css in sorted(os.popen("ls -1 static/skins/*css").readlines()):
+    for css in sorted(os.popen("ls -1 static/legacy/skins/*css").readlines()):
         csss.append(css.rstrip())
 
     printer_info = {
@@ -888,23 +1032,21 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "style_css": csss,
     }
     csss = [
-        "static/skins/" + os.path.basename(css) for css in csss
+        "/static/legacy/skins/" + os.path.basename(css) for css in csss
     ]  # Get just the file names
 
     printer_info["style_css"] = csss
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
-    # Rendering the template with the dynamic content
-    content = templates.get_template("admin.html").render(
-        style=style,
-        user_logged_in=True,
-        user_data=user_data,
-        printer_info=printer_info,
-        dest_section=dest_section,
-        udat=request.session["user_data"],
-    )
-
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/admin.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user_data": user_data,
+        "printer_info": printer_info,
+        "dest_section": dest_section,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 # Take a look at this later
@@ -956,20 +1098,22 @@ async def queue_details(
         if not i.is_deleted:
             qm.append(i.child_instance)
     queue_details = queue.sort_by_euid(qm)
-    queue_details = queue_details[(page - 1) * per_page : page * per_page]
+    queue_details_list = queue_details[(page - 1) * per_page : page * per_page]
     pagination = {"next": page + 1, "prev": page - 1, "euid": queue_euid}
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
-    content = templates.get_template("queue_details.html").render(
-        style=style,
-        queue=queue,
-        queue_details=queue_details,
-        pagination=pagination,
-        user_logged_in=user_logged_in,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Prepare queue object with items for modern template
+    queue.items = queue_details_list
+
+    # Use modern template
+    template = templates.get_template("modern/queue_details.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "queue": queue,
+        "pagination": pagination,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 @app.post("/generic_templates")
@@ -1022,16 +1166,17 @@ async def workflow_summary(request: Request, _auth=Depends(require_auth)):
     unique_workflow_types = list(workflow_statistics.keys())
 
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
-    content = templates.get_template("workflow_summary.html").render(
-        style=style,
-        workflows=workflows,
-        workflow_statistics=workflow_statistics,
-        unique_workflow_types=unique_workflow_types,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/workflows.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "workflows": workflows,
+        "workflow_statistics": workflow_statistics,
+        "unique_workflow_types": unique_workflow_types,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 @app.get("/update_object_name", response_class=HTMLResponse)
@@ -1063,15 +1208,16 @@ async def equipment_overview(request: Request, _auth=Depends(require_auth)):
         .all()
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
-    content = templates.get_template("equipment_overview.html").render(
-        style=style,
-        equipment_list=equipment_instances,
-        template_list=equipment_templates,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/equipment.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "equipment": equipment_instances,
+        "templates": equipment_templates,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 async def get_print_labs(_request: Request, _auth=Depends(require_auth)):
@@ -1101,15 +1247,16 @@ async def reagent_overview(request: Request, _auth=Depends(require_auth)):
         .all()
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
-    content = templates.get_template("reagent_overview.html").render(
-        style=style,
-        instance_list=reagent_instances,
-        template_list=reagent_templates,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/reagents.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "reagents": reagent_instances,
+        "templates": reagent_templates,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 @app.get("/control_overview", response_class=HTMLResponse)
@@ -1128,9 +1275,9 @@ async def control_overview(request: Request, _auth=Depends(require_auth)):
         .all()
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("control_overview.html").render(
+    content = templates.get_template("legacy/control_overview.html").render(
         style=style,
         instance_list=control_instances,
         template_list=control_templates,
@@ -1157,8 +1304,8 @@ async def _create_from_template(request: Request, euid: str):
     """Common logic for create_from_template."""
     if euid is None:
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("search_error.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/search_error.html").render(
             request=request,
             error="Missing required 'euid' parameter for template creation",
             style=style,
@@ -1189,9 +1336,9 @@ async def vertical_exp(request: Request, euid=None, _auth=Depends(require_auth))
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     instance = bobdb.get_by_euid(euid)
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("vertical_exp.html").render(
+    content = templates.get_template("legacy/vertical_exp.html").render(
         style=style, instance=instance, udat=request.session["user_data"]
     )
     return HTMLResponse(content=content)
@@ -1214,9 +1361,9 @@ async def plate_carosel(
     related_plates.append(main_plate)
     # Render the template with the main plate and related plates data
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("vertical_exp.html").render(
+    content = templates.get_template("legacy/vertical_exp.html").render(
         style=style,
         main_plate=main_plate,
         related_plates=related_plates,
@@ -1296,15 +1443,16 @@ async def plate_visualization(
         return "Plate not found."
         # Render the template with the plate data
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
 
-    content = templates.get_template("plate_display.html").render(
-        style=style,
-        plate=plate,
-        get_well_color=get_well_color,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/plate_visualization.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "plate": plate,
+        "get_well_color": get_well_color,
+    }
+    return HTMLResponse(content=template.render(context))
 
     # What is the correct path for {style.skin.css}?
 
@@ -1334,9 +1482,9 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     stats_30d = await get_stats(30)
 
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("database_statistics.html").render(
+    content = templates.get_template("legacy/database_statistics.html").render(
         request=request,
         stats_1d=stats_1d,
         stats_7d=stats_7d,
@@ -1395,9 +1543,9 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
         set(t.polymorphic_discriminator for t in generic_templates)
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("object_templates_summary.html").render(
+    content = templates.get_template("legacy/object_templates_summary.html").render(
         request=request,
         generic_templates=generic_templates,
         unique_discriminators=unique_discriminators,
@@ -1458,25 +1606,26 @@ async def euid_details(
         obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""
         audit_logs = bobdb.query_audit_log_by_euid(euid)
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
         # Get subjects for this object
         from bloom_lims.subjecting import list_subjects_for_object
         subjects_for_object = list_subjects_for_object(bobdb, euid)
 
-        content = templates.get_template("euid_details.html").render(
-            request=request,
-            object=obj_dict,
-            jaddl_prop=obj.json_addl.get("properties", {}),
-            jaddl_controlled_prop=obj.json_addl.get("controlled_properties", {}),
-            style=style,
-            relationships=relationship_data,
-            audit_logs=audit_logs,
-            oobj=obj,
-            udat=request.session["user_data"],
-            subjects_for_object=subjects_for_object,
-        )
-        return HTMLResponse(content=content)
+        # Use modern template
+        template = templates.get_template("modern/euid_details.html")
+        context = {
+            "request": request,
+            "obj": obj,
+            "obj_dict": obj_dict,
+            "jaddl_prop": obj.json_addl.get("properties", {}),
+            "jaddl_controlled_prop": obj.json_addl.get("controlled_properties", {}),
+            "relationships": relationship_data,
+            "audit_logs": audit_logs,
+            "udat": user_data,
+            "subjects_for_object": subjects_for_object,
+        }
+        return HTMLResponse(content=template.render(context))
 
     except Exception as e:
         logging.error(f"Error in euid_details for {euid}: {e}", exc_info=True)
@@ -1549,9 +1698,9 @@ async def bloom_schema_report(request: Request, _auth=Depends(require_auth)):
         nrows += int(ii["Total_Instances"])
 
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("bloom_schema_report.html").render(
+    content = templates.get_template("legacy/bloom_schema_report.html").render(
         request=request,
         reports=reports,
         nrows=nrows,
@@ -1614,9 +1763,9 @@ async def workflow_details(
     workflow = bwfdb.get_sorted_euid(workflow_euid)
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("workflow_details.html").render(
+    content = templates.get_template("legacy/workflow_details.html").render(
         request=request,
         workflow=workflow,
         accordion_states=accordion_states,
@@ -1743,7 +1892,7 @@ async def update_obj_json_addl_properties(
 
 @app.get("/dagg", response_class=HTMLResponse)
 async def dagg(request: Request):
-    content = templates.get_template("dag.html").render()
+    content = templates.get_template("legacy/dag.html").render()
     return HTMLResponse(content=content)
 
 
@@ -1759,9 +1908,9 @@ async def dindex2(
         request=request, euid=globalStartNodeEUID, depth=globalFilterLevel
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("dindex2.html").render(
+    content = templates.get_template("legacy/dindex2.html").render(
         request=request,
         style=style,
         globalFilterLevel=globalFilterLevel,
@@ -1804,16 +1953,20 @@ async def get_node_info(request: Request, euid, _auth=Depends(require_auth)):
 async def user_audit_logs(request: Request, username: str, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     results = bobdb.query_user_audit_logs(username)
-    
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-    
-    content = templates.get_template("audit_log_by_user.html").render(
-        results=results, username=username, style=style, udat=user_data, request=request, highlight_json_changes=highlight_json_changes
 
-    )
-    
-    return HTMLResponse(content=content)
+    user_data = request.session.get("user_data", {})
+
+    # Use modern template
+    template = templates.get_template("modern/audit_log.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "entries": results,
+        "username": username,
+        "page": 1,
+        "total_pages": 1,
+    }
+    return HTMLResponse(content=template.render(context))
 
 @app.get("/user_home", response_class=HTMLResponse)
 async def user_home(request: Request):
@@ -1831,7 +1984,7 @@ async def user_home(request: Request):
     skins_directory = "static/skins"
     css_files = [f"{skins_directory}/{file}" for file in os.listdir(skins_directory) if file.endswith(".css")]
 
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     dest_section = request.query_params.get("dest_section", {"section": ""})  # Example value
 
     if "print_lab" in user_data:
@@ -1862,7 +2015,7 @@ async def user_home(request: Request):
         raise MissingCognitoEnvVarsException(str(exc)) from exc
 
     # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
-    content = templates.get_template("user_home.html").render(
+    content = templates.get_template("legacy/user_home.html").render(
         request=request,
         user_data=user_data,
         session_data=session_data,  # Pass session_data to template
@@ -2139,7 +2292,7 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
 
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     upload_group_key = generate_unique_upload_key()
 
     # Fetch template data for dynamic fields    
@@ -2168,7 +2321,7 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
 
 
-    content = templates.get_template("dewey.html").render(
+    content = templates.get_template("legacy/dewey.html").render(
         request=request,
         accordion_states=accordion_states,
         style=style,
@@ -2194,9 +2347,9 @@ async def bulk_create_files(request: Request, _auth=Depends(require_auth)):
 
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("bulk_create_files.html").render(
+    content = templates.get_template("legacy/bulk_create_files.html").render(
         request=request,
         accordion_states=accordion_states,
         style=style,
@@ -2213,9 +2366,9 @@ async def dewey0(request: Request, _auth=Depends(require_auth)):
 
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     upload_group_key = generate_unique_upload_key()
-    content = templates.get_template("dewey.html").render(
+    content = templates.get_template("legacy/dewey.html").render(
         request=request,
         accordion_states=accordion_states,
         style=style,
@@ -2456,8 +2609,8 @@ async def create_file(
 
         # Render the report
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("create_file_report.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/create_file_report.html").render(
             request=request, results=results, style=style, udat=user_data
         )
 
@@ -2474,8 +2627,8 @@ async def create_file(
 
         accordion_states = dict(request.session)
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("dewey.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/dewey.html").render(
             request=request,
             error=f"An error occurred: {e}",
             accordion_states=accordion_states,
@@ -2527,8 +2680,8 @@ async def download_file(
 
         # Render the template with download paths
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("trigger_downloads.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/trigger_downloads.html").render(
             request=request,
             file_download_path=downloaded_file_path,
             metadata_download_path=metadata_yaml_path,
@@ -2543,10 +2696,10 @@ async def download_file(
 
         # Render the error page with a link to delete the offending temp files
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
         offending_file = str(e).split("/tmp/")[-1]
 
-        content = templates.get_template("download_error.html").render(
+        content = templates.get_template("legacy/download_error.html").render(
             request=request,
             error=f"An error occurred: {e}",
             style=style,
@@ -2687,7 +2840,7 @@ async def search_files(
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
         fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
   
         fset_template = fset_templates[0]
@@ -2695,7 +2848,7 @@ async def search_files(
         ui_form_fields_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)
         ui_form_fields_query_fset = generate_ui_form_fields(ui_form_properties_fset, fset_template.json_addl.get("controlled_properties", {}),  bobject=bobdb, form_type="query", super_type="file", btype="file_set", version=None)
 
-        content = templates.get_template("search_results.html").render(
+        content = templates.get_template("legacy/search_results.html").render(
             request=request,
             columns=columns,
             table_data=table_data,
@@ -2711,8 +2864,8 @@ async def search_files(
     except Exception as e:
         logging.error(f"Error searching files: {e}", exc_info=True)
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("search_error.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/search_error.html").render(
             request=request,
             error=f"An error occurred: {e}",
             style=style,
@@ -2896,10 +3049,10 @@ async def search_file_sets(
             table_data.append(row)
 
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
         num_results = len(table_data)
-        content = templates.get_template("file_set_search_results.html").render(
+        content = templates.get_template("legacy/file_set_search_results.html").render(
             request=request,
             table_data=table_data,
             columns=columns,
@@ -2912,8 +3065,8 @@ async def search_file_sets(
     except Exception as e:
         logging.error(f"Error searching file sets: {e}")
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
-        content = templates.get_template("search_error.html").render(
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+        content = templates.get_template("legacy/search_error.html").render(
             request=request,
             error=f"An error occurred: {e}",
             style=style,
@@ -2972,7 +3125,7 @@ async def visual_report(request: Request):
     plots.append(upload_users_img)
 
     # Render the HTML template with the plots
-    template = templates.get_template("visual_report.html")
+    template = templates.get_template("legacy/visual_report.html")
     context = {"request": request, "plots": plots}
 
     return HTMLResponse(content=template.render(context), status_code=200)
@@ -3004,11 +3157,11 @@ async def create_instance_form(request: Request, template_euid: str):
     ui_form_fields = generate_ui_form_fields(ui_form_properties, template_data.get("controlled_properties", {}))
     
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     
     controlled_properties_js = json.dumps(template_data.get("controlled_properties", {}))
     
-    content = templates.get_template("create_instance_form.html").render(
+    content = templates.get_template("legacy/create_instance_form.html").render(
         request=request,
         fields=form_fields,
         ui_fields=ui_form_fields,
@@ -3186,7 +3339,7 @@ async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_au
 
         # Render the HTML template
         user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
         context = {
             "request": request,
             "file_set": file_set,
@@ -3194,7 +3347,7 @@ async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_au
             "style": style,
             "udat": user_data,
         }
-        content = templates.get_template("file_set_urls.html").render(context)
+        content = templates.get_template("legacy/file_set_urls.html").render(context)
         return HTMLResponse(content=content)
 
     except Exception as e:
@@ -3215,9 +3368,9 @@ async def get_admin_template(request: Request, euid: str = Query(...)):
 
     controlled_properties = obj.json_addl.get("controlled_properties", {})
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "static/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     
-    template = templates.get_template("admin_template.html")
+    template = templates.get_template("legacy/admin_template.html")
     context = {
         "request": request,
         "euid": euid,

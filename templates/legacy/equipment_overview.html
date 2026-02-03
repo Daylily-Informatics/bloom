@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+        <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+        <script src="/static/legacy/action_buttons.js"></script>
+
+        {% set page_title = 'Equipment Overview' %}
+        <title>{{ page_title }}</title>
+
+        {% set bloom_mod = 'lims' %}
+
+    </head>
+    <body>
+        {% include 'legacy/bloom_header.html' %}
+
+        <small><a href=dindex2>( graph )</a></small> <small><a href= />( B )</a></small>
+
+        <h1>Create New Equipment</h1>
+        {% if template_list %}
+            <form action="/create_from_template" method="post">
+                <label for="template">Choose a Template:</label>
+                <select name="euid" id="euid">
+                    {% for template in template_list %}<option value="{{ template.euid }}">{{ template.name }}</option>{% endfor %}
+                </select>
+                <input type="submit" value="Create">
+            </form>
+        {% else %}
+            <p>No templates available for creating new equipment.</p>
+        {% endif %}
+
+        <h1>Equipment List</h1>
+        {% if equipment_list %}
+            <ul>
+                {% for equipment in equipment_list %}
+                    <li>
+                        <a href="euid_details?euid={{ equipment.euid }}">{{ equipment.name }}</a>
+                        <!-- Additional equipment details can be added here -->
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No equipment found.</p>
+        {% endif %}
+       
+    </body>
+</html>

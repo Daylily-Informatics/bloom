@@ -20,6 +20,10 @@ from .base import (
     validate_euid,
     TimestampMixin,
     AuditMixin,
+    DashboardStatsSchema,
+    RecentActivityItem,
+    RecentActivitySchema,
+    DashboardResponseSchema,
 )
 from .objects import (
     ObjectBaseSchema,
@@ -110,6 +114,10 @@ __all__ = [
     "validate_euid",
     "TimestampMixin",
     "AuditMixin",
+    "DashboardStatsSchema",
+    "RecentActivityItem",
+    "RecentActivitySchema",
+    "DashboardResponseSchema",
     # Object schemas
     "ObjectBaseSchema",
     "ObjectCreateSchema",

@@ -1,0 +1,94 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Equipment - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Equipment</h1>
+    <p class="text-muted">Laboratory equipment and instruments</p>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/equipment_overview" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Equipment Grid -->
+<div class="grid grid-3" id="equipment-grid">
+  {% if equipment %}
+    {% for item in equipment %}
+    <div class="card equipment-card">
+      <div class="card-header">
+        <span class="badge badge-euid">{{ item.euid }}</span>
+        <span class="badge badge-{% if item.json_addl.get('status') == 'active' %}success{% elif item.json_addl.get('status') == 'maintenance' %}warning{% else %}info{% endif %}">
+          {{ item.json_addl.get('status', 'available') }}
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="equipment-icon">
+          <i class="fas fa-{% if item.b_sub_type == 'sequencer' %}wave-square{% elif item.b_sub_type == 'centrifuge' %}sync{% elif item.b_sub_type == 'thermocycler' %}temperature-high{% else %}microscope{% endif %}"></i>
+        </div>
+        <h4 class="equipment-name">{{ item.name | default(item.b_sub_type) }}</h4>
+        <p class="text-muted text-sm">{{ item.b_sub_type }}</p>
+        {% if item.json_addl.get('location') %}
+        <div class="equipment-meta">
+          <i class="fas fa-map-marker-alt"></i> {{ item.json_addl.get('location') }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-footer">
+        <a href="/euid_details?euid={{ item.euid }}" class="btn btn-outline btn-sm">
+          <i class="fas fa-eye"></i> Details
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state" style="grid-column: 1 / -1;">
+      <div class="empty-state-icon"><i class="fas fa-microscope"></i></div>
+      <p>No equipment found</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.equipment-card .card-body {
+  text-align: center;
+}
+
+.equipment-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-gray-700);
+  border-radius: var(--radius-full);
+  font-size: 1.5rem;
+  color: var(--color-highlight);
+}
+
+.equipment-name {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.equipment-meta {
+  margin-top: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--color-gray-400);
+}
+
+.equipment-card .card-footer {
+  display: flex;
+  justify-content: center;
+}
+</style>
+{% endblock %}
+

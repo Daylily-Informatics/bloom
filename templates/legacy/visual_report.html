@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% set page_title = 'Dewey Reorts' %}
+    <title>{{ page_title }}</title>
+
+    {% set bloom_mod = 'dewey' %}
+
+</head>
+<body>
+    {% include 'legacy/bloom_header.html' %}
+
+    <h1>File Reports (dull)</h1>
+    {% for plot in plots %}
+        <img src="data:image/png;base64,{{ plot }}">
+    {% endfor %}
+</body>
+</html>

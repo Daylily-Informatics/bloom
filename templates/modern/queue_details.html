@@ -1,0 +1,147 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Queue Details - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <nav class="breadcrumb">
+      <a href="/">Dashboard</a>
+      <span class="separator">/</span>
+      <a href="/queues">Queues</a>
+      <span class="separator">/</span>
+      <span class="current">{{ queue.name if queue else 'Queue Details' }}</span>
+    </nav>
+    <h1>
+      <span class="badge badge-euid" style="font-size: 1.25rem;">{{ queue.euid if queue else '' }}</span>
+      {{ queue.name if queue else 'Queue Details' }}
+    </h1>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary" onclick="processQueue()">
+      <i class="fas fa-play"></i> Process Queue
+    </button>
+    <a href="/legacy/queue_details?queue_euid={{ queue.euid if queue else '' }}" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Queue Stats -->
+<div class="grid grid-4 mb-lg">
+  <div class="stat-card">
+    <div class="card-icon info"><i class="fas fa-list"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ queue.items | length if queue and queue.items else 0 }}</div>
+      <div class="stat-label">Total Items</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="card-icon warning"><i class="fas fa-clock"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ pending_count | default(0) }}</div>
+      <div class="stat-label">Pending</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="card-icon"><i class="fas fa-spinner"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ processing_count | default(0) }}</div>
+      <div class="stat-label">Processing</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="card-icon success"><i class="fas fa-check"></i></div>
+    <div class="stat-content">
+      <div class="stat-value">{{ complete_count | default(0) }}</div>
+      <div class="stat-label">Complete</div>
+    </div>
+  </div>
+</div>
+
+<!-- Queue Items Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-stream"></i> Queue Items</h3>
+    <div class="header-actions">
+      <input type="text" class="form-input" placeholder="Search items..." id="search-input" onkeyup="searchItems(this.value)" style="max-width: 200px;">
+      <button class="btn btn-outline btn-sm" onclick="refreshQueue()">
+        <i class="fas fa-sync"></i> Refresh
+      </button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table" id="queue-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
+            <th>Position</th>
+            <th>Item EUID</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Added</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if queue and queue.items %}
+          {% for item in queue.items %}
+          <tr>
+            <td><input type="checkbox" class="item-checkbox" value="{{ item.euid }}"></td>
+            <td class="text-center">{{ loop.index }}</td>
+            <td><a href="/euid_details?euid={{ item.euid }}" class="badge badge-euid">{{ item.euid }}</a></td>
+            <td>{{ item.b_sub_type | default('-') }}</td>
+            <td>
+              <span class="badge badge-{% if item.status == 'complete' %}success{% elif item.status == 'processing' %}warning{% elif item.status == 'error' %}error{% else %}info{% endif %}">
+                {{ item.status | default('pending') }}
+              </span>
+            </td>
+            <td class="text-muted text-sm">{{ item.added_dt.strftime('%Y-%m-%d %H:%M') if item.added_dt else '-' }}</td>
+            <td>
+              <button class="btn btn-outline btn-sm" onclick="removeFromQueue('{{ item.euid }}')" title="Remove">
+                <i class="fas fa-times"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">Queue is empty</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.header-actions { display: flex; gap: var(--spacing-sm); align-items: center; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleSelectAll(el) {
+  document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = el.checked);
+}
+function searchItems(query) {
+  const rows = document.querySelectorAll('#queue-table tbody tr');
+  const q = query.toLowerCase();
+  rows.forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function refreshQueue() { location.reload(); }
+function processQueue() {
+  BloomToast.info('Processing', 'Queue processing started...');
+}
+function removeFromQueue(euid) {
+  BloomToast.warning('Remove', 'Removing ' + euid + ' from queue...');
+}
+</script>
+{% endblock %}
+

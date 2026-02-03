@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+        {% set page_title = 'Database Stats' %}
+        <title>{{ page_title }}</title>
+        
+        {% set bloom_mod = 'admin' %}
+
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+        <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+        <script src="https://cdn.jsdelivr.net/npm/tablesort@5.2.1/dist/tablesort.min.js"></script>
+    </head>
+    <body>
+        {% include 'legacy/bloom_header.html' %}
+
+        <h1>Database Statistics</h1>
+        <h2>Records Created in the Last 1 Day, 7 Days, and 30 Days</h2>
+        <table id="statsTable">
+            <thead>
+                <tr>
+                    <th>b_sub_type</th>
+                    <th>Last 1 Day</th>
+                    <th>Last 7 Days</th>
+                    <th>Last 30 Days</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub_type, count in stats_1d %}
+                    <tr>
+                        <td>{{ sub_type }}</td>
+                        <td>{{ count }}</td>
+                        <td>{{ dict(stats_7d).get(sub_type, 0) }}</td>
+                        <td>{{ dict(stats_30d).get(sub_type, 0) }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            new Tablesort(document.getElementById('statsTable'));
+        });
+        </script>
+    </body>
+</html>

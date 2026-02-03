@@ -1,0 +1,47 @@
+<div class="header-container" style="display: flex; align-items: flex-end;">
+    <h1 style="margin: 0 0px; line-height: 1.2;"><a href="/legacy/index2" >home</a></h1>
+    <span style="margin: 0 5px;"> /// </span>
+    <small style="margin: 0 5px;">
+        {% if bloom_mod == 'admin' %}
+            <a href="/legacy/admin">admin</a>
+        {% elif bloom_mod == 'index' %}
+            <a href="/legacy/dewey">dewey</a>
+        {% elif bloom_mod == 'lims' %}
+            <a href="/legacy/lims">lims</a>
+        {% elif bloom_mod == 'dewey' %}
+            <a href="/legacy/dewey">dewey</a>
+        {% else %}
+                       <a href="/legacy/dewey">dewey</a>
+        {% endif %}
+    </small>
+    <span style="margin: 0 5px;"> /// </span>
+    <small style="margin: 0 5px;">
+        {% if page_title %}
+            {% if page_title == 'Bloom' %}
+
+            {% else %}
+                {{ page_title }}
+            {% endif %}
+        {% else %}
+                <small style="margin: 0 0px;"><a href="/legacy/dindex2" >(g)</a></small>
+        {% endif %}
+    </small>
+    <span style="margin: 0 5px;"> /// </span>
+        <small>
+            hello
+            {% if udat and 'email' in udat %}
+                <a href="/legacy/user_home" style="margin: 0 5px;">
+                {{ udat['email'] }}
+                </a>
+            {% else %}
+                <a href="/login">==> please login <==</a>
+            {% endif %}
+        </small>
+
+    <span style="margin: 0 5px;"> /// </span>
+    <small style="margin: 0 5px;"><a href="/" title="Switch to Modern UI">Modern UI</a></small>
+    <span style="margin: 0 5px;"> /// </span>
+    <small style="margin: 0 5px;"><a href="/logout">logout</a></small>
+</div>
+<hr>
+

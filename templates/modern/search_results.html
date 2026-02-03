@@ -1,0 +1,194 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Search Results - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-search"></i> Search Results</h1>
+    <p class="text-muted">
+      {% if results %}Found {{ results | length }} results for "{{ query }}"{% else %}Enter a search query{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    {% if results %}
+    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('tsv')" title="Export as TSV">
+      <i class="fas fa-file-csv"></i> Download TSV
+    </button>
+    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('json')" title="Export as JSON">
+      <i class="fas fa-file-code"></i> Dump to JSON
+    </button>
+    {% endif %}
+    <a href="/legacy/" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Search Form -->
+<div class="card mb-lg">
+  <div class="card-body">
+    <form action="/search" method="GET" class="search-form" id="searchForm">
+      <div class="form-group mb-md">
+        <label class="form-label">Search Query</label>
+        <input type="text" class="form-input" name="q" id="searchQuery" value="{{ query }}" placeholder="Search by EUID, name, type, or metadata...">
+      </div>
+      <div class="form-group mb-md">
+        <label class="form-label">Object Types</label>
+        <div class="type-checkboxes">
+          {% set selected_types = types.split(',') if types else [] %}
+          <label class="checkbox-label"><input type="checkbox" name="types" value="container" {% if 'container' in selected_types %}checked{% endif %}> Containers</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="content" {% if 'content' in selected_types %}checked{% endif %}> Content</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="workflow" {% if 'workflow' in selected_types %}checked{% endif %}> Workflows</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="equipment" {% if 'equipment' in selected_types %}checked{% endif %}> Equipment</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="file" {% if 'file' in selected_types %}checked{% endif %}> Files</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="file_set" {% if 'file_set' in selected_types %}checked{% endif %}> File Sets</label>
+          <label class="checkbox-label"><input type="checkbox" name="types" value="subject" {% if 'subject' in selected_types %}checked{% endif %}> Subjects</label>
+        </div>
+        <small class="text-muted">Leave all unchecked to search all types</small>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-search"></i> Search
+        </button>
+        <button type="button" class="btn btn-outline" onclick="clearFilters()">
+          <i class="fas fa-times"></i> Clear
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Results -->
+{% if results %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-table"></i> Results</h3>
+    <div class="result-actions">
+      <span class="text-muted text-sm">{{ results | length }} items</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>EUID</th>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr>
+            <td><a href="/euid_details?euid={{ result.euid }}" class="badge badge-euid">{{ result.euid }}</a></td>
+            <td>
+              <span class="badge badge-{% if result.super_type == 'workflow' %}info{% elif result.super_type == 'container' %}success{% elif result.super_type == 'content' %}warning{% elif result.super_type == 'equipment' %}error{% else %}info{% endif %}">
+                {{ result.super_type }}
+              </span>
+              <span class="text-muted text-sm">{{ result.btype }}/{{ result.b_sub_type }}</span>
+            </td>
+            <td>{{ result.name | default('-') }}</td>
+            <td><span class="badge badge-{% if result.bstatus == 'active' %}success{% elif result.bstatus == 'complete' %}info{% else %}warning{% endif %}">{{ result.bstatus }}</span></td>
+            <td class="text-muted text-sm">{{ result.created_dt.strftime('%Y-%m-%d %H:%M') if result.created_dt else '-' }}</td>
+            <td><a href="/euid_details?euid={{ result.euid }}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% elif query %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="fas fa-search"></i></div>
+      <h3>No Results Found</h3>
+      <p class="text-muted">Try adjusting your search query or filters</p>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="fas fa-search"></i></div>
+      <h3>Enter a Search Query</h3>
+      <p class="text-muted">Search across all BLOOM objects by EUID, name, type, or metadata</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.search-form { width: 100%; }
+.type-checkboxes {
+  display: flex; flex-wrap: wrap; gap: var(--spacing-md);
+  padding: var(--spacing-sm); background: var(--color-gray-700);
+  border-radius: var(--radius-sm);
+}
+.checkbox-label {
+  display: flex; align-items: center; gap: var(--spacing-xs);
+  cursor: pointer; font-size: 0.875rem;
+}
+.checkbox-label input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: var(--color-highlight);
+}
+.form-actions { display: flex; gap: var(--spacing-sm); }
+.table-container { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-gray-600); }
+.table th { background: var(--color-gray-700); font-weight: 600; font-size: 0.875rem; text-transform: uppercase; color: var(--color-gray-300); }
+.table tbody tr:hover { background: var(--color-gray-700); }
+.empty-state { text-align: center; padding: var(--spacing-2xl); }
+.empty-state-icon { font-size: 3rem; color: var(--color-gray-500); margin-bottom: var(--spacing-md); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getSelectedTypes() {
+  const checkboxes = document.querySelectorAll('input[name="types"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value).join(',');
+}
+
+function exportResults(format) {
+  const query = document.getElementById('searchQuery').value;
+  if (!query) {
+    BloomToast.warning('No Query', 'Enter a search query first');
+    return;
+  }
+  const types = getSelectedTypes();
+  let url = `/api/v1/search/export?q=${encodeURIComponent(query)}&format=${format}`;
+  if (types) url += `&types=${encodeURIComponent(types)}`;
+  window.location.href = url;
+}
+
+function clearFilters() {
+  document.getElementById('searchQuery').value = '';
+  document.querySelectorAll('input[name="types"]').forEach(cb => cb.checked = false);
+}
+
+// Convert checkboxes to comma-separated types param on form submit
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+  const checkboxes = document.querySelectorAll('input[name="types"]:checked');
+  if (checkboxes.length > 0) {
+    // Remove individual checkboxes from form submission
+    checkboxes.forEach(cb => cb.removeAttribute('name'));
+    // Add hidden input with comma-separated types
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'types';
+    hidden.value = Array.from(checkboxes).map(cb => cb.value).join(',');
+    this.appendChild(hidden);
+  }
+});
+</script>
+{% endblock %}
+

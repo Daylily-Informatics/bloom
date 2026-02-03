@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    {% set page_title = 'User Home' %}
+    <title>{{ page_title }}</title>
+    
+    {% set bloom_mod = 'user_home' %}
+
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+   
+        .user-info, .session-info, .actions {
+            margin-bottom: 20px;
+        }
+
+        .label-value {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .label-value strong {
+            margin-right: 10px;
+        }
+
+        .value-box {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            flex-grow: 1;
+        }
+
+        .actions a {
+            display: inline-block;
+            margin: 10px 0;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .actions a:hover {
+            background-color: #45a049;
+        }
+    </style>
+    <script>
+        $(document).ready(function() {
+            {% if dest_section and dest_section.section == 'skin' %}
+                $('#skin-css-section').addClass('flash-effect');
+            {% endif %}
+        });
+    </script>
+</head>
+<body>
+    
+    {% include 'legacy/bloom_header.html' %}
+<ul>
+    <h1>Welcome, {{ user_data.email }}</h1>
+    <ul>
+    <table><tr><td>
+
+        <div class="user-info">
+            <h2>User Information</h2>
+            <hr>
+            <ul>
+                <div class="label-value">
+                    <strong>Email:</strong>
+                    <span class="value-box">{{ user_data.email }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Style Sheet:</strong>
+                    <span class="value-box">{{ user_data.style_css }}</span>
+                </div>
+            </ul>
+        </div>
+        <div class="session-info">
+            <h2>Session Information</h2>
+
+            <hr>
+            <ul>
+            <table style="width:100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width:40%; white-space: nowrap;"><strong>Last Login</strong></td>
+                    <td class="value-box" style="width:40%;">{{ session_data.last_login }}</td>
+                </tr>
+                <tr>
+                    <td style="width:40%; white-space: nowrap;"><strong>Session Duration</strong> {{ session_data.session_duration }}</td>
+                    <td class="value-box" style="width:40%;">{{ session_data.session_duration }}</td>
+                </tr>
+                <tr>
+                    <td style="width:40%; white-space: nowrap;"><strong>Login Count:</strong> {{ session_data.login_count }}</td>
+                    <td class="value-box" style="width:40%;">{{ session_data.login_count }}</td>
+                </tr>
+                <!-- Display other user data that are not in the specified keys -->
+                {% for key, value in user_data.items() %}
+                {% if key not in ['print_lab', 'printer_name', 'label_zpl_style', 'style_css' ] %}
+                <tr>
+                    <td style="width:40%; white-space: nowrap;"><strong>{{ key }}</strong></td>
+                    <td class="value-box" style="width:40%;" >{{ value }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </table>
+            </ul>
+        </div>
+        <div class="dew">
+            <h2>Dewey Global Variables</h2>
+            <hr>
+            <ul>
+                <div class="label-value">
+                    <strong>Cognito Domain:</strong>
+                    <span class="value-box">{{ cognito_details.domain }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Cognito User Pool:</strong>
+                    <span class="value-box">{{ cognito_details.user_pool_id }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Cognito Client Id:</strong>
+                    <span class="value-box">{{ cognito_details.client_id }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Whitelisted Domains:</strong>
+                    <span class="value-box">{{ whitelisted_domains }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>S3 Bucket Prefix:</strong>
+                    <span class="value-box"><a target=thebucket href=https://us-east-1.console.aws.amazon.com/s3/buckets/{{ s3_bucket_prefix }} >{{ s3_bucket_prefix }}</a></span>
+                </div>
+            </ul>
+        </div>
+        <div class="system-info">
+            <h2>Software Systems</h2>
+            <hr>
+            <ul>
+                <div class="label-value">
+                    <strong>BLOOM Version:</strong>
+                    <span class="value-box">{{ bloom_version }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>FedEx Library Version:</strong>
+                    <span class="value-box">{{ fedex_version }}</span>
+                </div>
+                <div class="label-value">
+                    <strong>Zebra Printer Version:</strong>
+                    <span class="value-box">{{ zebra_printer_version }}</span>
+                </div>
+            </ul>
+        </div>
+    </td><td style="width: 3%;"> </td><td>
+    
+        <div id="skin-css-section">
+            <h3>Change The Bloom Skin CSS</h3>
+            <hr>
+            <ul>
+            <small>Placing a valid css file in static/skins will make the CSS available here.</small>
+            <ul>
+                <table>
+                    <tr>
+                        <td><strong>style_css</strong></td>
+                        <td>
+                            Current: <span class="value-box">{{ user_data.get('style_css', 'Not set') }}</span>
+                            <select name="style_css" onchange="updatePreferenceAndReload('style_css', this.value)">
+                                {% for css_file in css_files %}
+                                    <option value="{{ css_file }}" {% if user_data.get('style_css') == css_file %}selected{% endif %}>{{ css_file }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </ul></ul>
+        </div>
+
+        <div class="actions">
+            <h2>Actions</h2>
+            <hr>
+            <ul>
+            <a href="/user_audit_logs?username={{ user_data.email }}">View Your Audit Logs</a>
+            </ul>
+        </div>
+    </ul>
+    </div>
+
+    <div id="zebra-css-section" >
+        <h3>Zebra Printer Config</h3>
+        <hr>
+        <ul>
+        
+        <table>
+            <!-- Display select dropdowns for specific keys and their current value from user data -->
+            {% for key in ['print_lab', 'printer_name', 'label_zpl_style'] %}
+            <tr>
+                <td><strong>{{ key }}</strong></td>
+                <td>
+                    Current: <span class="value-box">{{ user_data.get(key, 'Not set') }}</span>
+                    <select name="{{ key }}" onchange="updatePreferenceAndReload('{{ key }}', this.value)">
+                        {% for option in printer_info[key] %}
+                            <option value="{{ option }}" {% if user_data.get(key) == option %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+            
+            {% endfor %}
+        </table></div>
+
+
+    </td></tr></table>
+
+</ul>
+    <script>
+        function updatePreferenceAndReload(key, value) {
+            console.log('Updating', key, 'to', value);
+            $.ajax({
+                url: '/update_preference',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ key: key, value: value }),
+                success: function(response) {
+                    console.log('Update successful:', response);
+                    window.location.reload();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Update failed:', status, error);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

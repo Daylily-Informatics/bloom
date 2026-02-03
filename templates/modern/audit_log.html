@@ -1,0 +1,149 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Audit Log - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-history"></i> Audit Log</h1>
+    <p class="text-muted">System-wide audit trail and activity history</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-outline btn-sm" onclick="exportAuditLog()">
+      <i class="fas fa-download"></i> Export
+    </button>
+    <a href="/legacy/audit_log" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-filter"></i> Filters</h3>
+  </div>
+  <div class="card-body">
+    <form id="filter-form" class="grid grid-4">
+      <div class="form-group">
+        <label class="form-label">Action Type</label>
+        <select class="form-select" name="action_type" id="filter-action">
+          <option value="">All Actions</option>
+          <option value="create">Create</option>
+          <option value="update">Update</option>
+          <option value="delete">Delete</option>
+          <option value="login">Login</option>
+          <option value="export">Export</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">User</label>
+        <input type="text" class="form-input" name="user" id="filter-user" placeholder="Filter by user...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date Range</label>
+        <input type="date" class="form-input" name="date_from" id="filter-date">
+      </div>
+      <div class="form-group" style="display: flex; align-items: flex-end; gap: var(--spacing-sm);">
+        <button type="button" class="btn btn-primary" onclick="applyFilters()">
+          <i class="fas fa-search"></i> Apply
+        </button>
+        <button type="button" class="btn btn-outline" onclick="clearFilters()">
+          <i class="fas fa-times"></i> Clear
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Audit Log Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-list"></i> Activity History</h3>
+    <span class="text-muted text-sm">{{ entries | length if entries else 0 }} entries</span>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table" id="audit-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Object</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if entries %}
+          {% for entry in entries %}
+          <tr>
+            <td class="text-sm font-mono">{{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') if entry.timestamp else '-' }}</td>
+            <td>{{ entry.user | default('system') }}</td>
+            <td>
+              <span class="badge badge-{% if entry.action == 'create' %}success{% elif entry.action == 'delete' %}error{% elif entry.action == 'update' %}warning{% else %}info{% endif %}">
+                {{ entry.action | default('-') }}
+              </span>
+            </td>
+            <td>
+              {% if entry.euid %}
+              <a href="/euid_details?euid={{ entry.euid }}" class="badge badge-euid">{{ entry.euid }}</a>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td class="text-muted text-sm">{{ entry.details | default('-') | truncate(50) }}</td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted">No audit entries found</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Pagination -->
+<div class="pagination-container mt-lg">
+  <div class="pagination">
+    <button class="btn btn-outline btn-sm" {% if page <= 1 %}disabled{% endif %}>
+      <i class="fas fa-chevron-left"></i> Previous
+    </button>
+    <span class="pagination-info">Page {{ page | default(1) }} of {{ total_pages | default(1) }}</span>
+    <button class="btn btn-outline btn-sm" {% if page >= total_pages %}disabled{% endif %}>
+      Next <i class="fas fa-chevron-right"></i>
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.pagination-container { display: flex; justify-content: center; }
+.pagination { display: flex; align-items: center; gap: var(--spacing-md); }
+.pagination-info { font-size: 0.875rem; color: var(--color-gray-400); }
+.font-mono { font-family: var(--font-mono); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function applyFilters() {
+  BloomLoading.show('Applying filters...');
+  const form = document.getElementById('filter-form');
+  const params = new URLSearchParams(new FormData(form));
+  window.location.href = '/audit_log?' + params.toString();
+}
+function clearFilters() {
+  document.querySelectorAll('#filter-form input, #filter-form select').forEach(el => el.value = '');
+  window.location.href = '/audit_log';
+}
+function exportAuditLog() {
+  BloomToast.info('Export', 'Generating audit log export...');
+}
+</script>
+{% endblock %}
+

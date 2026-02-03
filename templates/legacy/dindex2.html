@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html width="100%">
+    <head>
+        {% set page_title = 'DAG Explorer' %}
+        <title>{{ page_title }}</title>
+
+        {% set bloom_mod = 'dag' %}
+
+        <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}"  >
+        <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.19.0/cytoscape.min.js"></script>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+        <script src="https://unpkg.com/cytoscape-dagre"></script>
+
+        <!-- DAG Explorer Modular JavaScript -->
+        <script src="static/js/dag-explorer/config.js"></script>
+        <script src="static/js/dag-explorer/utils.js"></script>
+        <script src="static/js/dag-explorer/api.js"></script>
+        <script src="static/js/dag-explorer/graph.js"></script>
+        <script src="static/js/dag-explorer/filters.js"></script>
+        <script src="static/js/dag-explorer/events.js"></script>
+        <script src="static/js/dag-explorer/search.js"></script>
+        <script src="static/js/dag-explorer/layout-persistence.js"></script>
+        <script src="static/js/dag-explorer/index.js"></script>
+        <style>
+                .modal {
+                    display: none;
+                    position: fixed;
+                    z-index: 1;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: auto;
+                    background-color: rgb(0,0,0);
+                    background-color: rgba(0,0,0,0.4);
+                    padding-top: 60px;
+                }
+            
+                .modal-content {
+                    background-color: #fefefe;
+                    margin: 5% auto;
+                    padding: 20px;
+                    border: 1px solid #888;
+                    width: 80%;
+                }
+            
+                .closeBtn {
+                    color: #aaa;
+                    float: right;
+                    font-size: 28px;
+                    font-weight: bold;
+                    cursor: pointer;
+                }
+            
+                .closeBtn:hover,
+                .closeBtn:focus {
+                    color: black;
+                    text-decoration: none;
+                    cursor: pointer;
+                }
+
+
+      #cy {
+	  height: 650px;
+	  width: 100%;
+      }
+      @media screen and (max-width: 600px) {
+	  body, html {
+              width: 100%;
+              height: 100%;
+          }
+          /* Adjust styles for mobile here */
+         .container {
+             width: 100%; /* Full width on mobile */
+         }
+	  #cy {
+          height: 650px;
+          width: 100%;
+      }
+      }
+      
+      .hidden {
+            display: none !important;
+        }
+        </style>
+    </head>
+    <body>
+        {% include 'legacy/bloom_header.html'  %}
+
+        <div id="nodeDialog" class="node-dialog" style="display: none;">
+            <p id="nodeEuid">
+                EUID: <span></span>
+            </p>
+            <p id="nodeName">
+                Name: <span></span>
+            </p>
+            <div style="display: none;">
+            <a id="actionALink" href="">Calculate COGS To Produce</a>
+            ... $ <span id="actionAOutput"></span>            
+            </div>
+            <br>
+            <a id="actionBLink" href="">Calculate COGS Of Children</a>
+            ... $ <span id="actionBOutput"></span>
+            <br>
+            <a id="euidInfoLink" href="" target="euid" >EUID Info</a>
+            <button id="closeDialogButton" class="close-dialog-btn">Close</button>
+        </div>
+        <div class="container" style="margin-top: 0px; padding: 0px;" >
+            <div style="display: flex;" >
+
+            <div style="width: 92%;">
+            <div  id="cy"></div>
+        <hr>
+            <div  style="display: -webkit-inline-box;">
+                <div  style="display: -webkit-inline-box;">
+                    <label for="btypeCheckboxes"  >Filter Class:</label><br>
+                <div style="display: -webkit-inline-box;" id="btypeCheckboxes">
+                    <!-- Checkboxes will be added here -->
+                </div>
+            </div>
+      
+                <select style="font-size: 10px;" id="layoutSelect" onchange="changeLayout(this.value)">
+                    <option style="font-size: 10px;" value="dagre">Alter Layout</option>
+                    <option style="font-size: 10px;" value="dagre">Hierarchical</option>
+                    <option style="font-size: 10px;" value="cose">Cose (default)</option>
+                    <option style="font-size: 10px;" value="breadthfirst">Breadthfirst</option>
+                    <option style="font-size: 10px;" value="grid">Grid</option>
+                    <option style="font-size: 10px;" value="circle">Circle</option>
+                    <option style="font-size: 10px;" value="random">Random</option>
+                    <option style="font-size: 10px;" value="concentric">Concentric</option>
+                    <!-- Add other layout options as needed -->
+                </select>
+                <font color=darkgrey>‒‒</font>
+
+                <div  style="display: -webkit-inline-box;">
+                Filter #edges ≤  <span style="font-size: 10px;" id="transparencyDisplay" >1</span>
+                <br>
+                <input type="range"
+                id="transparencySlider"
+                min="0"
+                max="15"
+                style="width: 100px;"
+                value="1"
+                oninput="updateNodeTransparency()" />
+                </div>
+                <font color=darkgrey>‒‒</font>
+                <div  style="display: -webkit-inline-box;">
+                        <input type="text" style="width:70px; font-size: 10px; margin:0px;"  id="euidInput" placeholder="EUID"/>
+                        <br>
+                        <button style="font-size: 10px;width:70px;" onclick="centerOnEuid()">find</button>
+                </div>
+                <font color=darkgrey>‒‒</font>
+                           <div  style="display: -webkit-inline-box;">
+
+                           <label style="font-size: 10px;" for="distanceSlider"  >RELATIVE DISANCE, (0=all) ::  <span id="distanceDisplay" style="font-size: 10px;" >0</span>  </label>
+                            <br>
+                           <input type="range"
+                               id="distanceSlider"
+                               min="0"
+                               max="15"
+                               value="0"
+                               style="width: 100px; font-size: 10px;"
+                               oninput="filterNodes(this.value)" />
+                           </div>
+                               <button id="helpBtn">?</button>
+
+                               <div id="helpModal" class="modal">
+                                   <div class="modal-content">
+                                       <span class="closeBtn">&times;</span>
+                                       <div>
+                                           <small style="color: gray;">
+                                            <br>
+                                            NODE INFO: click node 1x for info box at bottom of page, click node 3x for popup dialog<br>
+                                            DELETE (this is reflected in the database!): -edges- right click 2x on an edge to delete it -nodes- right click 3x on a node to delete it <br>
+                                            CREATE EDGES: hold 'l', select a node, cont. holding 'l', click a new node to create an edge <br>
+                                            CREATE NODES: not available <br>
+                                            VISUALIZATION: hold 'n and click a node to highlight its neighbors, with each add'l click the neighborhood expands.</small>
+                                       </div>
+                                   </div>
+                               </div>
+            </div>
+            <div style="align: top; padding-top:0px;" class=info-box id="node-info"></div>
+
+            </div>
+            <div style="width: 8%;">
+                        <label for="distanceSlider">Filter:</label>
+
+                        <div id="bsubtypeButtons">
+                            <!-- Buttons/Checkboxes for b_sub_type will be added here -->
+                        </div>
+        </div>
+            </div>     
+         </div>
+            <button align=right id="saveButton" class="button">Save Changes</button>
+        </div>
+        <script>
+        // Server-side configuration passed to client
+        var globalFilterLevel = parseFloat('{{ globalFilterLevel }}') || 4;
+        var globalZoom = parseFloat('{{ globalZoom }}') || 4;
+        var globalStartNodeEUID = '{{ globalStartNodeEUID }}' || 'AY1';
+
+        // DAG data embedded from server (avoids extra API call)
+        var embeddedDagData = {{ dag_data | tojson | safe if dag_data else '{"elements": {"nodes": [], "edges": []}}' }};
+
+        // Initialize DAG Explorer when document is ready
+        $(document).ready(function() {
+            DAGExplorer.initWithData({
+                filterLevel: globalFilterLevel,
+                zoom: globalZoom,
+                startNodeEUID: globalStartNodeEUID,
+                data: embeddedDagData
+            });
+        });
+        </script>
+
+        <!--
+            Legacy inline code has been moved to static/js/dag-explorer/ modules.
+            The following script block provides backward compatibility for HTML inline handlers.
+        -->
+        <script>
+        // Backward compatibility: expose cy globally for any legacy code
+        var cy = null;
+        var clickCount = {};
+        var currentLayoutName = 'dagre';
+
+        // Update cy reference when DAGGraph initializes
+        $(document).ready(function() {
+            // Wait for DAGExplorer to initialize, then grab cy reference
+            setTimeout(function() {
+                if (DAGGraph) {
+                    cy = DAGGraph.getInstance();
+                }
+            }, 1000);
+        });
+        </script>
+
+        <!-- REMOVED: ~700 lines of inline JavaScript have been extracted to:
+             - static/js/dag-explorer/config.js     (Configuration constants)
+             - static/js/dag-explorer/utils.js     (Utility functions)
+             - static/js/dag-explorer/api.js       (Backend API calls)
+             - static/js/dag-explorer/graph.js     (Cytoscape initialization)
+             - static/js/dag-explorer/filters.js   (Filtering functionality)
+             - static/js/dag-explorer/events.js    (Event handlers)
+             - static/js/dag-explorer/search.js    (Search functionality)
+             - static/js/dag-explorer/layout-persistence.js (Layout saving)
+             - static/js/dag-explorer/index.js     (Main entry point)
+
+             Key improvements:
+             - SQL injection vulnerability FIXED in backend
+             - Timestamp-based multi-click detection (fixes race condition)
+             - Consolidated keyboard handlers (reduces code duplication)
+             - Debounced API calls (prevents rapid successive requests)
+             - Batch operations for filtering (improves performance)
+             - Proper AJAX error handling throughout
+             - Layout position persistence via localStorage
+             - Fuzzy search across node properties
+        -->
+    </body>
+</html>

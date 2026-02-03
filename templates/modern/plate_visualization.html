@@ -1,0 +1,165 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Plate Visualization - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <nav class="breadcrumb">
+      <a href="/">Dashboard</a>
+      <span class="separator">/</span>
+      <span class="current">Plate Visualization</span>
+    </nav>
+    <h1><i class="fas fa-th"></i> Plate Visualization</h1>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/plate_visualization" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<!-- Plate Selector -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-search"></i> Select Plate</h3>
+  </div>
+  <div class="card-body">
+    <div class="grid grid-3">
+      <div class="form-group">
+        <label class="form-label">Plate EUID</label>
+        <input type="text" class="form-input" id="plate-euid" placeholder="Enter plate EUID..." value="{{ plate.euid if plate else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Plate Type</label>
+        <select class="form-select" id="plate-type">
+          <option value="96">96-well</option>
+          <option value="384">384-well</option>
+          <option value="24">24-well</option>
+        </select>
+      </div>
+      <div class="form-group" style="display: flex; align-items: flex-end;">
+        <button class="btn btn-primary" onclick="loadPlate()">
+          <i class="fas fa-sync"></i> Load Plate
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Plate Grid -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fas fa-grip-horizontal"></i> 
+      <span id="plate-title">{{ plate.name if plate else 'Select a plate' }}</span>
+    </h3>
+    <div class="plate-legend">
+      <span class="legend-item"><span class="legend-color empty"></span> Empty</span>
+      <span class="legend-item"><span class="legend-color occupied"></span> Occupied</span>
+      <span class="legend-item"><span class="legend-color selected"></span> Selected</span>
+      <span class="legend-item"><span class="legend-color control"></span> Control</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="plate-container" id="plate-container">
+      <div class="plate-grid plate-96" id="plate-grid">
+        <!-- Column headers -->
+        <div class="plate-header"></div>
+        {% for col in range(1, 13) %}
+        <div class="plate-header">{{ col }}</div>
+        {% endfor %}
+        
+        <!-- Rows A-H -->
+        {% for row in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] %}
+        <div class="plate-row-header">{{ row }}</div>
+        {% for col in range(1, 13) %}
+        <div class="plate-well empty" data-position="{{ row }}{{ col }}" tabindex="0" 
+             role="button" aria-label="Well {{ row }}{{ col }}"
+             onclick="selectWell(this)" onkeydown="handleWellKeydown(event, this)">
+          <span class="well-label">{{ row }}{{ col }}</span>
+        </div>
+        {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Well Details Panel -->
+<div class="card mt-lg" id="well-details" style="display: none;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-info-circle"></i> Well Details</h3>
+  </div>
+  <div class="card-body" id="well-details-content">
+    <!-- Populated by JavaScript -->
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.plate-container { overflow-x: auto; }
+.plate-grid { display: grid; gap: 4px; justify-content: center; }
+.plate-96 { grid-template-columns: 40px repeat(12, 1fr); max-width: 800px; }
+.plate-384 { grid-template-columns: 30px repeat(24, 1fr); max-width: 100%; }
+.plate-header, .plate-row-header { 
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 0.75rem; color: var(--color-gray-400);
+}
+.plate-well {
+  aspect-ratio: 1; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; cursor: pointer;
+  transition: all 0.15s ease; min-width: 30px; min-height: 30px;
+  font-size: 0.625rem; font-family: var(--font-mono);
+}
+.plate-well:hover { transform: scale(1.1); }
+.plate-well:focus { outline: 2px solid var(--color-highlight); outline-offset: 2px; }
+.plate-well.empty { background: var(--color-gray-700); color: var(--color-gray-500); }
+.plate-well.occupied { background: var(--color-info); color: white; }
+.plate-well.selected { background: var(--color-highlight); color: white; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4); }
+.plate-well.control { background: var(--color-warning); color: var(--color-gray-900); }
+.well-label { display: none; }
+.plate-well:hover .well-label { display: block; }
+
+.plate-legend { display: flex; gap: var(--spacing-md); font-size: 0.75rem; }
+.legend-item { display: flex; align-items: center; gap: var(--spacing-xs); }
+.legend-color { width: 12px; height: 12px; border-radius: 50%; }
+.legend-color.empty { background: var(--color-gray-700); }
+.legend-color.occupied { background: var(--color-info); }
+.legend-color.selected { background: var(--color-highlight); }
+.legend-color.control { background: var(--color-warning); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedWells = [];
+function selectWell(el) {
+  el.classList.toggle('selected');
+  const pos = el.dataset.position;
+  if (el.classList.contains('selected')) {
+    selectedWells.push(pos);
+  } else {
+    selectedWells = selectedWells.filter(p => p !== pos);
+  }
+  updateWellDetails();
+}
+function handleWellKeydown(e, el) {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectWell(el); }
+}
+function updateWellDetails() {
+  const panel = document.getElementById('well-details');
+  const content = document.getElementById('well-details-content');
+  if (selectedWells.length > 0) {
+    panel.style.display = 'block';
+    content.innerHTML = '<p>Selected wells: <span class="badge badge-highlight">' + selectedWells.join('</span> <span class="badge badge-highlight">') + '</span></p>';
+  } else { panel.style.display = 'none'; }
+}
+function loadPlate() {
+  const euid = document.getElementById('plate-euid').value;
+  if (euid) { window.location.href = '/plate_visualization?euid=' + euid; }
+}
+</script>
+{% endblock %}
+

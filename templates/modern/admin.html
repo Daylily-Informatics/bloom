@@ -1,0 +1,145 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Admin - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Administration</h1>
+    <p class="text-muted">System settings and user preferences</p>
+  </div>
+  <div class="page-actions">
+    <a href="/legacy/admin" class="btn btn-outline btn-sm" title="Legacy view">
+      <i class="fas fa-history"></i> Legacy
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <!-- User Preferences -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-user-cog"></i> User Preferences</h3>
+    </div>
+    <div class="card-body">
+      <form action="/admin" method="POST" id="preferences-form">
+        <div class="form-group">
+          <label class="form-label">Default Print Lab</label>
+          <select class="form-select" name="print_lab">
+            {% for lab in printer_info.get('print_lab', []) %}
+            <option value="{{ lab }}" {% if user_data.get('print_lab') == lab %}selected{% endif %}>{{ lab }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Default Printer</label>
+          <select class="form-select" name="printer_name">
+            {% for printer in printer_info.get('printer_name', []) %}
+            <option value="{{ printer }}" {% if user_data.get('printer_name') == printer %}selected{% endif %}>{{ printer }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Label Style</label>
+          <select class="form-select" name="label_zpl_style">
+            {% for style in printer_info.get('label_zpl_style', []) %}
+            <option value="{{ style }}" {% if user_data.get('label_zpl_style') == style %}selected{% endif %}>{{ style }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">UI Theme</label>
+          <select class="form-select" name="ui_mode">
+            <option value="modern" {% if user_data.get('ui_mode', 'modern') == 'modern' %}selected{% endif %}>Modern</option>
+            <option value="legacy" {% if user_data.get('ui_mode') == 'legacy' %}selected{% endif %}>Legacy</option>
+          </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save"></i> Save Preferences
+        </button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Quick Links -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-link"></i> Quick Links</h3>
+    </div>
+    <div class="card-body">
+      <div class="list-group">
+        <a href="/object_templates_summary" class="list-item">
+          <span><i class="fas fa-cubes"></i> Object Templates</span>
+          <i class="fas fa-chevron-right text-muted"></i>
+        </a>
+        <a href="/database_statistics" class="list-item">
+          <span><i class="fas fa-chart-bar"></i> Database Statistics</span>
+          <i class="fas fa-chevron-right text-muted"></i>
+        </a>
+        <a href="/bloom_schema_report" class="list-item">
+          <span><i class="fas fa-database"></i> Schema Report</span>
+          <i class="fas fa-chevron-right text-muted"></i>
+        </a>
+        <a href="/user_home" class="list-item">
+          <span><i class="fas fa-user"></i> User Home</span>
+          <i class="fas fa-chevron-right text-muted"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- System Info -->
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-info-circle"></i> System Information</h3>
+  </div>
+  <div class="card-body">
+    <div class="grid grid-3">
+      <div class="info-item">
+        <div class="info-label">User</div>
+        <div class="info-value">{{ udat.email | default('Unknown') }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Database</div>
+        <div class="info-value font-mono text-sm">{{ db_info | default('PostgreSQL') }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Version</div>
+        <div class="info-value">{{ version | default('1.0.0') }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.info-item {
+  padding: var(--spacing-md);
+  background: var(--color-gray-700);
+  border-radius: var(--radius-sm);
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: var(--color-gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-xs);
+}
+
+.info-value {
+  font-weight: 500;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+</style>
+{% endblock %}
+

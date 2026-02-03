@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% set page_title = page_title if page_title else 'Bloom' %}
+    <title>{{ page_title }}</title>
+    
+    <link rel="stylesheet" type="text/css" href="{{ style.skin_css }}">
+    <link rel="stylesheet" type="text/css" href="/static/legacy/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/legacy/mobile.css">
+    <script src="/static/legacy/action_buttons.js"></script>
+    <script src="/static/legacy/mobile.js"></script>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% include 'legacy/bloom_header.html' %}
+    
+    {% block content %}{% endblock %}
+    
+    {% include 'legacy/pre_body_close.html' %}
+</body>
+</html>
+
