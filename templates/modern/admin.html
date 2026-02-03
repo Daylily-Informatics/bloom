@@ -6,7 +6,7 @@
 <div class="page-header">
   <div>
     <h1>Administration</h1>
-    <p class="text-muted">System settings and user preferences</p>
+    <p class="text-muted">System settings, user preferences, and integrations</p>
   </div>
   <div class="page-actions">
     <a href="/legacy/admin" class="btn btn-outline btn-sm" title="Legacy view">
@@ -31,7 +31,7 @@
             {% endfor %}
           </select>
         </div>
-        
+
         <div class="form-group">
           <label class="form-label">Default Printer</label>
           <select class="form-select" name="printer_name">
@@ -40,7 +40,7 @@
             {% endfor %}
           </select>
         </div>
-        
+
         <div class="form-group">
           <label class="form-label">Label Style</label>
           <select class="form-select" name="label_zpl_style">
@@ -49,7 +49,7 @@
             {% endfor %}
           </select>
         </div>
-        
+
         <div class="form-group">
           <label class="form-label">UI Theme</label>
           <select class="form-select" name="ui_mode">
@@ -57,14 +57,14 @@
             <option value="legacy" {% if user_data.get('ui_mode') == 'legacy' %}selected{% endif %}>Legacy</option>
           </select>
         </div>
-        
+
         <button type="submit" class="btn btn-primary">
           <i class="fas fa-save"></i> Save Preferences
         </button>
       </form>
     </div>
   </div>
-  
+
   <!-- Quick Links -->
   <div class="card">
     <div class="card-header">
@@ -93,6 +93,121 @@
   </div>
 </div>
 
+<!-- External Integrations -->
+<h2 class="section-title" style="margin-top: var(--spacing-xl);"><i class="fas fa-plug"></i> External Integrations</h2>
+<div class="grid grid-2">
+  <!-- zebra_day - Printer Management -->
+  <div class="card integration-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-print"></i> zebra_day
+        <span class="badge {% if dependency_info.zebra_day.status == 'available' %}badge-success{% else %}badge-warning{% endif %}">
+          {{ dependency_info.zebra_day.version }}
+        </span>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">{{ dependency_info.zebra_day.description }}</p>
+      {% if dependency_info.zebra_day.admin_url %}
+      <div class="integration-actions">
+        <a href="{{ dependency_info.zebra_day.admin_url }}" target="_blank" class="btn btn-outline btn-sm">
+          <i class="fas fa-external-link-alt"></i> Open Admin Interface
+        </a>
+        <span class="text-sm text-muted">Port 8118</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Carrier Tracking -->
+  <div class="card integration-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-truck"></i> daylily-carrier-tracking
+        <span class="badge {% if dependency_info.carrier_tracking.status == 'available' %}badge-success{% else %}badge-warning{% endif %}">
+          {{ dependency_info.carrier_tracking.version }}
+        </span>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">{{ dependency_info.carrier_tracking.description }}</p>
+      <div class="tracking-form">
+        <form id="tracking-form" onsubmit="trackPackage(event)">
+          <div class="input-group">
+            <input type="text" id="tracking-number" class="form-input" placeholder="Enter tracking number..." style="flex: 1;">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="fas fa-search"></i> Track
+            </button>
+          </div>
+        </form>
+        <div id="tracking-result" class="tracking-result" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- daylily-tapdb -->
+  <div class="card integration-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-database"></i> daylily-tapdb
+        <span class="badge {% if dependency_info.tapdb.status == 'available' %}badge-success{% else %}badge-warning{% endif %}">
+          {{ dependency_info.tapdb.version }}
+        </span>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">{{ dependency_info.tapdb.description }}</p>
+      <div class="info-grid">
+        <div class="info-row">
+          <span class="info-key">Host:</span>
+          <span class="info-val font-mono">{{ db_info.host }}:{{ db_info.port }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Database:</span>
+          <span class="info-val font-mono">{{ db_info.database }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">User:</span>
+          <span class="info-val font-mono">{{ db_info.user }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cognito Auth -->
+  <div class="card integration-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-key"></i> AWS Cognito
+        <span class="badge {% if cognito_info.status == 'configured' %}badge-success{% else %}badge-warning{% endif %}">
+          {{ cognito_info.status }}
+        </span>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">OAuth2 authentication via AWS Cognito</p>
+      {% if cognito_info.status == 'configured' %}
+      <div class="info-grid">
+        <div class="info-row">
+          <span class="info-key">Region:</span>
+          <span class="info-val font-mono">{{ cognito_info.region }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">User Pool:</span>
+          <span class="info-val font-mono">{{ cognito_info.user_pool_id }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Client ID:</span>
+          <span class="info-val font-mono">{{ cognito_info.client_id }}</span>
+        </div>
+      </div>
+      {% else %}
+      <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> {{ cognito_info.message }}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <!-- System Info -->
 <div class="card" style="margin-top: var(--spacing-lg);">
   <div class="card-header">
@@ -106,11 +221,11 @@
       </div>
       <div class="info-item">
         <div class="info-label">Database</div>
-        <div class="info-value font-mono text-sm">{{ db_info | default('PostgreSQL') }}</div>
+        <div class="info-value font-mono text-sm">{{ db_info.host }}:{{ db_info.port }}/{{ db_info.database }}</div>
       </div>
       <div class="info-item">
-        <div class="info-label">Version</div>
-        <div class="info-value">{{ version | default('1.0.0') }}</div>
+        <div class="info-label">BLOOM Version</div>
+        <div class="info-value">{{ bloom_version | default('0.0.0') }}</div>
       </div>
     </div>
   </div>
@@ -119,6 +234,48 @@
 
 {% block extra_css %}
 <style>
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-white);
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.integration-card .card-body p.text-muted {
+  margin-bottom: var(--spacing-md);
+  font-size: 0.875rem;
+}
+
+.integration-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.info-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  font-size: 0.875rem;
+}
+
+.info-key {
+  color: var(--color-gray-400);
+  min-width: 80px;
+}
+
+.info-val {
+  color: var(--color-gray-200);
+}
+
 .info-item {
   padding: var(--spacing-md);
   background: var(--color-gray-700);
@@ -140,6 +297,62 @@
 .font-mono {
   font-family: var(--font-mono);
 }
+
+.input-group {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.tracking-form {
+  margin-top: var(--spacing-sm);
+}
+
+.tracking-result {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-gray-700);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+.text-warning {
+  color: var(--color-warning);
+}
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function trackPackage(event) {
+  event.preventDefault();
+  const trackingNumber = document.getElementById('tracking-number').value.trim();
+  const resultDiv = document.getElementById('tracking-result');
+
+  if (!trackingNumber) {
+    resultDiv.innerHTML = '<span class="text-warning">Please enter a tracking number</span>';
+    resultDiv.style.display = 'block';
+    return;
+  }
+
+  resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Looking up tracking info...';
+  resultDiv.style.display = 'block';
+
+  // Call the tracking API (if available)
+  fetch('/api/v1/track/' + encodeURIComponent(trackingNumber))
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Tracking API not available');
+      }
+      return response.json();
+    })
+    .then(data => {
+      resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    })
+    .catch(error => {
+      resultDiv.innerHTML = '<span class="text-muted">Tracking lookup requires carrier API credentials. Number: ' + trackingNumber + '</span>';
+    });
+}
+</script>
 {% endblock %}
 

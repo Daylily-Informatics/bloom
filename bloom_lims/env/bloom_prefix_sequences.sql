@@ -17,7 +17,8 @@ CREATE SEQUENCE IF NOT EXISTS mrx_instance_seq;  -- reagent
 CREATE SEQUENCE IF NOT EXISTS mcx_instance_seq;  -- control
 
 -- Equipment prefixes
-CREATE SEQUENCE IF NOT EXISTS ex_instance_seq;   -- default equipment
+CREATE SEQUENCE IF NOT EXISTS lm_instance_seq;   -- default equipment (LM = Lab Machine/equipment)
+CREATE SEQUENCE IF NOT EXISTS ex_instance_seq;   -- legacy equipment prefix (deprecated)
 
 -- Workflow prefixes
 CREATE SEQUENCE IF NOT EXISTS wx_instance_seq;   -- default workflow
@@ -28,7 +29,8 @@ CREATE SEQUENCE IF NOT EXISTS wsx_instance_seq;  -- default workflow step
 CREATE SEQUENCE IF NOT EXISTS qx_instance_seq;   -- queue
 
 -- Data prefixes
-CREATE SEQUENCE IF NOT EXISTS dx_instance_seq;   -- default data
+CREATE SEQUENCE IF NOT EXISTS dat_instance_seq;  -- default data (DAT prefix from metadata.json)
+CREATE SEQUENCE IF NOT EXISTS dx_instance_seq;   -- legacy data prefix (deprecated)
 
 -- Test Requisition prefixes
 CREATE SEQUENCE IF NOT EXISTS trx_instance_seq;  -- default test requisition
@@ -49,7 +51,8 @@ CREATE SEQUENCE IF NOT EXISTS fx_instance_seq;   -- shared_ref
 CREATE SEQUENCE IF NOT EXISTS sx_instance_seq;   -- default subject
 
 -- Health Event prefixes
-CREATE SEQUENCE IF NOT EXISTS ev_instance_seq;   -- default health event
+CREATE SEQUENCE IF NOT EXISTS hev_instance_seq;  -- default health event (HEV prefix from metadata.json)
+CREATE SEQUENCE IF NOT EXISTS ev_instance_seq;   -- legacy health event prefix (deprecated)
 
 -- Generic prefixes
 CREATE SEQUENCE IF NOT EXISTS gx_instance_seq;   -- default generic

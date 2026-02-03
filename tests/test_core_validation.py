@@ -309,3 +309,192 @@ class TestTemplateValidator:
             assert result.valid is False
             assert any("Invalid JSON" in e for e in result.errors)
 
+
+class TestValidatorImports:
+    """Test that validator classes can be imported."""
+
+    def test_import_validation_error(self):
+        """Test ValidationError import."""
+        from bloom_lims.core.validation import ValidationError
+        assert ValidationError is not None
+
+    def test_import_validate_euid(self):
+        """Test validate_euid import."""
+        from bloom_lims.core.validation import validate_euid
+        assert callable(validate_euid)
+
+    def test_import_validate_uuid(self):
+        """Test validate_uuid import."""
+        from bloom_lims.core.validation import validate_uuid
+        assert callable(validate_uuid)
+
+    def test_import_validate_json_addl(self):
+        """Test validate_json_addl import."""
+        from bloom_lims.core.validation import validate_json_addl
+        assert callable(validate_json_addl)
+
+    def test_import_validated_decorator(self):
+        """Test validated decorator import."""
+        from bloom_lims.core.validation import validated
+        assert callable(validated)
+
+
+class TestSchemaValidation:
+    """Tests for schema validation functions."""
+
+    def test_validate_schema_valid_data(self):
+        """Test validate_schema with valid data."""
+        from bloom_lims.core.validation import validate_schema
+
+        # Schema is a dict defining field types
+        schema = {
+            "name": {"type": str, "required": True},
+            "value": {"type": int, "required": True},
+        }
+        result = validate_schema({"name": "test", "value": 42}, schema)
+        # Returns list of ValidationError - empty if valid
+        assert result == []
+
+    def test_validate_schema_missing_required(self):
+        """Test validate_schema with missing required field."""
+        from bloom_lims.core.validation import validate_schema
+
+        schema = {
+            "name": {"type": str, "required": True},
+            "value": {"type": int, "required": True},
+        }
+        result = validate_schema({"name": "test"}, schema)
+        # Should have validation errors
+        assert len(result) > 0
+
+    def test_validate_not_empty_with_values(self):
+        """Test validate_not_empty with various values."""
+        from bloom_lims.core.validation import validate_not_empty
+
+        assert validate_not_empty("hello") is True
+        assert validate_not_empty("  test  ") is True
+        assert validate_not_empty([1, 2, 3]) is True
+        assert validate_not_empty({"key": "value"}) is True
+
+    def test_validate_not_empty_with_empty(self):
+        """Test validate_not_empty with empty values."""
+        from bloom_lims.core.validation import validate_not_empty, ValidationError
+
+        with pytest.raises(ValidationError):
+            validate_not_empty("")
+        with pytest.raises(ValidationError):
+            validate_not_empty("   ")
+        with pytest.raises(ValidationError):
+            validate_not_empty([])
+        with pytest.raises(ValidationError):
+            validate_not_empty({})
+
+    def test_validate_positive_int_valid(self):
+        """Test validate_positive_int with valid values."""
+        from bloom_lims.core.validation import validate_positive_int
+
+        assert validate_positive_int(1) is True
+        assert validate_positive_int(100) is True
+        assert validate_positive_int(999999) is True
+
+    def test_validate_positive_int_invalid(self):
+        """Test validate_positive_int with invalid values."""
+        from bloom_lims.core.validation import validate_positive_int, ValidationError
+
+        with pytest.raises(ValidationError):
+            validate_positive_int(0)
+        with pytest.raises(ValidationError):
+            validate_positive_int(-1)
+        with pytest.raises(ValidationError):
+            validate_positive_int(-100)
+
+
+class TestCoreValidationAdditional:
+    """Additional tests for core validation module - testing actual functions."""
+
+    def test_validate_euid_with_prefix(self):
+        """Test validate_euid with different prefixes."""
+        from bloom_lims.core.validation import validate_euid
+
+        # Valid EUIDs require PREFIX (2-3 uppercase letters) + sequence number (no leading zeros)
+        # Pattern: [A-Z]{2,3}[1-9][0-9]*$
+        assert validate_euid("CX1") == True
+        assert validate_euid("WF123") == True
+        assert validate_euid("MRX42") == True
+
+    def test_validate_uuid_valid_format(self):
+        """Test validate_uuid with valid UUID format."""
+        from bloom_lims.core.validation import validate_uuid
+        import uuid
+
+        # Valid UUID should pass
+        valid_uuid = str(uuid.uuid4())
+        assert validate_uuid(valid_uuid) == True
+
+    def test_validate_json_addl_with_dict(self):
+        """Test validate_json_addl with dictionary."""
+        from bloom_lims.core.validation import validate_json_addl
+
+        # Valid dict should pass
+        assert validate_json_addl({"key": "value"}) == True
+        assert validate_json_addl({}) == True
+
+    def test_validate_json_addl_with_none(self):
+        """Test validate_json_addl with None."""
+        from bloom_lims.core.validation import validate_json_addl
+
+        # None should be valid (optional field)
+        assert validate_json_addl(None) == True
+
+    def test_validate_btype_container(self):
+        """Test validate_btype with container type."""
+        from bloom_lims.core.validation import validate_btype
+
+        assert validate_btype("container") == True
+
+    def test_validate_btype_content(self):
+        """Test validate_btype with content type."""
+        from bloom_lims.core.validation import validate_btype
+
+        assert validate_btype("content") == True
+
+    def test_validate_btype_workflow(self):
+        """Test validate_btype with workflow type."""
+        from bloom_lims.core.validation import validate_btype
+
+        assert validate_btype("workflow") == True
+
+    def test_validate_not_empty_with_string(self):
+        """Test validate_not_empty with non-empty string."""
+        from bloom_lims.core.validation import validate_not_empty
+
+        assert validate_not_empty("test") == True
+
+    def test_validate_not_empty_with_list(self):
+        """Test validate_not_empty with non-empty list."""
+        from bloom_lims.core.validation import validate_not_empty
+
+        assert validate_not_empty([1, 2, 3]) == True
+
+    def test_validate_schema_with_valid_data(self):
+        """Test validate_schema with valid data."""
+        from bloom_lims.core.validation import validate_schema
+
+        schema = {
+            "name": {"type": str, "required": True},
+            "count": {"type": int, "required": False}
+        }
+        data = {"name": "test", "count": 5}
+        errors = validate_schema(data, schema)
+        assert len(errors) == 0
+
+    def test_validate_schema_with_missing_required(self):
+        """Test validate_schema with missing required field."""
+        from bloom_lims.core.validation import validate_schema
+
+        schema = {
+            "name": {"type": str, "required": True}
+        }
+        data = {}
+        errors = validate_schema(data, schema)
+        assert len(errors) > 0

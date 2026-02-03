@@ -33,10 +33,13 @@ def pytest_configure(config):
     # Set test database port if not already set
     if "PGPORT" not in os.environ:
         os.environ["PGPORT"] = "5445"
-    
+
     # Disable SQL echo during tests unless explicitly enabled
     if "ECHO_SQL" not in os.environ:
         os.environ["ECHO_SQL"] = "False"
+
+    # Disable rate limiting during tests to prevent 429 errors
+    os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
 
 
 @pytest.fixture(scope="session")

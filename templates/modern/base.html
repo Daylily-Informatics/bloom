@@ -48,6 +48,9 @@
             <a href="/reagents" class="{% if '/reagents' in request.url.path %}active{% endif %}">
                 <i class="fas fa-vial"></i> Reagents
             </a>
+            <a href="/create_object" class="{% if '/create_object' in request.url.path %}active{% endif %}">
+                <i class="fas fa-plus-circle"></i> Create
+            </a>
             <div class="nav-dropdown">
                 <a href="#" class="nav-dropdown-toggle {% if '/search' in request.url.path or '/bulk_create' in request.url.path %}active{% endif %}">
                     <i class="fas fa-tools"></i> Tools <i class="fas fa-caret-down"></i>
@@ -67,8 +70,9 @@
         </button>
         
         <div class="header-actions">
-            {% if user %}
-            <span class="text-sm text-muted">{{ user.email }}</span>
+            {% set current_user = user or udat %}
+            {% if current_user and current_user.email %}
+            <span class="text-sm text-muted">{{ current_user.email }}</span>
             <a href="/legacy/" class="btn btn-outline btn-sm" title="Switch to Legacy UI">
                 <i class="fas fa-history"></i> Legacy
             </a>
