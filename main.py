@@ -147,13 +147,10 @@ from auth.cognito.client import (
 )
 
 
-# local udata prefernces
-UDAT_FILE = "./etc/udat.json"
-# Create if not exists
-os.makedirs(os.path.dirname(UDAT_FILE), exist_ok=True)
-if not os.path.exists(UDAT_FILE):
-    with open(UDAT_FILE, "w") as f:
-        json.dump({}, f)
+# Default user preferences (no longer file-based, stored in session only)
+DEFAULT_USER_PREFERENCES = {
+    "style_css": "/static/legacy/skins/bloom.css",
+}
 
 # Initialize Jinja2 environment
 templates = Environment(loader=FileSystemLoader("templates"))
@@ -269,17 +266,19 @@ def get_allowed_domains() -> List[str]:
     return [domain.strip() for domain in whitelist_domains.split(",") if domain.strip()]
 
 
-def proc_udat(email):
-    with open(UDAT_FILE, "r+") as f:
-        user_data = json.load(f)
-        if email not in user_data:
-            user_data[email] = {"style_css": "/static/legacy/skins/bloom.css", "email": email}
+def get_user_preferences(email: str) -> dict:
+    """Get user preferences with defaults. Preferences are stored in session only.
 
-            f.seek(0)
-            json.dump(user_data, f, indent=4)
-            f.truncate()
+    Args:
+        email: User's email address
 
-    return user_data[email]
+    Returns:
+        Dictionary with user preferences including email and style_css
+    """
+    return {
+        "email": email,
+        **DEFAULT_USER_PREFERENCES,
+    }
 
 
 async def DELis_instance(value, type_name):
@@ -749,7 +748,7 @@ async def oauth_callback(request: Request):
                 detail="Email domain not allowed"
             )
 
-    user_data = proc_udat(primary_email)
+    user_data = get_user_preferences(primary_email)
     user_data.update(
         {
             "id_token": id_token,
@@ -1036,12 +1035,6 @@ async def set_filter(request: Request, _auth=Depends(require_auth), curr_val="of
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
-
-    os.makedirs(os.path.dirname(UDAT_FILE), exist_ok=True)
-    if not os.path.exists(UDAT_FILE):
-        with open(UDAT_FILE, "w") as f:
-            json.dump({}, f)
-
     dest_section = {"section": dest}
 
     user_data = request.session.get("user_data", {})
@@ -1165,9 +1158,13 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     return HTMLResponse(content=template.render(context))
 
 
-# Take a look at this later
 @app.post("/update_preference")
 async def update_preference(request: Request, auth: dict = Depends(require_auth)):
+    """Update user preference in session.
+
+    Preferences are stored in session only (no file-based storage).
+    They persist for the duration of the session.
+    """
     # Early return if auth is None or doesn't contain 'email'
     if not auth or "email" not in auth:
         return {
@@ -1179,22 +1176,15 @@ async def update_preference(request: Request, auth: dict = Depends(require_auth)
     key = data.get("key")
     value = data.get("value")
 
-    if not os.path.exists(UDAT_FILE):
-        return {"status": "error", "message": "User data file not found"}
+    if not key:
+        return {"status": "error", "message": "Missing 'key' in request"}
 
-    with open(UDAT_FILE, "r") as f:
-        user_data = json.load(f)
+    # Update preference in session
+    if "user_data" not in request.session:
+        request.session["user_data"] = get_user_preferences(auth.get("email", ""))
 
-    email = request.session.get("user_data", {}).get("email")
-    if email in user_data:
-        user_data[email][key] = value
-        with open(UDAT_FILE, "w") as f:
-            json.dump(user_data, f)
-
-        request.session["user_data"][key] = value
-        return {"status": "success", "message": "User preference updated"}
-    else:
-        return {"status": "error", "message": "User not found in user data"}
+    request.session["user_data"][key] = value
+    return {"status": "success", "message": "User preference updated"}
 
 
 @app.get("/queue_details", response_class=HTMLResponse)
