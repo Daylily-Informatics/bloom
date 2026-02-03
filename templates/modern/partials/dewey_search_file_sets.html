@@ -1,0 +1,62 @@
+<div class="form-section">
+    <h5><i class="fas fa-folder-open me-2"></i> Search File Sets</h5>
+    
+    <form id="searchFileSetForm" action="/search_file_sets" method="post" enctype="multipart/form-data">
+        <div class="row g-3">
+            {% for field in ui_search_fields_fset %}
+                {% if field.name not in ["tags", "xxx"] %}
+                <div class="col-md-6">
+                    {% if field.type == "select" and field.multiple %}
+                        <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                        <div class="option-buttons" data-select-id="{{ field.name }}">
+                            <select class="form-select d-none" name="{{ field.name }}" id="{{ field.name }}" multiple>
+                                <option value="" selected></option>
+                                <option value=".na">is null</option>
+                                {% for option in field.options %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% elif field.type == "select" %}
+                        <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                        <select class="form-select" name="{{ field.name }}" id="{{ field.name }}">
+                            <option value="" selected></option>
+                            <option value=".na">is null</option>
+                            {% for option in field.options %}
+                                <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    {% elif not field.name.endswith('_datetime') %}
+                        <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                        <input type="{{ field.type }}" class="form-control" name="{{ field.name }}" id="{{ field.name }}">
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
+            
+            <div class="col-md-6">
+                <label class="form-label">Greedy Search</label>
+                <select class="form-select" name="is_greedy">
+                    <option value="yes" selected>Yes</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search me-1"></i> Search File Sets
+            </button>
+        </div>
+    </form>
+    
+    <hr class="my-3">
+    
+    <form id="searchFileSetFormALL" action="/search_file_sets" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="is_greedy" value="yes">
+        <button type="submit" class="btn btn-outline">
+            <i class="fas fa-list me-1"></i> Return All File Sets
+        </button>
+    </form>
+</div>
+

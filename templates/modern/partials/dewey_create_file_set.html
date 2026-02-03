@@ -1,0 +1,106 @@
+<div class="form-section">
+    <h5><i class="fas fa-folder-plus me-2"></i> Create A File Set</h5>
+    
+    <form action="/create_file_set" data-form="create-fs" method="post">
+        <div class="row g-3">
+            {% for field in ui_fields_fset %}
+                {% if field.name not in ["creating_user", "ref_type", "tags"] %}
+                <div class="col-md-6">
+                    {% if field.type == "select" %}
+                        <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                        <select class="form-select" name="{{ field.name }}" id="{{ field.name }}">
+                            <option value="" selected></option>
+                            {% for option in field.options %}
+                                <option value="{{ option }}">{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    {% elif field.name.endswith('_datetime') %}
+                        <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                        <input type="date" class="form-control" name="{{ field.name }}" id="{{ field.name }}">
+                    {% else %}
+                        <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                        <input type="{{ field.type }}" class="form-control" name="{{ field.name }}" id="{{ field.name }}">
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        
+        <div class="mt-3">
+            <label for="file_euids_set" class="form-label">File EUIDs <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="file_euids_set" name="file_euids" rows="4" required placeholder="Enter file EUIDs, one per line"></textarea>
+        </div>
+        
+        <hr class="my-3">
+        
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="ref_type" class="form-label">Share Files In Set?</label>
+                <select class="form-select" id="ref_type" name="ref_type" onchange="toggleRcloneOptions()">
+                    <option value="na">Just Create File Set</option>
+                    <option value="presigned_url">Create Presigned S3 URLs Per File</option>
+                    <option value="rclone serve http">Share File Set Via HTTP</option>
+                    <option value="rclone serve ftp">Share File Set Via FTP</option>
+                    <option value="rclone serve sftp">Share File Set Via SFTP</option>
+                    <option value="rclone serve webdav">Share File Set Via WEBDAV</option>
+                    <option value="rclone serve restic">Share File Set Via RESTIC</option>
+                    <option value="ne rclone nfs" disabled>Share File Set Via NFS (not enabled)</option>
+                    <option value="ne rclone s3" disabled>Share File Set Via S3 (not enabled)</option>
+                    <option value="ne rclone dlna" disabled>Share File Set Via DLNA (not enabled)</option>
+                    <option value="ne rclone docker" disabled>Share File Set Via DOCKER (not enabled)</option>
+                </select>
+            </div>
+            
+            <div class="col-md-6">
+                <label for="duration" class="form-label">Share Duration (days)</label>
+                <input type="text" class="form-control" id="duration" name="duration" value="1">
+                <div class="form-text">Float values acceptable (e.g., 0.5 for 12 hours)</div>
+            </div>
+        </div>
+        
+        <div id="rclone-options" class="mt-3" style="display: none;">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <a href="https://rclone.org/commands/rclone_serve/" target="_blank">rclone serve</a> is magic & free
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Bucket</label>
+                    <input type="text" class="form-control" name="bucket" value="{{ s3_bucket_prefix }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Host</label>
+                    <input type="text" class="form-control" name="host" value="0.0.0.0">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Port</label>
+                    <input type="text" class="form-control" name="port" value="8080">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">User</label>
+                    <input type="text" class="form-control" name="user" value="user">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Password</label>
+                    <input type="text" class="form-control" name="passwd" value="passwd">
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-folder-plus me-1"></i> Create File Set
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleRcloneOptions() {
+    var refType = document.getElementById("ref_type").value;
+    var rcloneOptions = document.getElementById("rclone-options");
+    rcloneOptions.style.display = refType.startsWith("rclone") ? "block" : "none";
+}
+document.addEventListener("DOMContentLoaded", toggleRcloneOptions);
+</script>
+

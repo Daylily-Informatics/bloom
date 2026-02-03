@@ -1,0 +1,43 @@
+<form id="downloadFileForm" action="/download_file" method="post">
+    <div class="form-section">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="euid" class="form-label">File EUID</label>
+                <input type="text" class="form-control" id="euid" name="euid" placeholder="e.g., FI123">
+            </div>
+            
+            <div class="col-md-6">
+                <label for="download-type" class="form-label">File Naming Mode</label>
+                <select class="form-select" id="download-type" name="download_type">
+                    <option value="dewey">dewey - {euid}.{suffix}</option>
+                    <option value="hybrid" selected>hybrid - {euid}.{original_name}</option>
+                    <option value="orig">orig - {original_name}</option>
+                </select>
+                <div class="form-text">
+                    <strong>dewey:</strong> <code>{euid}.{original_file_suffix}</code><br>
+                    <strong>hybrid:</strong> <code>{euid}.{original_file_name}</code><br>
+                    <strong>orig:</strong> <code>{original_file_name}</code> (risk of overwriting)
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <label for="create_metadata_file" class="form-label">Generate dewey.yaml</label>
+                <select class="form-select" id="create_metadata_file" name="create_metadata_file">
+                    <option value="yes" selected>Yes</option>
+                    <option value="no">No</option>
+                </select>
+                <div class="form-text">
+                    Creates a companion <code>{file}.dewey.yaml</code> with key metadata.
+                    For full details, use <a href="/euid_details?euid=GT1" target="_blank">EUID Details View</a>.
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-download me-1"></i> Download File
+            </button>
+        </div>
+    </div>
+</form>
+

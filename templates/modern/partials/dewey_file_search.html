@@ -1,0 +1,104 @@
+<div class="form-section">
+    <h5><i class="fas fa-search me-2"></i> Search Files</h5>
+    
+    <!-- Quick search for all records -->
+    <form id="queryAll" action="/query_by_euids" method="post" enctype="multipart/form-data" class="mb-3">
+        <input type="hidden" id="file_euids_all" name="file_euids">
+        <button type="submit" class="btn btn-outline">
+            <i class="fas fa-list me-1"></i> Return All Records
+        </button>
+    </form>
+    
+    <hr>
+    
+    <div class="row g-4">
+        <!-- Left Column: Search by EUIDs -->
+        <div class="col-lg-4">
+            <form id="queryByEuidsForm" action="/query_by_euids" method="post" enctype="multipart/form-data">
+                <h6>Search by EUIDs</h6>
+                <div class="mb-3">
+                    <label for="file_euids" class="form-label">File EUIDs (one per line)</label>
+                    <textarea class="form-control" id="file_euids" name="file_euids" rows="8"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search me-1"></i> Query by EUIDs
+                </button>
+            </form>
+        </div>
+        
+        <!-- Right Column: Search by Metadata -->
+        <div class="col-lg-8">
+            <form id="searchFileForm" data-form="search" action="/search_files" method="post" enctype="multipart/form-data">
+                <h6>Search by Metadata</h6>
+                <input type="hidden" value="" id="euid" name="euid">
+                
+                <div class="mb-3">
+                    <label class="form-label">Greedy Search</label>
+                    <select class="form-select" name="is_greedy">
+                        <option value="yes" selected>Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                </div>
+                
+                <div class="row g-3">
+                    {% for field in ui_search_fields %}
+                        <div class="col-md-6">
+                            {% if field.type == "select" and field.multiple %}
+                                <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                                <div class="option-buttons" data-select-id="{{ field.name }}">
+                                    <select class="form-select d-none" name="{{ field.name }}" id="{{ field.name }}" multiple>
+                                        <option value="" selected></option>
+                                        <option value=".na">is null</option>
+                                        {% for option in field.options %}
+                                            <option value="{{ option }}">{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            {% elif field.type == "select" %}
+                                <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                                <select class="form-select" name="{{ field.name }}" id="{{ field.name }}">
+                                    <option value="" selected></option>
+                                    <option value=".na">is null</option>
+                                    {% for option in field.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% elif not field.name.endswith('_datetime') %}
+                                <label for="{{ field.name }}" class="form-label">{{ field.label }}</label>
+                                <input type="{{ field.type }}" class="form-control" name="{{ field.name }}" id="{{ field.name }}">
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <hr class="my-3">
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="record_datetime_start" class="form-label">Relevant Date Start</label>
+                        <input type="date" class="form-control" name="record_datetime_start" id="record_datetime_start">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="record_datetime_end" class="form-label">Relevant Date End</label>
+                        <input type="date" class="form-control" name="record_datetime_end" id="record_datetime_end">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="created_datetime_start" class="form-label">Dewey Created Date Start</label>
+                        <input type="date" class="form-control" name="created_datetime_start" id="created_datetime_start">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="created_datetime_end" class="form-label">Dewey Created Date End</label>
+                        <input type="date" class="form-control" name="created_datetime_end" id="created_datetime_end">
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i> Search Files
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
