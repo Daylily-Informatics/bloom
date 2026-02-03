@@ -1654,16 +1654,17 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
         set(t.polymorphic_discriminator for t in generic_templates)
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("legacy/object_templates_summary.html").render(
-        request=request,
-        generic_templates=generic_templates,
-        unique_discriminators=unique_discriminators,
-        style=style,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/object_templates_summary.html")
+    context = {
+        "request": request,
+        "generic_templates": generic_templates,
+        "unique_discriminators": unique_discriminators,
+        "udat": user_data,
+        "user": user_data,
+    }
+    return HTMLResponse(content=template.render(context))
 
 # Quick hack to allow the details page to display deleted items.  Need to rework how the rest of the system juggles this.
 @app.get("/euid_details")
