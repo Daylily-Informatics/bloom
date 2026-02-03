@@ -40,6 +40,15 @@ Homepage = "https://github.com/Daylily-Informatics/bloom"
 Repository = "https://github.com/Daylily-Informatics/bloom.git"
 Issues = "https://github.com/Daylily-Informatics/bloom/issues"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
 [project.scripts]
 bloom = "bloom_lims.cli:main"
 bloom-backup = "bloom_lims.backup.cli:main"
@@ -86,7 +95,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --cov=bloom_lims --cov=main --cov-report=term-missing --cov-report=html:htmlcov"
 markers = [
     "api: marks tests as API tests",
 ]
@@ -94,6 +103,26 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+
+[tool.coverage.run]
+source = ["bloom_lims", "main"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/database/*",
+]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 50
+show_missing = true
 
 [tool.black]
 line-length = 88

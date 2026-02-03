@@ -237,14 +237,18 @@ class TestDatabaseEndpoints:
     """Tests for database information endpoints."""
 
     def test_database_statistics_returns_html(self, client):
-        """Test database statistics returns HTML."""
-        try:
-            response = client.get("/database_statistics")
-            assert response.status_code in [200, 500]
-            if response.status_code == 200:
-                assert "text/html" in response.headers["content-type"]
-        except Exception:
-            pytest.skip("database_statistics endpoint raised exception")
+        """Test database statistics returns HTML (fixed: was failing with await on sync query)."""
+        response = client.get("/database_statistics")
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "text/html" in response.headers["content-type"]
+
+    def test_database_statistics_contains_stats_sections(self, client):
+        """Test database statistics page contains expected stats sections."""
+        response = client.get("/database_statistics")
+        assert response.status_code == 200
+        # Page should contain statistics sections
+        content = response.text
+        assert "statistics" in content.lower() or "stats" in content.lower()
 
     def test_bloom_schema_report_returns_html(self, client):
         """Test BLOOM schema report returns HTML."""
@@ -257,14 +261,18 @@ class TestUserEndpoints:
     """Tests for user-related endpoints."""
 
     def test_user_home_returns_html(self, client):
-        """Test user home page returns HTML."""
-        try:
-            response = client.get("/user_home")
-            assert response.status_code in [200, 500]
-            if response.status_code == 200:
-                assert "text/html" in response.headers["content-type"]
-        except Exception:
-            pytest.skip("user_home endpoint raised exception")
+        """Test user home page returns HTML (fixed: was accessing session before auth check)."""
+        response = client.get("/user_home")
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        assert "text/html" in response.headers["content-type"]
+
+    def test_user_home_or_redirects_to_login(self, client):
+        """Test user home page returns content or redirects to login (based on auth state)."""
+        response = client.get("/user_home", follow_redirects=False)
+        # Should either return 200 (authenticated) or 307 redirect to login
+        assert response.status_code in [200, 307], f"Expected 200 or 307, got {response.status_code}"
+        if response.status_code == 307:
+            assert "/login" in response.headers.get("location", "")
 
     def test_user_audit_logs_returns_html(self, client):
         """Test user audit logs returns HTML."""
@@ -665,3 +673,116 @@ class TestObjectCreationAPI:
             assert data["super_type"] == "container"
             assert data["btype"] == "tube"
             assert data["b_sub_type"] == sub_type
+
+
+class TestLoginLogoutButtonDisplay:
+    """Tests for login/logout button display logic in modern UI header.
+
+    The base template checks for either 'user' or 'udat' variables to determine
+    whether to show the logout button (authenticated) or login button (unauthenticated).
+    """
+
+    def test_authenticated_user_sees_logout_button(self, client):
+        """Test that authenticated users see the logout button and their email."""
+        # With BLOOM_OAUTH=no, the session is populated with test user data
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should see logout button
+        assert "Logout" in content or "logout" in content.lower()
+        # Should see the user email (from test session)
+        assert "john@daylilyinformatics.com" in content or "email" in content.lower()
+
+    def test_dashboard_shows_logout_with_udat(self, client):
+        """Test dashboard page shows logout button when udat is passed."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        # The dashboard passes 'udat' to the template
+        # Should show logout, not login
+        assert 'href="/logout"' in content
+        assert 'fa-sign-out-alt' in content  # Logout icon
+
+    def test_create_object_shows_logout_with_user(self, client):
+        """Test create_object page shows logout button when user is passed."""
+        response = client.get("/create_object")
+        assert response.status_code == 200
+        content = response.text
+
+        # The create_object route passes both 'user' and 'user_data'
+        # Should show logout, not login
+        assert 'href="/logout"' in content
+
+    def test_search_page_shows_logout(self, client):
+        """Test search page shows logout button for authenticated users."""
+        response = client.get("/search")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should show logout button
+        assert 'href="/logout"' in content
+
+    def test_admin_page_shows_logout(self, client):
+        """Test admin page shows logout button for authenticated users."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should show logout button
+        assert 'href="/logout"' in content
+
+    def test_assays_page_shows_logout(self, client):
+        """Test assays page shows logout button for authenticated users."""
+        response = client.get("/assays")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should show logout button
+        assert 'href="/logout"' in content
+
+
+class TestModernUINavigation:
+    """Tests for modern UI navigation elements."""
+
+    def test_dashboard_has_navigation_links(self, client):
+        """Test dashboard has all expected navigation links."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        # Check for main navigation links
+        assert 'href="/"' in content  # Dashboard
+        assert 'href="/assays"' in content
+        assert 'href="/workflows"' in content
+        assert 'href="/admin"' in content
+        assert 'href="/create_object"' in content
+        assert 'href="/search"' in content
+
+    def test_dashboard_has_legacy_link(self, client):
+        """Test dashboard has link to legacy UI."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should have legacy UI link
+        assert 'href="/legacy/"' in content or "Legacy" in content
+
+    def test_modern_pages_use_bloom_modern_css(self, client):
+        """Test modern pages include the modern CSS file."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should include modern CSS
+        assert "bloom_modern.css" in content
+
+    def test_modern_pages_use_bloom_modern_js(self, client):
+        """Test modern pages include the modern JS file."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        # Should include modern JS
+        assert "bloom_modern.js" in content

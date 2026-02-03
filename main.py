@@ -1558,13 +1558,18 @@ async def plate_visualization(
 
 @app.get("/database_statistics", response_class=HTMLResponse)
 async def database_statistics(request: Request, _auth=Depends(require_auth)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    user_data = request.session.get("user_data", {})
+    if not user_data:
+        return RedirectResponse(url="/login")
 
-    async def get_stats(days):
+    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+
+    def get_stats(days):
+        """Get object creation statistics for the specified number of days."""
         cutoff_date = datetime.now() - timedelta(days=days)
-        # Assume bobdb.session.query can be awaited; if not, adjust accordingly
+        # Synchronous SQLAlchemy query (BLOOM uses synchronous SQLAlchemy)
         return (
-            await bobdb.session.query(
+            bobdb.session.query(
                 bobdb.Base.classes.generic_instance.b_sub_type,
                 func.count(bobdb.Base.classes.generic_instance.uuid),
             )
@@ -1576,11 +1581,10 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
             .all()
         )
 
-    stats_1d = await get_stats(1)
-    stats_7d = await get_stats(7)
-    stats_30d = await get_stats(30)
+    stats_1d = get_stats(1)
+    stats_7d = get_stats(7)
+    stats_30d = get_stats(30)
 
-    user_data = request.session.get("user_data", {})
     style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
     content = templates.get_template("legacy/database_statistics.html").render(
@@ -1589,7 +1593,7 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
         stats_7d=stats_7d,
         stats_30d=stats_30d,
         style=style,
-        udat=request.session["user_data"],
+        udat=user_data,
     )
     return HTMLResponse(content=content)
 
@@ -2073,11 +2077,10 @@ async def user_home(request: Request):
     user_data = request.session.get("user_data", {})
     session_data = request.session.get("session_data", {})  # Extract session_data from session
 
-
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]), cfg_printers=True,cfg_fedex=True)
-
     if not user_data:
         return RedirectResponse(url="/login")
+
+    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")), cfg_printers=True, cfg_fedex=True)
 
     # Directory containing the CSS files
     skins_directory = "static/skins"

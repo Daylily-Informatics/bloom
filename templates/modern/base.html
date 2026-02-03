@@ -70,8 +70,9 @@
         </button>
         
         <div class="header-actions">
-            {% if user %}
-            <span class="text-sm text-muted">{{ user.email }}</span>
+            {% set current_user = user or udat %}
+            {% if current_user and current_user.email %}
+            <span class="text-sm text-muted">{{ current_user.email }}</span>
             <a href="/legacy/" class="btn btn-outline btn-sm" title="Switch to Legacy UI">
                 <i class="fas fa-history"></i> Legacy
             </a>

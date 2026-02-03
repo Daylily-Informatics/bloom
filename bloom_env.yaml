@@ -60,3 +60,6 @@ dependencies:
     - pyyaml>=6.0
     - click>=8.0
     - rich>=13.0
+    - pytest>=8.0
+    - pytest-cov>=4.1.0
+    - pytest-asyncio>=0.23.0

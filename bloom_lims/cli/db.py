@@ -273,12 +273,16 @@ def db_reset(yes):
 
     console.print("[cyan]Resetting database...[/cyan]")
 
-    # Run the clear and rebuild script
-    rebuild_script = PROJECT_ROOT / "bloom_lims" / "env" / "clear_and_rebuild_postgres.sh"
+    # Run the clear and rebuild script (located in project root)
+    rebuild_script = PROJECT_ROOT / "clear_and_rebuild_postgres.sh"
 
     if rebuild_script.exists():
         console.print("  [yellow]→[/yellow] Running clear_and_rebuild_postgres.sh...")
-        result = subprocess.run(["bash", str(rebuild_script)], cwd=PROJECT_ROOT)
+        # Pass --yes flag if user confirmed
+        cmd = ["bash", str(rebuild_script)]
+        if yes:
+            cmd.append("--yes")
+        result = subprocess.run(cmd, cwd=PROJECT_ROOT)
         if result.returncode == 0:
             console.print("[green]✓[/green] Database reset complete!")
         else:
