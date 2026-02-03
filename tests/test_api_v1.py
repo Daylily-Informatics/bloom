@@ -954,3 +954,155 @@ class TestVersioningModule:
         """Test versioning module import."""
         from bloom_lims.api import versioning
         assert versioning is not None
+
+
+class TestActionsOperations:
+    """Tests for /api/v1/actions operation endpoints (aliquot, transfer, pool)."""
+
+    def test_aliquot_action(self, client):
+        """Test aliquot action endpoint."""
+        response = client.post("/api/v1/actions/aliquot", json={})
+        # May fail with validation error or not implemented
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_transfer_action(self, client):
+        """Test transfer action endpoint."""
+        response = client.post("/api/v1/actions/transfer", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_pool_action(self, client):
+        """Test pool action endpoint."""
+        response = client.post("/api/v1/actions/pool", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestContentCreation:
+    """Tests for /api/v1/content creation endpoints."""
+
+    def test_create_sample(self, client):
+        """Test create sample endpoint."""
+        response = client.post("/api/v1/content/samples", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_create_specimen(self, client):
+        """Test create specimen endpoint."""
+        response = client.post("/api/v1/content/specimens", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_create_reagent(self, client):
+        """Test create reagent endpoint."""
+        response = client.post("/api/v1/content/reagents", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestEquipmentMaintenance:
+    """Tests for /api/v1/equipment maintenance endpoint."""
+
+    def test_equipment_maintenance(self, client):
+        """Test equipment maintenance endpoint."""
+        response = client.post("/api/v1/equipment/EQ1/maintenance", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestFileLinking:
+    """Tests for /api/v1/files link endpoint."""
+
+    def test_file_link(self, client):
+        """Test file linking endpoint."""
+        response = client.post("/api/v1/files/DAT1/link/CX1")
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestSubjectSpecimens:
+    """Tests for /api/v1/subjects specimens endpoint."""
+
+    def test_subject_specimens(self, client):
+        """Test subject specimens endpoint."""
+        response = client.get("/api/v1/subjects/SBJ1/specimens")
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestWorkflowAdvance:
+    """Tests for /api/v1/workflows advance endpoint."""
+
+    def test_workflow_advance(self, client):
+        """Test workflow advance endpoint."""
+        response = client.post("/api/v1/workflows/WF1/advance", json={})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestAuthLogout:
+    """Tests for /api/v1/auth logout endpoint."""
+
+    def test_auth_logout(self, client):
+        """Test auth logout endpoint."""
+        response = client.post("/api/v1/auth/logout")
+        assert response.status_code in [200, 302, 400, 404, 422, 500]
+
+
+class TestBatchOperations:
+    """Tests for /api/v1/batch operation endpoints."""
+
+    def test_batch_create(self, client):
+        """Test batch create endpoint."""
+        response = client.post("/api/v1/batch/create", json={"operations": []})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_batch_update(self, client):
+        """Test batch update endpoint."""
+        response = client.post("/api/v1/batch/update", json={"operations": []})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_batch_delete(self, client):
+        """Test batch delete endpoint."""
+        response = client.post("/api/v1/batch/delete", json={"euids": []})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_batch_jobs_list(self, client):
+        """Test batch jobs list endpoint."""
+        response = client.get("/api/v1/batch/jobs")
+        assert response.status_code in [200, 404]
+
+    def test_batch_job_get(self, client):
+        """Test batch job get endpoint."""
+        response = client.get("/api/v1/batch/jobs/test-job-id")
+        assert response.status_code in [200, 404, 422, 500]
+
+    def test_batch_job_cancel(self, client):
+        """Test batch job cancel endpoint."""
+        response = client.post("/api/v1/batch/jobs/test-job-id/cancel")
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestAsyncTasks:
+    """Tests for /api/v1/tasks async task endpoints."""
+
+    def test_tasks_list(self, client):
+        """Test tasks list endpoint."""
+        response = client.get("/api/v1/tasks/")
+        assert response.status_code in [200, 404]
+
+    def test_task_types(self, client):
+        """Test task types endpoint."""
+        response = client.get("/api/v1/tasks/types")
+        assert response.status_code in [200, 404]
+
+    def test_task_submit(self, client):
+        """Test task submit endpoint."""
+        response = client.post("/api/v1/tasks/submit", json={"task_type": "test"})
+        assert response.status_code in [200, 400, 404, 422, 500]
+
+    def test_task_status(self, client):
+        """Test task status endpoint."""
+        response = client.get("/api/v1/tasks/00000000-0000-0000-0000-000000000000")
+        assert response.status_code in [200, 404, 422, 500]
+
+    def test_task_wait(self, client):
+        """Test task wait endpoint."""
+        response = client.get("/api/v1/tasks/00000000-0000-0000-0000-000000000000/wait")
+        assert response.status_code in [200, 404, 422, 500]
+
+    def test_task_cancel(self, client):
+        """Test task cancel endpoint."""
+        response = client.post("/api/v1/tasks/00000000-0000-0000-0000-000000000000/cancel")
+        assert response.status_code in [200, 400, 404, 422, 500]

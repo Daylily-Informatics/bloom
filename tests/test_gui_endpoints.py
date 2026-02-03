@@ -1761,3 +1761,9 @@ class TestAdditionalViewEndpoints:
         """Test lims endpoint."""
         response = client.get("/lims")
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+
+    @pytest.mark.skip(reason="Deprecated endpoint marked for deletion, has template errors")
+    def test_dewey0_deleteme(self, client):
+        """Test legacy dewey endpoint (marked for deletion)."""
+        response = client.get("/dewey0_DELETEME")
+        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
