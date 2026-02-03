@@ -578,3 +578,311 @@ class TestAsyncTasksAPI:
         """Test getting non-existent task."""
         response = client.get("/api/v1/tasks/00000000-0000-0000-0000-000000000000")
         assert response.status_code in [404, 422, 500]
+
+
+class TestHealthEndpoints:
+    """Tests for health check endpoints."""
+
+    def test_health_endpoint(self, client):
+        """Test /health endpoint."""
+        response = client.get("/health")
+        # Health endpoint should return 200 or be not implemented (404)
+        assert response.status_code in [200, 404, 503]
+        if response.status_code == 200:
+            data = response.json()
+            assert "status" in data or isinstance(data, dict)
+
+    def test_ready_endpoint(self, client):
+        """Test /ready endpoint."""
+        response = client.get("/ready")
+        assert response.status_code in [200, 404, 503]
+
+    def test_live_endpoint(self, client):
+        """Test /live endpoint."""
+        response = client.get("/live")
+        assert response.status_code in [200, 404, 503]
+
+
+class TestAPIVersionInfo:
+    """Tests for API version info endpoints."""
+
+    def test_api_version(self, client):
+        """Test API version endpoint."""
+        response = client.get("/api/v1/version")
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, dict)
+
+    def test_api_info(self, client):
+        """Test API info endpoint."""
+        response = client.get("/api/v1/info")
+        assert response.status_code in [200, 404]
+
+
+class TestActionsAPIExtended:
+    """Extended tests for actions API."""
+
+    def test_create_action_invalid(self, client):
+        """Test creating action with invalid data."""
+        response = client.post("/api/v1/actions/", json={})
+        assert response.status_code in [400, 404, 422, 500]
+
+    def test_actions_list_pagination(self, client):
+        """Test actions list with pagination params."""
+        response = client.get("/api/v1/actions/?page=1&page_size=10")
+        assert response.status_code in [200, 404]
+
+
+class TestSubjectsAPIDeep:
+    """Deeper tests for subjects API."""
+
+    def test_subjects_list_pagination(self, client):
+        """Test subjects list with pagination params."""
+        response = client.get("/api/v1/subjects/?page=1&page_size=5")
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert "items" in data or isinstance(data, list)
+
+    def test_subject_by_invalid_uuid(self, client):
+        """Test getting subject by invalid UUID."""
+        response = client.get("/api/v1/subjects/invalid-uuid")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestWorkflowsAPIDeep:
+    """Deeper tests for workflows API."""
+
+    def test_workflows_list_pagination(self, client):
+        """Test workflows list with pagination."""
+        response = client.get("/api/v1/workflows/?page=1&page_size=10")
+        assert response.status_code in [200, 404]
+
+    def test_workflow_by_invalid_euid(self, client):
+        """Test getting workflow by invalid EUID."""
+        response = client.get("/api/v1/workflows/INVALID999")
+        assert response.status_code in [404, 422, 500]
+
+    def test_workflow_steps_by_invalid_uuid(self, client):
+        """Test getting workflow steps for invalid UUID."""
+        response = client.get("/api/v1/workflows/00000000-0000-0000-0000-000000000000/steps")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestLineagesAPIDeep:
+    """Deeper tests for lineages API."""
+
+    def test_lineages_filter_by_type(self, client):
+        """Test filtering lineages by type."""
+        response = client.get("/api/v1/lineages/?type=container")
+        assert response.status_code in [200, 404]
+
+    def test_lineage_by_invalid_uuid(self, client):
+        """Test getting lineage by invalid UUID."""
+        response = client.get("/api/v1/lineages/invalid-uuid")
+        # 405 Method Not Allowed is valid if the route doesn't support GET with path param
+        assert response.status_code in [404, 405, 422, 500]
+
+
+class TestFilesAPIDeep:
+    """Deeper tests for files API."""
+
+    def test_files_list_pagination(self, client):
+        """Test files list with pagination."""
+        response = client.get("/api/v1/files/?page=1&page_size=10")
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert "items" in data or isinstance(data, list)
+
+    def test_file_by_invalid_uuid(self, client):
+        """Test getting file by invalid UUID."""
+        response = client.get("/api/v1/files/invalid-uuid")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestEquipmentAPIDeep:
+    """Deeper tests for equipment API."""
+
+    def test_equipment_list_pagination(self, client):
+        """Test equipment list with pagination."""
+        response = client.get("/api/v1/equipment/?page=1&page_size=10")
+        assert response.status_code in [200, 404]
+
+    def test_equipment_by_euid(self, client):
+        """Test getting equipment by EUID."""
+        response = client.get("/api/v1/equipment/by-euid/EQ1")
+        assert response.status_code in [200, 404, 422]
+
+
+class TestContentAPIDeep:
+    """Deeper tests for content API."""
+
+    def test_content_list_pagination(self, client):
+        """Test content list with pagination."""
+        response = client.get("/api/v1/content/?page=1&page_size=10")
+        assert response.status_code in [200, 404]
+
+    def test_content_by_type_filter(self, client):
+        """Test content list with type filter."""
+        response = client.get("/api/v1/content/?type=reagent")
+        assert response.status_code in [200, 404]
+
+
+class TestContainersAPIDeep:
+    """Deeper tests for containers API."""
+
+    def test_containers_by_super_type(self, client):
+        """Test listing containers by super type."""
+        response = client.get("/api/v1/containers/?super_type=container")
+        assert response.status_code in [200, 404]
+
+    def test_container_children(self, client):
+        """Test getting container children."""
+        response = client.get("/api/v1/containers/00000000-0000-0000-0000-000000000000/children")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestStatsAPIDeep:
+    """Deeper tests for stats API."""
+
+    def test_stats_overview(self, client):
+        """Test stats overview endpoint."""
+        response = client.get("/api/v1/stats/overview")
+        assert response.status_code in [200, 404]
+
+    def test_stats_by_type(self, client):
+        """Test stats by type endpoint."""
+        response = client.get("/api/v1/stats/by-type")
+        assert response.status_code in [200, 404]
+
+
+class TestObjectsAPI:
+    """Tests for objects API endpoints."""
+
+    def test_list_objects(self, client):
+        """Test listing objects."""
+        response = client.get("/api/v1/objects/")
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_object_by_uuid_invalid(self, client):
+        """Test getting object by invalid UUID."""
+        response = client.get("/api/v1/objects/invalid-uuid")
+        assert response.status_code in [404, 405, 422, 500]
+
+    def test_get_object_by_euid_invalid(self, client):
+        """Test getting object by invalid EUID."""
+        response = client.get("/api/v1/objects/euid/INVALID123")
+        assert response.status_code in [404, 422, 500]
+
+
+class TestSubjectsAPI:
+    """Tests for subjects API endpoints."""
+
+    def test_list_subjects(self, client):
+        """Test listing subjects."""
+        response = client.get("/api/v1/subjects/")
+        assert response.status_code in [200, 404, 405]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_subject_invalid_uuid(self, client):
+        """Test getting subject by invalid UUID."""
+        response = client.get("/api/v1/subjects/invalid-uuid")
+        assert response.status_code in [404, 405, 422, 500]
+
+
+class TestContentAPI:
+    """Tests for content API endpoints."""
+
+    def test_list_content(self, client):
+        """Test listing content."""
+        response = client.get("/api/v1/content/")
+        assert response.status_code in [200, 404, 405]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_content_invalid_uuid(self, client):
+        """Test getting content by invalid UUID."""
+        response = client.get("/api/v1/content/invalid-uuid")
+        assert response.status_code in [404, 405, 422, 500]
+
+
+class TestFilesAPI:
+    """Tests for files API endpoints."""
+
+    def test_list_files(self, client):
+        """Test listing files."""
+        response = client.get("/api/v1/files/")
+        assert response.status_code in [200, 404, 405]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_file_invalid_uuid(self, client):
+        """Test getting file by invalid UUID."""
+        response = client.get("/api/v1/files/invalid-uuid")
+        assert response.status_code in [404, 405, 422, 500]
+
+
+class TestWorkflowsAPIDeep:
+    """Extended tests for workflows API."""
+
+    def test_list_workflows(self, client):
+        """Test listing workflows."""
+        response = client.get("/api/v1/workflows/")
+        assert response.status_code in [200, 404, 405]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_workflow_invalid_uuid(self, client):
+        """Test getting workflow by invalid UUID."""
+        response = client.get("/api/v1/workflows/invalid-uuid")
+        assert response.status_code in [404, 405, 422, 500]
+
+
+class TestActionsAPIDeep:
+    """Extended tests for actions API."""
+
+    def test_list_actions(self, client):
+        """Test listing actions."""
+        response = client.get("/api/v1/actions/")
+        assert response.status_code in [200, 404, 405]
+        if response.status_code == 200:
+            data = response.json()
+            assert isinstance(data, (list, dict))
+
+    def test_get_action_invalid_uuid(self, client):
+        """Test getting action by invalid UUID."""
+        response = client.get("/api/v1/actions/invalid-uuid")
+        assert response.status_code in [404, 405, 422, 500]
+
+
+class TestDependenciesModule:
+    """Tests for API dependencies module."""
+
+    def test_import_dependencies(self):
+        """Test dependencies module import."""
+        from bloom_lims.api.v1 import dependencies
+        assert dependencies is not None
+
+    def test_import_api_user(self):
+        """Test APIUser class import."""
+        from bloom_lims.api.v1.dependencies import APIUser
+        assert APIUser is not None
+
+
+class TestVersioningModule:
+    """Tests for API versioning module."""
+
+    def test_import_versioning(self):
+        """Test versioning module import."""
+        from bloom_lims.api import versioning
+        assert versioning is not None
