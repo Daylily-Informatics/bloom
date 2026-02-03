@@ -1606,7 +1606,7 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=content)
 
 @app.post("/save_json_addl_key")
-async def save_json_addl_key(request: Request):
+async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
     try:
         # Extract JSON data from the request
         data = await request.json()
@@ -2002,7 +2002,7 @@ async def update_obj_json_addl_properties(
 
 
 @app.get("/dagg", response_class=HTMLResponse)
-async def dagg(request: Request):
+async def dagg(request: Request, _auth=Depends(require_auth)):
     content = templates.get_template("legacy/dag.html").render()
     return HTMLResponse(content=content)
 
@@ -3036,8 +3036,9 @@ async def create_file_set(
     host: str = Form(""),
     port: int = Form(0),
     user: str = Form(""),
-    passwd: str = Form("") 
-):        
+    passwd: str = Form(""),
+    _auth=Depends(require_auth),
+):
     rclone_config = {
                 "bucket": bucket,
                 "host": host,
@@ -3274,7 +3275,7 @@ class FormField(BaseModel):
     options: List[str] = []
 
 @app.get("/create_instance/{template_euid}", response_class=HTMLResponse)
-async def create_instance_form(request: Request, template_euid: str):
+async def create_instance_form(request: Request, template_euid: str, _auth=Depends(require_auth)):
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     
     template_instance = bobj.get_by_euid(template_euid)
@@ -3421,7 +3422,7 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
 
 
 @app.post("/create_instance")
-async def create_instance(request: Request):
+async def create_instance(request: Request, _auth=Depends(require_auth)):
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     form_data = await request.form()
     #form_data_dict = form_data._dict
