@@ -46,9 +46,9 @@ from bloom_lims.domain.utils import (
     unique_non_empty_strings,
 )
 
-# Try to import fedex tracking module
+# Try to import carrier tracking module (replaced fedex_tracking_day with daylily_carrier_tracking)
 try:
-    import fedex_tracking_day.fedex_track as FTD
+    import daylily_carrier_tracking as FTD
 except Exception:
     FTD = None
 
@@ -76,9 +76,9 @@ class BloomObj:
         if cfg_fedex:
             fedex_key = os.environ.get("FEDEX_API_KEY")
             fedex_secret = os.environ.get("FEDEX_SECRET")
-            if fedex_key and fedex_secret and "FTD" in globals():
+            if fedex_key and fedex_secret and FTD is not None:
                 try:
-                    self.track_fedex = FTD.FedexTrack()
+                    self.track_fedex = FTD.FedexTracker()
                 except Exception as e:
                     self.logger.warning(
                         "FedEx tracking disabled; failed to initialize client: %s", e

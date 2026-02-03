@@ -126,7 +126,7 @@ import sqlalchemy.orm as sqla_orm
 import zebra_day.print_mgr as zdpm
 
 try:
-    import fedex_tracking_day.fedex_track as FTD
+    import daylily_carrier_tracking as FTD
 except Exception:
     pass
 
