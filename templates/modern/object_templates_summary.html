@@ -1,0 +1,159 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Object Templates{% endblock %}
+
+{% block page_title %}Object Templates{% endblock %}
+{% block page_subtitle %}All available templates for creating LIMS objects{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="card-title mb-0"><i class="fas fa-cubes me-2"></i>Template Filters</h3>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            {% for discriminator in unique_discriminators %}
+            <button class="btn btn-outline-secondary btn-sm filter-btn" data-discriminator="{{ discriminator }}">
+                {{ discriminator }}
+            </button>
+            {% endfor %}
+            <button class="btn btn-outline-warning btn-sm" id="toggleInactiveBtn">
+                <i class="fas fa-eye-slash me-1"></i>Toggle Inactive
+            </button>
+        </div>
+        <div class="alert alert-warning mb-0">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Caution:</strong> Only create instances from this list if you know what you are doing.
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title mb-0"><i class="fas fa-list me-2"></i>Templates ({{ generic_templates|length }})</h3>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="templatesTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-col="0">EUID</th>
+                        <th class="sortable" data-col="1">Status</th>
+                        <th class="sortable" data-col="2">Type</th>
+                        <th class="sortable" data-col="3">Super Type</th>
+                        <th class="sortable" data-col="4">B Type</th>
+                        <th class="sortable" data-col="5">B Sub Type</th>
+                        <th class="sortable" data-col="6">Version</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in generic_templates %}
+                    <tr data-discriminator="{{ template.polymorphic_discriminator }}" 
+                        data-status="{{ template.bstatus }}"
+                        class="{% if template.bstatus == 'inactive' %}table-secondary text-muted inactive-row{% endif %}">
+                        <td>
+                            <a href="/euid_details?euid={{ template.euid }}" class="text-primary fw-bold">
+                                {{ template.euid }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge {% if template.bstatus == 'active' %}bg-success{% elif template.bstatus == 'inactive' %}bg-secondary{% else %}bg-info{% endif %}">
+                                {{ template.bstatus }}
+                            </span>
+                        </td>
+                        <td><code>{{ template.polymorphic_discriminator }}</code></td>
+                        <td>{{ template.super_type }}</td>
+                        <td>{{ template.btype }}</td>
+                        <td>{{ template.b_sub_type }}</td>
+                        <td>{{ template.version }}</td>
+                        <td>
+                            <a href="/create_instance/{{ template.euid }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus me-1"></i>Create
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Hide inactive rows by default
+    document.querySelectorAll('.inactive-row').forEach(row => row.style.display = 'none');
+    
+    // Filter buttons
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    const activeFilters = new Set();
+    
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const disc = this.dataset.discriminator;
+            if (activeFilters.has(disc)) {
+                activeFilters.delete(disc);
+                this.classList.remove('active', 'btn-primary');
+                this.classList.add('btn-outline-secondary');
+            } else {
+                activeFilters.add(disc);
+                this.classList.add('active', 'btn-primary');
+                this.classList.remove('btn-outline-secondary');
+            }
+            applyFilters();
+        });
+    });
+    
+    function applyFilters() {
+        document.querySelectorAll('#templatesTable tbody tr').forEach(row => {
+            const disc = row.dataset.discriminator;
+            const isInactive = row.classList.contains('inactive-row');
+            const showInactive = document.getElementById('toggleInactiveBtn').classList.contains('active');
+            
+            let show = true;
+            if (activeFilters.size > 0 && !activeFilters.has(disc)) show = false;
+            if (isInactive && !showInactive) show = false;
+            
+            row.style.display = show ? '' : 'none';
+        });
+    }
+    
+    // Toggle inactive button
+    document.getElementById('toggleInactiveBtn').addEventListener('click', function() {
+        this.classList.toggle('active');
+        this.classList.toggle('btn-warning');
+        this.classList.toggle('btn-outline-warning');
+        applyFilters();
+    });
+    
+    // Sortable columns
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function() {
+            const col = parseInt(this.dataset.col);
+            sortTable(col);
+        });
+    });
+    
+    let sortCol = -1, sortAsc = true;
+    function sortTable(col) {
+        const tbody = document.querySelector('#templatesTable tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        sortAsc = (col === sortCol) ? !sortAsc : true;
+        sortCol = col;
+        rows.sort((a, b) => {
+            const aVal = a.cells[col].textContent.trim().toLowerCase();
+            const bVal = b.cells[col].textContent.trim().toLowerCase();
+            return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        });
+        rows.forEach(row => tbody.appendChild(row));
+    }
+});
+</script>
+{% endblock %}
+

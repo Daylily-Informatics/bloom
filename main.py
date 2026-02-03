@@ -42,7 +42,16 @@ _init_aws_profile()
 from IPython import embed
 import nest_asyncio
 
-nest_asyncio.apply()
+# Only apply nest_asyncio if not running under uvloop (which uvicorn uses by default)
+try:
+    import asyncio
+    loop = asyncio.get_event_loop()
+    # Check if uvloop is being used - if so, skip nest_asyncio
+    if "uvloop" not in type(loop).__module__:
+        nest_asyncio.apply()
+except RuntimeError:
+    # No event loop running yet, safe to apply
+    nest_asyncio.apply()
 
 import difflib
 
@@ -1606,7 +1615,7 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=content)
 
 @app.post("/save_json_addl_key")
-async def save_json_addl_key(request: Request):
+async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
     try:
         # Extract JSON data from the request
         data = await request.json()
@@ -1654,16 +1663,17 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
         set(t.polymorphic_discriminator for t in generic_templates)
     )
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    content = templates.get_template("legacy/object_templates_summary.html").render(
-        request=request,
-        generic_templates=generic_templates,
-        unique_discriminators=unique_discriminators,
-        style=style,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    # Use modern template
+    template = templates.get_template("modern/object_templates_summary.html")
+    context = {
+        "request": request,
+        "generic_templates": generic_templates,
+        "unique_discriminators": unique_discriminators,
+        "udat": user_data,
+        "user": user_data,
+    }
+    return HTMLResponse(content=template.render(context))
 
 # Quick hack to allow the details page to display deleted items.  Need to rework how the rest of the system juggles this.
 @app.get("/euid_details")
@@ -2002,7 +2012,7 @@ async def update_obj_json_addl_properties(
 
 
 @app.get("/dagg", response_class=HTMLResponse)
-async def dagg(request: Request):
+async def dagg(request: Request, _auth=Depends(require_auth)):
     content = templates.get_template("legacy/dag.html").render()
     return HTMLResponse(content=content)
 
@@ -3036,8 +3046,9 @@ async def create_file_set(
     host: str = Form(""),
     port: int = Form(0),
     user: str = Form(""),
-    passwd: str = Form("") 
-):        
+    passwd: str = Form(""),
+    _auth=Depends(require_auth),
+):
     rclone_config = {
                 "bucket": bucket,
                 "host": host,
@@ -3274,7 +3285,7 @@ class FormField(BaseModel):
     options: List[str] = []
 
 @app.get("/create_instance/{template_euid}", response_class=HTMLResponse)
-async def create_instance_form(request: Request, template_euid: str):
+async def create_instance_form(request: Request, template_euid: str, _auth=Depends(require_auth)):
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     
     template_instance = bobj.get_by_euid(template_euid)
@@ -3421,7 +3432,7 @@ def generate_ui_form_fields(ui_form_properties: List[Dict], controlled_propertie
 
 
 @app.post("/create_instance")
-async def create_instance(request: Request):
+async def create_instance(request: Request, _auth=Depends(require_auth)):
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     form_data = await request.form()
     #form_data_dict = form_data._dict
