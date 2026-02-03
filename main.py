@@ -598,11 +598,15 @@ async def get_login_page(request: Request):
     """Modern login page."""
     user_data = request.session.get("user_data", {})
 
-    try:
-        cognito = get_cognito_auth()
-        cognito_login_url = cognito.config.authorize_url
-    except CognitoConfigurationError as exc:
-        raise MissingCognitoEnvVarsException(str(exc)) from exc
+    # When OAuth is disabled (testing), use placeholder URL
+    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
+        cognito_login_url = "#auth-disabled"
+    else:
+        try:
+            cognito = get_cognito_auth()
+            cognito_login_url = cognito.config.authorize_url
+        except CognitoConfigurationError as exc:
+            raise MissingCognitoEnvVarsException(str(exc)) from exc
 
     # Use modern login template
     template = templates.get_template("modern/login.html")
@@ -621,11 +625,15 @@ async def get_legacy_login_page(request: Request):
     user_data = request.session.get("user_data", {})
     style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
 
-    try:
-        cognito = get_cognito_auth()
-        cognito_login_url = cognito.config.authorize_url
-    except CognitoConfigurationError as exc:
-        raise MissingCognitoEnvVarsException(str(exc)) from exc
+    # When OAuth is disabled (testing), use placeholder URL
+    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
+        cognito_login_url = "#auth-disabled"
+    else:
+        try:
+            cognito = get_cognito_auth()
+            cognito_login_url = cognito.config.authorize_url
+        except CognitoConfigurationError as exc:
+            raise MissingCognitoEnvVarsException(str(exc)) from exc
 
     template = templates.get_template("legacy/login.html")
     context = {
@@ -2074,6 +2082,13 @@ async def user_audit_logs(request: Request, username: str, _auth=Depends(require
 @app.get("/user_home", response_class=HTMLResponse)
 async def user_home(request: Request):
 
+    # When OAuth is disabled (testing), populate session with test user data
+    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
+        request.session["user_data"] = request.session.get("user_data") or {
+            "email": "john@daylilyinformatics.com",
+            "dag_fnv2": "",
+        }
+
     user_data = request.session.get("user_data", {})
     session_data = request.session.get("session_data", {})  # Extract session_data from session
 
@@ -2084,14 +2099,17 @@ async def user_home(request: Request):
 
     # Directory containing the CSS files
     skins_directory = "static/skins"
-    css_files = [f"{skins_directory}/{file}" for file in os.listdir(skins_directory) if file.endswith(".css")]
+    try:
+        css_files = [f"{skins_directory}/{file}" for file in os.listdir(skins_directory) if file.endswith(".css")]
+    except FileNotFoundError:
+        css_files = []
 
     style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
     dest_section = request.query_params.get("dest_section", {"section": ""})  # Example value
 
     if "print_lab" in user_data:
         bobdb.get_lab_printers(user_data["print_lab"])
-        
+
     printer_info = {
         "print_lab": bobdb.printer_labs,
         "printer_name": bobdb.site_printers,
@@ -2106,15 +2124,23 @@ async def user_home(request: Request):
     fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()
     zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()
 
-    try:
-        cognito = get_cognito_auth()
+    # When OAuth is disabled (testing), use placeholder Cognito details
+    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
         cognito_details = {
-            "domain": cognito.config.domain,
-            "user_pool_id": cognito.config.user_pool_id,
-            "client_id": cognito.config.client_id,
+            "domain": "auth-disabled",
+            "user_pool_id": "auth-disabled",
+            "client_id": "auth-disabled",
         }
-    except CognitoConfigurationError as exc:
-        raise MissingCognitoEnvVarsException(str(exc)) from exc
+    else:
+        try:
+            cognito = get_cognito_auth()
+            cognito_details = {
+                "domain": cognito.config.domain,
+                "user_pool_id": cognito.config.user_pool_id,
+                "client_id": cognito.config.client_id,
+            }
+        except CognitoConfigurationError as exc:
+            raise MissingCognitoEnvVarsException(str(exc)) from exc
 
     # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
     content = templates.get_template("legacy/user_home.html").render(
