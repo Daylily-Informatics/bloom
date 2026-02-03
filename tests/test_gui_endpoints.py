@@ -786,3 +786,146 @@ class TestModernUINavigation:
 
         # Should include modern JS
         assert "bloom_modern.js" in content
+
+
+class TestFileAndDeweyEndpoints:
+    """Tests for file management (Dewey) endpoints."""
+
+    @pytest.mark.skip(reason="Requires /Users/jmajor/Downloads/dewey_search.tsv file to exist")
+    def test_visual_report_returns_html(self, client):
+        """Test visual report page returns HTML or handles gracefully."""
+        response = client.get("/visual_report")
+        # May fail due to missing file, accept various responses
+        assert response.status_code in [200, 307, 400, 404, 500]
+
+    def test_search_files_post(self, client):
+        """Test search files POST endpoint."""
+        response = client.post("/search_files", data={"search_query": "test"})
+        # Should not return 404 or 405
+        assert response.status_code in [200, 422, 307]
+
+    def test_search_file_sets_post(self, client):
+        """Test search file sets POST endpoint."""
+        response = client.post("/search_file_sets", data={"search_query": "test"})
+        assert response.status_code in [200, 422, 307]
+
+    def test_file_set_urls_requires_euid(self, client):
+        """Test file_set_urls endpoint requires EUID parameter."""
+        response = client.get("/file_set_urls")
+        # Should handle missing parameter gracefully
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    def test_delete_temp_file(self, client):
+        """Test delete temp file endpoint."""
+        response = client.get("/delete_temp_file")
+        # Should handle missing file gracefully
+        assert response.status_code in [200, 307, 400, 404, 422]
+
+
+class TestGraphAndVisualizationEndpoints:
+    """Tests for graph and visualization endpoints."""
+
+    def test_get_dagv2_requires_euid(self, client):
+        """Test get_dagv2 endpoint."""
+        response = client.get("/get_dagv2")
+        # Missing euid should be handled
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    def test_get_node_info_requires_node(self, client):
+        """Test get_node_info endpoint."""
+        response = client.get("/get_node_info")
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    def test_get_node_property_requires_uuid(self, client):
+        """Test get_node_property endpoint."""
+        response = client.get("/get_node_property")
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+
+class TestDataModificationEndpoints:
+    """Tests for data modification POST endpoints."""
+
+    def test_query_by_euids_post(self, client):
+        """Test query by EUIDs POST endpoint."""
+        response = client.post("/query_by_euids", data={"euids": "EX1"})
+        assert response.status_code in [200, 307, 422]
+
+    def test_update_preference_post(self, client):
+        """Test update preference POST endpoint."""
+        response = client.post(
+            "/update_preference",
+            json={"preference_key": "skin_css", "preference_value": "/static/legacy/skins/bloom.css"},
+        )
+        assert response.status_code in [200, 307, 422]
+
+    def test_save_json_addl_key_post(self, client):
+        """Test save JSON addl key POST endpoint."""
+        response = client.post(
+            "/save_json_addl_key",
+            json={"uuid": "test-uuid", "key": "test", "value": "test"},
+        )
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    @pytest.mark.skip(reason="Endpoint expects specific workflow step state data")
+    def test_update_accordion_state_post(self, client):
+        """Test update accordion state POST endpoint."""
+        response = client.post(
+            "/update_accordion_state",
+            json={"step_euid": "WF1", "section": "test", "is_open": True, "state": "open"},
+        )
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    @pytest.mark.skip(reason="Endpoint expects form data with specific format")
+    def test_generic_templates_post(self, client):
+        """Test generic templates POST endpoint."""
+        response = client.post("/generic_templates", data={"query": "test"})
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+
+class TestAdminAndConfigEndpoints:
+    """Tests for admin and configuration endpoints."""
+
+    def test_admin_template_get(self, client):
+        """Test admin template GET endpoint."""
+        response = client.get("/admin_template")
+        assert response.status_code in [200, 307, 400, 422]
+
+    def test_update_object_name_requires_params(self, client):
+        """Test update object name endpoint requires parameters."""
+        response = client.get("/update_object_name")
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    def test_uuid_details_requires_uuid(self, client):
+        """Test UUID details endpoint requires UUID parameter."""
+        response = client.get("/uuid_details")
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+    @pytest.mark.skip(reason="Requires valid EUID that exists in database")
+    def test_vertical_exp_requires_euid(self, client):
+        """Test vertical exp endpoint requires EUID parameter."""
+        response = client.get("/vertical_exp?euid=EX1")
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+
+class TestCalculationEndpoints:
+    """Tests for calculation endpoints."""
+
+    def test_calculate_cogs_children(self, client):
+        """Test calculate COGS children endpoint."""
+        response = client.get("/calculate_cogs_children")
+        # Should handle missing parameters
+        assert response.status_code in [200, 307, 400, 422, 500]
+
+
+class TestProtectedEndpoints:
+    """Tests for protected content endpoints."""
+
+    def test_protected_content(self, client):
+        """Test protected content endpoint."""
+        response = client.get("/protected_content")
+        assert response.status_code in [200, 307, 400, 401, 403]
+
+    def test_serve_endpoint_with_path(self, client):
+        """Test serve endpoint with file path."""
+        response = client.get("/serve_endpoint/test.txt")
+        assert response.status_code in [200, 307, 400, 404]

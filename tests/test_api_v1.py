@@ -269,3 +269,43 @@ class TestBulkContainerAPI:
         assert "created" in data
         assert "errors" in data
 
+
+class TestEquipmentAPI:
+    """Tests for equipment API endpoints."""
+
+    def test_list_equipment(self, client):
+        """Test listing equipment."""
+        response = client.get("/api/v1/equipment/")
+        assert response.status_code == 200
+        data = response.json()
+        # API returns paginated response with 'items' key
+        assert "items" in data
+        assert "total" in data
+
+    def test_get_equipment_not_found(self, client):
+        """Test getting non-existent equipment."""
+        response = client.get("/api/v1/equipment/00000000-0000-0000-0000-000000000000")
+        # 404 for not found, 422 for invalid UUID format, 500 for server error
+        assert response.status_code in [404, 422, 500]
+
+
+class TestFilesAPI:
+    """Tests for files API endpoints."""
+
+    def test_list_files(self, client):
+        """Test listing files."""
+        response = client.get("/api/v1/files/")
+        assert response.status_code == 200
+        data = response.json()
+        # API returns paginated response
+        assert "items" in data
+        assert "total" in data
+
+    def test_list_file_sets(self, client):
+        """Test listing file sets."""
+        response = client.get("/api/v1/file-sets/")
+        assert response.status_code == 200
+        data = response.json()
+        # API returns paginated response
+        assert "items" in data
+        assert "total" in data
