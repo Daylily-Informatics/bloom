@@ -40,7 +40,7 @@ dependencies:
   - gunicorn
   - pip:
     - -e ../daylily-tapdb
-    - zebra_day==2.0.0
+    - zebra_day==2.1.4
     - daylily-carrier-tracking==0.1.0
     - black
     - uvicorn==0.28.0
