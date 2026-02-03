@@ -379,8 +379,76 @@ class TestObjectCreationAPI:
 
     def test_get_sub_types(self, client):
         """Test getting sub types."""
-        response = client.get("/api/v1/object-creation/sub-types?super_type=container&b_type=plate")
+        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=plate")
         assert response.status_code in [200, 404, 422]
+
+
+class TestObjectCreationPathTraversal:
+    """Tests for path traversal protection in object creation API."""
+
+    def test_types_rejects_path_traversal_dotdot(self, client):
+        """Test that /types rejects .. in super_type."""
+        response = client.get("/api/v1/object-creation/types?super_type=..")
+        assert response.status_code == 400
+        assert "parent directory" in response.json().get("detail", "").lower()
+
+    def test_types_rejects_path_traversal_slash(self, client):
+        """Test that /types rejects / in super_type."""
+        response = client.get("/api/v1/object-creation/types?super_type=container/../../etc")
+        assert response.status_code == 400
+        assert "path separator" in response.json().get("detail", "").lower()
+
+    def test_types_rejects_path_traversal_backslash(self, client):
+        """Test that /types rejects \\ in super_type."""
+        response = client.get("/api/v1/object-creation/types?super_type=container\\..\\etc")
+        assert response.status_code == 400
+        assert "path separator" in response.json().get("detail", "").lower()
+
+    def test_sub_types_rejects_path_traversal_super_type(self, client):
+        """Test that /sub-types rejects .. in super_type."""
+        response = client.get("/api/v1/object-creation/sub-types?super_type=..&btype=plate")
+        assert response.status_code == 400
+        assert "parent directory" in response.json().get("detail", "").lower()
+
+    def test_sub_types_rejects_path_traversal_btype(self, client):
+        """Test that /sub-types rejects .. in btype."""
+        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=../../../etc/passwd")
+        assert response.status_code == 400
+        assert "path separator" in response.json().get("detail", "").lower()
+
+    def test_template_rejects_path_traversal_super_type(self, client):
+        """Test that /template rejects .. in super_type."""
+        response = client.get(
+            "/api/v1/object-creation/template?super_type=..&btype=plate&b_sub_type=test&version=1"
+        )
+        assert response.status_code == 400
+        assert "parent directory" in response.json().get("detail", "").lower()
+
+    def test_template_rejects_path_traversal_btype(self, client):
+        """Test that /template rejects path traversal in btype."""
+        response = client.get(
+            "/api/v1/object-creation/template?super_type=container&btype=../../../etc/passwd&b_sub_type=test&version=1"
+        )
+        assert response.status_code == 400
+        assert "path separator" in response.json().get("detail", "").lower()
+
+    def test_types_accepts_valid_super_type(self, client):
+        """Test that /types accepts valid super_type values."""
+        response = client.get("/api/v1/object-creation/types?super_type=container")
+        # Should be 200 or 404 (if container doesn't exist), but NOT 400
+        assert response.status_code in [200, 404]
+
+    def test_sub_types_accepts_valid_params(self, client):
+        """Test that /sub-types accepts valid parameter values."""
+        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=plate")
+        # Should be 200 or 404, but NOT 400
+        assert response.status_code in [200, 404]
+
+    def test_types_rejects_invalid_characters(self, client):
+        """Test that /types rejects invalid characters in super_type."""
+        response = client.get("/api/v1/object-creation/types?super_type=Container")
+        assert response.status_code == 400
+        assert "lowercase" in response.json().get("detail", "").lower()
 
 
 class TestTemplatesAPIExtended:

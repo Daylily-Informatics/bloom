@@ -6,6 +6,7 @@ Endpoints to support the multi-step object creation workflow.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,71 @@ router = APIRouter(prefix="/object-creation", tags=["Object Creation"])
 
 # Path to config directory
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
+
+# Regex pattern for valid path components: lowercase letters, numbers, underscores, hyphens
+VALID_PATH_COMPONENT_PATTERN = re.compile(r"^[a-z0-9_-]+$")
+
+
+def validate_path_component(value: str, param_name: str) -> None:
+    """
+    Validate a path component to prevent path traversal attacks.
+
+    Args:
+        value: The path component to validate
+        param_name: Name of the parameter (for error messages)
+
+    Raises:
+        HTTPException: If validation fails
+    """
+    # Check for path separators
+    if "/" in value or "\\" in value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {param_name}: path separators not allowed"
+        )
+
+    # Check for parent directory references
+    if ".." in value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {param_name}: parent directory references not allowed"
+        )
+
+    # Check against whitelist pattern
+    if not VALID_PATH_COMPONENT_PATTERN.match(value):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {param_name}: must contain only lowercase letters, numbers, underscores, and hyphens"
+        )
+
+
+def validate_path_within_config(resolved_path: Path) -> None:
+    """
+    Verify that a resolved path stays within CONFIG_DIR.
+
+    Args:
+        resolved_path: The resolved (normalized) path to check
+
+    Raises:
+        HTTPException: If path is outside CONFIG_DIR
+    """
+    config_dir_resolved = CONFIG_DIR.resolve()
+    try:
+        # Python 3.9+ method
+        if not resolved_path.is_relative_to(config_dir_resolved):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid path: access denied"
+            )
+    except AttributeError:
+        # Fallback for Python < 3.9
+        try:
+            resolved_path.relative_to(config_dir_resolved)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid path: access denied"
+            )
 
 
 class CreateObjectRequest(BaseModel):
@@ -83,11 +149,18 @@ async def list_types(
 ):
     """
     List all available types (JSON files) for a super type.
-    
+
     Step 2 of the object creation wizard.
     """
+    # Validate path component to prevent path traversal
+    validate_path_component(super_type, "super_type")
+
     try:
         super_type_dir = CONFIG_DIR / super_type
+
+        # Verify resolved path stays within CONFIG_DIR
+        validate_path_within_config(super_type_dir.resolve())
+
         if not super_type_dir.exists() or not super_type_dir.is_dir():
             raise HTTPException(status_code=404, detail=f"Super type not found: {super_type}")
         
@@ -127,11 +200,19 @@ async def list_sub_types(
 ):
     """
     List all available sub-types and versions from a type's JSON file.
-    
+
     Step 3 of the object creation wizard.
     """
+    # Validate path components to prevent path traversal
+    validate_path_component(super_type, "super_type")
+    validate_path_component(btype, "btype")
+
     try:
         json_file = CONFIG_DIR / super_type / f"{btype}.json"
+
+        # Verify resolved path stays within CONFIG_DIR
+        validate_path_within_config(json_file.resolve())
+
         if not json_file.exists():
             raise HTTPException(status_code=404, detail=f"Type not found: {super_type}/{btype}")
         
@@ -174,8 +255,18 @@ async def get_template_details(
 
     Step 4 of the object creation wizard - provides data for the creation form.
     """
+    # Validate path components to prevent path traversal
+    # Note: b_sub_type and version are JSON keys, not filesystem paths,
+    # but we validate them anyway for defense in depth
+    validate_path_component(super_type, "super_type")
+    validate_path_component(btype, "btype")
+
     try:
         json_file = CONFIG_DIR / super_type / f"{btype}.json"
+
+        # Verify resolved path stays within CONFIG_DIR
+        validate_path_within_config(json_file.resolve())
+
         if not json_file.exists():
             raise HTTPException(status_code=404, detail=f"Type not found: {super_type}/{btype}")
 
