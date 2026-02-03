@@ -134,16 +134,19 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# PG databases
+# PG databases (includes bloom_lims/database/ which contains PostgreSQL data files)
 database/
 
-# Environments
+# Environments (Python virtual environments)
 .env
 .venv
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Explicitly include bloom_lims/env/ which contains SQL scripts and shell scripts (not a venv)
+!bloom_lims/env/
 
 # Spyder project settings
 .spyderproject
