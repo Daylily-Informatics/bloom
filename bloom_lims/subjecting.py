@@ -30,6 +30,11 @@ SUBJECT_TEMPLATE_MAP = {
     "analysis_bundle": "subject/generic/analysis-bundle-subject/1.0",
     "report": "subject/generic/report-subject/1.0",
     "generic": "subject/generic/generic-subject/1.0",
+    # Workset subject templates
+    "workset": "subject/workset/accession/1.0",  # Default workset template
+    "workset_accession": "subject/workset/accession/1.0",
+    "workset_extraction": "subject/workset/extraction/1.0",
+    "workset_sequencing": "subject/workset/sequencing/1.0",
 }
 
 

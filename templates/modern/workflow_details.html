@@ -212,12 +212,12 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.5rem;
+        padding-left: 2rem;  /* Indent under container */
         background: var(--color-gray-800);
         border-radius: var(--radius-sm);
         margin-bottom: 0.25rem;
-    }
-    .child-content-item:last-child {
-        margin-bottom: 0;
+        border-left: 3px solid var(--color-success);
+        margin-left: 1rem;  /* Additional left margin for nesting */
     }
     .child-content-type {
         font-size: 0.75rem;
@@ -243,6 +243,15 @@
         display: flex;
         align-items: center;
         gap: 0.25rem;
+    }
+    /* Override btn-outline for better visibility in accordion body */
+    .accordion-body .btn-outline {
+        color: var(--color-highlight);
+        border-color: var(--color-highlight);
+    }
+    .accordion-body .btn-outline:hover {
+        background: var(--color-highlight);
+        color: var(--color-white);
     }
     .action-group {
         display: flex;
@@ -472,8 +481,17 @@
         {% elif child.category == 'content' %}
             {% set _ = content_children.append(child) %}
         {% else %}
-            {# container category or other #}
+            {# container category #}
             {% set _ = container_children.append(child) %}
+            {# Also collect contents FROM this container #}
+            {% if child.parent_of_lineages %}
+                {% for content_lineage in child.parent_of_lineages %}
+                    {% set content = content_lineage.child_instance %}
+                    {% if content.category == 'content' %}
+                        {% set _ = content_children.append(content) %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
         {% endif %}
     {% endfor %}
 {% endif %}
@@ -580,64 +598,57 @@
                     </form>
                 </details>
 
-                <!-- Child Containers (collapsible) -->
+                <!-- Child Containers with nested Contents (collapsible) -->
                 {% if container_children|length > 0 %}
                 <div class="child-containers" id="containers-{{ step.euid }}">
                     <div class="child-containers-header">
                         <span class="child-containers-title">
                             <i class="fas fa-box"></i> Linked Containers ({{ container_children|length }})
+                            {% if content_children|length > 0 %}
+                            <span class="badge bg-success ms-1" title="Total contents">🧪 {{ content_children|length }}</span>
+                            {% endif %}
                         </span>
                         <button class="show-children-btn" onclick="toggleChildContainers('{{ step.euid }}')" data-expanded="false">
                             <i class="fas fa-chevron-down"></i> Show All
                         </button>
                     </div>
                     <div class="child-container-list" id="container-list-{{ step.euid }}" style="display: none;">
-                        {% for child in container_children %}
-                        <div class="child-container-item" data-child-euid="{{ child.euid }}">
-                            <span class="child-container-type">{{ child.type }}</span>
-                            <a href="/euid_details?euid={{ child.euid }}" class="child-container-euid">{{ child.euid }}</a>
-                            <span class="text-muted" style="font-size: 0.75rem;">{{ child.json_addl.get('properties', {}).get('name', '') }}</span>
-                            <a href="/dindex2?globalStartNodeEUID={{ child.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
-                            {% if child.type == 'plate' or child.type == 'rack' %}
-                            <a href="/plate_visualization?plate_euid={{ child.euid }}" title="View plate" style="color: var(--color-highlight);"><i class="fas fa-th"></i></a>
+                        {% for container in container_children %}
+                        <div class="child-container-item" data-child-euid="{{ container.euid }}">
+                            <span class="child-container-type">{{ container.type }}</span>
+                            <a href="/euid_details?euid={{ container.euid }}" class="child-container-euid">{{ container.euid }}</a>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ container.json_addl.get('properties', {}).get('name', '') }}</span>
+                            <a href="/dindex2?globalStartNodeEUID={{ container.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+                            {% if container.type == 'plate' or container.type == 'rack' %}
+                            <a href="/plate_visualization?plate_euid={{ container.euid }}" title="View plate" style="color: var(--color-highlight);"><i class="fas fa-th"></i></a>
                             {% endif %}
                         </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Child Contents (samples, reagents, etc. - collapsible) -->
-                {% if content_children|length > 0 %}
-                <div class="child-contents" id="contents-{{ step.euid }}">
-                    <div class="child-contents-header">
-                        <span class="child-contents-title">
-                            <i class="fas fa-vial"></i> Linked Contents ({{ content_children|length }})
-                        </span>
-                        <button class="show-children-btn" onclick="toggleChildContents('{{ step.euid }}')" data-expanded="false">
-                            <i class="fas fa-chevron-down"></i> Show All
-                        </button>
-                    </div>
-                    <div class="child-content-list" id="content-list-{{ step.euid }}" style="display: none;">
-                        {% for child in content_children %}
-                        <div class="child-content-item" data-child-euid="{{ child.euid }}">
-                            <span class="child-content-type">{{ child.type }}</span>
-                            <a href="/euid_details?euid={{ child.euid }}" class="child-content-euid">{{ child.euid }}</a>
-                            <span class="text-muted" style="font-size: 0.75rem;">{{ child.json_addl.get('properties', {}).get('name', '') }}</span>
+                        {# Show contents nested under this container #}
+                        {% if container.parent_of_lineages %}
+                        {% for content_lineage in container.parent_of_lineages %}
+                        {% set content = content_lineage.child_instance %}
+                        {% if content.category == 'content' %}
+                        <div class="child-content-item" data-child-euid="{{ content.euid }}">
+                            <span class="child-content-type">{{ content.type }}</span>
+                            <a href="/euid_details?euid={{ content.euid }}" class="child-content-euid">{{ content.euid }}</a>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ content.json_addl.get('properties', {}).get('name', '') }}</span>
                             <span class="content-meta">
-                                {% if child.json_addl.get('properties', {}).get('volume') %}
+                                {% if content.json_addl.get('properties', {}).get('volume') %}
                                 <span class="content-meta-item" title="Volume">
-                                    <i class="fas fa-tint"></i> {{ child.json_addl.get('properties', {}).get('volume') }}
+                                    <i class="fas fa-tint"></i> {{ content.json_addl.get('properties', {}).get('volume') }}
                                 </span>
                                 {% endif %}
-                                {% if child.json_addl.get('properties', {}).get('concentration') %}
+                                {% if content.json_addl.get('properties', {}).get('concentration') %}
                                 <span class="content-meta-item" title="Concentration">
-                                    <i class="fas fa-flask"></i> {{ child.json_addl.get('properties', {}).get('concentration') }}
+                                    <i class="fas fa-flask"></i> {{ content.json_addl.get('properties', {}).get('concentration') }}
                                 </span>
                                 {% endif %}
                             </span>
-                            <a href="/dindex2?globalStartNodeEUID={{ child.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+                            <a href="/dindex2?globalStartNodeEUID={{ content.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
                         </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
