@@ -55,17 +55,22 @@ flag_modified(instance, 'json_addl')  # Required!
 **ALWAYS use the standard template code format with trailing slash.**
 
 ```
-{super_type}/{btype}/{b_sub_type}/{version}/
+{category}/{type}/{subtype}/{version}/
 ```
 
 Example: `container/plate/fixed-plate-96/1.0/`
+
+> **Note:** Field names were updated to align with TapDB conventions:
+> - `super_type` → `category`
+> - `btype` → `type`
+> - `b_sub_type` → `subtype`
 
 ### Rule 6: Polymorphic Identity Naming
 
 **Polymorphic identities must follow the naming convention:**
 
-- Templates: `{super_type}_template` (e.g., `container_template`)
-- Instances: `{super_type}_instance` (e.g., `container_instance`)
+- Templates: `{category}_template` (e.g., `container_template`)
+- Instances: `{category}_instance` (e.g., `container_instance`)
 
 ### Rule 7: EUID Immutability
 
@@ -112,7 +117,7 @@ def would_create_cycle(parent_uuid, child_uuid, session):
 
 **Respect is_singleton constraints.**
 
-When `is_singleton = TRUE`, only one template can exist for a given (super_type, btype, b_sub_type, version) combination.
+When `is_singleton = TRUE`, only one template can exist for a given (category, type, subtype, version) combination.
 
 ---
 

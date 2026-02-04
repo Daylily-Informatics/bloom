@@ -102,11 +102,11 @@ class TestFindSubjectByKey:
     def test_find_subject_by_key_returns_matching_subject(self):
         """Test that find_subject_by_key returns matching subject."""
         from bloom_lims.subjecting import find_subject_by_key
-        
+
         # Create mock subject
         mock_subject = Mock()
         mock_subject.json_addl = {"properties": {"subject_key": "accession:CX123"}}
-        mock_subject.super_type = "subject"
+        mock_subject.category = "subject"
         mock_subject.is_deleted = False
         
         # Create mock bob

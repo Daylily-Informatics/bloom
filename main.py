@@ -349,9 +349,9 @@ def get_relationship_data(obj):
                     "euid": rel_obj.euid,
                     "uuid": rel_obj.uuid,
                     "polymorphic_discriminator": rel_obj.polymorphic_discriminator,
-                    "super_type": rel_obj.super_type,
-                    "btype": rel_obj.btype,
-                    "b_sub_type": rel_obj.b_sub_type,
+                    "category": rel_obj.category,
+                    "type": rel_obj.type,
+                    "subtype": rel_obj.subtype,
                     "version": rel_obj.version,
                 }
                 for rel_obj in getattr(obj, relationship.key)
@@ -374,9 +374,9 @@ def get_relationship_data(obj):
                         "euid": rel_obj.euid,
                         "uuid": rel_obj.uuid,
                         "polymorphic_discriminator": rel_obj.polymorphic_discriminator,
-                        "super_type": rel_obj.super_type,
-                        "btype": rel_obj.btype,
-                        "b_sub_type": rel_obj.b_sub_type,
+                        "category": rel_obj.category,
+                        "type": rel_obj.type,
+                        "subtype": rel_obj.subtype,
                         "version": rel_obj.version,
                     }
                     if rel_obj
@@ -460,7 +460,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
 
         reagents_total = bobdb.session.query(bobdb.Base.classes.content_instance).filter(
             bobdb.Base.classes.content_instance.is_deleted == False,
-            bobdb.Base.classes.content_instance.b_sub_type.like('%reagent%')
+            bobdb.Base.classes.content_instance.subtype.like('%reagent%')
         ).count()
     except Exception:
         assays_total = workflows_active = equipment_total = reagents_total = 0
@@ -533,11 +533,11 @@ async def modern_search(
         query_obj = bobdb.session.query(gi)
         query_obj = query_obj.filter(gi.is_deleted == False)
 
-        # Filter by super_types if specified
+        # Filter by categories if specified
         if types:
             type_list = [t.strip().lower() for t in types.split(",") if t.strip()]
             if type_list:
-                query_obj = query_obj.filter(gi.super_type.in_(type_list))
+                query_obj = query_obj.filter(gi.category.in_(type_list))
 
         # Search across multiple fields
         search_pattern = f"%{q}%"
@@ -545,8 +545,8 @@ async def modern_search(
             or_(
                 gi.euid.ilike(search_pattern),
                 gi.name.ilike(search_pattern),
-                gi.btype.ilike(search_pattern),
-                gi.b_sub_type.ilike(search_pattern),
+                gi.type.ilike(search_pattern),
+                gi.subtype.ilike(search_pattern),
                 cast(gi.json_addl, String).ilike(search_pattern),
             )
         )
@@ -1234,12 +1234,12 @@ async def generic_templates(request: Request, _auth=Depends(require_auth)):
         .all()
     )
 
-    # Group templates by super_type
+    # Group templates by category
     grouped_templates = {}
     for temp in the_templates:
-        if temp.super_type not in grouped_templates:
-            grouped_templates[temp.super_type] = []
-        grouped_templates[temp.super_type].append(temp)
+        if temp.category not in grouped_templates:
+            grouped_templates[temp.category] = []
+        grouped_templates[temp.category].append(temp)
     return HTMLResponse(grouped_templates)
 
 
@@ -1307,7 +1307,7 @@ async def workflow_summary(request: Request, _auth=Depends(require_auth)):
     )
 
     for wf in workflows:
-        wf_type = wf.btype
+        wf_type = wf.type
         wf_status = wf.bstatus
         wf_created_dt = wf.created_dt.date()
 
@@ -1392,12 +1392,12 @@ async def reagent_overview(request: Request, _auth=Depends(require_auth)):
     # Fetch equipment instances and templates
     reagent_instances = (
         bobdb.session.query(bobdb.Base.classes.content_instance)
-        .filter_by(is_deleted=False, btype="reagent")
+        .filter_by(is_deleted=False, type="reagent")
         .all()
     )
     reagent_templates = (
         bobdb.session.query(bobdb.Base.classes.content_template)
-        .filter_by(is_deleted=False, btype="reagent")
+        .filter_by(is_deleted=False, type="reagent")
         .all()
     )
     user_data = request.session.get("user_data", {})
@@ -1420,12 +1420,12 @@ async def control_overview(request: Request, _auth=Depends(require_auth)):
     # Fetch equipment instances and templates
     control_instances = (
         bobdb.session.query(bobdb.Base.classes.content_instance)
-        .filter_by(is_deleted=False, btype="control")
+        .filter_by(is_deleted=False, type="control")
         .all()
     )
     control_templates = (
         bobdb.session.query(bobdb.Base.classes.content_template)
-        .filter_by(is_deleted=False, btype="control")
+        .filter_by(is_deleted=False, type="control")
         .all()
     )
     user_data = request.session.get("user_data", {})
@@ -1535,14 +1535,14 @@ async def get_related_plates(request: Request, main_plate, _auth=Depends(require
     for parent_lineage in main_plate.parent_of_lineages:
         if parent_lineage.is_deleted:
             continue
-        if parent_lineage.child_instance.btype == "plate":
+        if parent_lineage.child_instance.type == "plate":
             related_plates.append(parent_lineage.child_instance)
 
     # Fetching descendant plates through child_of_lineages
     for child_lineage in main_plate.child_of_lineages:
         if child_lineage.is_deleted:
             continue
-        if child_lineage.parent_instance.btype == "plate":
+        if child_lineage.parent_instance.type == "plate":
             related_plates.append(child_lineage.parent_instance)
 
     # Remove duplicates from the related_plates list
@@ -1557,7 +1557,7 @@ async def get_related_plates(request: Request, main_plate, _auth=Depends(require
                 continue
             if (
                 lineage.parent_instance.euid == plate.euid
-                and lineage.child_instance.btype == "well"
+                and lineage.child_instance.type == "well"
             ):
                 cd = lineage.child_instance.json_addl.get("cont_address", {})
                 num_rows = max(num_rows, int(cd.get("row_idx", 0)))
@@ -1583,7 +1583,7 @@ async def plate_visualization(
     for i in plate.parent_of_lineages:
         if i.is_deleted:
             continue
-        if i.parent_instance.euid == plate.euid and i.child_instance.btype == "well":
+        if i.parent_instance.euid == plate.euid and i.child_instance.type == "well":
             cd = i.child_instance.json_addl["cont_address"]
             if int(cd["row_idx"]) > num_rows:
                 num_rows = int(cd["row_idx"])
@@ -1625,14 +1625,14 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
         # Synchronous SQLAlchemy query (BLOOM uses synchronous SQLAlchemy)
         return (
             bobdb.session.query(
-                bobdb.Base.classes.generic_instance.b_sub_type,
+                bobdb.Base.classes.generic_instance.subtype,
                 func.count(bobdb.Base.classes.generic_instance.uuid),
             )
             .filter(
                 bobdb.Base.classes.generic_instance.created_dt >= cutoff_date,
                 bobdb.Base.classes.generic_instance.is_deleted == False,
             )
-            .group_by(bobdb.Base.classes.generic_instance.b_sub_type)
+            .group_by(bobdb.Base.classes.generic_instance.subtype)
             .all()
         )
 
@@ -1665,14 +1665,14 @@ async def legacy_database_statistics(request: Request, _auth=Depends(require_aut
         cutoff_date = datetime.now() - timedelta(days=days)
         return (
             bobdb.session.query(
-                bobdb.Base.classes.generic_instance.b_sub_type,
+                bobdb.Base.classes.generic_instance.subtype,
                 func.count(bobdb.Base.classes.generic_instance.uuid),
             )
             .filter(
                 bobdb.Base.classes.generic_instance.created_dt >= cutoff_date,
                 bobdb.Base.classes.generic_instance.is_deleted == False,
             )
-            .group_by(bobdb.Base.classes.generic_instance.b_sub_type)
+            .group_by(bobdb.Base.classes.generic_instance.subtype)
             .all()
         )
 
@@ -2189,9 +2189,9 @@ async def get_node_info(request: Request, euid, _auth=Depends(require_auth)):
         return {
             "uuid": str(node_dat.uuid),
             "name": node_dat.name,
-            "btype": node_dat.btype,
+            "type": node_dat.type,
             "euid": node_dat.euid,
-            "b_sub_type": node_dat.b_sub_type,
+            "subtype": node_dat.subtype,
             "status": node_dat.bstatus,
             "json_addl": json.dumps(node_dat.json_addl),
         }
@@ -2376,9 +2376,9 @@ def generate_dag_json_from_all_objects_v2(
             instance = {
                 "euid": r[0],
                 "name": r[2],
-                "btype": r[3],
-                "super_type": r[4],
-                "b_sub_type": r[5],
+                "type": r[3],
+                "category": r[4],
+                "subtype": r[5],
                 "version": r[6],
             }
             instance_result[r[0]] = instance
@@ -2406,18 +2406,18 @@ def generate_dag_json_from_all_objects_v2(
                 "type": "instance",
                 "euid": str(instance["euid"]),
                 "name": instance["name"],
-                "btype": instance["btype"],
-                "super_type": instance["super_type"],
-                "b_sub_type": instance["super_type"]
+                "obj_type": instance["type"],
+                "category": instance["category"],
+                "subtype": instance["category"]
                 + "."
-                + instance["btype"]
+                + instance["type"]
                 + "."
-                + instance["b_sub_type"],
+                + instance["subtype"],
                 "version": instance["version"],
                 "color": (
-                    colors.get(instance["super_type"], "pink")
-                    if instance["btype"] not in ["well", "file_set"]
-                    else sub_colors.get(instance["b_sub_type"], "white")
+                    colors.get(instance["category"], "pink")
+                    if instance["type"] not in ["well", "file_set"]
+                    else sub_colors.get(instance["subtype"], "white")
                 ),
             }
         }
@@ -3057,7 +3057,7 @@ async def search_files(
             search_criteria["record_datetime"] = record_datetime_filter
 
         euid_results = bfi.search_objs_by_addl_metadata(
-            {'properties':search_criteria}, greedy, "file", super_type="file"
+            {'properties':search_criteria}, greedy, "file", category="file"
         )
 
         if created_datetime_start or created_datetime_end:
@@ -3268,7 +3268,7 @@ async def search_file_sets(
     try:
         bfs = BloomFileSet(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         file_sets = bfs.search_objs_by_addl_metadata(
-            {'properties':search_criteria}, greedy, "file_set", super_type="file"
+            {'properties':search_criteria}, greedy, "file_set", category="file"
         )
 
         # Fetch details for each EUID
@@ -3419,9 +3419,9 @@ async def create_instance_form(request: Request, template_euid: str, _auth=Depen
         udat=user_data,
         template_euid=template_euid,
         polymorphic_discriminator=template_instance.polymorphic_discriminator,
-        super_type=template_instance.super_type,
-        btype=template_instance.btype,
-        b_sub_type=template_instance.b_sub_type,
+        category=template_instance.category,
+        type=template_instance.type,
+        subtype=template_instance.subtype,
         version=template_instance.version,
         name=template_instance.name,
         controlled_properties=template_data.get("controlled_properties", {}),
@@ -3572,12 +3572,12 @@ async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_au
         for lineage in file_set.parent_of_lineages:
             if lineage.is_deleted:
                 continue
-            if lineage.child_instance.btype == 'shared_ref':
- 
+            if lineage.child_instance.type == 'shared_ref':
+
                 orig_file = None
                 for x in lineage.child_instance.child_of_lineages.all():
-                    if x.parent_instance.btype == 'file':
-                        orig_file = x.parent_instance                
+                    if x.parent_instance.type == 'file':
+                        orig_file = x.parent_instance
                         
                 shared_refs.append({
                     "euid": lineage.child_instance.euid,

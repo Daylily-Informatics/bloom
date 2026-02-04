@@ -42,28 +42,28 @@ async def list_files(
     """List files with optional filters."""
     try:
         bdb = get_bdb()
-        
+
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.super_type == "file")
-        
+        query = query.filter(bdb.Base.classes.generic_instance.category == "file")
+
         if file_type:
-            query = query.filter(bdb.Base.classes.generic_instance.btype == file_type.lower())
+            query = query.filter(bdb.Base.classes.generic_instance.type == file_type.lower())
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
-        
+
         query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+
         total = query.count()
         offset = (page - 1) * page_size
         items = query.limit(page_size).offset(offset).all()
-        
+
         return {
             "items": [
                 {
                     "euid": obj.euid,
                     "uuid": str(obj.uuid),
                     "name": obj.name,
-                    "file_type": obj.btype,
+                    "file_type": obj.type,
                     "status": obj.bstatus,
                     "s3_uri": obj.json_addl.get("properties", {}).get("s3_uri") if obj.json_addl else None,
                 }
@@ -84,20 +84,20 @@ async def get_file(euid: str):
     try:
         bdb = get_bdb()
         from bloom_lims.bobjs import BloomFile
-        
+
         bf = BloomFile(bdb)
         file_obj = bf.get_by_euid(euid)
-        
+
         if not file_obj:
             raise HTTPException(status_code=404, detail=f"File not found: {euid}")
-        
+
         props = file_obj.json_addl.get("properties", {}) if file_obj.json_addl else {}
-        
+
         return {
             "euid": file_obj.euid,
             "uuid": str(file_obj.uuid),
             "name": file_obj.name,
-            "file_type": file_obj.btype,
+            "file_type": file_obj.type,
             "status": file_obj.bstatus,
             "s3_uri": props.get("s3_uri"),
             "s3_bucket": props.get("current_s3_bucket_name"),

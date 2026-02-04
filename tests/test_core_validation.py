@@ -10,7 +10,7 @@ from bloom_lims.core.validation import (
     validate_euid,
     validate_uuid,
     validate_json_addl,
-    validate_btype,
+    validate_type,
     validate_not_empty,
     validate_positive_int,
     validated,
@@ -265,7 +265,7 @@ class TestTemplateValidator:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create subdirectory for super_type
+            # Create subdirectory for category
             workflow_dir = tmppath / "workflow"
             workflow_dir.mkdir()
 
@@ -446,23 +446,23 @@ class TestCoreValidationAdditional:
         # None should be valid (optional field)
         assert validate_json_addl(None) == True
 
-    def test_validate_btype_container(self):
-        """Test validate_btype with container type."""
-        from bloom_lims.core.validation import validate_btype
+    def test_validate_type_container(self):
+        """Test validate_type with container type."""
+        from bloom_lims.core.validation import validate_type
 
-        assert validate_btype("container") == True
+        assert validate_type("container") == True
 
-    def test_validate_btype_content(self):
-        """Test validate_btype with content type."""
-        from bloom_lims.core.validation import validate_btype
+    def test_validate_type_content(self):
+        """Test validate_type with content type."""
+        from bloom_lims.core.validation import validate_type
 
-        assert validate_btype("content") == True
+        assert validate_type("content") == True
 
-    def test_validate_btype_workflow(self):
-        """Test validate_btype with workflow type."""
-        from bloom_lims.core.validation import validate_btype
+    def test_validate_type_workflow(self):
+        """Test validate_type with workflow type."""
+        from bloom_lims.core.validation import validate_type
 
-        assert validate_btype("workflow") == True
+        assert validate_type("workflow") == True
 
     def test_validate_not_empty_with_string(self):
         """Test validate_not_empty with non-empty string."""

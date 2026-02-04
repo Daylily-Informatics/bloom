@@ -30,6 +30,11 @@ SUBJECT_TEMPLATE_MAP = {
     "analysis_bundle": "subject/generic/analysis-bundle-subject/1.0",
     "report": "subject/generic/report-subject/1.0",
     "generic": "subject/generic/generic-subject/1.0",
+    # Workset subject templates
+    "workset": "subject/workset/accession/1.0",  # Default workset template
+    "workset_accession": "subject/workset/accession/1.0",
+    "workset_extraction": "subject/workset/extraction/1.0",
+    "workset_sequencing": "subject/workset/sequencing/1.0",
 }
 
 
@@ -366,3 +371,216 @@ def list_members_for_subject(bob, subject_euid: str) -> Dict[str, List[Dict[str,
 
     return result
 
+
+# =============================================================================
+# Workset-specific functions
+# =============================================================================
+
+
+def create_workset(
+    bob,
+    anchor_euid: str,
+    workset_type: str = "accession",
+    workflow_euid: Optional[str] = None,
+    executed_by: Optional[str] = None,
+    name: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Create a workset subject for grouping workflow transaction objects.
+
+    A workset groups workflow steps and objects created during a single
+    transaction/batch operation (e.g., accessioning, extraction, sequencing).
+
+    Args:
+        bob: BloomObj instance
+        anchor_euid: EUID of the anchor object (typically first workflow step)
+        workset_type: Type of workset (accession, extraction, sequencing)
+        workflow_euid: Optional EUID of the parent workflow
+        executed_by: Optional username of who executed the workset
+        name: Optional custom name for the workset
+
+    Returns:
+        Workset subject EUID if successful, None otherwise
+    """
+    from datetime import datetime
+    import pytz
+
+    # Map workset_type to template key
+    template_key = f"workset_{workset_type}"
+    if template_key not in SUBJECT_TEMPLATE_MAP:
+        template_key = "workset"  # Fallback to default
+
+    # Generate subject key
+    subject_key = generate_subject_key("workset", anchor_euid)
+
+    # Build extra properties
+    timezone = pytz.timezone("US/Eastern")
+    now = datetime.now(timezone).isoformat()
+
+    extra_props = {
+        "status": "in_progress",
+        "started_at": now,
+        "workflow_euid": workflow_euid or "",
+        "executed_by": executed_by or "",
+    }
+
+    if name:
+        extra_props["name"] = name
+    else:
+        extra_props["name"] = f"Workset: {workset_type} - {anchor_euid}"
+
+    # Get template EUID
+    template_euid = get_subject_template_euid(bob, template_key)
+
+    return create_subject(
+        bob,
+        anchor_euid=anchor_euid,
+        subject_kind="workset",
+        subject_key=subject_key,
+        extra_props=extra_props,
+        template_euid=template_euid,
+    )
+
+
+def complete_workset(bob, workset_euid: str, status: str = "complete") -> bool:
+    """
+    Mark a workset as complete and set completed_at timestamp.
+
+    Args:
+        bob: BloomObj instance
+        workset_euid: EUID of the workset subject
+        status: Final status (complete, failed, abandoned)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    from datetime import datetime
+    import pytz
+    from sqlalchemy.orm.attributes import flag_modified
+
+    if status not in ("complete", "failed", "abandoned"):
+        logger.error(f"Invalid workset status: {status}")
+        return False
+
+    try:
+        workset = bob.get_by_euid(workset_euid)
+        if not workset:
+            logger.error(f"Workset not found: {workset_euid}")
+            return False
+
+        if workset.category != "subject":
+            logger.error(f"Object is not a subject: {workset_euid}")
+            return False
+
+        props = workset.json_addl.get("properties", {})
+        if props.get("subject_kind") != "workset":
+            logger.error(f"Subject is not a workset: {workset_euid}")
+            return False
+
+        # Update status and completed_at
+        timezone = pytz.timezone("US/Eastern")
+        now = datetime.now(timezone).isoformat()
+
+        props["status"] = status
+        props["completed_at"] = now
+        workset.json_addl["properties"] = props
+        flag_modified(workset, "json_addl")
+
+        bob.session.commit()
+        logger.info(f"Workset {workset_euid} marked as {status}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error completing workset {workset_euid}: {e}")
+        bob.session.rollback()
+        return False
+
+
+def get_workset_by_anchor(bob, anchor_euid: str) -> Optional[Dict[str, Any]]:
+    """
+    Find a workset subject by its anchor EUID.
+
+    Args:
+        bob: BloomObj instance
+        anchor_euid: EUID of the anchor object
+
+    Returns:
+        Dict with workset info if found, None otherwise
+    """
+    subject_key = generate_subject_key("workset", anchor_euid)
+    workset = find_subject_by_key(bob, subject_key)
+
+    if not workset:
+        return None
+
+    props = workset.json_addl.get("properties", {})
+    return {
+        "euid": workset.euid,
+        "subject_key": props.get("subject_key", ""),
+        "anchor_euid": props.get("anchor_euid", ""),
+        "workflow_euid": props.get("workflow_euid", ""),
+        "status": props.get("status", "unknown"),
+        "started_at": props.get("started_at", ""),
+        "completed_at": props.get("completed_at", ""),
+        "executed_by": props.get("executed_by", ""),
+        "name": props.get("name", workset.name),
+    }
+
+
+def list_worksets(
+    bob,
+    status: Optional[str] = None,
+    workflow_euid: Optional[str] = None,
+    limit: int = 100,
+) -> List[Dict[str, Any]]:
+    """
+    List workset subjects with optional filters.
+
+    Args:
+        bob: BloomObj instance
+        status: Filter by status (in_progress, complete, failed, abandoned)
+        workflow_euid: Filter by workflow EUID
+        limit: Maximum number of results
+
+    Returns:
+        List of workset info dicts
+    """
+    worksets = []
+
+    try:
+        query = bob.session.query(bob.Base.classes.generic_instance).filter(
+            bob.Base.classes.generic_instance.category == "subject",
+            bob.Base.classes.generic_instance.type == "workset",
+            bob.Base.classes.generic_instance.is_deleted == False,
+        )
+
+        results = query.limit(limit).all()
+
+        for workset in results:
+            props = workset.json_addl.get("properties", {})
+
+            # Apply filters
+            if status and props.get("status") != status:
+                continue
+            if workflow_euid and props.get("workflow_euid") != workflow_euid:
+                continue
+
+            worksets.append({
+                "euid": workset.euid,
+                "subject_key": props.get("subject_key", ""),
+                "anchor_euid": props.get("anchor_euid", ""),
+                "workflow_euid": props.get("workflow_euid", ""),
+                "status": props.get("status", "unknown"),
+                "started_at": props.get("started_at", ""),
+                "completed_at": props.get("completed_at", ""),
+                "executed_by": props.get("executed_by", ""),
+                "name": props.get("name", workset.name),
+                "type": workset.type,
+                "subtype": workset.subtype,
+            })
+
+        return worksets
+
+    except Exception as e:
+        logger.error(f"Error listing worksets: {e}")
+        return []

@@ -182,8 +182,8 @@ class RecentActivityItem(BloomBaseSchema):
 
     euid: str = Field(description="Enterprise Unique Identifier")
     name: Optional[str] = Field(None, description="Object name")
-    b_type: str = Field(description="Object type")
-    b_sub_type: Optional[str] = Field(None, description="Object sub-type")
+    type: str = Field(description="Object type")
+    subtype: Optional[str] = Field(None, description="Object subtype")
     status: Optional[str] = Field(None, description="Current status")
     created_dt: Optional[datetime] = Field(None, description="Creation timestamp")
 

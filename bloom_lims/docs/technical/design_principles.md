@@ -73,6 +73,14 @@ Three operational tables only!
 The sqlalchemy ORM allows for dynamic generation of classes as defined by the polymorphic_discriminator field in PG. These classes are effectively the top level directories named in `bloom_lims/config/`. These subclass distinctions resulted from a lot of pondering, certainly not perfect. The typing is only needed to manage action routing right now, and arguably could be removed in place of just generics...?
 
 #### Common Fields To All Three Tables
+
+> **Note:** Field naming was updated to align with TapDB conventions:
+> - `super_type` → `category`
+> - `btype` → `type`
+> - `b_sub_type` → `subtype`
+>
+> Backward compatibility is maintained via SQLAlchemy hybrid_property synonyms in `tapdb_adapter.py`.
+
 ```python
 
     uuid = Column(UUID, primary_key=True, nullable=True, server_default=FetchedValue())
@@ -85,9 +93,9 @@ The sqlalchemy ORM allows for dynamic generation of classes as defined by the po
 
     polymorphic_discriminator = Column(Text, nullable=True)
 
-    super_type = Column(Text, nullable=True)
-    btype = Column(Text, nullable=True)
-    b_sub_type = Column(Text, nullable=True)
+    category = Column(Text, nullable=True)       # formerly super_type
+    type = Column(Text, nullable=True)           # formerly btype
+    subtype = Column(Text, nullable=True)        # formerly b_sub_type
     version = Column(Text, nullable=True)
 
     bstate = Column(Text, nullable=True)
@@ -104,12 +112,12 @@ The sqlalchemy ORM allows for dynamic generation of classes as defined by the po
 * Name: right now, is a concatemer of sub-fields.  Can prob be removed, but I am reluctant to?  This is NOT the object name the user can set (that is in the json_addl['properties']['name'] field)
 * created_dt : when the object was created, w/TZ
 * modified_dt : when the object was last modified, w/TZ (for bookkeeping and to prevent dag UI generation when not necessary)
-* polymorphic_discriminator : sqlalchemy magic field to allow for polymorphic inheritance.  This is the field that allows the ORM to know which class to instantiate when querying the DB.  It is `{btype}_[template|instance|instance_lineage]` and controls what class sqlalcehmy instantiates.
+* polymorphic_discriminator : sqlalchemy magic field to allow for polymorphic inheritance.  This is the field that allows the ORM to know which class to instantiate when querying the DB.  It is `{type}_[template|instance|instance_lineage]` and controls what class sqlalcehmy instantiates.
 
-* super_type : This names a top level class, which can have various child subtypes, etc.  This corresponds to the directories found in `bloom_lims/config/`.
-* btype : This is the name of the first removed child sub-class.  This corresponds to the json file name in the `bloom_lims/config/{super_type}/` dir.
-* b_sub_type : This is the name of the second removed child sub-class.  This corresponds to the *KEYS* in the json files in the `bloom_lims/config/{super_type}/{btype}.json` dir.
-* version : This is the version of the b_sub_type instance. Meant to capture finer differences in the same b_sub_type. VERSION are all keys below the 'b_sub_type' json file top level keys.  This is not really in use.  I had tinkered with allowing specifying a `*` for all versions, and largely just assume this means 1.0. TLDR: this is not well considered yet.
+* category : This names a top level class, which can have various child subtypes, etc.  This corresponds to the directories found in `bloom_lims/config/`. (Formerly `super_type`)
+* type : This is the name of the first removed child sub-class.  This corresponds to the json file name in the `bloom_lims/config/{category}/` dir. (Formerly `btype`)
+* subtype : This is the name of the second removed child sub-class.  This corresponds to the *KEYS* in the json files in the `bloom_lims/config/{category}/{type}.json` dir. (Formerly `b_sub_type`)
+* version : This is the version of the subtype instance. Meant to capture finer differences in the same subtype. VERSION are all keys below the 'subtype' json file top level keys.  This is not really in use.  I had tinkered with allowing specifying a `*` for all versions, and largely just assume this means 1.0. TLDR: this is not well considered yet.
 
 * bstate : Not really in use. Intended to capture the instance state && I wanted to distinguish between state and status. 
 * bstatus : Not really in use. Intended to capture the instance status && I wanted to distinguish between state and status.

@@ -256,9 +256,9 @@ class BloomFile(BloomObj):
             existing_euids = self.search_objs_by_addl_metadata(
                 search_criteria,
                 True,
-                super_type="actor",
-                btype="generic",
-                b_sub_type="patient"
+                category="actor",
+                type="generic",
+                subtype="patient"
             )
 
             if existing_euids:
@@ -405,7 +405,7 @@ class BloomFile(BloomObj):
             # Check if a remote file with the same metadata already exists
 
             search_criteria = {"properties": {"current_s3_uri": s3_uri}}
-            existing_euids = self.search_objs_by_addl_metadata(search_criteria,True,super_type="file", btype="file",b_sub_type="generic")
+            existing_euids = self.search_objs_by_addl_metadata(search_criteria, True, category="file", type="file", subtype="generic")
             
             if len(existing_euids) > 0:
                 raise Exception(f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}.")

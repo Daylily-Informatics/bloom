@@ -55,8 +55,8 @@ async def search_objects(
     """
     Search across all BLOOM object types.
 
-    - **q**: Search query (searches euid, name, btype, b_sub_type, json_addl)
-    - **types**: Comma-separated list of super_types to filter (e.g., "container,content")
+    - **q**: Search query (searches euid, name, type, subtype, json_addl)
+    - **types**: Comma-separated list of categories to filter (e.g., "container,content")
     - **format**: Response format - "json" or "tsv"
     - **page**: Page number
     - **page_size**: Results per page
@@ -71,12 +71,12 @@ async def search_objects(
         query = bdb.session.query(gi)
         query = query.filter(gi.is_deleted == False)
 
-        # Filter by super_types if specified
+        # Filter by categories if specified
         if types:
             type_list = [t.strip().lower() for t in types.split(",") if t.strip()]
             valid_types = [t for t in type_list if t in SEARCHABLE_TYPES]
             if valid_types:
-                query = query.filter(gi.super_type.in_(valid_types))
+                query = query.filter(gi.category.in_(valid_types))
 
         # Search across multiple fields
         search_pattern = f"%{q}%"
@@ -84,8 +84,8 @@ async def search_objects(
             or_(
                 gi.euid.ilike(search_pattern),
                 gi.name.ilike(search_pattern),
-                gi.btype.ilike(search_pattern),
-                gi.b_sub_type.ilike(search_pattern),
+                gi.type.ilike(search_pattern),
+                gi.subtype.ilike(search_pattern),
                 cast(gi.json_addl, String).ilike(search_pattern),
             )
         )
@@ -103,9 +103,9 @@ async def search_objects(
             result = {
                 "euid": obj.euid,
                 "uuid": str(obj.uuid),
-                "super_type": obj.super_type,
-                "btype": obj.btype,
-                "b_sub_type": obj.b_sub_type,
+                "category": obj.category,
+                "type": obj.type,
+                "subtype": obj.subtype,
                 "name": obj.name,
                 "status": obj.bstatus,
                 "created_dt": obj.created_dt.isoformat() if obj.created_dt else None,
@@ -138,7 +138,7 @@ def _generate_tsv_response(results: List[Dict], query: str) -> StreamingResponse
     writer = csv.writer(output, delimiter="\t")
 
     # Header
-    headers = ["euid", "super_type", "btype", "b_sub_type", "name", "status", "created_dt"]
+    headers = ["euid", "category", "type", "subtype", "name", "status", "created_dt"]
     writer.writerow(headers)
 
     # Data rows
@@ -182,15 +182,15 @@ async def export_search_results(
             type_list = [t.strip().lower() for t in types.split(",") if t.strip()]
             valid_types = [t for t in type_list if t in SEARCHABLE_TYPES]
             if valid_types:
-                query = query.filter(gi.super_type.in_(valid_types))
+                query = query.filter(gi.category.in_(valid_types))
 
         search_pattern = f"%{q}%"
         query = query.filter(
             or_(
                 gi.euid.ilike(search_pattern),
                 gi.name.ilike(search_pattern),
-                gi.btype.ilike(search_pattern),
-                gi.b_sub_type.ilike(search_pattern),
+                gi.type.ilike(search_pattern),
+                gi.subtype.ilike(search_pattern),
                 cast(gi.json_addl, String).ilike(search_pattern),
             )
         )
@@ -203,9 +203,9 @@ async def export_search_results(
             result = {
                 "euid": obj.euid,
                 "uuid": str(obj.uuid),
-                "super_type": obj.super_type,
-                "btype": obj.btype,
-                "b_sub_type": obj.b_sub_type,
+                "category": obj.category,
+                "type": obj.type,
+                "subtype": obj.subtype,
                 "name": obj.name,
                 "status": obj.bstatus,
                 "created_dt": obj.created_dt.isoformat() if obj.created_dt else None,

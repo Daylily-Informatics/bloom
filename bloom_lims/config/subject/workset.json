@@ -1,0 +1,165 @@
+{
+  "accession": {
+    "1.0": {
+      "description": "Workset grouping workflow steps and objects created during an accessioning transaction.",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "workset",
+        "subject_key": "",
+        "anchor_euid": "",
+        "workflow_euid": "",
+        "status": "active",
+        "started_at": "",
+        "completed_at": "",
+        "executed_by": ""
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "workflow_euid", "form_label": "Workflow EUID", "required": false, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "started_at", "form_label": "Started At", "required": false, "value_type": "datetime"},
+        {"property_key": "completed_at", "form_label": "Completed At", "required": false, "value_type": "datetime"},
+        {"property_key": "executed_by", "form_label": "Executed By", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["workset"]},
+        "status": {"type": "string", "enum": ["in_progress", "complete", "failed", "abandoned"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "extraction": {
+    "1.0": {
+      "description": "Workset grouping workflow steps and objects created during an extraction batch.",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "workset",
+        "subject_key": "",
+        "anchor_euid": "",
+        "workflow_euid": "",
+        "status": "active",
+        "started_at": "",
+        "completed_at": "",
+        "executed_by": ""
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "workflow_euid", "form_label": "Workflow EUID", "required": false, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "started_at", "form_label": "Started At", "required": false, "value_type": "datetime"},
+        {"property_key": "completed_at", "form_label": "Completed At", "required": false, "value_type": "datetime"},
+        {"property_key": "executed_by", "form_label": "Executed By", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["workset"]},
+        "status": {"type": "string", "enum": ["in_progress", "complete", "failed", "abandoned"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "sequencing": {
+    "1.0": {
+      "description": "Workset grouping workflow steps and objects created during a sequencing run.",
+      "properties": {
+        "name": "",
+        "comments": "",
+        "lab_code": "",
+        "subject_kind": "workset",
+        "subject_key": "",
+        "anchor_euid": "",
+        "workflow_euid": "",
+        "status": "active",
+        "started_at": "",
+        "completed_at": "",
+        "executed_by": ""
+      },
+      "ui_form_properties": [
+        {"property_key": "subject_kind", "form_label": "Subject Kind", "required": true, "value_type": "controlled"},
+        {"property_key": "anchor_euid", "form_label": "Anchor EUID", "required": true, "value_type": "uid-interactive"},
+        {"property_key": "workflow_euid", "form_label": "Workflow EUID", "required": false, "value_type": "uid-interactive"},
+        {"property_key": "subject_key", "form_label": "Subject Key", "required": true, "value_type": "string"},
+        {"property_key": "status", "form_label": "Status", "required": true, "value_type": "controlled"},
+        {"property_key": "name", "form_label": "Name", "required": false, "value_type": "string"},
+        {"property_key": "started_at", "form_label": "Started At", "required": false, "value_type": "datetime"},
+        {"property_key": "completed_at", "form_label": "Completed At", "required": false, "value_type": "datetime"},
+        {"property_key": "executed_by", "form_label": "Executed By", "required": false, "value_type": "string"},
+        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "text"}
+      ],
+      "controlled_properties": {
+        "subject_kind": {"type": "string", "enum": ["workset"]},
+        "status": {"type": "string", "enum": ["in_progress", "complete", "failed", "abandoned"]}
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        }
+      }
+    }
+  }
+}
+

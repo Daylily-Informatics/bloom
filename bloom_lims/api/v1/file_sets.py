@@ -53,11 +53,11 @@ async def list_file_sets(
         bdb = get_bdb(user.email)
         
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.btype == "file_set")
+        query = query.filter(bdb.Base.classes.generic_instance.type == "file_set")
         query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+
         if file_type:
-            query = query.filter(bdb.Base.classes.generic_instance.b_sub_type == file_type.lower())
+            query = query.filter(bdb.Base.classes.generic_instance.subtype == file_type.lower())
         
         total = query.count()
         offset = (page - 1) * page_size
@@ -69,7 +69,7 @@ async def list_file_sets(
                     "euid": fs.euid,
                     "uuid": str(fs.uuid),
                     "name": fs.name,
-                    "file_type": fs.b_sub_type,
+                    "file_type": fs.subtype,
                     "status": fs.bstatus,
                 }
                 for fs in items
@@ -91,30 +91,30 @@ async def get_file_set(euid: str, user: APIUser = Depends(require_api_auth)):
         
         file_set = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.btype == "file_set",
+            bdb.Base.classes.generic_instance.type == "file_set",
         ).first()
-        
+
         if not file_set:
             raise HTTPException(status_code=404, detail=f"File set not found: {euid}")
-        
+
         # Get files in set
         files = []
         for lineage in file_set.parent_of_lineages:
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if child.btype == "file":
+            if child.type == "file":
                 files.append({
                     "euid": child.euid,
                     "name": child.name,
                     "path": child.json_addl.get("path") if child.json_addl else None,
                 })
-        
+
         return {
             "euid": file_set.euid,
             "uuid": str(file_set.uuid),
             "name": file_set.name,
-            "file_type": file_set.b_sub_type,
+            "file_type": file_set.subtype,
             "status": file_set.bstatus,
             "json_addl": file_set.json_addl,
             "files": files,
@@ -144,9 +144,9 @@ async def create_file_set(
         file_set = GenericInstance(
             uuid=uuid_lib.uuid4(),
             name=data.name,
-            super_type="data",
-            btype="file_set",
-            b_sub_type=data.file_type or "generic",
+            category="data",
+            type="file_set",
+            subtype=data.file_type or "generic",
             bstatus="created",
             json_addl=data.json_addl or {},
         )

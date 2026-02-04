@@ -19,7 +19,7 @@ def set_status(b, obj, status):
             #records = (
             #    bob_wfs.session.query(bob_wfs.Base.classes.workflow_template)
             #    .filter(
-            #        bob_wfs.Base.classes.workflow_template.b_sub_type
+            #        bob_wfs.Base.classes.workflow_template.subtype
             #        == "accession-package-kit-tubes-testreq"
             #    )
             #    .all()
@@ -63,7 +63,7 @@ def set_status(b, obj, status):
             
             child_wfs = ""
             for i in wfs.parent_of_lineages:
-                if i.child_instance.btype == "accessioning-steps":
+                if i.child_instance.type == "accessioning-steps":
                     child_wfs = i.child_instance
 
             assert hasattr(child_wfs, "euid") == True
@@ -76,11 +76,11 @@ def set_status(b, obj, status):
             bob_wfs.do_action(child_wfs.euid, c_action, c_action_group, c_wfs_action_data)
             set_status(bob_wfs, wfs, "complete")
 
-            set_status(bob_wfs, child_wfs, "in_progress")        
+            set_status(bob_wfs, child_wfs, "in_progress")
 
             new_child_wfs = ""
             for i in child_wfs.parent_of_lineages:
-                if i.child_instance.super_type == "workflow_step":
+                if i.child_instance.category == "workflow_step":
                     new_child_wfs = i.child_instance
             assert hasattr(new_child_wfs, "euid") == True
 
@@ -105,14 +105,14 @@ def set_status(b, obj, status):
             trf_child_wfs = ""
             trf_child_cont = ""
             for i in trf_wfs.parent_of_lineages:
-                if i.child_instance.super_type == "workflow_step":
+                if i.child_instance.category == "workflow_step":
                     trf_child_wfs = i.child_instance
-                if i.child_instance.super_type == "container":
+                if i.child_instance.category == "container":
                     trf_child_cont = i.child_instance
 
             trf = ""
             for i in trf_child_cont.child_of_lineages:
-                if i.parent_instance.super_type == "test_requisition":
+                if i.parent_instance.category == "test_requisition":
                     trf = i.parent_instance
 
 
@@ -180,7 +180,7 @@ def set_status(b, obj, status):
             scanned_bcs = "\n".join(tubes)
             q_wfs = ""
             for i in trf_child_cont.child_of_lineages:
-                if i.parent_instance.b_sub_type == "plasma-isolation-queue-available":
+                if i.parent_instance.subtype == "plasma-isolation-queue-available":
                     q_wfs = i.parent_instance
 
             piso_q_action_data = q_wfs.json_addl["action_groups"]["tube_xfer"]["actions"][
@@ -196,12 +196,12 @@ def set_status(b, obj, status):
 
             plasma_cont = None
             for i in trf_child_cont.parent_of_lineages:
-                if i.child_instance.b_sub_type == "tube-generic-10ml":
+                if i.child_instance.subtype == "tube-generic-10ml":
                     plasma_cont = i.child_instance
             scanned_bcs_plasma = plasma_cont.euid
 
             for i in plasma_cont.child_of_lineages:
-                if i.parent_instance.super_type == "workflow_step":
+                if i.parent_instance.category == "workflow_step":
                     pi_wfs = i.parent_instance
             
             wfset_wf = pi_wfs.child_of_lineages[0].parent_instance
@@ -223,7 +223,7 @@ def set_status(b, obj, status):
 
             plt_fill_wfs = ""
             for i in wfs_plt.parent_of_lineages:
-                if i.child_instance.super_type == "workflow_step":
+                if i.child_instance.category == "workflow_step":
                     plt_fill_wfs = i.child_instance
 
             action_data_dat = plt_fill_wfs.json_addl["action_groups"]["plate_operations"][
@@ -241,13 +241,13 @@ def set_status(b, obj, status):
 
             eplt = None
             for i in plt_fill_wfs.parent_of_lineages:
-                if i.child_instance.super_type == "workflow_step":
+                if i.child_instance.category == "workflow_step":
                     eplt = i.child_instance
             set_status(bob_wfs, eplt, "in_progress")
 
             next_plate = ""
             for i in plt_fill_wfs.parent_of_lineages:
-                if i.child_instance.btype == "plate":
+                if i.child_instance.type == "plate":
                     next_plate = i.child_instance.euid
 
             stamp_action_data = plt_fill_wfs.json_addl["action_groups"]["plate_operations"][
@@ -263,11 +263,11 @@ def set_status(b, obj, status):
             )
 
             for i in plt_fill_wfs.parent_of_lineages:
-                if i.child_instance.btype == "plate-operations":
+                if i.child_instance.type == "plate-operations":
                     sec_stamp_wfs = i.child_instance
 
             for i in sec_stamp_wfs.parent_of_lineages:
-                if i.child_instance.super_type == "container":
+                if i.child_instance.category == "container":
                     next_plate2 = i.child_instance.euid
 
             stamp_action_data2 = sec_stamp_wfs.json_addl["action_groups"]["plate_operations"][
