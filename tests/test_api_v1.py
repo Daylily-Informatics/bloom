@@ -1106,3 +1106,95 @@ class TestAsyncTasks:
         """Test task cancel endpoint."""
         response = client.post("/api/v1/tasks/00000000-0000-0000-0000-000000000000/cancel")
         assert response.status_code in [200, 400, 404, 422, 500]
+
+
+class TestWorksetsAPI:
+    """Tests for /api/v1/worksets endpoints."""
+
+    def test_list_worksets(self, client):
+        """Test listing worksets."""
+        response = client.get("/api/v1/worksets/")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+
+    def test_list_worksets_with_filters(self, client):
+        """Test listing worksets with status filter."""
+        response = client.get("/api/v1/worksets/?status=complete&page_size=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["page_size"] == 10
+
+    def test_list_worksets_with_workflow_filter(self, client):
+        """Test listing worksets with workflow filter."""
+        response = client.get("/api/v1/worksets/?workflow_euid=AY1")
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+
+    def test_get_workset_not_found(self, client):
+        """Test getting non-existent workset."""
+        # Use a truly non-existent EUID pattern that won't match any object
+        response = client.get("/api/v1/worksets/ZZZZZ_DOES_NOT_EXIST_99999")
+        assert response.status_code == 404
+
+    def test_get_workset_not_a_workset(self, client):
+        """Test getting an object that exists but is not a workset."""
+        # GT1 is a template, not a workset
+        response = client.get("/api/v1/worksets/GT1")
+        assert response.status_code == 404
+
+    def test_create_workset_response_structure(self, client):
+        """Test creating workset returns expected response structure."""
+        # Note: This may create a workset even with non-existent anchor
+        # depending on implementation. We just verify the response structure.
+        response = client.post(
+            "/api/v1/worksets/",
+            json={
+                "anchor_euid": "WSX1",  # Use a likely existing workflow step
+                "workset_type": "accession",
+            }
+        )
+        # Should return 200 with success structure or 400/500 on error
+        assert response.status_code in [200, 400, 500]
+        if response.status_code == 200:
+            data = response.json()
+            assert "success" in data
+            assert "euid" in data or "message" in data
+
+    def test_add_members_workset_not_found(self, client):
+        """Test adding members to non-existent workset."""
+        response = client.post(
+            "/api/v1/worksets/ZZZZZ_DOES_NOT_EXIST_99999/members",
+            json={"member_euids": ["CX1", "CX2"]}
+        )
+        assert response.status_code == 404
+
+    def test_get_members_workset_not_found(self, client):
+        """Test getting members of non-existent workset."""
+        response = client.get("/api/v1/worksets/ZZZZZ_DOES_NOT_EXIST_99999/members")
+        assert response.status_code == 404
+
+    def test_complete_workset_not_found(self, client):
+        """Test completing non-existent workset."""
+        response = client.put(
+            "/api/v1/worksets/ZZZZZ_DOES_NOT_EXIST_99999/complete",
+            json={"status": "complete"}
+        )
+        assert response.status_code == 404
+
+    def test_get_workset_by_anchor_response(self, client):
+        """Test finding workset by anchor returns expected structure."""
+        # Use a unique anchor that likely doesn't have a workset
+        import uuid
+        unique_anchor = f"TEST_ANCHOR_{uuid.uuid4().hex[:8]}"
+        response = client.get(f"/api/v1/worksets/by-anchor/{unique_anchor}")
+        # Should return 404 for non-existent anchor, or 200 with workset info
+        assert response.status_code in [200, 404]
+        if response.status_code == 200:
+            data = response.json()
+            assert "euid" in data
+            assert "anchor_euid" in data

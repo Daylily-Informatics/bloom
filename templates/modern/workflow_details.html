@@ -470,11 +470,12 @@
 {% set is_open = accordion_states.get(step.euid, 'closed') == 'open' %}
 
 {# Separate workflow step children from container and content children #}
+{# Query both container_instance AND content_instance lineages per Rule 6 (polymorphic identity naming) #}
 {% set workflow_children = [] %}
 {% set container_children = [] %}
 {% set content_children = [] %}
 {% if step.parent_of_lineages %}
-    {% for child_lineage in step.get_sorted_parent_of_lineages(['container_instance']) %}
+    {% for child_lineage in step.get_sorted_parent_of_lineages(['container_instance', 'content_instance']) %}
         {% set child = child_lineage.child_instance %}
         {% if child.category == 'workflow_step' %}
             {% set _ = workflow_children.append(child) %}

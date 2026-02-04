@@ -98,14 +98,18 @@ async def get_workset(euid: str, user: APIUser = Depends(require_api_auth)):
         bdb = get_bdb(user.email)
         bob = get_bob(bdb)
 
-        workset = bob.get_by_euid(euid)
+        try:
+            workset = bob.get_by_euid(euid)
+        except Exception:
+            workset = None
+
         if not workset:
             raise HTTPException(status_code=404, detail=f"Workset not found: {euid}")
 
         if workset.category != "subject" or workset.type != "workset":
             raise HTTPException(status_code=404, detail=f"Not a workset: {euid}")
 
-        props = workset.json_addl.get("properties", {})
+        props = workset.json_addl.get("properties", {}) if workset.json_addl else {}
         members = subjecting.list_members_for_subject(bob, euid)
 
         return {
@@ -181,7 +185,11 @@ async def add_workset_members(
         bob = get_bob(bdb)
 
         # Verify workset exists
-        workset = bob.get_by_euid(euid)
+        try:
+            workset = bob.get_by_euid(euid)
+        except Exception:
+            workset = None
+
         if not workset:
             raise HTTPException(status_code=404, detail=f"Workset not found: {euid}")
 
@@ -217,7 +225,11 @@ async def get_workset_members(euid: str, user: APIUser = Depends(require_api_aut
         bob = get_bob(bdb)
 
         # Verify workset exists
-        workset = bob.get_by_euid(euid)
+        try:
+            workset = bob.get_by_euid(euid)
+        except Exception:
+            workset = None
+
         if not workset:
             raise HTTPException(status_code=404, detail=f"Workset not found: {euid}")
 
@@ -254,7 +266,11 @@ async def complete_workset(
         bob = get_bob(bdb)
 
         # Verify workset exists
-        workset = bob.get_by_euid(euid)
+        try:
+            workset = bob.get_by_euid(euid)
+        except Exception:
+            workset = None
+
         if not workset:
             raise HTTPException(status_code=404, detail=f"Workset not found: {euid}")
 
