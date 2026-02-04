@@ -215,7 +215,7 @@ class BloomFile(BloomObj):
                 raise Exception(e)
         else:
             logging.warning(f"No data provided for file creation or import skipped: {file_data, url}")
-            new_file.bstatus = f"no file data provided or {import_or_remote} is not 'import'"
+            new_file.bstatus = "awaiting file data"
             self.session.commit()
 
         if create_locked:
@@ -297,8 +297,8 @@ class BloomFile(BloomObj):
                 raise Exception(e)
         else:
             logging.warning(f"No data provided for file creation, or import skipped ({import_or_remote}): {file_data, url}")
-            new_file.bstatus = f"no file data provided or {import_or_remote} is not 'import'"
-            self.session.commit() 
+            new_file.bstatus = "awaiting file data"
+            self.session.commit()
 
         if create_locked:
             self.lock_file(new_file.euid)
