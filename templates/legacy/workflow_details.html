@@ -155,9 +155,10 @@
                                         <!-- Recursive call for child steps -->     
                                                                                       
 
+                                        {# Query both container_instance AND content_instance lineages per Rule 6 #}
                                         {% if step.parent_of_lineages %}
                                             <div>
-                                                {% for child_step in step.get_sorted_parent_of_lineages(['container_instance']) %}
+                                                {% for child_step in step.get_sorted_parent_of_lineages(['container_instance', 'content_instance']) %}
                                                 {% if child_step.child_instance.category != 'workflow_step' and udat.get('wf_filter','off') == 'off' %}
                                                         <ul>
                                                         {% else %}
