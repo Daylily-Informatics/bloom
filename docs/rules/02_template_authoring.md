@@ -29,7 +29,7 @@ Versions must follow semantic versioning: `MAJOR.MINOR`
 
 ### Template Naming
 
-Template names (btype) must be:
+Template names (type) must be:
 - Lowercase
 - Hyphen-separated for multi-word names
 - Descriptive and specific
@@ -57,7 +57,7 @@ NGS_Lib
   "instantiation_layouts": [
     {
       "layout_name": "required-unique-name",
-      "layout_string": "super_type/btype/b_sub_type/version/",
+      "layout_string": "category/type/subtype/version/",
       "count": 1,
       "naming_pattern": "{parent_name}_{index}",
       "lineage_type": "contains"
@@ -203,12 +203,12 @@ Do not use these as custom properties:
 
 ### metadata.json Structure
 
-Each super_type directory must have a metadata.json:
+Each category directory must have a metadata.json:
 
 ```json
 {
   "euid_prefix": "CX",
-  "super_type": "container",
+  "category": "container",
   "description": "Container objects",
   "polymorphic_discriminator": "container_template"
 }
@@ -217,7 +217,7 @@ Each super_type directory must have a metadata.json:
 ### EUID Prefix Rules
 
 - 1-5 uppercase letters (typically 2-3)
-- Must be unique across all super_types
+- Must be unique across all categories
 - Must be registered in `EUIDConfig`
 - Must have corresponding database sequence
 

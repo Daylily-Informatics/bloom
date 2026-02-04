@@ -60,12 +60,14 @@ class TemplateValidator:
     reference validation, and dependency analysis.
     """
     
-    # Valid super types
-    VALID_SUPER_TYPES = {
+    # Valid categories (formerly super_types)
+    VALID_CATEGORIES = {
         "workflow", "workflow_step", "container", "content",
         "equipment", "data", "test_requisition", "actor",
-        "action", "file", "health_event", "generic"
+        "action", "file", "health_event", "generic", "subject"
     }
+    # Backward compatibility alias
+    VALID_SUPER_TYPES = VALID_CATEGORIES
     
     # Required fields for different template types
     REQUIRED_FIELDS = {

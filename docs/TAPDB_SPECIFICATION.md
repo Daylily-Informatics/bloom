@@ -2,19 +2,36 @@
 
 ## Technical Specification Document
 
-**Version:** 1.3.0
+**Version:** 1.3.1
 **Status:** Draft
-**Date:** 2026-01-19
+**Date:** 2026-02-04
 **Repository:** `github.com/Daylily-Informatics/daylily-tapdb`
 
 ### Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3.1 | 2026-02-04 | Field naming convention note: API/code uses category/type/subtype; DB columns remain super_type/btype/b_sub_type with ORM synonyms for backward compatibility |
 | 1.3.0 | 2026-01-19 | Second ChatGPT review: transaction patterns, audit verbosity, loader semantics, action group naming, auto-created template stubs |
 | 1.2.0 | 2026-01-19 | First ChatGPT review: soft delete fix, pgcrypto, trigger attachment, lineage prefix, cycle detection |
 | 1.1.0 | 2026-01-19 | EUID prefix tiers, action instances as first-class objects |
 | 1.0.0 | 2026-01-19 | Initial specification |
+
+---
+
+### ⚠️ Field Naming Convention
+
+**API and Application Code** uses TapDB-aligned field names:
+- `category` (top-level classification)
+- `type` (object type within category)
+- `subtype` (specific variant)
+
+**Database Columns** retain legacy names for backward compatibility:
+- `super_type` → maps to `category`
+- `btype` → maps to `type`
+- `b_sub_type` → maps to `subtype`
+
+**Backward Compatibility** is provided via SQLAlchemy `hybrid_property` synonyms in `tapdb_adapter.py`. Both naming conventions work interchangeably in ORM code.
 
 ---
 

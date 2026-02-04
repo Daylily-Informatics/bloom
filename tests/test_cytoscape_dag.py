@@ -28,7 +28,7 @@ class TestDAGDataStructure:
         valid_dag = {
             "elements": {
                 "nodes": [
-                    {"data": {"id": "CX1", "euid": "CX1", "btype": "container"}}
+                    {"data": {"id": "CX1", "euid": "CX1", "obj_type": "container"}}
                 ],
                 "edges": [
                     {"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}
@@ -41,10 +41,10 @@ class TestDAGDataStructure:
 
     def test_node_required_fields(self):
         """Test that nodes have required fields for Cytoscape rendering."""
-        required_fields = ["id", "euid", "btype"]
-        node = {"data": {"id": "CX123", "euid": "CX123", "btype": "container", 
+        required_fields = ["id", "euid", "obj_type"]
+        node = {"data": {"id": "CX123", "euid": "CX123", "obj_type": "container",
                         "name": "Test", "color": "#8B00FF"}}
-        
+
         for field in required_fields:
             assert field in node["data"], f"Missing required field: {field}"
 
@@ -147,13 +147,13 @@ class TestNodeColorMapping:
         assert color == default_color
 
     def test_sub_type_color_override(self):
-        """Test that sub-types can override main type colors."""
+        """Test that subtypes can override main type colors."""
         sub_colors = {
             "well": "#70658c",
             "file_set": "#228080",
         }
-        btype = "well"
-        assert sub_colors.get(btype) == "#70658c"
+        obj_type = "well"
+        assert sub_colors.get(obj_type) == "#70658c"
 
 
 class TestEdgeFiltering:
@@ -194,29 +194,29 @@ class TestEdgeFiltering:
         assert len(filtered) == 2
 
 
-class TestBTypeFiltering:
-    """Tests for filtering by object type (btype)."""
+class TestTypeFiltering:
+    """Tests for filtering by object type."""
 
-    def test_filter_by_single_btype(self):
-        """Test filtering nodes by single btype."""
+    def test_filter_by_single_type(self):
+        """Test filtering nodes by single type."""
         nodes = [
-            {"id": "CX1", "btype": "container"},
-            {"id": "WX1", "btype": "workflow"},
-            {"id": "CX2", "btype": "container"},
+            {"id": "CX1", "obj_type": "container"},
+            {"id": "WX1", "obj_type": "workflow"},
+            {"id": "CX2", "obj_type": "container"},
         ]
-        filter_btype = "container"
-        filtered = [n for n in nodes if n["btype"] == filter_btype]
+        filter_type = "container"
+        filtered = [n for n in nodes if n["obj_type"] == filter_type]
         assert len(filtered) == 2
 
-    def test_filter_by_multiple_btypes(self):
-        """Test filtering nodes by multiple btypes."""
+    def test_filter_by_multiple_types(self):
+        """Test filtering nodes by multiple types."""
         nodes = [
-            {"id": "CX1", "btype": "container"},
-            {"id": "WX1", "btype": "workflow"},
-            {"id": "EX1", "btype": "equipment"},
+            {"id": "CX1", "obj_type": "container"},
+            {"id": "WX1", "obj_type": "workflow"},
+            {"id": "EX1", "obj_type": "equipment"},
         ]
-        filter_btypes = {"container", "workflow"}
-        filtered = [n for n in nodes if n["btype"] in filter_btypes]
+        filter_types = {"container", "workflow"}
+        filtered = [n for n in nodes if n["obj_type"] in filter_types]
         assert len(filtered) == 2
 
 
@@ -291,9 +291,9 @@ class TestGraphDataGeneration:
         instance = {
             "euid": "CX123",
             "name": "Test Container",
-            "btype": "container",
-            "super_type": "container",
-            "b_sub_type": "plate",
+            "type": "container",
+            "category": "container",
+            "subtype": "plate",
             "version": "1.0",
         }
         colors = {"container": "#8B00FF"}
@@ -304,17 +304,17 @@ class TestGraphDataGeneration:
                 "type": "instance",
                 "euid": str(instance["euid"]),
                 "name": instance["name"],
-                "btype": instance["btype"],
-                "super_type": instance["super_type"],
-                "b_sub_type": f"{instance['super_type']}.{instance['btype']}.{instance['b_sub_type']}",
+                "obj_type": instance["type"],
+                "category": instance["category"],
+                "subtype": f"{instance['category']}.{instance['type']}.{instance['subtype']}",
                 "version": instance["version"],
-                "color": colors.get(instance["super_type"], "pink"),
+                "color": colors.get(instance["category"], "pink"),
             }
         }
 
         assert node["data"]["id"] == "CX123"
         assert node["data"]["color"] == "#8B00FF"
-        assert node["data"]["b_sub_type"] == "container.container.plate"
+        assert node["data"]["subtype"] == "container.container.plate"
 
     def test_generate_edge_from_lineage(self):
         """Test creating a Cytoscape edge from lineage data."""
@@ -347,7 +347,7 @@ class TestGraphManipulation:
     def test_add_node_to_graph(self):
         """Test adding a node to existing graph."""
         graph = {"elements": {"nodes": [], "edges": []}}
-        new_node = {"data": {"id": "CX1", "euid": "CX1", "btype": "container"}}
+        new_node = {"data": {"id": "CX1", "euid": "CX1", "obj_type": "container"}}
 
         graph["elements"]["nodes"].append(new_node)
 
@@ -576,8 +576,8 @@ class TestFuzzySearch:
     def test_fuzzy_search_by_id(self):
         """Test fuzzy search matches node ID."""
         nodes = [
-            {"id": "CX123", "name": "Container A", "btype": "container"},
-            {"id": "WX456", "name": "Workflow B", "btype": "workflow"},
+            {"id": "CX123", "name": "Container A", "obj_type": "container"},
+            {"id": "WX456", "name": "Workflow B", "obj_type": "workflow"},
         ]
         query = "cx1"
         matches = [n for n in nodes if query.lower() in n["id"].lower()]
@@ -587,39 +587,39 @@ class TestFuzzySearch:
     def test_fuzzy_search_by_name(self):
         """Test fuzzy search matches node name."""
         nodes = [
-            {"id": "CX1", "name": "Test Container", "btype": "container"},
-            {"id": "WX1", "name": "Production Workflow", "btype": "workflow"},
+            {"id": "CX1", "name": "Test Container", "obj_type": "container"},
+            {"id": "WX1", "name": "Production Workflow", "obj_type": "workflow"},
         ]
         query = "prod"
         matches = [n for n in nodes if query.lower() in n["name"].lower()]
         assert len(matches) == 1
         assert matches[0]["name"] == "Production Workflow"
 
-    def test_fuzzy_search_by_btype(self):
-        """Test fuzzy search matches btype."""
+    def test_fuzzy_search_by_type(self):
+        """Test fuzzy search matches obj_type."""
         nodes = [
-            {"id": "CX1", "name": "A", "btype": "container"},
-            {"id": "WX1", "name": "B", "btype": "workflow"},
-            {"id": "EX1", "name": "C", "btype": "equipment"},
+            {"id": "CX1", "name": "A", "obj_type": "container"},
+            {"id": "WX1", "name": "B", "obj_type": "workflow"},
+            {"id": "EX1", "name": "C", "obj_type": "equipment"},
         ]
         query = "work"
-        matches = [n for n in nodes if query.lower() in n["btype"].lower()]
+        matches = [n for n in nodes if query.lower() in n["obj_type"].lower()]
         assert len(matches) == 1
 
     def test_fuzzy_search_empty_query(self):
         """Test fuzzy search with empty query returns no matches."""
-        nodes = [{"id": "CX1", "name": "Test", "btype": "container"}]
+        nodes = [{"id": "CX1", "name": "Test", "obj_type": "container"}]
         query = ""
         matches = [n for n in nodes if query and query.lower() in n["id"].lower()]
         assert len(matches) == 0
 
     def test_fuzzy_search_no_matches(self):
         """Test fuzzy search with no matches."""
-        nodes = [{"id": "CX1", "name": "Test", "btype": "container"}]
+        nodes = [{"id": "CX1", "name": "Test", "obj_type": "container"}]
         query = "xyz"
         matches = [n for n in nodes if query.lower() in n["id"].lower() or
                    query.lower() in n["name"].lower() or
-                   query.lower() in n["btype"].lower()]
+                   query.lower() in n["obj_type"].lower()]
         assert len(matches) == 0
 
 

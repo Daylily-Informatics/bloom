@@ -39,7 +39,7 @@ def get_bdb(username: str = "api-user"):
 @router.get("/", response_model=Dict[str, Any])
 async def list_containers(
     container_type: Optional[str] = Query(None, description="Filter by type (plate, rack, box)"),
-    b_sub_type: Optional[str] = Query(None, description="Filter by subtype"),
+    subtype: Optional[str] = Query(None, description="Filter by subtype"),
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
@@ -49,32 +49,32 @@ async def list_containers(
     try:
         bdb = get_bdb(user.email)
         from bloom_lims.bobjs import BloomContainer
-        
+
         bc = BloomContainer(bdb)
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.super_type == "container")
-        
+        query = query.filter(bdb.Base.classes.generic_instance.category == "container")
+
         if container_type:
-            query = query.filter(bdb.Base.classes.generic_instance.btype == container_type.lower())
-        if b_sub_type:
-            query = query.filter(bdb.Base.classes.generic_instance.b_sub_type == b_sub_type.lower())
+            query = query.filter(bdb.Base.classes.generic_instance.type == container_type.lower())
+        if subtype:
+            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
-        
+
         query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+
         total = query.count()
         offset = (page - 1) * page_size
         items = query.limit(page_size).offset(offset).all()
-        
+
         return {
             "items": [
                 {
                     "euid": obj.euid,
                     "uuid": str(obj.uuid),
                     "name": obj.name,
-                    "container_type": obj.btype,
-                    "b_sub_type": obj.b_sub_type,
+                    "container_type": obj.type,
+                    "subtype": obj.subtype,
                     "status": obj.bstatus,
                 }
                 for obj in items
@@ -109,12 +109,12 @@ async def get_container(
             "euid": container.euid,
             "uuid": str(container.uuid),
             "name": container.name,
-            "container_type": container.btype,
-            "b_sub_type": container.b_sub_type,
+            "container_type": container.type,
+            "subtype": container.subtype,
             "status": container.bstatus,
             "json_addl": container.json_addl,
         }
-        
+
         if include_contents:
             contents = []
             for lineage in container.parent_of_lineages:
@@ -122,7 +122,7 @@ async def get_container(
                 contents.append({
                     "euid": child.euid,
                     "name": child.name,
-                    "type": child.btype,
+                    "type": child.type,
                     "position": child.json_addl.get("cont_address") if child.json_addl else None,
                 })
             result["contents"] = contents
@@ -321,7 +321,7 @@ async def get_container_layout(
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if child.btype == "well":
+            if child.type == "well":
                 addr = child.json_addl.get("cont_address", {}) if child.json_addl else {}
                 position = addr.get("name", child.name)
                 layout[position] = {
@@ -335,16 +335,16 @@ async def get_container_layout(
                     if well_lineage.is_deleted:
                         continue
                     content = well_lineage.child_instance
-                    if content.super_type == "content":
+                    if content.category == "content":
                         layout[position]["contents"].append({
                             "euid": content.euid,
                             "name": content.name,
-                            "btype": content.btype,
+                            "type": content.type,
                         })
 
         return {
             "container_euid": euid,
-            "container_type": container.btype,
+            "container_type": container.type,
             "layout": layout,
             "well_count": len(layout),
         }
@@ -395,14 +395,14 @@ async def bulk_create_containers(
                     if not cx_template:
                         raise ValueError(f"Container template not found: {cx_euid}")
                 elif cx_type:
-                    # Parse type string: "btype:b_sub_type:version" or "btype:b_sub_type"
+                    # Parse type string: "type:subtype:version" or "type:subtype"
                     parts = cx_type.split(":")
                     if len(parts) < 2:
                         raise ValueError(f"Invalid container_type format: {cx_type}")
-                    btype, b_sub_type = parts[0], parts[1]
+                    type_val, subtype_val = parts[0], parts[1]
                     version = parts[2] if len(parts) > 2 else "1.0"
                     templates = bobj.query_template_by_component_v2(
-                        "container", btype, b_sub_type, version
+                        "container", type_val, subtype_val, version
                     )
                     if not templates:
                         raise ValueError(f"No container template found: {cx_type}")
@@ -423,10 +423,10 @@ async def bulk_create_containers(
                     parts = mx_type.split(":")
                     if len(parts) < 2:
                         raise ValueError(f"Invalid content_type format: {mx_type}")
-                    btype, b_sub_type = parts[0], parts[1]
+                    type_val, subtype_val = parts[0], parts[1]
                     version = parts[2] if len(parts) > 2 else "1.0"
                     templates = bobj.query_template_by_component_v2(
-                        "content", btype, b_sub_type, version
+                        "content", type_val, subtype_val, version
                     )
                     if not templates:
                         raise ValueError(f"No content template found: {mx_type}")

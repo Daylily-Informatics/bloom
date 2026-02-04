@@ -44,7 +44,7 @@ def create_template_from_json(json_file, db):
     :param json_file: Path to the JSON file.
     :param db: Instance of BLOOMdb3 for database interactions.
     """
-    btype = os.path.splitext(os.path.basename(json_file))[0]
+    type_name = os.path.splitext(os.path.basename(json_file))[0]
 
     table_prefix = os.path.dirname(json_file).split("/")[-1]
 
@@ -54,15 +54,15 @@ def create_template_from_json(json_file, db):
     with open(json_file, "r") as file:
         data = json.load(file)
 
-    for b_sub_type, versions in data.items():
+    for subtype, versions in data.items():
         for version, details in versions.items():
             # Prepare json_addl field
             json_addl = details  # json.dumps(details)
 
             obj_prefix = (
                 md_json["euid_prefixes"]["default"]
-                if btype not in md_json["euid_prefixes"]
-                else md_json["euid_prefixes"][btype]
+                if type_name not in md_json["euid_prefixes"]
+                else md_json["euid_prefixes"][type_name]
             )
 
             # Ensure the EUID sequence exists for this prefix
@@ -75,10 +75,10 @@ def create_template_from_json(json_file, db):
             # Create new table_template record
             table_template = db.Base.classes.generic_template
             new_table_template = table_template(
-                name=f"{btype}:{b_sub_type}:{version}",
-                super_type=table_prefix,
-                btype=btype,
-                b_sub_type=b_sub_type,
+                name=f"{type_name}:{subtype}:{version}",
+                category=table_prefix,
+                type=type_name,
+                subtype=subtype,
                 version=version,
                 json_addl=json_addl,
                 instance_prefix=obj_prefix,

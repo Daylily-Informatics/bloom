@@ -60,23 +60,23 @@ class TestObjectSchemas:
     def test_object_create_schema(self):
         """Test ObjectCreateSchema validation."""
         from bloom_lims.schemas import ObjectCreateSchema
-        
+
         data = ObjectCreateSchema(
             name="Test Object",
-            btype="sample",
-            b_sub_type="blood",
+            type="sample",
+            subtype="blood",
         )
         assert data.name == "Test Object"
-        assert data.btype == "sample"
-        assert data.b_sub_type == "blood"
-    
+        assert data.type == "sample"
+        assert data.subtype == "blood"
+
     def test_object_create_with_json_addl(self):
         """Test ObjectCreateSchema with json_addl."""
         from bloom_lims.schemas import ObjectCreateSchema
-        
+
         data = ObjectCreateSchema(
             name="Test Object",
-            btype="sample",
+            type="sample",
             json_addl={"properties": {"key": "value"}},
         )
         assert data.json_addl == {"properties": {"key": "value"}}
@@ -84,7 +84,7 @@ class TestObjectSchemas:
 
 class TestContainerSchemas:
     """Tests for container schemas."""
-    
+
     def test_container_create_schema(self):
         """Test ContainerCreateSchema validation."""
         from bloom_lims.schemas import ContainerCreateSchema
@@ -92,7 +92,7 @@ class TestContainerSchemas:
         data = ContainerCreateSchema(
             name="Test Plate",
             container_type="plate",
-            b_sub_type="96-well",
+            subtype="96-well",
             template_euid="CT123456",  # Valid EUID format: PREFIX + sequence number
         )
         assert data.name == "Test Plate"

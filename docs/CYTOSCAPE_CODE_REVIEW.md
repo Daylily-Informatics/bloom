@@ -491,11 +491,11 @@ function fuzzySearch(query) {
     return cy.nodes().filter(node => {
         const id = node.id().toLowerCase();
         const name = (node.data('name') || '').toLowerCase();
-        const btype = (node.data('btype') || '').toLowerCase();
+        const type = (node.data('type') || '').toLowerCase();
 
         return id.includes(query) ||
                name.includes(query) ||
-               btype.includes(query);
+               type.includes(query);
     });
 }
 ```

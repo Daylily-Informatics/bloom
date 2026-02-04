@@ -36,7 +36,7 @@ def get_bdb(username: str = "api-user"):
 @router.get("/", response_model=Dict[str, Any])
 async def list_content(
     content_type: Optional[str] = Query(None, description="Filter by type (sample, specimen, reagent)"),
-    b_sub_type: Optional[str] = Query(None, description="Filter by subtype"),
+    subtype: Optional[str] = Query(None, description="Filter by subtype"),
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
@@ -45,14 +45,14 @@ async def list_content(
     """List content objects with optional filters."""
     try:
         bdb = get_bdb(user.email)
-        
+
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.super_type == "content")
-        
+        query = query.filter(bdb.Base.classes.generic_instance.category == "content")
+
         if content_type:
-            query = query.filter(bdb.Base.classes.generic_instance.btype == content_type.lower())
-        if b_sub_type:
-            query = query.filter(bdb.Base.classes.generic_instance.b_sub_type == b_sub_type.lower())
+            query = query.filter(bdb.Base.classes.generic_instance.type == content_type.lower())
+        if subtype:
+            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
         
@@ -68,8 +68,8 @@ async def list_content(
                     "euid": obj.euid,
                     "uuid": str(obj.uuid),
                     "name": obj.name,
-                    "content_type": obj.btype,
-                    "b_sub_type": obj.b_sub_type,
+                    "content_type": obj.type,
+                    "subtype": obj.subtype,
                     "status": obj.bstatus,
                 }
                 for obj in items
@@ -100,8 +100,8 @@ async def get_content(euid: str, user: APIUser = Depends(require_api_auth)):
             "euid": content.euid,
             "uuid": str(content.uuid),
             "name": content.name,
-            "content_type": content.btype,
-            "b_sub_type": content.b_sub_type,
+            "content_type": content.type,
+            "subtype": content.subtype,
             "status": content.bstatus,
             "json_addl": content.json_addl,
         }

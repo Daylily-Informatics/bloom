@@ -35,11 +35,11 @@ async def list_workflows(
         bdb = BLOOMdb3()
 
         query = bdb.session.query(bdb.Base.classes.workflow_instance)
-        
+
         if status:
             query = query.filter(bdb.Base.classes.workflow_instance.bstatus == status)
         if workflow_type:
-            query = query.filter(bdb.Base.classes.workflow_instance.btype == workflow_type.lower())
+            query = query.filter(bdb.Base.classes.workflow_instance.type == workflow_type.lower())
         
         total = query.count()
         offset = (page - 1) * page_size
@@ -51,7 +51,7 @@ async def list_workflows(
                     "euid": wf.euid,
                     "uuid": str(wf.uuid),
                     "name": wf.name,
-                    "type": wf.btype,
+                    "type": wf.type,
                     "status": wf.bstatus,
                 }
                 for wf in items
@@ -85,7 +85,7 @@ async def get_workflow(euid: str, user: APIUser = Depends(require_api_auth)):
             "euid": workflow.euid,
             "uuid": str(workflow.uuid),
             "name": workflow.name,
-            "type": workflow.btype,
+            "type": workflow.type,
             "status": workflow.bstatus,
             "json_addl": workflow.json_addl,
         }
@@ -243,19 +243,19 @@ async def get_workflow_steps(euid: str, user: APIUser = Depends(require_api_auth
         if not workflow:
             raise HTTPException(status_code=404, detail=f"Workflow not found: {euid}")
 
-        # Get workflow steps (children with btype containing 'step' or 'queue')
+        # Get workflow steps (children with type containing 'step' or 'queue')
         steps = []
         for lineage in workflow.parent_of_lineages:
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if child.btype in ["queue", "step"] or "step" in child.btype:
+            if child.type in ["queue", "step"] or "step" in child.type:
                 steps.append({
                     "euid": child.euid,
                     "uuid": str(child.uuid),
                     "name": child.name,
-                    "btype": child.btype,
-                    "b_sub_type": child.b_sub_type,
+                    "type": child.type,
+                    "subtype": child.subtype,
                     "status": child.bstatus,
                     "order": child.json_addl.get("properties", {}).get("order", 0),
                 })

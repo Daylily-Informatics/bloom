@@ -145,10 +145,15 @@ with db.session_scope() as session:
 ### Template Code Format
 
 ```
-{super_type}/{btype}/{b_sub_type}/{version}/
+{category}/{type}/{subtype}/{version}/
 ```
 
 Always include trailing slash.
+
+> **Note:** Field names were updated to align with TapDB conventions:
+> - `super_type` → `category`
+> - `btype` → `type`
+> - `b_sub_type` → `subtype`
 
 
 ---
@@ -306,7 +311,7 @@ Include context in error messages:
 ```python
 raise TemplateNotFoundError(
     f"Template not found: {template_code}. "
-    f"Searched in super_type={parts['super_type']}, btype={parts['btype']}"
+    f"Searched in category={parts['category']}, type={parts['type']}"
 )
 ```
 

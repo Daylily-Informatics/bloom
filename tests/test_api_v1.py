@@ -51,7 +51,7 @@ class TestObjectsAPI:
     
     def test_list_objects_with_filters(self, client):
         """Test listing objects with filters."""
-        response = client.get("/api/v1/objects/?super_type=container&page_size=10")
+        response = client.get("/api/v1/objects/?category=container&page_size=10")
         assert response.status_code == 200
         data = response.json()
         assert data["page_size"] == 10
@@ -124,13 +124,13 @@ class TestTemplatesAPI:
         assert "items" in data
         assert "total" in data
     
-    def test_list_templates_by_super_type(self, client):
-        """Test listing templates by super_type."""
-        response = client.get("/api/v1/templates/by-type/container")
+    def test_list_templates_by_category(self, client):
+        """Test listing templates by category."""
+        response = client.get("/api/v1/templates/by-category/container")
         assert response.status_code == 200
         data = response.json()
         assert "templates" in data
-        assert data["super_type"] == "container"
+        assert data["category"] == "container"
 
 
 class TestSubjectsAPI:
@@ -346,40 +346,40 @@ class TestSubjectsAPIExtended:
 class TestObjectCreationAPI:
     """Tests for object creation API endpoints."""
 
-    def test_get_super_types(self, client):
-        """Test getting super types."""
-        response = client.get("/api/v1/object-creation/super-types")
+    def test_get_categories(self, client):
+        """Test getting categories."""
+        response = client.get("/api/v1/object-creation/categories")
         assert response.status_code == 200
         data = response.json()
-        # Response is a dict with 'super_types' key
+        # Response is a dict with 'categories' key
         if isinstance(data, dict):
-            assert "super_types" in data
-            super_types = data["super_types"]
+            assert "categories" in data
+            categories = data["categories"]
         else:
-            super_types = data
-        assert isinstance(super_types, list)
-        # Should include common super types
-        type_names = [item.get("name") or item for item in super_types]
-        assert any("container" in str(st).lower() for st in type_names)
+            categories = data
+        assert isinstance(categories, list)
+        # Should include common categories
+        type_names = [item.get("name") or item for item in categories]
+        assert any("container" in str(cat).lower() for cat in type_names)
 
-    def test_get_types_for_super_type(self, client):
-        """Test getting types for a super type."""
+    def test_get_types_for_category(self, client):
+        """Test getting types for a category."""
         # Use query parameter format
-        response = client.get("/api/v1/object-creation/types?super_type=container")
+        response = client.get("/api/v1/object-creation/types?category=container")
         # May return 404 if endpoint uses different path
         assert response.status_code in [200, 404, 422]
         if response.status_code == 200:
             data = response.json()
             assert isinstance(data, (list, dict))
 
-    def test_get_types_for_invalid_super_type(self, client):
-        """Test getting types for invalid super type."""
-        response = client.get("/api/v1/object-creation/types?super_type=invalid_type")
+    def test_get_types_for_invalid_category(self, client):
+        """Test getting types for invalid category."""
+        response = client.get("/api/v1/object-creation/types?category=invalid_type")
         assert response.status_code in [200, 404, 422]
 
-    def test_get_sub_types(self, client):
-        """Test getting sub types."""
-        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=plate")
+    def test_get_subtypes(self, client):
+        """Test getting subtypes."""
+        response = client.get("/api/v1/object-creation/subtypes?category=container&type=plate")
         assert response.status_code in [200, 404, 422]
 
 
@@ -387,66 +387,66 @@ class TestObjectCreationPathTraversal:
     """Tests for path traversal protection in object creation API."""
 
     def test_types_rejects_path_traversal_dotdot(self, client):
-        """Test that /types rejects .. in super_type."""
-        response = client.get("/api/v1/object-creation/types?super_type=..")
+        """Test that /types rejects .. in category."""
+        response = client.get("/api/v1/object-creation/types?category=..")
         assert response.status_code == 400
         assert "parent directory" in response.json().get("detail", "").lower()
 
     def test_types_rejects_path_traversal_slash(self, client):
-        """Test that /types rejects / in super_type."""
-        response = client.get("/api/v1/object-creation/types?super_type=container/../../etc")
+        """Test that /types rejects / in category."""
+        response = client.get("/api/v1/object-creation/types?category=container/../../etc")
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
     def test_types_rejects_path_traversal_backslash(self, client):
-        """Test that /types rejects \\ in super_type."""
-        response = client.get("/api/v1/object-creation/types?super_type=container\\..\\etc")
+        """Test that /types rejects \\ in category."""
+        response = client.get("/api/v1/object-creation/types?category=container\\..\\etc")
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
-    def test_sub_types_rejects_path_traversal_super_type(self, client):
-        """Test that /sub-types rejects .. in super_type."""
-        response = client.get("/api/v1/object-creation/sub-types?super_type=..&btype=plate")
+    def test_subtypes_rejects_path_traversal_category(self, client):
+        """Test that /subtypes rejects .. in category."""
+        response = client.get("/api/v1/object-creation/subtypes?category=..&type=plate")
         assert response.status_code == 400
         assert "parent directory" in response.json().get("detail", "").lower()
 
-    def test_sub_types_rejects_path_traversal_btype(self, client):
-        """Test that /sub-types rejects .. in btype."""
-        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=../../../etc/passwd")
+    def test_subtypes_rejects_path_traversal_type(self, client):
+        """Test that /subtypes rejects .. in type."""
+        response = client.get("/api/v1/object-creation/subtypes?category=container&type=../../../etc/passwd")
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
-    def test_template_rejects_path_traversal_super_type(self, client):
-        """Test that /template rejects .. in super_type."""
+    def test_template_rejects_path_traversal_category(self, client):
+        """Test that /template rejects .. in category."""
         response = client.get(
-            "/api/v1/object-creation/template?super_type=..&btype=plate&b_sub_type=test&version=1"
+            "/api/v1/object-creation/template?category=..&type=plate&subtype=test&version=1"
         )
         assert response.status_code == 400
         assert "parent directory" in response.json().get("detail", "").lower()
 
-    def test_template_rejects_path_traversal_btype(self, client):
-        """Test that /template rejects path traversal in btype."""
+    def test_template_rejects_path_traversal_type(self, client):
+        """Test that /template rejects path traversal in type."""
         response = client.get(
-            "/api/v1/object-creation/template?super_type=container&btype=../../../etc/passwd&b_sub_type=test&version=1"
+            "/api/v1/object-creation/template?category=container&type=../../../etc/passwd&subtype=test&version=1"
         )
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
-    def test_types_accepts_valid_super_type(self, client):
-        """Test that /types accepts valid super_type values."""
-        response = client.get("/api/v1/object-creation/types?super_type=container")
+    def test_types_accepts_valid_category(self, client):
+        """Test that /types accepts valid category values."""
+        response = client.get("/api/v1/object-creation/types?category=container")
         # Should be 200 or 404 (if container doesn't exist), but NOT 400
         assert response.status_code in [200, 404]
 
-    def test_sub_types_accepts_valid_params(self, client):
-        """Test that /sub-types accepts valid parameter values."""
-        response = client.get("/api/v1/object-creation/sub-types?super_type=container&btype=plate")
+    def test_subtypes_accepts_valid_params(self, client):
+        """Test that /subtypes accepts valid parameter values."""
+        response = client.get("/api/v1/object-creation/subtypes?category=container&type=plate")
         # Should be 200 or 404, but NOT 400
         assert response.status_code in [200, 404]
 
     def test_types_rejects_invalid_characters(self, client):
-        """Test that /types rejects invalid characters in super_type."""
-        response = client.get("/api/v1/object-creation/types?super_type=Container")
+        """Test that /types rejects invalid characters in category."""
+        response = client.get("/api/v1/object-creation/types?category=Container")
         assert response.status_code == 400
         assert "lowercase" in response.json().get("detail", "").lower()
 
@@ -801,9 +801,9 @@ class TestContentAPIDeep:
 class TestContainersAPIDeep:
     """Deeper tests for containers API."""
 
-    def test_containers_by_super_type(self, client):
-        """Test listing containers by super type."""
-        response = client.get("/api/v1/containers/?super_type=container")
+    def test_containers_by_category(self, client):
+        """Test listing containers by category."""
+        response = client.get("/api/v1/containers/?category=container")
         assert response.status_code in [200, 404]
 
     def test_container_children(self, client):

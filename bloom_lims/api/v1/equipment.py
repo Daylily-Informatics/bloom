@@ -45,29 +45,29 @@ async def list_equipment(
     """List equipment with optional filters."""
     try:
         bdb = get_bdb()
-        
+
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.super_type == "equipment")
-        
+        query = query.filter(bdb.Base.classes.generic_instance.category == "equipment")
+
         if equipment_type:
-            query = query.filter(bdb.Base.classes.generic_instance.btype == equipment_type.lower())
+            query = query.filter(bdb.Base.classes.generic_instance.type == equipment_type.lower())
         if operational_status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == operational_status)
-        
+
         query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+
         total = query.count()
         offset = (page - 1) * page_size
         items = query.limit(page_size).offset(offset).all()
-        
+
         return {
             "items": [
                 {
                     "euid": obj.euid,
                     "uuid": str(obj.uuid),
                     "name": obj.name,
-                    "equipment_type": obj.btype,
-                    "b_sub_type": obj.b_sub_type,
+                    "equipment_type": obj.type,
+                    "subtype": obj.subtype,
                     "status": obj.bstatus,
                     "location": obj.json_addl.get("properties", {}).get("location") if obj.json_addl else None,
                 }
@@ -88,21 +88,21 @@ async def get_equipment(euid: str):
     try:
         bdb = get_bdb()
         from bloom_lims.bobjs import BloomEquipment
-        
+
         be = BloomEquipment(bdb)
         equipment = be.get_by_euid(euid)
-        
+
         if not equipment:
             raise HTTPException(status_code=404, detail=f"Equipment not found: {euid}")
-        
+
         props = equipment.json_addl.get("properties", {}) if equipment.json_addl else {}
-        
+
         return {
             "euid": equipment.euid,
             "uuid": str(equipment.uuid),
             "name": equipment.name,
-            "equipment_type": equipment.btype,
-            "b_sub_type": equipment.b_sub_type,
+            "equipment_type": equipment.type,
+            "subtype": equipment.subtype,
             "status": equipment.bstatus,
             "serial_number": props.get("serial_number"),
             "model": props.get("model"),

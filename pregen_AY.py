@@ -13,8 +13,8 @@ bob = BloomObj(BLOOMdb3(app_username="bloom_db_init"))
 
 for tobe_locked_assay in (
     bob.session.query(bob.Base.classes.generic_template)
-    .filter(bob.Base.classes.generic_template.super_type == "workflow")
-    .filter(bob.Base.classes.generic_template.btype == "assay")
+    .filter(bob.Base.classes.generic_template.category == "workflow")
+    .filter(bob.Base.classes.generic_template.type == "assay")
     .all()
 ):
     print(f"WHATISTHIS::: {tobe_locked_assay}")

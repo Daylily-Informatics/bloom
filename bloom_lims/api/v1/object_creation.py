@@ -91,9 +91,9 @@ def validate_path_within_config(resolved_path: Path) -> None:
 
 class CreateObjectRequest(BaseModel):
     """Request body for creating a new object."""
-    super_type: str
-    btype: str
-    b_sub_type: str
+    category: str
+    type: str
+    subtype: str
     version: str
     name: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
@@ -104,9 +104,9 @@ class CreateObjectResponse(BaseModel):
     euid: str
     uuid: str
     name: str
-    super_type: str
-    btype: str
-    b_sub_type: str
+    category: str
+    type: str
+    subtype: str
     message: str
 
 
@@ -116,137 +116,137 @@ def get_bdb(username: str = "api-user"):
     return BLOOMdb3(app_username=username)
 
 
-@router.get("/super-types")
-async def list_super_types(user: APIUser = Depends(require_api_auth)):
+@router.get("/categories")
+async def list_categories(user: APIUser = Depends(require_api_auth)):
     """
-    List all available super types (directories in config/).
-    
+    List all available categories (directories in config/).
+
     Step 1 of the object creation wizard.
     """
     try:
-        super_types = []
+        categories = []
         for path in sorted(CONFIG_DIR.iterdir()):
             if path.is_dir() and not path.name.startswith((".", "_")):
                 # Count JSON files in directory
                 json_files = list(path.glob("*.json"))
                 # Exclude metadata.json from count
                 type_count = len([f for f in json_files if f.name != "metadata.json"])
-                super_types.append({
+                categories.append({
                     "name": path.name,
                     "display_name": path.name.replace("_", " ").title(),
                     "type_count": type_count,
                 })
-        return {"super_types": super_types}
+        return {"categories": categories}
     except Exception as e:
-        logger.error(f"Error listing super types: {e}")
+        logger.error(f"Error listing categories: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/types")
 async def list_types(
-    super_type: str = Query(..., description="Super type directory name"),
+    category: str = Query(..., description="Category directory name"),
     user: APIUser = Depends(require_api_auth),
 ):
     """
-    List all available types (JSON files) for a super type.
+    List all available types (JSON files) for a category.
 
     Step 2 of the object creation wizard.
     """
     # Validate path component to prevent path traversal
-    validate_path_component(super_type, "super_type")
+    validate_path_component(category, "category")
 
     try:
-        super_type_dir = CONFIG_DIR / super_type
+        category_dir = CONFIG_DIR / category
 
         # Verify resolved path stays within CONFIG_DIR
-        validate_path_within_config(super_type_dir.resolve())
+        validate_path_within_config(category_dir.resolve())
 
-        if not super_type_dir.exists() or not super_type_dir.is_dir():
-            raise HTTPException(status_code=404, detail=f"Super type not found: {super_type}")
-        
+        if not category_dir.exists() or not category_dir.is_dir():
+            raise HTTPException(status_code=404, detail=f"Category not found: {category}")
+
         types = []
-        for json_file in sorted(super_type_dir.glob("*.json")):
+        for json_file in sorted(category_dir.glob("*.json")):
             if json_file.name == "metadata.json":
                 continue  # Skip metadata files
-            
+
             type_name = json_file.stem
-            # Load file to count sub-types
+            # Load file to count subtypes
             try:
                 with open(json_file) as f:
                     data = json.load(f)
-                    sub_type_count = len(data)
+                    subtype_count = len(data)
             except Exception:
-                sub_type_count = 0
-            
+                subtype_count = 0
+
             types.append({
                 "name": type_name,
                 "display_name": type_name.replace("_", " ").replace("-", " ").title(),
-                "sub_type_count": sub_type_count,
+                "subtype_count": subtype_count,
             })
-        
-        return {"super_type": super_type, "types": types}
+
+        return {"category": category, "types": types}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error listing types for {super_type}: {e}")
+        logger.error(f"Error listing types for {category}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sub-types")
-async def list_sub_types(
-    super_type: str = Query(..., description="Super type directory name"),
-    btype: str = Query(..., description="Type (JSON file name without extension)"),
+@router.get("/subtypes")
+async def list_subtypes(
+    category: str = Query(..., description="Category directory name"),
+    type: str = Query(..., description="Type (JSON file name without extension)"),
     user: APIUser = Depends(require_api_auth),
 ):
     """
-    List all available sub-types and versions from a type's JSON file.
+    List all available subtypes and versions from a type's JSON file.
 
     Step 3 of the object creation wizard.
     """
     # Validate path components to prevent path traversal
-    validate_path_component(super_type, "super_type")
-    validate_path_component(btype, "btype")
+    validate_path_component(category, "category")
+    validate_path_component(type, "type")
 
     try:
-        json_file = CONFIG_DIR / super_type / f"{btype}.json"
+        json_file = CONFIG_DIR / category / f"{type}.json"
 
         # Verify resolved path stays within CONFIG_DIR
         validate_path_within_config(json_file.resolve())
 
         if not json_file.exists():
-            raise HTTPException(status_code=404, detail=f"Type not found: {super_type}/{btype}")
-        
+            raise HTTPException(status_code=404, detail=f"Type not found: {category}/{type}")
+
         with open(json_file) as f:
             data = json.load(f)
-        
-        sub_types = []
-        for sub_type_name, versions in data.items():
+
+        subtypes = []
+        for subtype_name, versions in data.items():
             version_list = list(versions.keys()) if isinstance(versions, dict) else []
             # Get description from first version if available
             description = ""
             if version_list and isinstance(versions.get(version_list[0]), dict):
                 description = versions[version_list[0]].get("description", "")
-            
-            sub_types.append({
-                "name": sub_type_name,
-                "display_name": sub_type_name.replace("-", " ").replace("_", " ").title(),
+
+            subtypes.append({
+                "name": subtype_name,
+                "display_name": subtype_name.replace("-", " ").replace("_", " ").title(),
                 "versions": version_list,
                 "description": description,
             })
-        
-        return {"super_type": super_type, "btype": btype, "sub_types": sub_types}
+
+        return {"category": category, "type": type, "subtypes": subtypes}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error listing sub-types for {super_type}/{btype}: {e}")
+        logger.error(f"Error listing subtypes for {category}/{type}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/template")
 async def get_template_details(
-    super_type: str = Query(..., description="Super type directory name"),
-    btype: str = Query(..., description="Type (JSON file name without extension)"),
-    b_sub_type: str = Query(..., description="Sub-type key in JSON"),
+    category: str = Query(..., description="Category directory name"),
+    type: str = Query(..., description="Type (JSON file name without extension)"),
+    subtype: str = Query(..., description="Subtype key in JSON"),
     version: str = Query(..., description="Version key"),
     user: APIUser = Depends(require_api_auth),
 ):
@@ -256,36 +256,36 @@ async def get_template_details(
     Step 4 of the object creation wizard - provides data for the creation form.
     """
     # Validate path components to prevent path traversal
-    # Note: b_sub_type and version are JSON keys, not filesystem paths,
+    # Note: subtype and version are JSON keys, not filesystem paths,
     # but we validate them anyway for defense in depth
-    validate_path_component(super_type, "super_type")
-    validate_path_component(btype, "btype")
+    validate_path_component(category, "category")
+    validate_path_component(type, "type")
 
     try:
-        json_file = CONFIG_DIR / super_type / f"{btype}.json"
+        json_file = CONFIG_DIR / category / f"{type}.json"
 
         # Verify resolved path stays within CONFIG_DIR
         validate_path_within_config(json_file.resolve())
 
         if not json_file.exists():
-            raise HTTPException(status_code=404, detail=f"Type not found: {super_type}/{btype}")
+            raise HTTPException(status_code=404, detail=f"Type not found: {category}/{type}")
 
         with open(json_file) as f:
             data = json.load(f)
 
-        if b_sub_type not in data:
-            raise HTTPException(status_code=404, detail=f"Sub-type not found: {b_sub_type}")
+        if subtype not in data:
+            raise HTTPException(status_code=404, detail=f"Subtype not found: {subtype}")
 
-        versions = data[b_sub_type]
+        versions = data[subtype]
         if version not in versions:
             raise HTTPException(status_code=404, detail=f"Version not found: {version}")
 
         template_data = versions[version]
 
         return {
-            "super_type": super_type,
-            "btype": btype,
-            "b_sub_type": b_sub_type,
+            "category": category,
+            "type": type,
+            "subtype": subtype,
             "version": version,
             "template": template_data,
             "properties": template_data.get("properties", {}),
@@ -294,7 +294,7 @@ async def get_template_details(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting template {super_type}/{btype}/{b_sub_type}/{version}: {e}")
+        logger.error(f"Error getting template {category}/{type}/{subtype}/{version}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -318,16 +318,16 @@ async def create_object(
 
         # Query for the template using components
         templates = bloom_obj.query_template_by_component_v2(
-            request.super_type,
-            request.btype,
-            request.b_sub_type,
+            request.category,
+            request.type,
+            request.subtype,
             request.version
         )
 
         if not templates:
             raise HTTPException(
                 status_code=404,
-                detail=f"Template not found: {request.super_type}/{request.btype}/{request.b_sub_type}/{request.version}"
+                detail=f"Template not found: {request.category}/{request.type}/{request.subtype}/{request.version}"
             )
 
         template = templates[0]
@@ -358,9 +358,9 @@ async def create_object(
             euid=new_instance.euid,
             uuid=str(new_instance.uuid),
             name=new_instance.name or "",
-            super_type=new_instance.super_type,
-            btype=new_instance.btype,
-            b_sub_type=new_instance.b_sub_type,
+            category=new_instance.category,
+            type=new_instance.type,
+            subtype=new_instance.subtype,
             message=f"Successfully created {new_instance.euid}",
         )
     except HTTPException:

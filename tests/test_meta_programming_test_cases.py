@@ -13,7 +13,7 @@ class BaseTest:
         try:
             bob.create_instances(template.euid)
         except Exception as e:
-            if template.btype == "assay":
+            if template.type == "assay":
                 pass  # Expected to fail if already instantiated
             else:
                 pytest.fail(

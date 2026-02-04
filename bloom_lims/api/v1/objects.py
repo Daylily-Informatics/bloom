@@ -35,8 +35,8 @@ router = APIRouter(prefix="/objects", tags=["Objects"])
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_objects(
-    btype: Optional[str] = Query(None, description="Filter by type"),
-    b_sub_type: Optional[str] = Query(None, description="Filter by subtype"),
+    type: Optional[str] = Query(None, description="Filter by type"),
+    subtype: Optional[str] = Query(None, description="Filter by subtype"),
     status: Optional[str] = Query(None, description="Filter by status"),
     name_contains: Optional[str] = Query(None, description="Filter by name"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -57,11 +57,11 @@ async def list_objects(
         
         # Build query
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        
-        if btype:
-            query = query.filter(bdb.Base.classes.generic_instance.btype == btype.lower())
-        if b_sub_type:
-            query = query.filter(bdb.Base.classes.generic_instance.b_sub_type == b_sub_type.lower())
+
+        if type:
+            query = query.filter(bdb.Base.classes.generic_instance.type == type.lower())
+        if subtype:
+            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
         if name_contains:
@@ -83,8 +83,8 @@ async def list_objects(
                     "euid": obj.euid,
                     "uuid": str(obj.uuid),
                     "name": obj.name,
-                    "btype": obj.btype,
-                    "b_sub_type": obj.b_sub_type,
+                    "type": obj.type,
+                    "subtype": obj.subtype,
                     "status": obj.bstatus,
                 }
                 for obj in items
@@ -120,8 +120,8 @@ async def get_object(euid: str, user: APIUser = Depends(require_api_auth)):
             "euid": obj.euid,
             "uuid": str(obj.uuid),
             "name": obj.name,
-            "btype": obj.btype,
-            "b_sub_type": obj.b_sub_type,
+            "type": obj.type,
+            "subtype": obj.subtype,
             "status": obj.bstatus,
             "json_addl": obj.json_addl,
             "created_at": obj.created_dt.isoformat() if obj.created_dt else None,
@@ -155,8 +155,8 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
         obj_class = getattr(bdb.Base.classes, 'content_instance')
         obj = obj_class(
             name=data.name,
-            btype=data.btype,
-            b_sub_type=data.b_sub_type,
+            type=data.type,
+            subtype=data.subtype,
             json_addl=data.json_addl or {},
         )
 

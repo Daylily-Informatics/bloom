@@ -42,7 +42,7 @@ class SubjectUpdateSchema(BaseModel):
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_subjects(
-    b_sub_type: Optional[str] = Query(None, description="Filter by subtype"),
+    subtype: Optional[str] = Query(None, description="Filter by subtype"),
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
@@ -51,12 +51,12 @@ async def list_subjects(
     """List subjects with optional filters."""
     try:
         bdb = get_bdb(user.email)
-        
+
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.super_type == "subject")
-        
-        if b_sub_type:
-            query = query.filter(bdb.Base.classes.generic_instance.b_sub_type == b_sub_type.lower())
+        query = query.filter(bdb.Base.classes.generic_instance.category == "subject")
+
+        if subtype:
+            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
         
@@ -72,8 +72,8 @@ async def list_subjects(
                     "euid": obj.euid,
                     "uuid": str(obj.uuid),
                     "name": obj.name,
-                    "btype": obj.btype,
-                    "b_sub_type": obj.b_sub_type,
+                    "type": obj.type,
+                    "subtype": obj.subtype,
                     "status": obj.bstatus,
                 }
                 for obj in items
@@ -95,18 +95,18 @@ async def get_subject(euid: str, user: APIUser = Depends(require_api_auth)):
         
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.super_type == "subject",
+            bdb.Base.classes.generic_instance.category == "subject",
         ).first()
-        
+
         if not subject:
             raise HTTPException(status_code=404, detail=f"Subject not found: {euid}")
-        
+
         return {
             "euid": subject.euid,
             "uuid": str(subject.uuid),
             "name": subject.name,
-            "btype": subject.btype,
-            "b_sub_type": subject.b_sub_type,
+            "type": subject.type,
+            "subtype": subject.subtype,
             "status": subject.bstatus,
             "json_addl": subject.json_addl,
         }
@@ -176,7 +176,7 @@ async def update_subject(
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.super_type == "subject",
+            bdb.Base.classes.generic_instance.category == "subject",
         ).first()
 
         if not subject:
@@ -218,7 +218,7 @@ async def delete_subject(
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.super_type == "subject",
+            bdb.Base.classes.generic_instance.category == "subject",
         ).first()
 
         if not subject:
@@ -251,7 +251,7 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.super_type == "subject",
+            bdb.Base.classes.generic_instance.category == "subject",
         ).first()
 
         if not subject:
@@ -262,12 +262,12 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if child.super_type == "content" and child.btype in ["specimen", "sample"]:
+            if child.category == "content" and child.type in ["specimen", "sample"]:
                 specimens.append({
                     "euid": child.euid,
                     "name": child.name,
-                    "btype": child.btype,
-                    "b_sub_type": child.b_sub_type,
+                    "type": child.type,
+                    "subtype": child.subtype,
                     "status": child.bstatus,
                 })
 

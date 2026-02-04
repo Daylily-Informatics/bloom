@@ -38,17 +38,17 @@ class JsonAddlSchema(BloomBaseSchema):
 
 class ObjectBaseSchema(BloomBaseSchema):
     """Base schema for BloomObj/generic_instance objects."""
-    
+
     name: str = Field(..., min_length=1, max_length=500, description="Object name")
-    btype: str = Field(..., min_length=1, max_length=100, description="Object type (e.g., sample, plate)")
-    b_sub_type: Optional[str] = Field(None, max_length=100, description="Object subtype")
-    super_type: str = Field(default="instance", max_length=50, description="Super type")
+    type: str = Field(..., min_length=1, max_length=100, description="Object type (e.g., sample, plate)")
+    subtype: Optional[str] = Field(None, max_length=100, description="Object subtype")
+    category: str = Field(default="instance", max_length=50, description="Category (formerly super_type)")
     json_addl: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional JSON data")
-    
-    @field_validator("btype", mode="before")
+
+    @field_validator("type", mode="before")
     @classmethod
-    def normalize_btype(cls, v):
-        """Normalize btype to lowercase."""
+    def normalize_type(cls, v):
+        """Normalize type to lowercase."""
         if v:
             return str(v).strip().lower()
         return v
@@ -120,10 +120,10 @@ class ObjectResponseSchema(ObjectBaseSchema, TimestampMixin):
 
 class ObjectQueryParams(BloomBaseSchema):
     """Query parameters for listing/searching objects."""
-    
-    btype: Optional[str] = Field(None, description="Filter by object type")
-    b_sub_type: Optional[str] = Field(None, description="Filter by subtype")
-    super_type: Optional[str] = Field(None, description="Filter by super type")
+
+    type: Optional[str] = Field(None, description="Filter by object type")
+    subtype: Optional[str] = Field(None, description="Filter by subtype")
+    category: Optional[str] = Field(None, description="Filter by category")
     status: Optional[str] = Field(None, description="Filter by status")
     name_contains: Optional[str] = Field(None, description="Filter by name (contains)")
     parent_euid: Optional[str] = Field(None, description="Filter by parent")
@@ -132,8 +132,8 @@ class ObjectQueryParams(BloomBaseSchema):
     created_after: Optional[datetime] = Field(None, description="Filter by creation date")
     created_before: Optional[datetime] = Field(None, description="Filter by creation date")
     include_deleted: bool = Field(default=False, description="Include soft-deleted objects")
-    
-    @field_validator("btype", "b_sub_type", mode="before")
+
+    @field_validator("type", "subtype", mode="before")
     @classmethod
     def normalize_types(cls, v):
         """Normalize type fields to lowercase."""

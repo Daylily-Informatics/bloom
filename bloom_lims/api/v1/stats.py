@@ -71,7 +71,7 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
                 bdb.session.query(content_class)
                 .filter(
                     content_class.is_deleted == False,
-                    content_class.b_sub_type.like("%reagent%"),
+                    content_class.subtype.like("%reagent%"),
                 )
                 .count()
             )
@@ -106,8 +106,8 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
                 RecentActivityItem(
                     euid=a.euid,
                     name=a.name,
-                    b_type=a.btype or "workflow",
-                    b_sub_type=a.b_sub_type,
+                    type=a.type or "workflow",
+                    subtype=a.subtype,
                     status=a.bstatus,
                     created_dt=a.created_dt,
                 )
@@ -126,8 +126,8 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
                 RecentActivityItem(
                     euid=w.euid,
                     name=w.name,
-                    b_type=w.btype or "workflow",
-                    b_sub_type=w.b_sub_type,
+                    type=w.type or "workflow",
+                    subtype=w.subtype,
                     status=w.bstatus,
                     created_dt=w.created_dt,
                 )
