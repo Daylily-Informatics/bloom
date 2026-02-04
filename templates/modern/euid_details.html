@@ -35,6 +35,11 @@
   <div class="card" style="grid-column: span 2;">
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-info-circle"></i> Object Details</h3>
+      {% if is_admin %}
+      <button class="btn btn-outline btn-sm" id="edit-mode-toggle" onclick="toggleEditMode()">
+        <i class="fas fa-edit"></i> <span id="edit-mode-text">Edit</span>
+      </button>
+      {% endif %}
     </div>
     <div class="card-body">
       <div class="detail-grid">
@@ -58,25 +63,50 @@
           <div class="detail-label">Version</div>
           <div class="detail-value">{{ obj.version }}</div>
         </div>
-        <div class="detail-item">
-          <div class="detail-label">Status</div>
-          <div class="detail-value">{{ obj.bstatus }}</div>
+        <div class="detail-item editable-field" data-field="status">
+          <div class="detail-label">Status {% if is_admin %}<i class="fas fa-pencil-alt edit-icon" style="display:none;"></i>{% endif %}</div>
+          <div class="detail-value">
+            <span class="display-value">{{ obj.bstatus }}</span>
+            {% if is_admin %}
+            <input type="text" class="edit-input" value="{{ obj.bstatus }}" style="display:none;">
+            {% endif %}
+          </div>
         </div>
-        <div class="detail-item">
-          <div class="detail-label">Name</div>
-          <div class="detail-value">{{ obj.json_addl.properties.name | default(obj.name) | default('-') }}</div>
+        <div class="detail-item editable-field" data-field="name">
+          <div class="detail-label">Name {% if is_admin %}<i class="fas fa-pencil-alt edit-icon" style="display:none;"></i>{% endif %}</div>
+          <div class="detail-value">
+            <span class="display-value">{{ obj.json_addl.properties.name | default(obj.name) | default('-') }}</span>
+            {% if is_admin %}
+            <input type="text" class="edit-input" value="{{ obj.json_addl.properties.name | default(obj.name) | default('') }}" style="display:none;">
+            {% endif %}
+          </div>
         </div>
-        <div class="detail-item">
-          <div class="detail-label">Created</div>
-          <div class="detail-value">{{ obj.created_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.created_dt else '-' }}</div>
+        <div class="detail-item editable-field" data-field="created_dt">
+          <div class="detail-label">Created {% if is_admin %}<i class="fas fa-pencil-alt edit-icon" style="display:none;"></i>{% endif %}</div>
+          <div class="detail-value">
+            <span class="display-value">{{ obj.created_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.created_dt else '-' }}</span>
+            {% if is_admin %}
+            <input type="datetime-local" class="edit-input" value="{{ obj.created_dt.strftime('%Y-%m-%dT%H:%M:%S') if obj.created_dt else '' }}" style="display:none;">
+            {% endif %}
+          </div>
         </div>
         <div class="detail-item">
           <div class="detail-label">Is Deleted?</div>
           <div class="detail-value">
             {% if obj.is_deleted %}
             <span class="badge badge-error">Yes</span>
+            {% if is_admin %}
+            <button class="btn btn-sm btn-outline" onclick="undeleteObject('{{ obj.euid }}')" style="margin-left: var(--spacing-xs);">
+              <i class="fas fa-undo"></i> Restore
+            </button>
+            {% endif %}
             {% else %}
             <span class="badge badge-success">No</span>
+            {% if is_admin %}
+            <button class="btn btn-sm btn-outline" onclick="softDeleteObject('{{ obj.euid }}')" style="margin-left: var(--spacing-xs);">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+            {% endif %}
             {% endif %}
           </div>
         </div>
@@ -404,12 +434,30 @@
 <div class="card" style="margin-top: var(--spacing-lg);">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-code"></i> Full JSON (json_addl)</h3>
-    <button class="btn btn-outline btn-sm" onclick="toggleFullJsonView()">
-      <i class="fas fa-expand" id="json-toggle-icon"></i> <span id="json-toggle-text">Expand</span>
-    </button>
+    <div>
+      <button class="btn btn-outline btn-sm" onclick="toggleFullJsonView()">
+        <i class="fas fa-expand" id="json-toggle-icon"></i> <span id="json-toggle-text">Expand</span>
+      </button>
+      {% if is_admin %}
+      <button class="btn btn-outline btn-sm" id="json-edit-toggle" onclick="toggleJsonEditMode()">
+        <i class="fas fa-edit"></i> <span id="json-edit-text">Edit</span>
+      </button>
+      {% endif %}
+    </div>
   </div>
   <div class="card-body">
     <pre class="json-display" id="json-display">{{ obj.json_addl | tojson }}</pre>
+    {% if is_admin %}
+    <div id="json-editor-full" class="json-editor-container" style="display: none; min-height: 400px;"></div>
+    <div id="json-save-buttons" style="display: none; margin-top: var(--spacing-md);">
+      <button class="btn btn-primary" onclick="saveFullJson()">
+        <i class="fas fa-save"></i> Save JSON
+      </button>
+      <button class="btn btn-outline" onclick="cancelJsonEdit()">
+        <i class="fas fa-times"></i> Cancel
+      </button>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -438,6 +486,27 @@
 .detail-label { font-size: 0.75rem; color: var(--color-gray-400); text-transform: uppercase; margin-bottom: var(--spacing-xs); }
 .detail-value { font-weight: 500; }
 .font-mono { font-family: var(--font-mono); }
+
+/* Editable field styles */
+.editable-field .edit-icon { font-size: 0.65rem; margin-left: var(--spacing-xs); color: var(--color-highlight); }
+.editable-field .edit-input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-gray-800);
+  border: 1px solid var(--color-highlight);
+  border-radius: var(--radius-sm);
+  color: var(--color-white);
+  font-size: inherit;
+  font-weight: 500;
+}
+.editable-field.editing { background: var(--color-gray-600); }
+.edit-mode-active .editable-field { cursor: pointer; }
+.edit-mode-active .editable-field:hover { background: var(--color-gray-600); }
+
+/* Edit mode buttons */
+#edit-mode-toggle.active { background: var(--color-highlight); color: white; }
+.edit-actions { margin-top: var(--spacing-md); display: flex; gap: var(--spacing-sm); }
+.edit-actions.hidden { display: none; }
 
 .action-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .btn-block { width: 100%; justify-content: flex-start; }
@@ -769,6 +838,239 @@ function saveTemplateProperties() {
 // Print label
 function printLabel(euid) {
   BloomToast.info('Print Label', 'Printing label for ' + euid);
+}
+
+// Edit mode state
+var isEditMode = false;
+var editorFull = null;
+var isJsonEditMode = false;
+
+// Toggle edit mode for inline fields
+function toggleEditMode() {
+  isEditMode = !isEditMode;
+  var btn = document.getElementById('edit-mode-toggle');
+  var text = document.getElementById('edit-mode-text');
+  var detailGrid = document.querySelector('.detail-grid');
+
+  if (isEditMode) {
+    btn.classList.add('active');
+    text.textContent = 'Save';
+    detailGrid.classList.add('edit-mode-active');
+
+    // Show edit inputs and icons
+    document.querySelectorAll('.editable-field .edit-icon').forEach(function(icon) {
+      icon.style.display = 'inline';
+    });
+    document.querySelectorAll('.editable-field .edit-input').forEach(function(input) {
+      input.style.display = 'block';
+    });
+    document.querySelectorAll('.editable-field .display-value').forEach(function(val) {
+      val.style.display = 'none';
+    });
+  } else {
+    // Save changes
+    saveFieldChanges();
+  }
+}
+
+// Save inline field changes
+function saveFieldChanges() {
+  var updates = {};
+
+  document.querySelectorAll('.editable-field').forEach(function(field) {
+    var fieldName = field.dataset.field;
+    var input = field.querySelector('.edit-input');
+    if (input) {
+      var value = input.value;
+      if (fieldName === 'created_dt' && value) {
+        // Convert to ISO format
+        updates[fieldName] = new Date(value).toISOString();
+      } else if (fieldName === 'status') {
+        updates[fieldName] = value;
+      } else if (fieldName === 'name') {
+        updates[fieldName] = value;
+      }
+    }
+  });
+
+  if (Object.keys(updates).length === 0) {
+    exitEditMode();
+    return;
+  }
+
+  fetch('/api/v1/objects/{{ obj.euid }}', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  })
+  .then(function(response) {
+    if (response.ok) {
+      BloomToast.success('Saved', 'Changes saved successfully');
+      setTimeout(function() {
+        window.location.reload();
+      }, 1000);
+    } else {
+      return response.json().then(function(data) {
+        throw new Error(data.detail || 'Failed to save');
+      });
+    }
+  })
+  .catch(function(error) {
+    BloomToast.error('Error', error.message);
+    exitEditMode();
+  });
+}
+
+// Exit edit mode without saving
+function exitEditMode() {
+  isEditMode = false;
+  var btn = document.getElementById('edit-mode-toggle');
+  var text = document.getElementById('edit-mode-text');
+  var detailGrid = document.querySelector('.detail-grid');
+
+  btn.classList.remove('active');
+  text.textContent = 'Edit';
+  detailGrid.classList.remove('edit-mode-active');
+
+  document.querySelectorAll('.editable-field .edit-icon').forEach(function(icon) {
+    icon.style.display = 'none';
+  });
+  document.querySelectorAll('.editable-field .edit-input').forEach(function(input) {
+    input.style.display = 'none';
+  });
+  document.querySelectorAll('.editable-field .display-value').forEach(function(val) {
+    val.style.display = 'inline';
+  });
+}
+
+// Soft delete object
+function softDeleteObject(euid) {
+  if (!confirm('Are you sure you want to delete this object? This is a soft delete and can be undone.')) {
+    return;
+  }
+
+  fetch('/api/v1/objects/' + euid, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_deleted: true })
+  })
+  .then(function(response) {
+    if (response.ok) {
+      BloomToast.success('Deleted', 'Object soft deleted');
+      setTimeout(function() {
+        window.location.href = '/euid_details?euid=' + euid + '&is_deleted=true';
+      }, 1000);
+    } else {
+      return response.json().then(function(data) {
+        throw new Error(data.detail || 'Failed to delete');
+      });
+    }
+  })
+  .catch(function(error) {
+    BloomToast.error('Error', error.message);
+  });
+}
+
+// Undelete (restore) object
+function undeleteObject(euid) {
+  fetch('/api/v1/objects/' + euid, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_deleted: false })
+  })
+  .then(function(response) {
+    if (response.ok) {
+      BloomToast.success('Restored', 'Object restored');
+      setTimeout(function() {
+        window.location.href = '/euid_details?euid=' + euid;
+      }, 1000);
+    } else {
+      return response.json().then(function(data) {
+        throw new Error(data.detail || 'Failed to restore');
+      });
+    }
+  })
+  .catch(function(error) {
+    BloomToast.error('Error', error.message);
+  });
+}
+
+// Toggle JSON edit mode
+function toggleJsonEditMode() {
+  isJsonEditMode = !isJsonEditMode;
+  var jsonDisplay = document.getElementById('json-display');
+  var jsonEditor = document.getElementById('json-editor-full');
+  var saveButtons = document.getElementById('json-save-buttons');
+  var editText = document.getElementById('json-edit-text');
+  var editToggle = document.getElementById('json-edit-toggle');
+
+  if (isJsonEditMode) {
+    jsonDisplay.style.display = 'none';
+    jsonEditor.style.display = 'block';
+    saveButtons.style.display = 'block';
+    editText.textContent = 'Cancel';
+    editToggle.classList.add('active');
+
+    // Initialize editor if not done
+    if (!editorFull) {
+      editorFull = new JSONEditor(jsonEditor, {
+        mode: 'tree',
+        modes: ['tree', 'code', 'view'],
+        search: true
+      });
+      editorFull.set({{ obj.json_addl | tojson }});
+    }
+  } else {
+    cancelJsonEdit();
+  }
+}
+
+// Save full JSON
+function saveFullJson() {
+  if (!editorFull) return;
+
+  try {
+    var jsonData = editorFull.get();
+
+    fetch('/api/v1/objects/{{ obj.euid }}', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ json_addl: jsonData })
+    })
+    .then(function(response) {
+      if (response.ok) {
+        BloomToast.success('Saved', 'JSON saved successfully');
+        setTimeout(function() {
+          window.location.reload();
+        }, 1000);
+      } else {
+        return response.json().then(function(data) {
+          throw new Error(data.detail || 'Failed to save');
+        });
+      }
+    })
+    .catch(function(error) {
+      BloomToast.error('Error', error.message);
+    });
+  } catch (e) {
+    BloomToast.error('Invalid JSON', e.message);
+  }
+}
+
+// Cancel JSON edit
+function cancelJsonEdit() {
+  isJsonEditMode = false;
+  var jsonDisplay = document.getElementById('json-display');
+  var jsonEditor = document.getElementById('json-editor-full');
+  var saveButtons = document.getElementById('json-save-buttons');
+  var editText = document.getElementById('json-edit-text');
+  var editToggle = document.getElementById('json-edit-toggle');
+
+  jsonDisplay.style.display = 'block';
+  jsonEditor.style.display = 'none';
+  saveButtons.style.display = 'none';
+  editText.textContent = 'Edit';
+  editToggle.classList.remove('active');
 }
 
 // Initialize JSONEditors on DOMContentLoaded
