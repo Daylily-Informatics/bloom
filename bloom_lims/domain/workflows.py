@@ -351,7 +351,11 @@ class BloomWorkflowStep(BloomObj):
         results = self.query_template_by_component_v2(
             category, type_name, subtype, version
         )
-
+        if not results:
+            raise Exception(
+                f"Template not found: {category}/{type_name}/{subtype}/{version}. "
+                "Please ensure the database is seeded with templates."
+            )
         gdna_template = results[0]
 
         cx_category = "container"
@@ -361,7 +365,11 @@ class BloomWorkflowStep(BloomObj):
         cx_results = self.query_template_by_component_v2(
             cx_category, cx_type, cx_subtype, cx_version
         )
-
+        if not cx_results:
+            raise Exception(
+                f"Template not found: {cx_category}/{cx_type}/{cx_subtype}/{cx_version}. "
+                "Please ensure the database is seeded with templates."
+            )
         cx_tube_template = cx_results[0]
 
         parent_wf = wfs.child_of_lineages[0].parent_instance

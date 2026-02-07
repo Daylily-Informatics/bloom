@@ -2589,15 +2589,21 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     
     f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
     fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
- 
+
     # these should only be 1
+    if not f_templates:
+        logging.error("No file template found for file/file/generic/1.0")
+        raise HTTPException(status_code=500, detail="File template not found: file/file/generic/1.0. Please run 'bloom init' to seed templates.")
     if len(f_templates) > 1:
         logging.error(f"Multiple file templates found for file/file/generic/1.0")
         raise HTTPException(status_code=500, detail="Multiple file templates found for file/file/generic/1.0")
+    if not fset_templates:
+        logging.error("No file set template found for file/file_set/generic/1.0")
+        raise HTTPException(status_code=500, detail="File set template not found: file/file_set/generic/1.0. Please run 'bloom init' to seed templates.")
     if len(fset_templates) > 1:
         logging.error(f"Multiple file set templates found for file/file_set/generic/1.0")
         raise HTTPException(status_code=500, detail="Multiple file set templates found for file/file_set/generic/1.0")
-    
+
     f_template = f_templates[0]
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
     ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)

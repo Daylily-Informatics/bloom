@@ -462,6 +462,51 @@
 </div>
 {% endif %}
 
+<!-- Linked Test Requisitions (shown if workflow is child of any test_requisition) -->
+{% if workflow.child_of_lineages %}
+{% set linked_requisitions = [] %}
+{% for lineage in workflow.child_of_lineages %}
+    {% if lineage.parent_instance and lineage.parent_instance.type == 'test_requisition' and not lineage.parent_instance.is_deleted %}
+        {% set _ = linked_requisitions.append(lineage.parent_instance) %}
+    {% endif %}
+{% endfor %}
+{% if linked_requisitions|length > 0 %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-file-medical"></i> Linked Test Requisitions ({{ linked_requisitions|length }})</h3>
+    </div>
+    <div class="card-body">
+        {% for trx in linked_requisitions %}
+        <div class="requisition-item" style="margin-bottom: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-gray-700); border-radius: var(--radius-sm);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; margin-bottom: var(--spacing-sm);">
+                <a href="/euid_details?euid={{ trx.euid }}" class="text-highlight" style="font-weight: 600;">{{ trx.euid }}</a>
+                <span class="text-muted">{{ trx.json_addl.get('properties', {}).get('name', '') }}</span>
+                <span class="badge bg-{{ 'success' if trx.bstatus == 'active' else 'secondary' }}">{{ trx.bstatus }}</span>
+                <a href="/dindex2?globalStartNodeEUID={{ trx.euid }}" target="bloom_dag" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+            </div>
+            {% if trx.json_addl and trx.json_addl.action_groups %}
+            <div class="requisition-actions" style="display: flex; flex-wrap: wrap; gap: var(--spacing-xs);">
+                {% for group_key, group_value in trx.json_addl.action_groups.items() %}
+                <div class="action-group" style="display: flex; align-items: center; gap: var(--spacing-xs);">
+                    <span class="action-group-name" style="font-size: 0.75rem; color: var(--color-gray-400);">{{ group_value.group_name }}:</span>
+                    {% for action_key, action_value in group_value.actions.items() %}
+                    <button class="action-btn btn btn-outline btn-sm"
+                            onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ trx.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                            {% if action_value.action_enabled == "0" %}disabled style="opacity: 0.5;"{% endif %}>
+                        {{ action_value.action_name }}
+                    </button>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
 <!-- Define recursive step rendering macro -->
 {% macro render_step(step, accordion_states, depth=0) %}
 {% set is_workflow_step = step.polymorphic_discriminator in ['workflow_step_instance', 'workflow_instance'] %}
@@ -561,6 +606,47 @@
                         {% endfor %}
                     </div>
                     {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Carrier Tracking Form (for package steps) -->
+                {% if step_type == 'package' %}
+                <div class="mb-3 tracking-form-section">
+                    <div class="tracking-form-header" style="display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                        <i class="fas fa-shipping-fast" style="color: var(--color-info);"></i>
+                        <span style="font-weight: 600;">Carrier Tracking</span>
+                    </div>
+                    <div class="tracking-input-row" style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap; align-items: center;">
+                        <select id="carrier-{{ step.euid }}" class="form-select" style="width: 120px;">
+                            <option value="FedEx" {{ 'selected' if step.json_addl.get('properties', {}).get('carrier') == 'FedEx' else '' }}>FedEx</option>
+                            <option value="UPS" {{ 'selected' if step.json_addl.get('properties', {}).get('carrier') == 'UPS' else '' }}>UPS</option>
+                            <option value="USPS" {{ 'selected' if step.json_addl.get('properties', {}).get('carrier') == 'USPS' else '' }}>USPS</option>
+                            <option value="Other" {{ 'selected' if step.json_addl.get('properties', {}).get('carrier') == 'Other' else '' }}>Other</option>
+                        </select>
+                        <input type="text" id="tracking-number-{{ step.euid }}" class="form-control"
+                               placeholder="Enter tracking number"
+                               value="{{ step.json_addl.get('properties', {}).get('tracking_number', '') }}"
+                               style="flex: 1; min-width: 200px;">
+                        <button class="btn btn-primary btn-sm" onclick="lookupTracking('{{ step.euid }}')" title="Look up tracking info">
+                            <i class="fas fa-search"></i> Track
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="saveTracking('{{ step.euid }}')" title="Save tracking info">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                    </div>
+                    {% set fedex_data = step.json_addl.get('properties', {}).get('fedex_tracking_data', []) %}
+                    {% if fedex_data|length > 0 %}
+                    <div class="tracking-results" style="margin-top: var(--spacing-sm); padding: var(--spacing-sm); background: var(--color-gray-700); border-radius: var(--radius-sm);">
+                        <div class="tracking-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-sm);">
+                            <div><strong>Status:</strong> {{ fedex_data[0].get('status', 'N/A') }}</div>
+                            <div><strong>Transit Time:</strong> {{ ((fedex_data[0].get('Transit_Time_sec', 0) | float) / 3600) | round(1) }} hours</div>
+                            <div><strong>Origin:</strong> {{ fedex_data[0].get('origin_state', 'N/A') }}</div>
+                            <div><strong>Ship Date:</strong> {{ fedex_data[0].get('ship_date', 'N/A') }}</div>
+                            <div><strong>Delivery:</strong> {{ fedex_data[0].get('delivery_date', 'N/A') }}</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div id="tracking-result-{{ step.euid }}" style="display: none; margin-top: var(--spacing-sm);"></div>
                 </div>
                 {% endif %}
 
@@ -857,6 +943,79 @@ function removeListItem(stepEuid, key) {
     if (list.childElementCount > 1) {
         list.removeChild(list.lastChild);
     }
+}
+
+// Carrier Tracking Functions
+function lookupTracking(stepEuid) {
+    const carrier = document.getElementById('carrier-' + stepEuid).value;
+    const trackingNumber = document.getElementById('tracking-number-' + stepEuid).value.trim();
+    const resultDiv = document.getElementById('tracking-result-' + stepEuid);
+
+    if (!trackingNumber) {
+        resultDiv.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Please enter a tracking number</span>';
+        resultDiv.style.display = 'block';
+        return;
+    }
+
+    resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Looking up tracking...';
+    resultDiv.style.display = 'block';
+
+    fetch('/api/v1/tracking/track/' + encodeURIComponent(trackingNumber) + '?carrier=' + encodeURIComponent(carrier))
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultDiv.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ' + data.error + '</span>';
+            } else {
+                let html = '<div class="tracking-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-sm); padding: var(--spacing-sm); background: var(--color-gray-700); border-radius: var(--radius-sm);">';
+                html += '<div><strong>Status:</strong> ' + (data.status || 'N/A') + '</div>';
+                if (data.transit_time_hours) html += '<div><strong>Transit Time:</strong> ' + data.transit_time_hours + ' hours</div>';
+                if (data.origin_state) html += '<div><strong>Origin:</strong> ' + data.origin_state + '</div>';
+                if (data.ship_date) html += '<div><strong>Ship Date:</strong> ' + data.ship_date + '</div>';
+                if (data.delivery_date) html += '<div><strong>Delivery:</strong> ' + data.delivery_date + '</div>';
+                html += '</div>';
+                resultDiv.innerHTML = html;
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Tracking lookup failed: ' + error.message + '</span>';
+        });
+}
+
+function saveTracking(stepEuid) {
+    const carrier = document.getElementById('carrier-' + stepEuid).value;
+    const trackingNumber = document.getElementById('tracking-number-' + stepEuid).value.trim();
+    const resultDiv = document.getElementById('tracking-result-' + stepEuid);
+
+    if (!trackingNumber) {
+        resultDiv.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Please enter a tracking number</span>';
+        resultDiv.style.display = 'block';
+        return;
+    }
+
+    resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving tracking info...';
+    resultDiv.style.display = 'block';
+
+    const formData = new FormData();
+    formData.append('obj_euid', stepEuid);
+    formData.append('carrier', carrier);
+    formData.append('tracking_number', trackingNumber);
+
+    fetch('/update_obj_json_addl_properties', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Failed to save');
+        return response.json();
+    })
+    .then(data => {
+        resultDiv.innerHTML = '<span class="text-success"><i class="fas fa-check"></i> Tracking information saved. Looking up details...</span>';
+        // After saving, look up the tracking info
+        setTimeout(() => lookupTracking(stepEuid), 500);
+    })
+    .catch(error => {
+        resultDiv.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Failed to save: ' + error.message + '</span>';
+    });
 }
 </script>
 {% endblock %}

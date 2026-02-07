@@ -183,8 +183,16 @@ class BloomFile(BloomObj):
         file_properties = {"properties": file_metadata}
         import_or_remote = file_metadata.get('import_or_remote', 'import')
 
+        # Query for file template with proper error handling
+        file_templates = self.query_template_by_component_v2("file", "file", "generic", "1.0")
+        if not file_templates:
+            raise Exception(
+                "File template not found: file/file/generic/1.0. "
+                "Please ensure the database is seeded with file templates (run: bloom init)."
+            )
+
         new_file = self.create_instance(
-            self.query_template_by_component_v2("file", "file", "generic", "1.0")[0].euid,
+            file_templates[0].euid,
             file_properties,
         )
         self.session.commit()

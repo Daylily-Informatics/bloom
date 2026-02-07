@@ -18,6 +18,11 @@
     </h1>
   </div>
   <div class="page-actions">
+    {% if obj.category.endswith('_template') %}
+    <a href="/create_object_wizard?template_euid={{ obj.euid }}" class="btn btn-success btn-sm" title="Create an instance from this template">
+      <i class="fas fa-plus-circle"></i> Create Instance
+    </a>
+    {% endif %}
     <a href="/dindex2?globalStartNodeEUID={{ obj.euid }}" class="btn btn-primary btn-sm" title="View in DAG Explorer">
       <i class="fas fa-project-diagram"></i> Graph
     </a>
@@ -131,6 +136,25 @@
             <a href="/uuid_details?uuid={{ obj.uuid }}" class="link-uuid">{{ obj.uuid }}</a>
           </div>
         </div>
+        {% if obj.category == 'file' and obj.json_addl and obj.json_addl.properties and obj.json_addl.properties.current_s3_uri %}
+        <div class="detail-item" style="grid-column: span 2;">
+          <div class="detail-label">S3 URI</div>
+          <div class="detail-value" style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;">
+            <a href="{{ obj.json_addl.properties.current_s3_uri }}" target="_blank" class="link-uuid font-mono" style="word-break: break-all;">
+              {{ obj.json_addl.properties.current_s3_uri }}
+            </a>
+            {% if obj.json_addl.properties.current_s3_bucket_name and obj.json_addl.properties.current_s3_key %}
+            <a href="https://us-east-1.console.aws.amazon.com/s3/object/{{ obj.json_addl.properties.current_s3_bucket_name }}?region=us-east-1&prefix={{ obj.json_addl.properties.current_s3_key }}"
+               target="_blank" class="btn btn-outline btn-sm" title="Open in AWS S3 Console">
+              <i class="fab fa-aws"></i> AWS Console
+            </a>
+            {% endif %}
+            <button class="btn btn-outline btn-sm" onclick="copyToClipboard('{{ obj.json_addl.properties.current_s3_uri }}')" title="Copy S3 URI">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -160,6 +184,37 @@
     </div>
   </div>
 </div>
+
+<!-- Object Actions from json_addl.action_groups -->
+{% if obj.json_addl and obj.json_addl.action_groups %}
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-bolt"></i> Object Actions</h3>
+  </div>
+  <div class="card-body">
+    {% for group_key, group_value in obj.json_addl.action_groups.items() %}
+    <div class="action-group-section" style="margin-bottom: var(--spacing-md);">
+      <h4 style="font-size: 0.875rem; color: var(--color-gray-400); margin-bottom: var(--spacing-sm); text-transform: uppercase;">
+        {{ group_value.group_name }}
+      </h4>
+      <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
+        {% for action_key, action_value in group_value.actions.items() %}
+        <button class="btn btn-outline btn-sm action-button"
+          data-action-json="{{ action_value | tojson | e }}"
+          data-euid="{{ obj.euid }}"
+          data-action-name="{{ action_key }}"
+          data-action-group="{{ group_key }}"
+          onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ obj.euid }}', '{{ action_key }}', '{{ group_key }}')"
+          {% if action_value.action_enabled == "0" %}disabled style="opacity: 0.5;"{% endif %}>
+          <i class="fas fa-play"></i> {{ action_value.action_name }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <!-- Collapsible Sections -->
 <div class="collapsible-nav" style="margin-top: var(--spacing-lg);">
@@ -650,6 +705,8 @@
 
 
 {% block extra_js %}
+<!-- Action Buttons (shared functions for workflow actions) -->
+<script src="/static/legacy/action_buttons.js"></script>
 <!-- JSONEditor JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.js"></script>
 <script>
