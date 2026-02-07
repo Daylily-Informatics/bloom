@@ -405,12 +405,26 @@ async def authentication_required_exception_handler(
 
 
 async def require_auth(request: Request):
-    
+    """
+    Require authentication for a route.
+
+    Sets user_data in session with:
+    - email: User email address
+    - role: User role ('admin' or 'user')
+    - dag_fnv2: DAG fingerprint (optional)
+
+    In development mode (BLOOM_OAUTH=no), defaults to admin role.
+    """
 
     if os.environ.get("BLOOM_OAUTH", "yes") == "no":
-        request.session["user_data"] = {"email": "john@daylilyinformatics.com", "dag_fnv2": ""}
+        # Development mode - default to admin role for testing
+        request.session["user_data"] = {
+            "email": "john@daylilyinformatics.com",
+            "dag_fnv2": "",
+            "role": "admin",  # Default to admin in dev mode
+        }
         return request
-    
+
     try:
         get_cognito_auth()
     except CognitoConfigurationError as exc:
@@ -420,6 +434,11 @@ async def require_auth(request: Request):
 
     if "user_data" not in request.session:
         raise AuthenticationRequiredException()
+
+    # Ensure role is set (default to 'user' if not present)
+    if "role" not in request.session["user_data"]:
+        request.session["user_data"]["role"] = "user"
+
     return request.session["user_data"]
 
 
@@ -1812,6 +1831,9 @@ async def euid_details(
         from bloom_lims.subjecting import list_subjects_for_object
         subjects_for_object = list_subjects_for_object(bobdb, euid)
 
+        # Determine if user is admin
+        is_admin = user_data.get("role", "user") == "admin"
+
         # Use modern template
         template = templates.get_template("modern/euid_details.html")
         context = {
@@ -1824,6 +1846,7 @@ async def euid_details(
             "audit_logs": audit_logs,
             "udat": user_data,
             "subjects_for_object": subjects_for_object,
+            "is_admin": is_admin,
         }
         return HTMLResponse(content=template.render(context))
 
@@ -2566,15 +2589,21 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
     
     f_templates = bobdb.query_template_by_component_v2("file","file","generic","1.0")
     fset_templates = bobdb.query_template_by_component_v2("file","file_set","generic","1.0")
- 
+
     # these should only be 1
+    if not f_templates:
+        logging.error("No file template found for file/file/generic/1.0")
+        raise HTTPException(status_code=500, detail="File template not found: file/file/generic/1.0. Please run 'bloom init' to seed templates.")
     if len(f_templates) > 1:
         logging.error(f"Multiple file templates found for file/file/generic/1.0")
         raise HTTPException(status_code=500, detail="Multiple file templates found for file/file/generic/1.0")
+    if not fset_templates:
+        logging.error("No file set template found for file/file_set/generic/1.0")
+        raise HTTPException(status_code=500, detail="File set template not found: file/file_set/generic/1.0. Please run 'bloom init' to seed templates.")
     if len(fset_templates) > 1:
         logging.error(f"Multiple file set templates found for file/file_set/generic/1.0")
         raise HTTPException(status_code=500, detail="Multiple file set templates found for file/file_set/generic/1.0")
-    
+
     f_template = f_templates[0]
     ui_form_properties = f_template.json_addl.get("ui_form_properties", [])
     ui_form_fields = generate_ui_form_fields(ui_form_properties, f_template.json_addl.get("controlled_properties", {}),  bobject=bobdb)

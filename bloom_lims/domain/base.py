@@ -406,9 +406,15 @@ class BloomObj:
         if version == "*":
             version = "1.0"
 
-        template = self.query_template_by_component_v2(
+        templates = self.query_template_by_component_v2(
             category, type_name, subtype, version
-        )[0]
+        )
+        if not templates:
+            raise Exception(
+                f"Template not found: {category}/{type_name}/{subtype}/{version}. "
+                "Please ensure the database is seeded with templates."
+            )
+        template = templates[0]
 
         new_instance = self.create_instance(template.euid)
         _update_recursive(new_instance.json_addl, defaults_ds)
@@ -949,11 +955,13 @@ class BloomObj:
     def create_instance_by_template_components(
         self, category, type, subtype, version
     ):
-        return self.create_instances(
-            self.query_template_by_component_v2(category, type, subtype, version)[
-                0
-            ].euid
-        )
+        templates = self.query_template_by_component_v2(category, type, subtype, version)
+        if not templates:
+            raise Exception(
+                f"Template not found: {category}/{type}/{subtype}/{version}. "
+                "Please ensure the database is seeded with templates (run: bloom init)."
+            )
+        return self.create_instances(templates[0].euid)
 
     # Is this too special casey? Belong lower?
     def create_container_with_content(self, cx_quad_tup, mx_quad_tup):
@@ -961,16 +969,25 @@ class BloomObj:
         ("content", "control", "giab-HG002", "1.0"),
         ("container", "tube", "tube-generic-10ml", "1.0")
         """
-        container = self.create_instance(
-            self.query_template_by_component_v2(
-                cx_quad_tup[0], cx_quad_tup[1], cx_quad_tup[2], cx_quad_tup[3]
-            )[0].euid
+        cx_templates = self.query_template_by_component_v2(
+            cx_quad_tup[0], cx_quad_tup[1], cx_quad_tup[2], cx_quad_tup[3]
         )
-        content = self.create_instance(
-            self.query_template_by_component_v2(
-                mx_quad_tup[0], mx_quad_tup[1], mx_quad_tup[2], mx_quad_tup[3]
-            )[0].euid
+        if not cx_templates:
+            raise Exception(
+                f"Container template not found: {'/'.join(cx_quad_tup)}. "
+                "Please ensure the database is seeded with templates."
+            )
+        container = self.create_instance(cx_templates[0].euid)
+
+        mx_templates = self.query_template_by_component_v2(
+            mx_quad_tup[0], mx_quad_tup[1], mx_quad_tup[2], mx_quad_tup[3]
         )
+        if not mx_templates:
+            raise Exception(
+                f"Content template not found: {'/'.join(mx_quad_tup)}. "
+                "Please ensure the database is seeded with templates."
+            )
+        content = self.create_instance(mx_templates[0].euid)
 
         container.json_addl["properties"]["name"] = content.json_addl["properties"][
             "name"
