@@ -212,14 +212,14 @@ def mock_api_auth():
     Patches the require_api_auth dependency to return a test user.
 
     Yields:
-        MagicMock: Mock user object
+        APIUser: Mock user object
     """
     from bloom_lims.api.v1.dependencies import APIUser
 
     mock_user = APIUser(
         user_id="test-user-id",
         email="test@example.com",
-        roles=["admin"],
+        role="admin",
     )
 
     with patch("bloom_lims.api.v1.dependencies.require_api_auth", return_value=mock_user):

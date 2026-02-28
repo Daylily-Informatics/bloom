@@ -2,6 +2,10 @@
 BLOOM LIMS API v1 - Dependencies
 
 Common dependencies for API endpoints including authentication.
+
+Authentication is provided by daylily-cognito's ``create_auth_dependency()``.
+A LOCAL DEV ONLY bypass is available via ``BLOOM_DEV_AUTH_BYPASS=true``.
+The bypass is blocked when ``APP_ENV=production``.
 """
 
 import logging
@@ -13,13 +17,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger(__name__)
 
-# Optional Bearer token scheme
-security = HTTPBearer(auto_error=False)
+# ---------------------------------------------------------------------------
+# APIUser — kept for backward compatibility with all endpoint signatures
+# ---------------------------------------------------------------------------
 
 
 class APIUser:
     """Represents an authenticated API user."""
-    
+
     def __init__(
         self,
         email: str,
@@ -31,7 +36,7 @@ class APIUser:
         self.user_id = user_id or email
         self.role = role
         self.is_service_account = is_service_account
-    
+
     def dict(self) -> Dict[str, Any]:
         return {
             "email": self.email,
@@ -41,33 +46,90 @@ class APIUser:
         }
 
 
+# ---------------------------------------------------------------------------
+# Dev bypass guard
+# ---------------------------------------------------------------------------
+
+def _is_dev_bypass_active() -> bool:
+    """Return True only when the dev auth bypass is enabled AND safe.
+
+    Conditions (ALL must be true):
+      1. ``BLOOM_DEV_AUTH_BYPASS`` is set to a truthy value (``true``, ``1``, ``yes``).
+      2. ``APP_ENV`` is **not** ``production``.
+    """
+    bypass = os.environ.get("BLOOM_DEV_AUTH_BYPASS", "").lower()
+    if bypass not in ("true", "1", "yes"):
+        return False
+    env = os.environ.get("APP_ENV", "development").lower()
+    if env == "production":
+        logger.warning(
+            "BLOOM_DEV_AUTH_BYPASS is set but APP_ENV=production — bypass DENIED."
+        )
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Cognito-backed auth dependency
+# ---------------------------------------------------------------------------
+
+def _build_cognito_dependency():
+    """Create the real Cognito auth dependency via daylily-cognito.
+
+    Returns the FastAPI dependency callable, or None if daylily-cognito
+    is not configured (e.g. missing env vars / config).
+    """
+    try:
+        from daylily_cognito.auth import CognitoAuth
+        from daylily_cognito.fastapi import create_auth_dependency
+
+        # Reuse Bloom's existing config loader for Cognito settings
+        from bloom_lims.config import get_settings
+
+        settings = get_settings()
+        auth_cfg = settings.auth
+
+        cognito = CognitoAuth(
+            region=auth_cfg.cognito_region,
+            user_pool_id=auth_cfg.cognito_user_pool_id,
+            app_client_id=auth_cfg.cognito_client_id,
+        )
+        return create_auth_dependency(cognito)
+    except Exception as exc:
+        logger.debug("daylily-cognito auth not available: %s", exc)
+        return None
+
+
+_cognito_get_user = _build_cognito_dependency()
+
+
+# ---------------------------------------------------------------------------
+# Core auth dependency — used by every protected endpoint
+# ---------------------------------------------------------------------------
+
 async def get_api_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False)
+    ),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ) -> APIUser:
+    """Authenticate API requests.
+
+    Auth chain (first match wins):
+      1. Dev bypass (``BLOOM_DEV_AUTH_BYPASS=true``, non-production only)
+      2. Session cookie (UI integration)
+      3. ``X-API-Key`` header
+      4. Bearer token verified by daylily-cognito
     """
-    Authenticate API requests.
-    
-    Supports multiple authentication methods:
-    1. Session-based auth (for UI integration)
-    2. Bearer token auth (JWT)
-    3. API key auth (X-API-Key header)
-    
-    Returns:
-        APIUser object with user information
-        
-    Raises:
-        HTTPException 401 if authentication fails
-    """
-    # Skip auth in development mode
-    if os.environ.get("BLOOM_API_AUTH", "yes") == "no":
+    # 1. LOCAL DEV ONLY bypass ------------------------------------------------
+    if _is_dev_bypass_active():
         return APIUser(
             email="api-dev@daylilyinformatics.com",
             role="admin",
         )
-    
-    # 1. Check session-based auth (from UI)
+
+    # 2. Session-based auth (UI) ----------------------------------------------
     if hasattr(request, "session") and "user_data" in request.session:
         user_data = request.session["user_data"]
         return APIUser(
@@ -75,20 +137,28 @@ async def get_api_user(
             user_id=user_data.get("sub"),
             role=user_data.get("role", "user"),
         )
-    
-    # 2. Check API key auth
+
+    # 3. API key auth ---------------------------------------------------------
     if x_api_key:
         api_user = await verify_api_key(x_api_key)
         if api_user:
             return api_user
-    
-    # 3. Check Bearer token auth
-    if credentials:
-        api_user = await verify_bearer_token(credentials.credentials)
-        if api_user:
-            return api_user
-    
-    # No valid authentication found
+
+    # 4. Bearer token via daylily-cognito -------------------------------------
+    if credentials and _cognito_get_user is not None:
+        try:
+            claims = _cognito_get_user(credentials)
+            return APIUser(
+                email=claims.get("email", "token-user"),
+                user_id=claims.get("sub"),
+                role=claims.get("custom:role", "user"),
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Cognito token verification failed: %s", exc)
+
+    # Nothing worked ----------------------------------------------------------
     raise HTTPException(
         status_code=401,
         detail="Authentication required. Provide session cookie, Bearer token, or X-API-Key header.",
@@ -96,66 +166,33 @@ async def get_api_user(
     )
 
 
+# ---------------------------------------------------------------------------
+# API key verification (unchanged)
+# ---------------------------------------------------------------------------
+
 async def verify_api_key(api_key: str) -> Optional[APIUser]:
-    """
-    Verify an API key and return the associated user.
-    
-    For now, supports a simple environment-based API key.
-    Can be extended to support database-backed API keys.
-    """
+    """Verify an API key and return the associated user."""
     valid_key = os.environ.get("BLOOM_API_KEY")
-    
     if valid_key and api_key == valid_key:
         return APIUser(
             email="api-service@daylilyinformatics.com",
             role="service",
             is_service_account=True,
         )
-    
     return None
 
 
-async def verify_bearer_token(token: str) -> Optional[APIUser]:
-    """
-    Verify a Bearer token and return the associated user.
-    
-    Attempts to verify via Cognito if configured.
-    """
-    try:
-        from auth.cognito.client import get_cognito_auth, CognitoConfigurationError
-        
-        try:
-            cognito = get_cognito_auth()
-            # Verify token with Cognito
-            user_info = cognito.verify_token(token)
-            if user_info:
-                return APIUser(
-                    email=user_info.get("email", "token-user"),
-                    user_id=user_info.get("sub"),
-                    role=user_info.get("custom:role", "user"),
-                )
-        except CognitoConfigurationError:
-            logger.debug("Cognito not configured, skipping token verification")
-        except Exception as e:
-            logger.warning(f"Token verification failed: {e}")
-    except ImportError:
-        logger.debug("Cognito auth not available")
-    
-    return None
-
+# ---------------------------------------------------------------------------
+# Convenience wrappers (public API unchanged)
+# ---------------------------------------------------------------------------
 
 async def require_api_auth(user: APIUser = Depends(get_api_user)) -> APIUser:
-    """
-    Dependency that requires authentication.
-    Use this in endpoints that need auth.
-    """
+    """Dependency that requires authentication."""
     return user
 
 
 async def require_admin(user: APIUser = Depends(get_api_user)) -> APIUser:
-    """
-    Dependency that requires admin role.
-    Use this in endpoints that need admin privileges.
+    """Dependency that requires admin role.
 
     Raises:
         HTTPException 403 if user is not admin
@@ -170,13 +207,12 @@ async def require_admin(user: APIUser = Depends(get_api_user)) -> APIUser:
 
 async def optional_api_auth(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False)
+    ),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ) -> Optional[APIUser]:
-    """
-    Optional authentication - returns None if not authenticated.
-    Use this for endpoints that work with or without auth.
-    """
+    """Optional authentication — returns None if not authenticated."""
     try:
         return await get_api_user(request, credentials, x_api_key)
     except HTTPException:

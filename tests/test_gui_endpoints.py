@@ -14,7 +14,7 @@ from unittest.mock import patch, MagicMock
 
 # Set up auth bypass BEFORE importing FastAPI app
 os.environ["BLOOM_OAUTH"] = "no"
-os.environ["BLOOM_API_AUTH"] = "no"
+os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 from fastapi.testclient import TestClient
 
