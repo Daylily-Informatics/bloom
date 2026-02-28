@@ -8,6 +8,9 @@ Extracted from bloom_lims/bobjs.py for better code organization.
 """
 
 import logging
+from typing import Any, Dict, Optional
+
+from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.domain.base import BloomObj
 
@@ -32,6 +35,128 @@ class BloomContainer(BloomObj):
         content = self.get_by_euid(content_euid)
         container.contents.remove(content)
         self.session.commit()
+
+    def link_biospecimen(self, container_euid: str, biospecimen_euid: str) -> Dict[str, Any]:
+        """Link a container to a biospecimen EUID.
+
+        Stores the biospecimen_euid in the container's json_addl under
+        the key 'biospecimen_euid'. This is a string reference — the
+        biospecimen entity does not need to exist in Bloom yet.
+
+        Args:
+            container_euid: EUID of the container (CTN-* prefix).
+            biospecimen_euid: EUID of the biospecimen (BSP-* prefix).
+
+        Returns:
+            Dict with container_euid, biospecimen_euid, and success status.
+
+        Raises:
+            Exception: If the container is not found.
+        """
+        container = self.get_by_euid(container_euid)
+        if container.json_addl is None:
+            container.json_addl = {}
+        container.json_addl["biospecimen_euid"] = biospecimen_euid
+        flag_modified(container, "json_addl")
+        self.session.commit()
+        logger.info(
+            "Linked container %s to biospecimen %s",
+            container_euid,
+            biospecimen_euid,
+        )
+        return {
+            "container_euid": container_euid,
+            "biospecimen_euid": biospecimen_euid,
+            "success": True,
+        }
+
+    def set_atlas_references(
+        self,
+        container_euid: str,
+        atlas_requisition_euid: Optional[str] = None,
+        atlas_kit_euid: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Store Atlas reference EUIDs on a container.
+
+        These are opaque string references to Atlas-owned entities.
+        Bloom never resolves them — they exist for cross-system traceability.
+
+        Args:
+            container_euid: EUID of the container.
+            atlas_requisition_euid: Atlas requisition EUID (nullable).
+            atlas_kit_euid: Atlas kit EUID (nullable).
+
+        Returns:
+            Dict with the updated reference fields.
+        """
+        container = self.get_by_euid(container_euid)
+        if container.json_addl is None:
+            container.json_addl = {}
+        if atlas_requisition_euid is not None:
+            container.json_addl["atlas_requisition_euid"] = atlas_requisition_euid
+        if atlas_kit_euid is not None:
+            container.json_addl["atlas_kit_euid"] = atlas_kit_euid
+        flag_modified(container, "json_addl")
+        self.session.commit()
+        logger.info(
+            "Set Atlas references on container %s: requisition=%s, kit=%s",
+            container_euid,
+            atlas_requisition_euid,
+            atlas_kit_euid,
+        )
+        return {
+            "container_euid": container_euid,
+            "atlas_requisition_euid": container.json_addl.get("atlas_requisition_euid"),
+            "atlas_kit_euid": container.json_addl.get("atlas_kit_euid"),
+            "success": True,
+        }
+
+    def get_container_chain(self, container_euid: str) -> Dict[str, Any]:
+        """Return the container and its linked biospecimen + patient EUID chain.
+
+        Traverses: container → biospecimen_euid (from json_addl) →
+        patient_euid (looked up from the biospecimen's json_addl if the
+        biospecimen entity exists in Bloom).
+
+        Args:
+            container_euid: EUID of the container.
+
+        Returns:
+            Dict containing the container info, linked biospecimen EUID,
+            patient EUID (if resolvable), and Atlas reference EUIDs.
+        """
+        container = self.get_by_euid(container_euid)
+        json_addl = container.json_addl or {}
+
+        biospecimen_euid = json_addl.get("biospecimen_euid")
+        patient_euid = None
+
+        # Attempt to resolve patient EUID from the biospecimen entity
+        if biospecimen_euid:
+            try:
+                biospecimen = self.get_by_euid(biospecimen_euid)
+                bio_addl = biospecimen.json_addl or {}
+                # Patient EUID may be stored directly or under properties
+                patient_euid = bio_addl.get("patient_euid") or (
+                    bio_addl.get("properties", {}).get("patient_euid")
+                )
+            except Exception:
+                # Biospecimen entity may not exist yet — that's fine.
+                logger.debug(
+                    "Could not resolve biospecimen %s for chain lookup",
+                    biospecimen_euid,
+                )
+
+        return {
+            "container_euid": container.euid,
+            "container_name": container.name,
+            "container_type": container.type,
+            "container_status": container.bstatus,
+            "biospecimen_euid": biospecimen_euid,
+            "patient_euid": patient_euid,
+            "atlas_requisition_euid": json_addl.get("atlas_requisition_euid"),
+            "atlas_kit_euid": json_addl.get("atlas_kit_euid"),
+        }
 
 
 class BloomContainerPlate(BloomContainer):

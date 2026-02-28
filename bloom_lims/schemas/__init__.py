@@ -59,6 +59,9 @@ from .containers import (
     ContainerResponseSchema,
     PlaceInContainerSchema,
     BulkPlaceInContainerSchema,
+    LinkBiospecimenSchema,
+    SetAtlasReferencesSchema,
+    ContainerChainResponseSchema,
 )
 from .content import (
     ContentBaseSchema,
@@ -69,6 +72,14 @@ from .content import (
     PoolCreateSchema,
     ContentUpdateSchema,
     ContentResponseSchema,
+)
+from .biospecimen import (
+    BioSpecimenStatusEnum,
+    BioSpecimenCreate,
+    BioSpecimenUpdate,
+    BioSpecimenStatusUpdate,
+    BioSpecimenStatusHistoryEntry,
+    BioSpecimenResponse,
 )
 from .actions import (
     ActionParameterSchema,
@@ -149,6 +160,9 @@ __all__ = [
     "ContainerResponseSchema",
     "PlaceInContainerSchema",
     "BulkPlaceInContainerSchema",
+    "LinkBiospecimenSchema",
+    "SetAtlasReferencesSchema",
+    "ContainerChainResponseSchema",
     # Content schemas
     "ContentBaseSchema",
     "SampleCreateSchema",
@@ -158,6 +172,13 @@ __all__ = [
     "PoolCreateSchema",
     "ContentUpdateSchema",
     "ContentResponseSchema",
+    # BioSpecimen schemas
+    "BioSpecimenStatusEnum",
+    "BioSpecimenCreate",
+    "BioSpecimenUpdate",
+    "BioSpecimenStatusUpdate",
+    "BioSpecimenStatusHistoryEntry",
+    "BioSpecimenResponse",
     # Action schemas
     "ActionParameterSchema",
     "ActionGroupSchema",

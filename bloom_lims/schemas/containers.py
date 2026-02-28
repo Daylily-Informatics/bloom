@@ -150,12 +150,73 @@ class PlaceInContainerSchema(BloomBaseSchema):
 
 class BulkPlaceInContainerSchema(BloomBaseSchema):
     """Schema for placing multiple objects in a container."""
-    
+
     container_euid: str = Field(..., description="Container EUID")
     placements: List[Dict[str, str]] = Field(..., description="List of {object_euid, position}")
-    
+
     @field_validator("container_euid", mode="before")
     @classmethod
     def validate_container_euid(cls, v):
         return validate_euid(v)
+
+
+class LinkBiospecimenSchema(BloomBaseSchema):
+    """Schema for linking a container to a biospecimen EUID."""
+
+    biospecimen_euid: str = Field(
+        ...,
+        description="Biospecimen EUID (BSP-* prefix) to link to this container",
+    )
+
+    @field_validator("biospecimen_euid", mode="before")
+    @classmethod
+    def validate_biospecimen_euid(cls, v):
+        return validate_euid(v)
+
+
+class SetAtlasReferencesSchema(BloomBaseSchema):
+    """Schema for setting Atlas reference EUIDs on a container."""
+
+    atlas_requisition_euid: Optional[str] = Field(
+        None, description="Atlas requisition EUID reference"
+    )
+    atlas_kit_euid: Optional[str] = Field(
+        None, description="Atlas kit EUID reference"
+    )
+
+    @field_validator("atlas_requisition_euid", "atlas_kit_euid", mode="before")
+    @classmethod
+    def validate_optional_euids(cls, v):
+        if v is not None and str(v).strip():
+            return validate_euid(v)
+        return None
+
+    @model_validator(mode="after")
+    def at_least_one_reference(self):
+        if self.atlas_requisition_euid is None and self.atlas_kit_euid is None:
+            raise ValueError(
+                "At least one of atlas_requisition_euid or atlas_kit_euid must be provided"
+            )
+        return self
+
+
+class ContainerChainResponseSchema(BloomBaseSchema):
+    """Response schema for the container→biospecimen→patient EUID chain."""
+
+    container_euid: str = Field(..., description="Container EUID")
+    container_name: Optional[str] = Field(None, description="Container name")
+    container_type: Optional[str] = Field(None, description="Container type")
+    container_status: Optional[str] = Field(None, description="Container status")
+    biospecimen_euid: Optional[str] = Field(
+        None, description="Linked biospecimen EUID (BSP-*)"
+    )
+    patient_euid: Optional[str] = Field(
+        None, description="Patient EUID resolved from biospecimen (PAT-*)"
+    )
+    atlas_requisition_euid: Optional[str] = Field(
+        None, description="Atlas requisition EUID reference"
+    )
+    atlas_kit_euid: Optional[str] = Field(
+        None, description="Atlas kit EUID reference"
+    )
 

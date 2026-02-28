@@ -18,6 +18,9 @@ from bloom_lims.schemas import (
     ContainerResponseSchema,
     PlaceInContainerSchema,
     BulkPlaceInContainerSchema,
+    LinkBiospecimenSchema,
+    SetAtlasReferencesSchema,
+    ContainerChainResponseSchema,
     PaginatedResponse,
     SuccessResponse,
 )
@@ -353,6 +356,94 @@ async def get_container_layout(
     except Exception as e:
         logger.error(f"Error getting container layout {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{euid}/link-biospecimen", response_model=Dict[str, Any])
+async def link_biospecimen_to_container(
+    euid: str,
+    data: LinkBiospecimenSchema,
+    user: APIUser = Depends(require_api_auth),
+):
+    """Link a container to a biospecimen EUID.
+
+    Stores the biospecimen reference in the container's json_addl.
+    The biospecimen entity does not need to exist yet — this is a
+    forward reference by EUID string.
+    """
+    try:
+        bdb = get_bdb(user.email)
+        from bloom_lims.domain.containers import BloomContainer
+
+        bc = BloomContainer(bdb)
+        result = bc.link_biospecimen(euid, data.biospecimen_euid)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error linking biospecimen to container {euid}: {error_msg}")
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.post("/{euid}/atlas-references", response_model=Dict[str, Any])
+async def set_container_atlas_references(
+    euid: str,
+    data: SetAtlasReferencesSchema,
+    user: APIUser = Depends(require_api_auth),
+):
+    """Set Atlas reference EUIDs (requisition, kit) on a container.
+
+    These are opaque cross-system references stored in json_addl.
+    """
+    try:
+        bdb = get_bdb(user.email)
+        from bloom_lims.domain.containers import BloomContainer
+
+        bc = BloomContainer(bdb)
+        result = bc.set_atlas_references(
+            euid,
+            atlas_requisition_euid=data.atlas_requisition_euid,
+            atlas_kit_euid=data.atlas_kit_euid,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error setting Atlas references on container {euid}: {error_msg}")
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.get("/{euid}/chain", response_model=ContainerChainResponseSchema)
+async def get_container_chain(
+    euid: str,
+    user: APIUser = Depends(require_api_auth),
+):
+    """Get the container→biospecimen→patient EUID chain.
+
+    Returns the container details along with linked biospecimen EUID,
+    resolved patient EUID (if the biospecimen exists), and Atlas
+    reference EUIDs (requisition, kit).
+    """
+    try:
+        bdb = get_bdb(user.email)
+        from bloom_lims.domain.containers import BloomContainer
+
+        bc = BloomContainer(bdb)
+        result = bc.get_container_chain(euid)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error getting container chain for {euid}: {error_msg}")
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/bulk-create", response_model=Dict[str, Any])
