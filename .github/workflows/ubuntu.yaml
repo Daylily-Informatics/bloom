@@ -1,4 +1,4 @@
-name: BLOOM Ubuntu 
+name: BLOOM Ubuntu
 
 on:
   push:
@@ -25,6 +25,12 @@ jobs:
         with:
           repository: Daylily-Informatics/daylily-tapdb
           path: daylily-tapdb
+
+      - name: Check out daylily-cognito (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: Daylily-Informatics/daylily-cognito
+          path: daylily-cognito
 
       - name: Set up Python
         uses: actions/setup-python@v4
