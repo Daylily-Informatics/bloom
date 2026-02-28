@@ -18,8 +18,18 @@
     
     <!-- BLOOM Modern CSS -->
     <link rel="stylesheet" href="/static/modern/css/bloom_modern.css">
-    
+
     {% block extra_css %}{% endblock %}
+
+    <!-- Apply theme from localStorage immediately to prevent flash -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('bloom_theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('theme-light-loading');
+        }
+      })();
+    </script>
 </head>
 <body>
     <!-- Accent stripe bar -->
@@ -130,8 +140,20 @@
             user: {{ udat | tojson | safe if udat else 'null' }},
             version: '{{ version | default("dev") }}'
         };
+
+        // Apply theme from localStorage
+        (function() {
+            const theme = localStorage.getItem('bloom_theme') || 'dark';
+            if (theme === 'light') {
+                document.body.classList.add('theme-light');
+            } else {
+                document.body.classList.remove('theme-light');
+            }
+            // Remove loading class from html element
+            document.documentElement.classList.remove('theme-light-loading');
+        })();
     </script>
-    
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

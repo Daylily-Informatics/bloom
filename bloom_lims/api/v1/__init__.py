@@ -29,6 +29,7 @@ from .stats import router as stats_router
 from .search import router as search_router
 from .object_creation import router as object_creation_router
 from .worksets import router as worksets_router
+from .tracking import router as tracking_router
 
 
 # Main v1 router
@@ -53,6 +54,7 @@ router.include_router(stats_router)
 router.include_router(search_router)
 router.include_router(object_creation_router)
 router.include_router(worksets_router)
+router.include_router(tracking_router)
 
 
 @router.get("/")

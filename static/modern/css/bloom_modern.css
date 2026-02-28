@@ -60,6 +60,47 @@
   --transition-slow: 0.3s ease;
 }
 
+/* ==================== Light Theme Override ==================== */
+/* Prevent flash of wrong theme on page load */
+html.theme-light-loading body {
+  --color-primary: #f8fafc;
+  --color-secondary: #e2e8f0;
+  --color-gray-900: #f8fafc;
+  --color-gray-800: #f1f5f9;
+  --color-gray-700: #e2e8f0;
+  --color-gray-200: #334155;
+  --color-white: #0f172a;
+}
+
+body.theme-light {
+  /* Primary colors - light variants */
+  --color-primary: #f8fafc;
+  --color-secondary: #e2e8f0;
+  --color-accent: #cbd5e1;
+  --color-highlight: #4f46e5;
+
+  /* Gray scale - inverted for light theme */
+  --color-gray-900: #f8fafc;
+  --color-gray-800: #f1f5f9;
+  --color-gray-700: #e2e8f0;
+  --color-gray-600: #cbd5e1;
+  --color-gray-500: #94a3b8;
+  --color-gray-400: #64748b;
+  --color-gray-300: #475569;
+  --color-gray-200: #334155;
+  --color-white: #0f172a;
+
+  /* BLOOM-specific - darker for visibility on light bg */
+  --color-euid: #4f46e5;
+  --color-template: #7c3aed;
+  --color-instance: #059669;
+
+  /* Shadows - lighter for light theme */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
 /* ==================== Base Styles ==================== */
 *, *::before, *::after {
   box-sizing: border-box;

@@ -24,7 +24,7 @@ from bloom_lims.exceptions import (
     DatabaseError,
     create_error_response,
 )
-from .dependencies import require_api_auth, APIUser
+from .dependencies import require_api_auth, require_admin, APIUser
 
 
 logger = logging.getLogger(__name__)
@@ -179,13 +179,20 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
 async def update_object(
     euid: str,
     data: ObjectUpdateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_admin),
 ):
     """
-    Update an existing object.
+    Update an existing object. Requires admin privileges.
 
     Supports partial updates - only provided fields are updated.
     json_addl fields are merged, not replaced.
+
+    Editable fields:
+    - name: Object name
+    - status: Object status (bstatus)
+    - created_dt: Creation datetime
+    - is_deleted: Soft delete flag
+    - json_addl: Additional JSON data (merged with existing)
     """
     try:
         from bloom_lims.db import BLOOMdb3
@@ -202,10 +209,18 @@ async def update_object(
         # Update name if provided
         if data.name is not None:
             obj.name = data.name
+            # Also update in json_addl.properties.name for consistency
+            if obj.json_addl and "properties" in obj.json_addl:
+                obj.json_addl["properties"]["name"] = data.name
+                flag_modified(obj, "json_addl")
 
         # Update status if provided
         if data.status is not None:
             obj.bstatus = data.status
+
+        # Update created_dt if provided
+        if data.created_dt is not None:
+            obj.created_dt = data.created_dt
 
         # Merge json_addl if provided
         if data.json_addl is not None:
@@ -241,10 +256,10 @@ async def update_object(
 async def delete_object(
     euid: str,
     hard_delete: bool = Query(False, description="Permanently delete (vs soft delete)"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_admin),
 ):
     """
-    Delete an object.
+    Delete an object. Requires admin privileges.
 
     By default performs a soft delete (sets is_deleted=True).
     Use hard_delete=True for permanent deletion (use with caution).

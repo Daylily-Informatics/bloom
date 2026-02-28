@@ -52,10 +52,11 @@
 
         <div class="form-group">
           <label class="form-label">UI Theme</label>
-          <select class="form-select" name="ui_mode">
-            <option value="modern" {% if user_data.get('ui_mode', 'modern') == 'modern' %}selected{% endif %}>Modern</option>
-            <option value="legacy" {% if user_data.get('ui_mode') == 'legacy' %}selected{% endif %}>Legacy</option>
+          <select class="form-select" name="ui_theme" id="theme-selector">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
           </select>
+          <div class="form-text text-muted" style="font-size: 0.75rem; margin-top: var(--spacing-xs);">Theme is saved automatically to your browser</div>
         </div>
 
         <button type="submit" class="btn btn-primary">
@@ -133,7 +134,13 @@
       <p class="text-muted">{{ dependency_info.carrier_tracking.description }}</p>
       <div class="tracking-form">
         <form id="tracking-form" onsubmit="trackPackage(event)">
-          <div class="input-group">
+          <div class="input-group" style="gap: var(--spacing-sm);">
+            <select id="tracking-carrier" class="form-select" style="width: 120px;">
+              <option value="FedEx">FedEx</option>
+              <option value="UPS">UPS</option>
+              <option value="USPS">USPS</option>
+              <option value="Other">Other</option>
+            </select>
             <input type="text" id="tracking-number" class="form-input" placeholder="Enter tracking number..." style="flex: 1;">
             <button type="submit" class="btn btn-primary btn-sm">
               <i class="fas fa-search"></i> Track
@@ -312,8 +319,23 @@
   padding: var(--spacing-md);
   background: var(--color-gray-700);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
   font-size: 0.875rem;
+}
+
+.tracking-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.tracking-row {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.tracking-row strong {
+  min-width: 100px;
+  color: var(--color-gray-400);
 }
 
 .text-warning {
@@ -324,9 +346,34 @@
 
 {% block extra_js %}
 <script>
+// Theme selector with localStorage persistence
+document.addEventListener('DOMContentLoaded', function() {
+  const themeSelector = document.getElementById('theme-selector');
+  const savedTheme = localStorage.getItem('bloom_theme') || 'dark';
+
+  // Set selector to current theme
+  themeSelector.value = savedTheme;
+
+  // Listen for theme changes
+  themeSelector.addEventListener('change', function(e) {
+    const theme = e.target.value;
+    localStorage.setItem('bloom_theme', theme);
+    applyTheme(theme);
+  });
+});
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('theme-light');
+  } else {
+    document.body.classList.remove('theme-light');
+  }
+}
+
 function trackPackage(event) {
   event.preventDefault();
   const trackingNumber = document.getElementById('tracking-number').value.trim();
+  const carrier = document.getElementById('tracking-carrier').value;
   const resultDiv = document.getElementById('tracking-result');
 
   if (!trackingNumber) {
@@ -335,11 +382,11 @@ function trackPackage(event) {
     return;
   }
 
-  resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Looking up tracking info...';
+  resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Looking up ' + carrier + ' tracking info...';
   resultDiv.style.display = 'block';
 
-  // Call the tracking API (if available)
-  fetch('/api/v1/track/' + encodeURIComponent(trackingNumber))
+  // Call the tracking API
+  fetch('/api/v1/tracking/track/' + encodeURIComponent(trackingNumber) + '?carrier=' + encodeURIComponent(carrier))
     .then(response => {
       if (!response.ok) {
         throw new Error('Tracking API not available');
@@ -347,10 +394,30 @@ function trackPackage(event) {
       return response.json();
     })
     .then(data => {
-      resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      if (data.error) {
+        resultDiv.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ' + data.error + '</span>';
+      } else {
+        let html = '<div class="tracking-details">';
+        html += '<div class="tracking-row"><strong>Status:</strong> ' + (data.status || 'Unknown') + '</div>';
+        if (data.transit_time_hours) {
+          html += '<div class="tracking-row"><strong>Transit Time:</strong> ' + data.transit_time_hours + ' hours</div>';
+        }
+        if (data.origin_state) {
+          html += '<div class="tracking-row"><strong>Origin State:</strong> ' + data.origin_state + '</div>';
+        }
+        if (data.ship_date) {
+          html += '<div class="tracking-row"><strong>Shipped:</strong> ' + data.ship_date + '</div>';
+        }
+        if (data.delivery_date) {
+          html += '<div class="tracking-row"><strong>Delivered:</strong> ' + data.delivery_date + '</div>';
+        }
+        html += '</div>';
+        html += '<details style="margin-top: var(--spacing-sm);"><summary class="text-muted">Raw Data</summary><pre style="font-size: 0.75rem; max-height: 200px; overflow: auto;">' + JSON.stringify(data.raw_data, null, 2) + '</pre></details>';
+        resultDiv.innerHTML = html;
+      }
     })
     .catch(error => {
-      resultDiv.innerHTML = '<span class="text-muted">Tracking lookup requires carrier API credentials. Number: ' + trackingNumber + '</span>';
+      resultDiv.innerHTML = '<span class="text-muted">Tracking lookup failed. ' + error.message + '</span>';
     });
 }
 </script>

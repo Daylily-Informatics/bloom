@@ -152,6 +152,22 @@ async def require_api_auth(user: APIUser = Depends(get_api_user)) -> APIUser:
     return user
 
 
+async def require_admin(user: APIUser = Depends(get_api_user)) -> APIUser:
+    """
+    Dependency that requires admin role.
+    Use this in endpoints that need admin privileges.
+
+    Raises:
+        HTTPException 403 if user is not admin
+    """
+    if user.role not in ("admin", "service"):
+        raise HTTPException(
+            status_code=403,
+            detail="Admin privileges required for this operation.",
+        )
+    return user
+
+
 async def optional_api_auth(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),

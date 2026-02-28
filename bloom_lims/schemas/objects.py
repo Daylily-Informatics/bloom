@@ -87,16 +87,17 @@ class ObjectCreateSchema(ObjectBaseSchema):
 
 class ObjectUpdateSchema(BloomBaseSchema):
     """Schema for updating an existing BloomObj."""
-    
+
     name: Optional[str] = Field(None, min_length=1, max_length=500, description="Object name")
     json_addl: Optional[Dict[str, Any]] = Field(None, description="Additional JSON data (merged)")
     status: Optional[str] = Field(None, max_length=50, description="Object status")
     is_deleted: Optional[bool] = Field(None, description="Soft delete flag")
-    
+    created_dt: Optional[datetime] = Field(None, description="Creation datetime (admin only)")
+
     @model_validator(mode="after")
     def check_at_least_one_field(self):
         """Ensure at least one field is provided for update."""
-        if not any([self.name, self.json_addl, self.status, self.is_deleted is not None]):
+        if not any([self.name, self.json_addl, self.status, self.is_deleted is not None, self.created_dt]):
             raise ValueError("At least one field must be provided for update")
         return self
 
