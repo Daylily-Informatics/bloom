@@ -3,18 +3,24 @@
     "1.0": {
       "description": "Whole Blood",
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
       },
       "properties": {
         "name": "Whole Blood",
+        "specimen_barcode": "",
+        "collection_date": "",
+        "condition": "",
         "volume": "",
         "volume_units": "",
+        "status": "REGISTERED",
+        "atlas_patient_euid": "",
+        "atlas_order_euid": "",
         "comments": "",
-        "lab_code":""
+        "lab_code": ""
       },
       "expected_inputs": [],
       "singleton": "0",
@@ -27,20 +33,26 @@
       "description": "FFPE Block",
       "properties": {
         "name": "FFPE Block",
+        "specimen_barcode": "",
+        "collection_date": "",
+        "condition": "",
         "volume": "",
         "volume_units": "",
+        "status": "REGISTERED",
+        "atlas_patient_euid": "",
+        "atlas_order_euid": "",
         "comments": "",
-        "lab_code":""
+        "lab_code": ""
       },
       "expected_inputs": [],
       "expected_outputs": [],
       "singleton": "0",
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
       },
       "actions": {}
     }
@@ -50,19 +62,84 @@
       "description": "FFPE Slides",
       "properties": {
         "name": "FFPE Slides",
+        "specimen_barcode": "",
+        "collection_date": "",
+        "condition": "",
         "volume": "",
         "volume_units": "",
-        "comments": "","lab_code":""
+        "status": "REGISTERED",
+        "atlas_patient_euid": "",
+        "atlas_order_euid": "",
+        "comments": "",
+        "lab_code": ""
       },
       "expected_inputs": [],
       "expected_outputs": [],
       "singleton": "0",
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "actions": {}
+    }
+  },
+  "saliva": {
+    "1.0": {
+      "description": "Saliva",
+      "properties": {
+        "name": "Saliva",
+        "specimen_barcode": "",
+        "collection_date": "",
+        "condition": "",
+        "volume": "",
+        "volume_units": "",
+        "status": "REGISTERED",
+        "atlas_patient_euid": "",
+        "atlas_order_euid": "",
+        "comments": "",
+        "lab_code": ""
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "singleton": "0",
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
+      },
+      "actions": {}
+    }
+  },
+  "buccal-swab": {
+    "1.0": {
+      "description": "Buccal Swab",
+      "properties": {
+        "name": "Buccal Swab",
+        "specimen_barcode": "",
+        "collection_date": "",
+        "condition": "",
+        "volume": "",
+        "volume_units": "",
+        "status": "REGISTERED",
+        "atlas_patient_euid": "",
+        "atlas_order_euid": "",
+        "comments": "",
+        "lab_code": ""
+      },
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "singleton": "0",
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [{"*/*/*/*": {}}],
+        "allocation_type": ""
       },
       "actions": {}
     }

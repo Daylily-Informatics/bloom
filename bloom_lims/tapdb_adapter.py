@@ -20,6 +20,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import sessionmaker, Session, synonym
 
 # Import TapDB models
+from daylily_tapdb.euid import EUIDConfig
 from daylily_tapdb.models.base import Base as TapDBBase, tapdb_core
 from daylily_tapdb.models.audit import audit_log
 from daylily_tapdb.models.template import (
@@ -333,6 +334,12 @@ class BLOOMdb3:
 
         # Register ORM classes
         self._register_orm_classes()
+
+        # Register EUID prefixes for Bloom-owned entities
+        self.euid_config = EUIDConfig()
+        self.euid_config.register_prefix("BSP", "content_instance")
+        self.euid_config.register_prefix("CTN", "container_instance")
+        self.euid_config.register_prefix("EQP", "equipment_instance")
 
     def _set_session_username(self) -> None:
         """Set the session username for audit logging."""
