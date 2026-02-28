@@ -92,6 +92,13 @@ from .files import (
     FileReferenceResponseSchema,
     FileSearchSchema,
 )
+from .biospecimen import (
+    BioSpecimenStatus,
+    BioSpecimenCreate,
+    BioSpecimenUpdate,
+    BioSpecimenStatusUpdate,
+    BioSpecimenResponse,
+)
 from .equipment import (
     MaintenanceRecordSchema,
     CalibrationRecordSchema,
@@ -178,6 +185,12 @@ __all__ = [
     "FileReferenceSchema",
     "FileReferenceResponseSchema",
     "FileSearchSchema",
+    # Biospecimen schemas
+    "BioSpecimenStatus",
+    "BioSpecimenCreate",
+    "BioSpecimenUpdate",
+    "BioSpecimenStatusUpdate",
+    "BioSpecimenResponse",
     # Equipment schemas
     "MaintenanceRecordSchema",
     "CalibrationRecordSchema",
