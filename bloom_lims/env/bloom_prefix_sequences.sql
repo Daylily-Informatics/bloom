@@ -17,7 +17,7 @@ CREATE SEQUENCE IF NOT EXISTS mrx_instance_seq;  -- reagent
 CREATE SEQUENCE IF NOT EXISTS mcx_instance_seq;  -- control
 
 -- Equipment prefixes
-CREATE SEQUENCE IF NOT EXISTS lm_instance_seq;   -- default equipment (LM = Lab Machine/equipment)
+CREATE SEQUENCE IF NOT EXISTS em_instance_seq;   -- default equipment (EM = Equipment/Machine)
 CREATE SEQUENCE IF NOT EXISTS ex_instance_seq;   -- legacy equipment prefix (deprecated)
 
 -- Workflow prefixes
@@ -43,7 +43,7 @@ CREATE SEQUENCE IF NOT EXISTS xx_instance_seq;   -- default action
 
 -- File prefixes
 CREATE SEQUENCE IF NOT EXISTS fg_instance_seq;   -- default file (generic)
-CREATE SEQUENCE IF NOT EXISTS fi_instance_seq;   -- file
+CREATE SEQUENCE IF NOT EXISTS fn_instance_seq;   -- file (FN prefix)
 CREATE SEQUENCE IF NOT EXISTS fs_instance_seq;   -- file_set
 CREATE SEQUENCE IF NOT EXISTS fx_instance_seq;   -- shared_ref
 

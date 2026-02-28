@@ -1,4 +1,4 @@
-"""Add missing EUID sequences for DAT, LM, HEV prefixes
+"""Add missing EUID sequences for DAT, EM, HEV prefixes
 
 This migration adds the missing PostgreSQL sequences required by the
 set_generic_instance_euid() trigger for template prefixes that were
@@ -6,7 +6,7 @@ added to metadata.json files but not to bloom_prefix_sequences.sql.
 
 Missing sequences:
 - dat_instance_seq: For data category templates (prefix DAT)
-- lm_instance_seq: For equipment category templates (prefix LM)
+- em_instance_seq: For equipment category templates (prefix EM, formerly LM)
 - hev_instance_seq: For health_event category templates (prefix HEV)
 
 The trigger dynamically constructs sequence names as {lowercase_prefix}_instance_seq
@@ -33,7 +33,7 @@ depends_on: Union[str, Sequence[str], None] = None
 # Format: (sequence_name, comment)
 MISSING_SEQUENCES = [
     ('dat_instance_seq', 'EUID sequence for data category templates (prefix DAT)'),
-    ('lm_instance_seq', 'EUID sequence for equipment category templates (prefix LM)'),
+    ('em_instance_seq', 'EUID sequence for equipment category templates (prefix EM)'),
     ('hev_instance_seq', 'EUID sequence for health_event category templates (prefix HEV)'),
 ]
 
@@ -61,11 +61,11 @@ def upgrade() -> None:
         SELECT sequence_name 
         FROM information_schema.sequences 
         WHERE sequence_schema = 'public'
-        AND sequence_name IN ('dat_instance_seq', 'lm_instance_seq', 'hev_instance_seq')
+        AND sequence_name IN ('dat_instance_seq', 'em_instance_seq', 'hev_instance_seq')
     """))
     
     created = [row[0] for row in result]
-    expected = {'dat_instance_seq', 'lm_instance_seq', 'hev_instance_seq'}
+    expected = {'dat_instance_seq', 'em_instance_seq', 'hev_instance_seq'}
     
     if set(created) != expected:
         missing = expected - set(created)

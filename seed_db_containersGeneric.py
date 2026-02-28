@@ -17,7 +17,7 @@ def ensure_sequence_exists(db, prefix: str) -> None:
 
     Args:
         db: BLOOMdb3 database instance
-        prefix: The instance_prefix (e.g., 'DAT', 'LM', 'HEV')
+        prefix: The instance_prefix (e.g., 'DAT', 'EM', 'HEV')
     """
     seq_name = f"{prefix.lower()}_instance_seq"
 

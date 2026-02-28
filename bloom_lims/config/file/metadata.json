@@ -1,7 +1,7 @@
 {
   "euid_prefixes": {
     "default": "FG",
-    "file": "FI",
+    "file": "FN",
     "file_set": "FS",
     "shared_ref": "FX"
     }
