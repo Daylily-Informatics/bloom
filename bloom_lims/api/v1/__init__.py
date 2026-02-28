@@ -30,6 +30,7 @@ from .search import router as search_router
 from .object_creation import router as object_creation_router
 from .worksets import router as worksets_router
 from .tracking import router as tracking_router
+from .biospecimen import router as biospecimen_router
 
 
 # Main v1 router
@@ -55,6 +56,7 @@ router.include_router(search_router)
 router.include_router(object_creation_router)
 router.include_router(worksets_router)
 router.include_router(tracking_router)
+router.include_router(biospecimen_router)
 
 
 @router.get("/")
@@ -83,6 +85,7 @@ async def api_v1_info():
             "search": "/api/v1/search",
             "object_creation": "/api/v1/object-creation",
             "worksets": "/api/v1/worksets",
+            "biospecimen": "/api/v1/biospecimen",
         },
     }
 
