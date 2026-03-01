@@ -2,8 +2,10 @@
 
 # Default values
 host="0.0.0.0"
-port=8000
+port=8912
 mode="dev"
+cert_file="certs/cert.pem"
+key_file="certs/key.pem"
 
 unset HTTP_PROXY
 unset HTTPS_PROXY
@@ -26,7 +28,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       echo "Usage: $0 [--host <host>] [--port <port>] [--mode <dev|prod>]"
       echo "  --host     Host to bind (default: 0.0.0.0)"
-      echo "  --port     Port to bind (default: 8911)"
+      echo "  --port     Port to bind (default: 8912)"
       echo "  --mode     Run mode: 'dev' for development, 'prod' for production (default: dev)"
       exit 0
       ;;
@@ -37,6 +39,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ ! -f "$cert_file" || ! -f "$key_file" ]]; then
+  echo "HTTPS certificates are required."
+  echo "Missing: $cert_file and/or $key_file"
+  exit 1
+fi
 
 # Detect the number of CPU cores
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -63,7 +71,9 @@ if [[ "$mode" == "dev" ]]; then
     --log-level trace \
     --port $port \
     --timeout-keep-alive 15 \
-    --host $host --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem 
+    --host $host \
+    --ssl-keyfile "$key_file" \
+    --ssl-certfile "$cert_file"
 
 elif [[ "$mode" == "prod" ]]; then
   num_workers=4
@@ -75,7 +85,9 @@ elif [[ "$mode" == "prod" ]]; then
     -k uvicorn.workers.UvicornWorker \
     --log-level trace \
     --timeout 15 \
-    --bind $host:$port 
+    --bind $host:$port \
+    --certfile "$cert_file" \
+    --keyfile "$key_file"
 
 else
   echo "Invalid mode: $mode"

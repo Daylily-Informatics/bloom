@@ -6,6 +6,7 @@ import subprocess
 from typing import List
 from pathlib import Path
 import random
+from urllib.parse import quote
 
 import csv
 import os
@@ -648,79 +649,127 @@ async def get_login_page(request: Request):
     return HTMLResponse(content=template.render(context))
 
 
-@app.get("/legacy/login", include_in_schema=False)
-async def get_legacy_login_page(request: Request):
-    """Legacy login page."""
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+@app.get("/oauth_callback")
+@app.get("/auth/callback")
+async def oauth_callback_get(request: Request):
+    """Handle OAuth callback.
 
-    # When OAuth is disabled (testing), use placeholder URL
-    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
-        cognito_login_url = "#auth-disabled"
-    else:
+    Primary path: Authorization Code flow (`?code=...`).
+    Fallback path: legacy implicit flow URL fragment parsing.
+    """
+
+    oauth_error = request.query_params.get("error")
+    if oauth_error:
+        error_desc = request.query_params.get("error_description") or oauth_error
+        return RedirectResponse(
+            url=f"/login?error={quote(error_desc)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    code = request.query_params.get("code")
+    if code:
         try:
             cognito = get_cognito_auth()
-            cognito_login_url = cognito.config.authorize_url
+            token_response = cognito.exchange_code_for_tokens(code)
+
+            access_token = token_response.get("access_token") or token_response.get("AccessToken")
+            id_token = token_response.get("id_token") or token_response.get("IdToken")
+
+            if not id_token and not access_token:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No Cognito tokens returned from token exchange",
+                )
+
+            return _finalize_oauth_login(
+                request=request,
+                cognito=cognito,
+                id_token=id_token,
+                access_token=access_token,
+            )
         except CognitoConfigurationError as exc:
             raise MissingCognitoEnvVarsException(str(exc)) from exc
+        except (CognitoTokenError, HTTPException) as exc:
+            logging.error(f"Unable to complete OAuth callback: {exc}")
+            return RedirectResponse(
+                url="/login?error=authentication_failed",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
 
-    template = templates.get_template("legacy/login.html")
-    context = {
-        "request": request,
-        "style": style,
-        "udat": user_data,
-        "cognito_authorize_url": cognito_login_url,
-    }
-    return HTMLResponse(content=template.render(context))
+    return RedirectResponse(
+        url="/login?error=no_authorization_code",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
-@app.get("/oauth_callback")
-async def oauth_callback_get(request: Request):
-    """Handle OAuth implicit flow callback - parse URL fragment and POST tokens."""
-    html_content = """<!DOCTYPE html>
-<html>
-<head><title>Processing login...</title></head>
-<body>
-    <p>Processing your login...</p>
-    <script>
-        const fragment = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = fragment.get('access_token');
-        const idToken = fragment.get('id_token');
-        const error = fragment.get('error');
-        const errorDescription = fragment.get('error_description');
-        
-        if (error) {
-            window.location.href = '/login?error=' + encodeURIComponent(errorDescription || error);
-        } else if (accessToken || idToken) {
-            fetch('/oauth_callback', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({access_token: accessToken, id_token: idToken}),
-                credentials: 'same-origin'
-            }).then(response => {
-                if (response.redirected) {
-                    window.location.href = response.url;
-                } else if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    return response.json().then(data => {
-                        window.location.href = '/login?error=' + encodeURIComponent(data.detail || 'Authentication failed');
-                    });
-                }
-            }).catch(err => {
-                console.error('Error:', err);
-                window.location.href = '/login?error=authentication_failed';
-            });
-        } else {
-            window.location.href = '/login?error=no_tokens';
+def _extract_primary_email(decoded_token: dict) -> str:
+    primary_email = decoded_token.get("email") or decoded_token.get("username")
+    if not primary_email:
+        primary_email = decoded_token.get("cognito:username")
+    return primary_email or ""
+
+
+def _validate_allowed_domain(primary_email: str) -> None:
+    allowed_domains = get_allowed_domains()
+
+    if allowed_domains == ["__BLOCK_ALL__"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email domain authentication is not enabled",
+        )
+
+    if allowed_domains:
+        user_domain = primary_email.split("@")[-1]
+        if user_domain not in allowed_domains:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email domain not allowed",
+            )
+
+
+def _finalize_oauth_login(
+    request: Request,
+    cognito,
+    id_token: str | None,
+    access_token: str | None,
+):
+    decoded_token = {}
+
+    if id_token:
+        try:
+            decoded_token = cognito.validate_token(id_token)
+        except CognitoTokenError:
+            if not access_token:
+                raise
+
+    if not decoded_token and access_token:
+        decoded_token = cognito.validate_token(access_token)
+
+    primary_email = _extract_primary_email(decoded_token)
+    if not primary_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to determine email from Cognito token",
+        )
+
+    _validate_allowed_domain(primary_email)
+
+    user_data = get_user_preferences(primary_email)
+    user_data.update(
+        {
+            "id_token": id_token,
+            "access_token": access_token,
+            "cognito_username": decoded_token.get("cognito:username"),
+            "cognito_sub": decoded_token.get("sub"),
         }
-    </script>
-</body>
-</html>"""
-    return HTMLResponse(content=html_content)
+    )
+    request.session["user_data"] = user_data
+
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/oauth_callback")
+@app.post("/auth/callback")
 async def oauth_callback(request: Request):
     body = await request.json()
     access_token = body.get("access_token") or body.get("accessToken")
@@ -734,7 +783,12 @@ async def oauth_callback(request: Request):
 
     try:
         cognito = get_cognito_auth()
-        decoded_token = cognito.validate_token(id_token or access_token)
+        return _finalize_oauth_login(
+            request=request,
+            cognito=cognito,
+            id_token=id_token,
+            access_token=access_token,
+        )
     except CognitoConfigurationError as exc:
         raise MissingCognitoEnvVarsException(str(exc)) from exc
     except CognitoTokenError as exc:
@@ -742,46 +796,6 @@ async def oauth_callback(request: Request):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Cognito token"
         ) from exc
-
-    primary_email = decoded_token.get("email") or decoded_token.get("username")
-    if not primary_email:
-        primary_email = decoded_token.get("cognito:username")
-
-    if not primary_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to determine email from Cognito token",
-        )
-
-    allowed_domains = get_allowed_domains()
-    # Handle block all sentinel (when COGNITO_WHITELIST_DOMAINS="")
-    if allowed_domains == ["__BLOCK_ALL__"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email domain authentication is not enabled"
-        )
-    # Check against whitelist if not empty (empty = allow all)
-    if allowed_domains:
-        user_domain = primary_email.split("@")[-1]
-        if user_domain not in allowed_domains:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email domain not allowed"
-            )
-
-    user_data = get_user_preferences(primary_email)
-    user_data.update(
-        {
-            "id_token": id_token,
-            "access_token": access_token,
-            "cognito_username": decoded_token.get("cognito:username"),
-            "cognito_sub": decoded_token.get("sub"),
-        }
-    )
-    request.session["user_data"] = user_data
-
-    # Redirect to home page or dashboard
-    return RedirectResponse(url="/", status_code=303)
 
 
 @app.post("/login", include_in_schema=False)

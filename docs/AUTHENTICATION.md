@@ -1,7 +1,8 @@
 # Bloom Authentication Setup
 
-Bloom LIMS uses AWS Cognito for authentication, sharing a User Pool with lsmc-atlas
-and daylily-ursa for consistent authentication across all three applications.
+Bloom LIMS uses AWS Cognito for authentication via `daylily-cognito` and `daycog`.
+Bloom stores only the Cognito User Pool ID in YAML; app client/callback/logout/domain
+are resolved from `~/.config/daycog/*.env` files.
 
 ## Configuration
 
@@ -16,18 +17,8 @@ environment: development
 
 # Authentication settings
 auth:
-  # Shared Cognito pool (same as lsmc-atlas and daylily-ursa)
-  cognito_user_pool_id: us-west-2_pUqKyIM1N
-  cognito_client_id: 1glmn93pg49bove54r48t48907
-  cognito_client_secret: <your-client-secret>
-  cognito_region: us-west-2
-  cognito_domain: lsmc-shared-dev-puqkyim1n.auth.us-west-2.amazoncognito.com
-  cognito_redirect_uri: http://localhost:8911/oauth_callback
-  cognito_logout_redirect_uri: http://localhost:8911/
-  cognito_scopes:
-    - openid
-    - email
-    - profile
+  # Required: pool ID only
+  cognito_user_pool_id: us-east-1_JcKx3p6YP
 
   # Email domain whitelist for authentication
   # Empty list blocks all domains. Use ["*"] to allow all domains.
@@ -39,7 +30,42 @@ auth:
     - dyly.bio
 ```
 
-### Environment Variables (Legacy)
+### daycog Files (Preferred)
+
+daycog writes region/app-scoped files (v0.1.22+):
+
+- `~/.config/daycog/<pool>.<region>.env`
+- `~/.config/daycog/<pool>.<region>.<app>.env`
+- `~/.config/daycog/default.env`
+
+Bloom resolves the file matching `auth.cognito_user_pool_id`, then prefers the pool-scoped
+file (`<pool>.<region>.env`) because `daycog add-app/edit-app --set-default` keeps that file
+as the active app context. If multiple app files exist and you need to force one, set
+`BLOOM_COGNITO_APP_NAME`.
+
+For daylily-cognito `0.1.22`, preferred lifecycle commands include:
+
+```bash
+# Base pool + app setup for Bloom (port 8912, callback defaults to /auth/callback)
+daycog setup --name <pool-name> --port 8912 --attach-domain \
+  --domain-prefix <domain-prefix> --profile <profile> --region us-east-1
+
+# Optional: one-shot pool/app + Google IdP setup
+daycog setup-with-google --name <pool-name> --client-name <app-name> \
+  --profile <profile> --region us-east-1
+
+# Multi-app management
+daycog list-apps --pool-name <pool-name> --profile <profile> --region us-east-1
+daycog add-app --pool-name <pool-name> --app-name bloom-gui \
+  --callback-url http://localhost:8912/auth/callback --logout-url http://localhost:8912/ \
+  --set-default --profile <profile> --region us-east-1
+```
+
+Bloom accepts both callback routes:
+- `http://localhost:8912/auth/callback` (daycog default path)
+- `http://localhost:8912/oauth_callback` (legacy path)
+
+### Environment Variables (Legacy fallback)
 
 For backward compatibility, environment variables are still supported:
 
@@ -49,7 +75,7 @@ export COGNITO_CLIENT_ID=1glmn93pg49bove54r48t48907
 export COGNITO_CLIENT_SECRET=<your-client-secret>
 export COGNITO_REGION=us-west-2
 export COGNITO_DOMAIN=lsmc-shared-dev-puqkyim1n.auth.us-west-2.amazoncognito.com
-export COGNITO_REDIRECT_URI=http://localhost:8911/oauth_callback
+export COGNITO_REDIRECT_URI=http://localhost:8912/auth/callback
 export COGNITO_WHITELIST_DOMAINS=lsmc.bio,lsmc.com,lsmc.life,daylilyinformatics.com,dyly.bio
 ```
 
@@ -63,7 +89,7 @@ bloom gui
 bloom gui --background
 
 # Stop background server
-bloom gui stop
+bloom stop
 
 # View logs
 bloom logs

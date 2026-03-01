@@ -202,7 +202,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 flowchart TB
     subgraph BLOOM["BLOOM LIMS"]
         subgraph Presentation["Presentation Layer"]
-            FastAPI["FastAPI API<br/>(Port 8000)"]
+            FastAPI["FastAPI API<br/>(Port 8912)"]
             CLI["CLI Tools"]
         end
 
@@ -1166,12 +1166,9 @@ database:
 
 # Authentication (Cognito)
 auth:
-  cognito_region: "us-east-1"
+  # Required in Bloom YAML: pool ID only.
+  # Client/region/domain/callback/logout are loaded from ~/.config/daycog/*.env
   cognito_user_pool_id: "us-east-1_XXXXXXXXX"
-  cognito_client_id: "your_app_client_id"
-  cognito_domain: "your-domain.auth.us-east-1.amazoncognito.com"
-  cognito_redirect_uri: "http://127.0.0.1:8000/"
-  cognito_logout_redirect_uri: "http://127.0.0.1:8000/"
   cognito_allowed_domains: []   # Empty = allow all
 
 # AWS settings
@@ -1279,7 +1276,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 5000 8000 8080
+EXPOSE 5000 8912 8080
 
 CMD ["python", "-m", "bloom_lims.bkend.bkend"]
 ```
@@ -1300,9 +1297,9 @@ services:
 
   bloom-api:
     build: .
-    command: ["uvicorn", "bloom_lims.bkend.fastapi_bkend:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "bloom_lims.bkend.fastapi_bkend:app", "--host", "0.0.0.0", "--port", "8912"]
     ports:
-      - "8000:8000"
+      - "8912:8912"
     environment:
       - DATABASE_URL=postgresql://bloom:password@db:5432/bloom_lims
     depends_on:
@@ -1345,7 +1342,7 @@ bobj.load_templates_from_directory('bloom_lims/templates/')
 ```bash
 
 # FastAPI (development)
-uvicorn bloom_lims.bkend.fastapi_bkend:app --reload --port 8000
+uvicorn bloom_lims.bkend.fastapi_bkend:app --reload --port 8912
 
 # Production with gunicorn
 gunicorn -w 4 -b 0.0.0.0:5000 bloom_lims.bkend.bkend:app

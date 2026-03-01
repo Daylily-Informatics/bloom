@@ -33,6 +33,8 @@ uvicorn~=0.27.0.post1
 starlette~=0.35.1
 boto3
 botocore
+daylily-cognito[auth]>=0.1.21
+python-jose[cryptography]>=3.3.0
 requests_mock
 moto
 pandas

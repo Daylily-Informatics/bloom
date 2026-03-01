@@ -80,27 +80,29 @@ def _build_cognito_dependency():
     is not configured (e.g. missing env vars / config).
     """
     try:
-        from daylily_cognito.auth import CognitoAuth
         from daylily_cognito.fastapi import create_auth_dependency
+        from auth.cognito.client import get_cognito_auth
 
-        # Reuse Bloom's existing config loader for Cognito settings
-        from bloom_lims.config import get_settings
-
-        settings = get_settings()
-        auth_cfg = settings.auth
-
-        cognito = CognitoAuth(
-            region=auth_cfg.cognito_region,
-            user_pool_id=auth_cfg.cognito_user_pool_id,
-            app_client_id=auth_cfg.cognito_client_id,
-        )
-        return create_auth_dependency(cognito)
+        cognito = get_cognito_auth()
+        return create_auth_dependency(cognito.auth)
     except Exception as exc:
         logger.debug("daylily-cognito auth not available: %s", exc)
         return None
 
 
-_cognito_get_user = _build_cognito_dependency()
+_cognito_get_user = None
+
+
+def _get_cognito_dependency():
+    """Lazily initialize the Cognito dependency.
+
+    This allows Bloom to start before daycog env files are available, and
+    initialize auth on first bearer-token request after configuration exists.
+    """
+    global _cognito_get_user
+    if _cognito_get_user is None:
+        _cognito_get_user = _build_cognito_dependency()
+    return _cognito_get_user
 
 
 # ---------------------------------------------------------------------------
@@ -145,9 +147,10 @@ async def get_api_user(
             return api_user
 
     # 4. Bearer token via daylily-cognito -------------------------------------
-    if credentials and _cognito_get_user is not None:
+    cognito_dep = _get_cognito_dependency()
+    if credentials and cognito_dep is not None:
         try:
-            claims = _cognito_get_user(credentials)
+            claims = cognito_dep(credentials)
             return APIUser(
                 email=claims.get("email", "token-user"),
                 user_id=claims.get("sub"),
@@ -217,4 +220,3 @@ async def optional_api_auth(
         return await get_api_user(request, credentials, x_api_key)
     except HTTPException:
         return None
-

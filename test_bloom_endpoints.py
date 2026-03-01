@@ -16,7 +16,7 @@ CLIENT_ID = '1glmn93pg49bove54r48t48907'
 CLIENT_SECRET = '1ekmqjhi4pq7p5il5t9gd32k873gbihrb4rgi1j9a31s7nbdhv94'
 USERNAME = 'john@dyly.bio'
 PASSWORD = 'TestPass123!'
-BASE_URL = 'http://localhost:8911'
+BASE_URL = 'http://localhost:8912'
 
 # Delay between requests to avoid rate limiting (seconds)
 REQUEST_DELAY = 1.5

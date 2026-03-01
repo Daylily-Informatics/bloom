@@ -165,15 +165,15 @@ If using Google as an identity provider:
 
 5. **Allowed callback URLs**:
    ```
-   http://127.0.0.1:8000/
-   http://localhost:8000/
+   http://127.0.0.1:8912/
+   http://localhost:8912/
    ```
    > Add your production URL(s) here as well (e.g., `https://bloom.yourcompany.com/`)
 
 6. **Allowed sign-out URLs**:
    ```
-   http://127.0.0.1:8000/
-   http://localhost:8000/
+   http://127.0.0.1:8912/
+   http://localhost:8912/
    ```
 
 7. **Advanced app client settings** (expand this section):
@@ -221,13 +221,13 @@ Click **Edit** under Hosted UI:
 │ Hosted UI Settings                                          │
 ├─────────────────────────────────────────────────────────────┤
 │ Allowed callback URLs:                                      │
-│   http://127.0.0.1:8000/                                    │
-│   http://localhost:8000/                                    │
+│   http://127.0.0.1:8912/                                    │
+│   http://localhost:8912/                                    │
 │   https://your-production-domain.com/                       │
 │                                                             │
 │ Allowed sign-out URLs:                                      │
-│   http://127.0.0.1:8000/                                    │
-│   http://localhost:8000/                                    │
+│   http://127.0.0.1:8912/                                    │
+│   http://localhost:8912/                                    │
 │   https://your-production-domain.com/                       │
 │                                                             │
 │ Identity providers:                                         │
@@ -360,8 +360,8 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
      cognito_client_id: "1abc2defgh3ijklmno4pqrst"    # Your App Client ID
      cognito_region: "us-east-1"                       # AWS region
      cognito_domain: "bloom-lims-yourorg.auth.us-east-1.amazoncognito.com"
-     cognito_redirect_uri: "http://127.0.0.1:8000/"
-     cognito_logout_redirect_uri: "http://127.0.0.1:8000/"
+     cognito_redirect_uri: "http://127.0.0.1:8912/"
+     cognito_logout_redirect_uri: "http://127.0.0.1:8912/"
      cognito_scopes:
        - "openid"
        - "email"
@@ -379,8 +379,8 @@ export BLOOM_AUTH__COGNITO_REGION=us-east-1
 export BLOOM_AUTH__COGNITO_USER_POOL_ID=us-east-1_AbCdEfGhI
 export BLOOM_AUTH__COGNITO_CLIENT_ID=1abc2defgh3ijklmno4pqrst
 export BLOOM_AUTH__COGNITO_DOMAIN=bloom-lims-yourorg.auth.us-east-1.amazoncognito.com
-export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
-export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
+export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://127.0.0.1:8912/
+export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8912/
 
 # Disable authentication for development (NEVER use in production!)
 export BLOOM_OAUTH=no
@@ -409,8 +409,8 @@ export BLOOM_OAUTH=no
 1. **Set up your configuration** (see [Configuration](#configuration) above)
 
 2. **Verify your Cognito callback URLs** include your local address:
-   - `http://127.0.0.1:8000/`
-   - `http://localhost:8000/` (optional, add if you use localhost)
+   - `http://127.0.0.1:8912/`
+   - `http://localhost:8912/` (optional, add if you use localhost)
 
 3. **Activate the environment and start the application**:
 
@@ -420,7 +420,7 @@ export BLOOM_OAUTH=no
    ```
 
 4. **Test authentication**:
-   - Navigate to `http://127.0.0.1:8000/`
+   - Navigate to `http://127.0.0.1:8912/`
    - Click **"Login with Cognito"**
    - Complete authentication in the Cognito Hosted UI
    - You should be redirected back to Bloom
@@ -444,20 +444,20 @@ If you need to test from different hosts (e.g., mobile device on same network):
 
 1. Add the IP/hostname to Cognito callback URLs:
    ```
-   http://192.168.1.100:8000/
+   http://192.168.1.100:8912/
    ```
 
 2. Update your `~/.config/bloom/bloom-config.yaml`:
    ```yaml
    auth:
-     cognito_redirect_uri: "http://192.168.1.100:8000/"
-     cognito_logout_redirect_uri: "http://192.168.1.100:8000/"
+     cognito_redirect_uri: "http://192.168.1.100:8912/"
+     cognito_logout_redirect_uri: "http://192.168.1.100:8912/"
    ```
 
    Or use environment variables:
    ```bash
-   export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://192.168.1.100:8000/
-   export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://192.168.1.100:8000/
+   export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://192.168.1.100:8912/
+   export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://192.168.1.100:8912/
    ```
 
 ---
@@ -593,17 +593,17 @@ print(f"Expiry: {decoded.get('exp')}")
    - Compare callback URLs character-by-character
 
 2. **Common mismatches**:
-   - Trailing slash: `http://127.0.0.1:8000/` vs `http://127.0.0.1:8000`
+   - Trailing slash: `http://127.0.0.1:8912/` vs `http://127.0.0.1:8912`
    - Protocol: `http://` vs `https://`
    - Host: `localhost` vs `127.0.0.1`
    - Port: Missing or wrong port number
 
 3. **Add all variations** you might use:
    ```
-   http://127.0.0.1:8000/
-   http://127.0.0.1:8000
-   http://localhost:8000/
-   http://localhost:8000
+   http://127.0.0.1:8912/
+   http://127.0.0.1:8912
+   http://localhost:8912/
+   http://localhost:8912
    ```
 
 ---

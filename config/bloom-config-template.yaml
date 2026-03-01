@@ -94,8 +94,13 @@ api:
 # Authentication Configuration
 # -----------------------------------------------------------------------------
 auth:
-  # AWS Cognito (optional)
+  # AWS Cognito
+  # Required: set only the User Pool ID here.
+  # Runtime app details are resolved from daycog env files in ~/.config/daycog/
+  # (e.g. <pool>.<region>.env and <pool>.<region>.<app>.env).
   cognito_user_pool_id: ""
+
+  # Optional legacy overrides (prefer daycog env files)
   cognito_client_id: ""
   cognito_region: ""
   cognito_domain: ""
@@ -191,4 +196,3 @@ constants:
 
   # Template config paths (relative to bloom_lims)
   config_base_path: "config"
-

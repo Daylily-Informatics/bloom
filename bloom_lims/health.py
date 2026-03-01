@@ -113,13 +113,13 @@ async def check_cognito_health() -> ComponentHealth:
     """Check Cognito connectivity by resolving JWKS metadata."""
     import time
     start = time.time()
-    
-    settings = get_settings()
-    if not (
-        settings.auth.cognito_user_pool_id
-        and settings.auth.cognito_region
-        and settings.auth.cognito_domain
-    ):
+
+    try:
+        from auth.cognito.client import get_cognito_auth
+
+        cognito = get_cognito_auth()
+        jwks_url = cognito.config.jwks_url
+    except Exception:
         return ComponentHealth(
             name="cognito",
             status="degraded",
@@ -128,10 +128,6 @@ async def check_cognito_health() -> ComponentHealth:
     
     try:
         import httpx
-        jwks_url = (
-            f"https://cognito-idp.{settings.auth.cognito_region}.amazonaws.com/"
-            f"{settings.auth.cognito_user_pool_id}/.well-known/jwks.json"
-        )
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(jwks_url)
             latency = (time.time() - start) * 1000

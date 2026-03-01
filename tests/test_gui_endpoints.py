@@ -343,10 +343,9 @@ class TestLegacyRoutes:
         assert "text/html" in response.headers["content-type"]
 
     def test_legacy_login(self, client):
-        """Test legacy login page is accessible."""
+        """Legacy login route has been removed."""
         response = client.get("/legacy/login")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 404
 
 
 class TestModernUIRoutes:
@@ -1091,7 +1090,7 @@ class TestOAuthEndpoints:
         """Test OAuth callback GET without authorization code."""
         response = client.get("/oauth_callback")
         # Should handle missing code gracefully
-        assert response.status_code in [200, 302, 307, 400, 422]
+        assert response.status_code in [302, 303, 307, 400, 422]
 
     @pytest.mark.skip(reason="Endpoint expects JSON body, not form data")
     def test_oauth_callback_post_without_code(self, client):
@@ -1725,7 +1724,7 @@ class TestOAuthEndpoints:
     def test_oauth_callback_get(self, client):
         """Test OAuth callback GET endpoint."""
         response = client.get("/oauth_callback")
-        assert response.status_code in [200, 302, 307, 400, 401, 404, 422, 500]
+        assert response.status_code in [200, 302, 303, 307, 400, 401, 404, 422, 500]
 
     def test_oauth_callback_post(self, client):
         """Test OAuth callback POST endpoint."""

@@ -1,7 +1,7 @@
 
 # Create an ubuntu 22.04 AMI instance, using 8-16vCPU and reasonable memory and 60BG disk (this is to get started, 
 #  we can always increase later).  I have only tested on x86_64, but arm64 should work too. 
-# Launch your instance ** Make sure the ssh port is open in your AWS settings, as well as port 8911 and 8118. http and https, ssh anb dns are good ideas too.
+# Launch your instance ** Make sure the ssh port is open in your AWS settings, as well as port 8912 and 8118. http and https, ssh anb dns are good ideas too.
 
 # ssh into the box ssh -i .pem ubuntu@ip
 ssh-keygen # defaults
@@ -89,7 +89,7 @@ bloom gui  # or: source run_bloomui.sh (edit gunicorn command for external IP)
 TERM_OUT="""
 (BLOOM) ubuntu@ip-172-31-7-22:~/projects/git/bloom$ source run_bloomui.sh
 INFO:     Will watch for changes in these directories: ['/home/ubuntu/projects/git/bloom']
-INFO:     Uvicorn running on http://127.0.0.1:8911 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:8912 (Press CTRL+C to quit)
 INFO:     Started reloader process [6128] using StatReload
 INFO:     Started server process [6130]
 INFO:     Waiting for application startup.
@@ -102,7 +102,7 @@ INFO:     Application startup complete.
 # This can be made a service and directed to log to a file if you wish.
 
 
-# Next, visit the UI at http://ip:8911/ and you should be able to auth with an rcrf.org email.
+# Next, visit the UI at http://ip:8912/ and you should be able to auth with an rcrf.org email.
 # Dewey is the file manager app.
 
 echo "fin!"

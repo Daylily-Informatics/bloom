@@ -53,18 +53,23 @@ def _get_pid() -> int | None:
 
 
 @click.command()
-@click.option('--port', '-p', default=8911, type=int, help='Port to run on (default: 8911)')
+@click.option('--port', '-p', default=8912, type=int, help='Port to run on (default: 8912)')
 @click.option('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
 @click.option('--reload', '-r', is_flag=True, help='Enable auto-reload for development')
-@click.option('--https', is_flag=True, help='Enable HTTPS (requires certs in certs/)')
+@click.option('--https/--no-https', default=True, help='HTTPS is required (HTTP is not supported)')
 @click.option('--background/--foreground', '-b/-f', default=True, help='Run in background (default)')
 def gui(port, host, reload, https, background):
     """Start the BLOOM web UI."""
     _ensure_dir()
 
+    if not https:
+        console.print("[red]✗[/red] HTTP is not supported. Start with HTTPS only.")
+        console.print("   Use [cyan]bloom gui[/cyan] or [cyan]bloom gui --https[/cyan]")
+        raise SystemExit(1)
+
     pid = _get_pid()
     if pid:
-        protocol = "https" if https else "http"
+        protocol = "https"
         console.print(f"[yellow]⚠[/yellow]  Server already running (PID {pid})")
         console.print(f"   URL: [cyan]{protocol}://{host}:{port}[/cyan]")
         console.print("   Use [cyan]bloom stop[/cyan] to stop or [cyan]bloom logs[/cyan] to view logs")
@@ -73,14 +78,16 @@ def gui(port, host, reload, https, background):
     cmd = [sys.executable, "-m", "uvicorn", "main:app", "--host", host, "--port", str(port)]
     if reload:
         cmd.append("--reload")
-    if https:
-        certs_dir = PROJECT_ROOT / "certs"
-        if not (certs_dir / "key.pem").exists():
-            console.print("[red]✗[/red] HTTPS certificates not found in certs/")
-            raise SystemExit(1)
-        cmd.extend(["--ssl-keyfile", str(certs_dir / "key.pem"), "--ssl-certfile", str(certs_dir / "cert.pem")])
+    certs_dir = PROJECT_ROOT / "certs"
+    key_file = certs_dir / "key.pem"
+    cert_file = certs_dir / "cert.pem"
+    if not key_file.exists() or not cert_file.exists():
+        console.print("[red]✗[/red] HTTPS certificates not found in certs/")
+        console.print(f"   Expected: [dim]{key_file}[/dim] and [dim]{cert_file}[/dim]")
+        raise SystemExit(1)
+    cmd.extend(["--ssl-keyfile", str(key_file), "--ssl-certfile", str(cert_file)])
 
-    protocol = "https" if https else "http"
+    protocol = "https"
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
@@ -134,4 +141,3 @@ def stop():
     except PermissionError:
         console.print(f"[red]✗[/red]  Permission denied stopping PID {pid}")
         raise SystemExit(1)
-

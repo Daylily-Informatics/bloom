@@ -204,14 +204,26 @@ class AWSSettings(BaseModel):
 
 class AuthSettings(BaseModel):
     """Authentication configuration."""
-    
+
     # Cognito
-    cognito_user_pool_id: str = Field(default="", description="Cognito user pool ID")
-    cognito_client_id: str = Field(default="", description="Cognito app client ID")
-    cognito_client_secret: str = Field(default="", description="Cognito app client secret")
-    cognito_region: str = Field(default="", description="AWS region for Cognito")
-    cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
-    cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
+    cognito_user_pool_id: str = Field(
+        default="", description="Cognito user pool ID (required)"
+    )
+    cognito_client_id: str = Field(
+        default="", description="Legacy override: Cognito app client ID"
+    )
+    cognito_client_secret: str = Field(
+        default="", description="Legacy override: Cognito app client secret"
+    )
+    cognito_region: str = Field(
+        default="", description="Legacy override: AWS region for Cognito"
+    )
+    cognito_domain: str = Field(
+        default="", description="Legacy override: Cognito hosted UI domain"
+    )
+    cognito_redirect_uri: str = Field(
+        default="", description="Legacy override: Cognito callback URL"
+    )
     cognito_logout_redirect_uri: str = Field(
         default="", description="Cognito logout redirect URI"
     )
@@ -454,16 +466,10 @@ def validate_settings() -> List[str]:
         warnings.append("Database password is not set in production")
 
     # Check auth settings
-    if not all(
-        [
-            settings.auth.cognito_user_pool_id,
-            settings.auth.cognito_client_id,
-            settings.auth.cognito_region,
-            settings.auth.cognito_domain,
-            settings.auth.cognito_redirect_uri,
-        ]
-    ):
-        warnings.append("Cognito configuration is incomplete")
+    # Bloom now treats cognito_user_pool_id as the only required YAML value.
+    # Client/region/domain/callback are resolved from daycog pool/app env files.
+    if not settings.auth.cognito_user_pool_id:
+        warnings.append("Cognito user pool ID is not configured")
 
     if not settings.auth.jwt_secret and settings.is_production:
         warnings.append("JWT secret is not set in production")
