@@ -22,7 +22,7 @@ from bloom_lims.schemas import (
     SuccessResponse,
 )
 from bloom_lims.exceptions import NotFoundError, ValidationError
-from .dependencies import require_api_auth, APIUser
+from .dependencies import APIUser, require_read, require_write
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ async def list_containers(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """List containers with optional filters."""
     try:
@@ -92,7 +92,7 @@ async def list_containers(
 async def get_container(
     euid: str,
     include_contents: bool = Query(False),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """Get a container by EUID, optionally including contents."""
     try:
@@ -142,7 +142,7 @@ async def get_container(
 @router.post("/", response_model=Dict[str, Any])
 async def create_container(
     data: ContainerCreateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Create a new container from a template."""
     try:
@@ -174,7 +174,7 @@ async def create_container(
 async def update_container(
     euid: str,
     data: ContainerUpdateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Update a container."""
     try:
@@ -216,7 +216,7 @@ async def update_container(
 async def delete_container(
     euid: str,
     hard_delete: bool = Query(False, description="Permanently delete"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Delete a container (soft delete by default)."""
     try:
@@ -251,7 +251,7 @@ async def delete_container(
 async def add_content_to_container(
     container_euid: str,
     data: PlaceInContainerSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Add content to a container."""
     try:
@@ -271,7 +271,7 @@ async def add_content_to_container(
 async def remove_content_from_container(
     container_euid: str,
     content_euid: str,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Remove content from a container."""
     try:
@@ -303,7 +303,7 @@ async def remove_content_from_container(
 @router.get("/{euid}/layout", response_model=Dict[str, Any])
 async def get_container_layout(
     euid: str,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """Get the layout/wells of a container (for plates)."""
     try:
@@ -358,7 +358,7 @@ async def get_container_layout(
 @router.post("/bulk-create", response_model=Dict[str, Any])
 async def bulk_create_containers(
     file: UploadFile = File(..., description="TSV file with container/content data"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """
     Bulk create containers with content from a TSV file.
@@ -500,4 +500,3 @@ async def bulk_create_containers(
     except Exception as e:
         logger.error(f"Error in bulk container creation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

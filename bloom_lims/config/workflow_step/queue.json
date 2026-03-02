@@ -238,5 +238,342 @@
         }
       }
     }
+  },
+  "extraction-batch-eligible": {
+    "1.0": {
+      "description": "Extraction Batch Eligible",
+      "step_properties": {
+        "start_timestamp": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "end_operator": "",
+        "comments": "",
+        "step_number": ""
+      },
+      "properties": {
+        "name": "Extraction Batch Eligible",
+        "comments": "",
+        "step_number": "",
+        "lab_code": ""
+      },
+      "instantiation_layouts": [],
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        },
+        "queue-routing": {
+          "group_order": "2",
+          "group_name": "Queue Routing",
+          "actions": {
+            "action/workflow_step_queue/add-to-blood-gdna-extraction-queue/1.0/": {},
+            "action/workflow_step_queue/add-to-buccal-gdna-extraction-queue/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "blood-to-gdna-extraction-eligible": {
+    "1.0": {
+      "description": "Blood To gDNA Extraction Eligible",
+      "step_properties": {
+        "start_timestamp": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "end_operator": "",
+        "comments": "",
+        "step_number": ""
+      },
+      "properties": {
+        "name": "Blood To gDNA Extraction Eligible",
+        "comments": "",
+        "step_number": "",
+        "lab_code": ""
+      },
+      "instantiation_layouts": [],
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        },
+        "queue-routing": {
+          "group_order": "2",
+          "group_name": "Queue Routing",
+          "actions": {
+            "action/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0/": {}
+          }
+        },
+        "plate-fill": {
+          "group_order": "3",
+          "group_name": "Plate Fill Actions",
+          "actions": {
+            "action/workflow_step_queue/plate-create-fill-auto/1.0/": {},
+            "action/workflow_step_queue/plate-create-fill-directed/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-auto/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-directed/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "buccal-to-gdna-extraction-eligible": {
+    "1.0": {
+      "description": "Buccal To gDNA Extraction Eligible",
+      "step_properties": {
+        "start_timestamp": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "end_operator": "",
+        "comments": "",
+        "step_number": ""
+      },
+      "properties": {
+        "name": "Buccal To gDNA Extraction Eligible",
+        "comments": "",
+        "step_number": "",
+        "lab_code": ""
+      },
+      "instantiation_layouts": [],
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        },
+        "queue-routing": {
+          "group_order": "2",
+          "group_name": "Queue Routing",
+          "actions": {
+            "action/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0/": {}
+          }
+        },
+        "plate-fill": {
+          "group_order": "3",
+          "group_name": "Plate Fill Actions",
+          "actions": {
+            "action/workflow_step_queue/plate-create-fill-auto/1.0/": {},
+            "action/workflow_step_queue/plate-create-fill-directed/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-auto/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-directed/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "input-gdna-normalization-eligible": {
+    "1.0": {
+      "description": "Input gDNA Normalization Eligible",
+      "step_properties": {
+        "start_timestamp": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "end_operator": "",
+        "comments": "",
+        "step_number": ""
+      },
+      "properties": {
+        "name": "Input gDNA Normalization Eligible",
+        "comments": "",
+        "step_number": "",
+        "lab_code": ""
+      },
+      "instantiation_layouts": [],
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        },
+        "plate-fill": {
+          "group_order": "2",
+          "group_name": "Plate Fill Actions",
+          "actions": {
+            "action/workflow_step_queue/plate-create-fill-auto/1.0/": {},
+            "action/workflow_step_queue/plate-create-fill-directed/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-auto/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-directed/1.0/": {}
+          }
+        },
+        "quant": {
+          "group_order": "3",
+          "group_name": "Quant Actions",
+          "actions": {
+            "action/workflow_step_queue/save-quant-data/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "illumina-novaseq-libprep-eligible": {
+    "1.0": {
+      "description": "Illumina Novaseq LibPrep Eligible",
+      "step_properties": {
+        "start_timestamp": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "end_operator": "",
+        "comments": "",
+        "step_number": ""
+      },
+      "properties": {
+        "name": "Illumina Novaseq LibPrep Eligible",
+        "comments": "",
+        "step_number": "",
+        "lab_code": ""
+      },
+      "instantiation_layouts": [],
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        },
+        "plate-fill": {
+          "group_order": "2",
+          "group_name": "Plate Fill Actions",
+          "actions": {
+            "action/workflow_step_queue/plate-create-fill-auto/1.0/": {},
+            "action/workflow_step_queue/plate-create-fill-directed/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-auto/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-directed/1.0/": {}
+          }
+        }
+      }
+    }
+  },
+  "ont-libprep-eligible": {
+    "1.0": {
+      "description": "ONT LibPrep Eligible",
+      "step_properties": {
+        "start_timestamp": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "end_operator": "",
+        "comments": "",
+        "step_number": ""
+      },
+      "properties": {
+        "name": "ONT LibPrep Eligible",
+        "comments": "",
+        "step_number": "",
+        "lab_code": ""
+      },
+      "instantiation_layouts": [],
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "singleton": "0",
+      "action_groups": {},
+      "action_imports": {
+        "core": {
+          "group_order": "1",
+          "group_name": "Core Actions",
+          "actions": {
+            "action/core/*/1.0/": {}
+          }
+        },
+        "plate-fill": {
+          "group_order": "2",
+          "group_name": "Plate Fill Actions",
+          "actions": {
+            "action/workflow_step_queue/plate-create-fill-auto/1.0/": {},
+            "action/workflow_step_queue/plate-create-fill-directed/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-auto/1.0/": {},
+            "action/workflow_step_queue/existing-plate-fill-directed/1.0/": {}
+          }
+        }
+      }
+    }
   }
 }

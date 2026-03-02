@@ -77,9 +77,59 @@ Bloom DB commands are wrappers around TapDB:
 - `bloom db seed`
 - `bloom db reset`
 
+### Assay Extraction Pipeline Reseed (Destructive)
+
+For assay extraction queue/action rollouts (HLA 1.2 + Carrier 3.9), use:
+
+```bash
+bloom db reset -y
+bloom db seed
+bloom gui
+```
+
+Then verify newly seeded assay workflows include queue steps:
+- `extraction-batch-eligible`
+- `blood-to-gdna-extraction-eligible`
+- `buccal-to-gdna-extraction-eligible`
+- `input-gdna-normalization-eligible`
+- `illumina-novaseq-libprep-eligible`
+- `ont-libprep-eligible`
+
 ## Notes
 
 - Bloom does not own Alembic migration artifacts.
 - Bloom does not own a backup CLI.
 - TapDB is authoritative for DB runtime, schema, and backup/restore operations.
 - Bloom unified search v2 (`/api/v1/search/v2/*`, `/search`) uses TapDB-backed ORM access through `BLOOMdb3`; no direct PostgreSQL lifecycle calls are used for search.
+
+## Auth/RBAC Runtime Notes
+
+Bloom auth group/token metadata is persisted in TapDB generic templates:
+- `bloom/auth/user-group/1.0/`
+- `bloom/auth/user-group-revision/1.0/`
+- `bloom/auth/user-group-membership/1.0/`
+- `bloom/auth/user-api-token/1.0/`
+- `bloom/auth/user-api-token-revision/1.0/`
+- `bloom/auth/user-api-token-usage-log/1.0/`
+
+System groups are automatically bootstrapped on demand:
+- `INTERNAL_READ_ONLY`
+- `INTERNAL_READ_WRITE`
+- `ADMIN`
+- `API_ACCESS`
+
+To test legacy API key behavior in local development only:
+
+```bash
+export BLOOM_ALLOW_LEGACY_API_KEY=true
+```
+
+For Atlas read integration runtime:
+
+```bash
+export BLOOM_ATLAS__BASE_URL=https://atlas.example.org
+export BLOOM_ATLAS__TOKEN=<atlas-service-token>
+export BLOOM_ATLAS__TIMEOUT_SECONDS=10
+export BLOOM_ATLAS__CACHE_TTL_SECONDS=300
+export BLOOM_ATLAS__VERIFY_SSL=true
+```

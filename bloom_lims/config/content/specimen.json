@@ -66,5 +66,32 @@
       },
       "actions": {}
     }
+  },
+  "buccal-swab": {
+    "1.0": {
+      "description": "Buccal Swab",
+      "instantiation_layouts": [],
+      "cogs": {
+        "state": "active",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "allocation_type": ""
+      },
+      "properties": {
+        "name": "Buccal Swab",
+        "volume": "",
+        "volume_units": "",
+        "comments": "",
+        "lab_code": ""
+      },
+      "expected_inputs": [],
+      "singleton": "0",
+      "expected_outputs": [],
+      "actions": {}
+    }
   }
 }

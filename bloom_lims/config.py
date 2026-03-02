@@ -219,6 +219,16 @@ class AuthSettings(BaseModel):
     max_sessions_per_user: int = Field(default=5, description="Max concurrent sessions")
 
 
+class AtlasSettings(BaseModel):
+    """Atlas integration settings."""
+
+    base_url: str = Field(default="", description="Atlas API base URL")
+    token: str = Field(default="", description="Atlas API bearer token")
+    timeout_seconds: int = Field(default=10, description="Atlas API timeout seconds")
+    cache_ttl_seconds: int = Field(default=300, description="Atlas response cache TTL in seconds")
+    verify_ssl: bool = Field(default=True, description="Verify Atlas TLS certificates")
+
+
 class LoggingSettings(BaseModel):
     """Logging configuration."""
 
@@ -337,6 +347,7 @@ class BloomSettings(BaseSettings):
     storage: StorageSettings = Field(default_factory=StorageSettings)
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    atlas: AtlasSettings = Field(default_factory=AtlasSettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
     ui: UISettings = Field(default_factory=UISettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)

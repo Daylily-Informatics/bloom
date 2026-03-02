@@ -915,9 +915,19 @@ API modules are organized in `bloom_lims/api/v1/`:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/auth/login` | POST | Authenticate user |
-| `/api/v1/auth/refresh` | POST | Refresh access token |
 | `/api/v1/auth/me` | GET | Get current user info |
+| `/api/v1/user-tokens` | GET/POST | List/create personal Bloom API tokens |
+| `/api/v1/user-tokens/{token_id}` | DELETE | Revoke personal Bloom API token |
+| `/api/v1/user-tokens/{token_id}/usage` | GET | View usage for personal token |
+| `/api/v1/admin/groups` | GET | Admin group list |
+| `/api/v1/admin/groups/{group_code}/members` | GET/POST | Admin group membership management |
+| `/api/v1/admin/groups/{group_code}/members/{user_id}` | DELETE | Admin remove group member |
+| `/api/v1/admin/user-tokens` | GET | Admin list all tokens |
+| `/api/v1/admin/user-tokens/{token_id}` | DELETE | Admin revoke any token |
+| `/api/v1/admin/user-tokens/{token_id}/usage` | GET | Admin token usage |
+| `/api/v1/external/specimens` | POST | External Atlas-driven specimen create |
+| `/api/v1/external/specimens/{specimen_euid}` | GET/PATCH | External specimen get/update |
+| `/api/v1/external/specimens/by-reference` | GET | External specimen lookup by Atlas refs |
 
 ### 10.2 Request/Response Format
 
@@ -953,16 +963,34 @@ Content-Type: application/json
 
 ### 10.3 Authentication
 
-API authentication uses Supabase Auth:
+Bloom API authentication supports:
+- Session/Cognito auth for interactive/internal use
+- Bloom personal API bearer tokens (`blm_...`) for external machine integrations
+- Legacy `X-API-Key` only when explicitly enabled in development
+
+Bloom RBAC roles:
+- `INTERNAL_READ_ONLY`
+- `INTERNAL_READ_WRITE`
+- `ADMIN`
+
+External token scopes:
+- `internal_ro`
+- `internal_rw`
+- `admin`
+
+Token self-service is gated by `API_ACCESS` group membership.
+
+Legacy API key behavior:
+- disabled by default
+- only available when both:
+  - environment is development
+  - `BLOOM_ALLOW_LEGACY_API_KEY=true`
+
+See full integration runbook: `docs/AUTH_INTEGRATION.md`.
 
 ```python
-# JWT token in Authorization header
-Authorization: Bearer <jwt_token>
-
-# Token validation
-from gotrue import SyncGoTrueClient
-client = SyncGoTrueClient(url=SUPABASE_URL, headers={"apikey": SUPABASE_KEY})
-user = client.get_user(token)
+# External integration token example
+Authorization: Bearer blm_<token>
 ```
 
 ---
@@ -1525,6 +1553,20 @@ Use TapDB-backed BLOOM CLI commands:
 bloom db reset --yes
 bloom db seed
 ```
+
+Assay extraction pipeline reseed runbook (HLA 1.2 + Carrier 3.9):
+```bash
+bloom db reset -y
+bloom db seed
+bloom gui
+```
+After reseed, verify each assay workflow has queue steps with these subtypes:
+- `extraction-batch-eligible`
+- `blood-to-gdna-extraction-eligible`
+- `buccal-to-gdna-extraction-eligible`
+- `input-gdna-normalization-eligible`
+- `illumina-novaseq-libprep-eligible`
+- `ont-libprep-eligible`
 
 #### Build LIMS Workflows With Autogen Objects
 Similar to `pytest`, but more extensive. Useful for development and smoke testing. Run the accessioning/extraction workflow generator:

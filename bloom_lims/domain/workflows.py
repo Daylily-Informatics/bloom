@@ -7,7 +7,9 @@ steps, and instances.
 Extracted from bloom_lims/bobjs.py for better code organization.
 """
 
+import csv
 import logging
+import re
 
 from sqlalchemy import desc
 from sqlalchemy.orm.attributes import flag_modified
@@ -169,6 +171,18 @@ class BloomWorkflowStep(BloomObj):
             )
         elif action_method == "do_action_add_container_to_assay_q":
             self.do_action_add_container_to_assay_q(wfs_euid, action_ds)
+        elif action_method == "do_action_move_instances_to_queue":
+            self.do_action_move_instances_to_queue(wfs_euid, action_ds)
+        elif action_method == "do_action_plate_create_fill_auto":
+            self.do_action_plate_create_fill_auto(wfs_euid, action_ds)
+        elif action_method == "do_action_plate_create_fill_directed":
+            self.do_action_plate_create_fill_directed(wfs_euid, action_ds)
+        elif action_method == "do_action_existing_plate_fill_auto":
+            self.do_action_existing_plate_fill_auto(wfs_euid, action_ds)
+        elif action_method == "do_action_existing_plate_fill_directed":
+            self.do_action_existing_plate_fill_directed(wfs_euid, action_ds)
+        elif action_method == "do_action_save_quant_data":
+            self.do_action_save_quant_data(wfs_euid, action_ds)
         elif action_method == "do_action_fill_plate_undirected":
             self.do_action_fill_plate_undirected(wfs_euid, action_ds)
         elif action_method == "do_action_fill_plate_directed":
@@ -200,6 +214,393 @@ class BloomWorkflowStep(BloomObj):
             )
             flag_modified(i.child_instance, "json_addl")
             self.session.commit()
+
+    def _step_number(self, step_obj):
+        json_addl = step_obj.json_addl if isinstance(step_obj.json_addl, dict) else {}
+        props = json_addl.get("properties", {})
+        return props.get("step_number")
+
+    def _step_sort_key(self, step_obj):
+        step_number = self._step_number(step_obj)
+        try:
+            return (int(step_number), step_obj.euid)
+        except (TypeError, ValueError):
+            return (10**9, step_obj.euid)
+
+    def _iter_active_child_instances(
+        self, parent_obj, category=None, type_name=None, subtype=None
+    ):
+        for lineage in parent_obj.parent_of_lineages:
+            child = lineage.child_instance
+            if lineage.is_deleted or child is None:
+                continue
+            if getattr(child, "is_deleted", False):
+                continue
+            if category and child.category != category:
+                continue
+            if type_name and child.type != type_name:
+                continue
+            if subtype and child.subtype != subtype:
+                continue
+            yield lineage, child
+
+    def _get_parent_workflow_for_step(self, step_obj):
+        for lineage in step_obj.child_of_lineages:
+            parent = lineage.parent_instance
+            if lineage.is_deleted or parent is None:
+                continue
+            if getattr(parent, "is_deleted", False):
+                continue
+            if parent.category == "workflow":
+                return parent
+        raise Exception(f"Could not determine parent workflow for step {step_obj.euid}")
+
+    def _get_workflow_steps(self, workflow_obj, subtype=None):
+        steps = [
+            child
+            for _, child in self._iter_active_child_instances(
+                workflow_obj, category="workflow_step", type_name="queue", subtype=subtype
+            )
+        ]
+        steps.sort(key=self._step_sort_key)
+        return steps
+
+    def _default_queue_name(self, subtype):
+        tokens = []
+        for token in str(subtype).split("-"):
+            if token.lower() == "gdna":
+                tokens.append("gDNA")
+            elif token.lower() == "ont":
+                tokens.append("ONT")
+            elif token.lower() == "novaseq":
+                tokens.append("Novaseq")
+            elif token.lower() == "libprep":
+                tokens.append("LibPrep")
+            else:
+                tokens.append(token.capitalize())
+        return " ".join(tokens).strip()
+
+    def _get_or_create_queue_step(self, workflow_obj, queue_subtype):
+        existing_steps = self._get_workflow_steps(workflow_obj, subtype=queue_subtype)
+        if existing_steps:
+            return existing_steps[0]
+
+        current_steps = self._get_workflow_steps(workflow_obj)
+        next_step_number = "1"
+        if current_steps:
+            highest = current_steps[-1]
+            try:
+                next_step_number = str(int(self._step_number(highest)) + 1)
+            except Exception:
+                next_step_number = str(len(current_steps) + 1)
+
+        queue_name = self._default_queue_name(queue_subtype)
+        layout = f"workflow_step/queue/{queue_subtype}/1.0"
+        new_step = self.create_instance_by_code(
+            layout,
+            {
+                "json_addl": {
+                    "description": queue_name,
+                    "properties": {
+                        "name": queue_name,
+                        "comments": "",
+                        "step_number": next_step_number,
+                        "lab_code": "",
+                    },
+                }
+            },
+        )
+        self.create_generic_instance_lineage_by_euids(workflow_obj.euid, new_step.euid)
+        self.session.commit()
+        return new_step
+
+    def _merge_captured_text(self, captured_data, key_names):
+        if not isinstance(captured_data, dict):
+            return ""
+        parts = []
+        for key in key_names:
+            if key not in captured_data:
+                continue
+            value = captured_data[key]
+            if isinstance(value, list):
+                for entry in value:
+                    entry_text = str(entry).strip()
+                    if entry_text:
+                        parts.append(entry_text)
+            else:
+                value_text = str(value).strip()
+                if value_text:
+                    parts.append(value_text)
+        return "\n".join(parts)
+
+    def _parse_reference_tokens(self, raw_text):
+        tokens = []
+        seen = set()
+        for piece in re.split(r"[\n,;]+", raw_text or ""):
+            token = piece.strip()
+            if not token or token in seen:
+                continue
+            tokens.append(token)
+            seen.add(token)
+        return tokens
+
+    def _parse_instance_refs(self, action_ds):
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        merged_text = self._merge_captured_text(
+            captured,
+            ("instance_refs", "instance_refs_file_text", "instance_refs_file"),
+        )
+        refs = self._parse_reference_tokens(merged_text)
+        if not refs:
+            raise Exception("No instance refs were provided")
+        return refs
+
+    def _resolve_well_by_plate_and_address(self, plate_euid, well_address):
+        plate = self.get_by_euid(plate_euid)
+        if (
+            plate is None
+            or plate.category != "container"
+            or plate.type != "plate"
+            or plate.is_deleted
+        ):
+            raise Exception(f"Invalid plate EUID in reference: {plate_euid}")
+
+        target_address = str(well_address).strip().upper()
+        for _, child in self._iter_active_child_instances(
+            plate, category="container", type_name="well"
+        ):
+            address = (
+                child.json_addl.get("cont_address", {}).get("name", "")
+                if isinstance(child.json_addl, dict)
+                else ""
+            )
+            if str(address).strip().upper() == target_address:
+                return child
+        raise Exception(f"Could not resolve well {well_address} on plate {plate_euid}")
+
+    def _resolve_instance_reference(self, ref_token):
+        token = str(ref_token).strip()
+        if "." in token:
+            plate_euid, well_address = token.split(".", 1)
+            return self._resolve_well_by_plate_and_address(plate_euid.strip(), well_address.strip())
+
+        instance = self.get_by_euid(token)
+        if instance is None or getattr(instance, "is_deleted", False):
+            raise Exception(f"Could not resolve instance ref '{token}'")
+        return instance
+
+    def _get_first_active_child_content(self, instance_obj):
+        for _, child in self._iter_active_child_instances(instance_obj, category="content"):
+            return child
+        return None
+
+    def _ensure_lineage(self, parent_euid, child_euid):
+        parent_obj = self.get_by_euid(parent_euid)
+        for _, child in self._iter_active_child_instances(parent_obj):
+            if child.euid == child_euid:
+                return
+        self.create_generic_instance_lineage_by_euids(parent_euid, child_euid)
+
+    def _is_well_occupied(self, well_obj):
+        for _, child in self._iter_active_child_instances(well_obj, category="content"):
+            if child is not None:
+                return True
+        return False
+
+    def _get_plate_wells_in_address_order(self, plate_obj):
+        wells = [
+            child
+            for _, child in self._iter_active_child_instances(
+                plate_obj, category="container", type_name="well"
+            )
+        ]
+
+        def _addr_sort_key(well_obj):
+            cont_address = (
+                well_obj.json_addl.get("cont_address", {})
+                if isinstance(well_obj.json_addl, dict)
+                else {}
+            )
+            row_idx = cont_address.get("row_idx", 0)
+            col_idx = cont_address.get("col_idx", 0)
+            try:
+                row_idx = int(row_idx)
+            except Exception:
+                row_idx = 0
+            try:
+                col_idx = int(col_idx)
+            except Exception:
+                col_idx = 0
+            return (row_idx, col_idx, well_obj.euid)
+
+        wells.sort(key=_addr_sort_key)
+        return wells
+
+    def _create_plate_instance(self, plate_subtype="fixed-plate-96"):
+        templates = self.query_template_by_component_v2(
+            "container", "plate", plate_subtype, "1.0"
+        )
+        if not templates:
+            raise Exception(
+                f"Template not found: container/plate/{plate_subtype}/1.0"
+            )
+        plate_parts = self.create_instances(templates[0].euid)
+        return plate_parts[0][0]
+
+    def _create_output_gdna_content(self, normalized=False):
+        templates = self.query_template_by_component_v2("content", "sample", "gdna", "1.0")
+        if not templates:
+            raise Exception("Template not found: content/sample/gdna/1.0")
+        content_obj = self.create_instances(templates[0].euid)[0][0]
+        if normalized:
+            props = content_obj.json_addl.setdefault("properties", {})
+            props["normalized"] = "true"
+            props["normalization_state"] = "normalized"
+            flag_modified(content_obj, "json_addl")
+        return content_obj
+
+    def _resolve_destination_well_ref(self, plate_obj, dest_ref):
+        token = str(dest_ref).strip()
+        plate_euid = plate_obj.euid
+        well_address = token
+        if "." in token:
+            plate_part, well_part = token.split(".", 1)
+            if plate_part.strip() and plate_part.strip() != plate_obj.euid:
+                raise Exception(
+                    f"Destination mapping '{dest_ref}' does not target destination plate {plate_obj.euid}"
+                )
+            well_address = well_part.strip()
+        return self._resolve_well_by_plate_and_address(plate_euid, well_address)
+
+    def _parse_mapping_rows(self, action_ds):
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        merged = self._merge_captured_text(
+            captured,
+            ("mapping_csv_text", "mapping_csv_file_text", "mapping_csv_file"),
+        )
+        if not merged.strip():
+            raise Exception("Missing directed mapping CSV")
+
+        rows = []
+        for row in csv.reader(merged.splitlines()):
+            if not row:
+                continue
+            source_ref = str(row[0]).strip()
+            dest_ref = str(row[1]).strip() if len(row) > 1 else ""
+            if not source_ref and not dest_ref:
+                continue
+            if source_ref.lower() in ("source_ref", "source", "instance_ref"):
+                continue
+            if not source_ref or not dest_ref:
+                raise Exception(f"Invalid mapping row: {row}")
+            rows.append((source_ref, dest_ref))
+
+        if not rows:
+            raise Exception("No valid mapping rows found")
+        return rows
+
+    def _parse_quant_rows(self, action_ds):
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        merged = self._merge_captured_text(
+            captured,
+            ("quant_csv_text", "quant_csv_file_text", "quant_csv_file"),
+        )
+        if not merged.strip():
+            raise Exception("Missing quant CSV data")
+
+        quant_rows = []
+        for row in csv.reader(merged.splitlines()):
+            if not row:
+                continue
+            first = str(row[0]).strip().lower() if len(row) > 0 else ""
+            if first in ("plate_euid", "plate"):
+                continue
+            if len(row) < 3:
+                raise Exception(f"Invalid quant row: {row}")
+            plate_euid = str(row[0]).strip()
+            well_address = str(row[1]).strip()
+            quant_raw = str(row[2]).strip()
+            if not plate_euid or not well_address or not quant_raw:
+                raise Exception(f"Invalid quant row: {row}")
+            try:
+                quant_value = float(quant_raw)
+            except ValueError as exc:
+                raise Exception(f"Quant value must be float for row: {row}") from exc
+            quant_rows.append((plate_euid, well_address, quant_value))
+
+        if not quant_rows:
+            raise Exception("No valid quant rows found")
+        return quant_rows
+
+    def _fill_plate_from_sources(
+        self,
+        queue_step_obj,
+        plate_obj,
+        source_refs,
+        directed_mapping=None,
+    ):
+        if not source_refs:
+            raise Exception("No source refs were provided")
+
+        normalized = queue_step_obj.subtype == "input-gdna-normalization-eligible"
+        destinations = {}
+
+        if directed_mapping:
+            for source_ref, dest_ref in directed_mapping:
+                source_instance = self._resolve_instance_reference(source_ref)
+                destination_well = self._resolve_destination_well_ref(plate_obj, dest_ref)
+                if self._is_well_occupied(destination_well):
+                    raise Exception(
+                        f"Destination well already occupied: {plate_obj.euid}.{destination_well.json_addl.get('cont_address', {}).get('name', '')}"
+                    )
+                destinations[source_instance.euid] = destination_well
+        else:
+            resolved_sources = [self._resolve_instance_reference(ref) for ref in source_refs]
+            available_wells = [
+                w for w in self._get_plate_wells_in_address_order(plate_obj) if not self._is_well_occupied(w)
+            ]
+            if len(available_wells) < len(resolved_sources):
+                raise Exception(
+                    f"Not enough available wells on destination plate {plate_obj.euid} (needed {len(resolved_sources)}, available {len(available_wells)})"
+                )
+            for idx, source_instance in enumerate(resolved_sources):
+                destinations[source_instance.euid] = available_wells[idx]
+
+        self._ensure_lineage(queue_step_obj.euid, plate_obj.euid)
+
+        for source_ref in source_refs:
+            source_instance = self._resolve_instance_reference(source_ref)
+            source_content = self._get_first_active_child_content(source_instance)
+            destination_well = destinations.get(source_instance.euid)
+            if destination_well is None:
+                raise Exception(f"No destination mapping found for source {source_ref}")
+
+            output_content = self._create_output_gdna_content(normalized=normalized)
+
+            self._ensure_lineage(source_instance.euid, destination_well.euid)
+            if source_content:
+                self._ensure_lineage(source_content.euid, output_content.euid)
+            self._ensure_lineage(destination_well.euid, output_content.euid)
+
+    def _get_library_prep_targets(self, workflow_obj):
+        props = workflow_obj.json_addl.get("properties", {}) if isinstance(workflow_obj.json_addl, dict) else {}
+        targets = props.get("library_prep_queue_subtypes", [])
+        if isinstance(targets, str):
+            targets = [targets]
+        if not isinstance(targets, list):
+            targets = []
+        cleaned = [str(t).strip() for t in targets if str(t).strip()]
+        if cleaned:
+            return cleaned
+        return ["illumina-novaseq-libprep-eligible", "ont-libprep-eligible"]
+
+    def _route_instances_to_library_prep_queues(self, queue_step_obj, instances):
+        workflow_obj = self._get_parent_workflow_for_step(queue_step_obj)
+        targets = self._get_library_prep_targets(workflow_obj)
+        for queue_subtype in targets:
+            destination_queue = self._get_or_create_queue_step(workflow_obj, queue_subtype)
+            for instance in instances:
+                self._ensure_lineage(destination_queue.euid, instance.euid)
 
     def do_action_log_temperature(self, wfs_euid, action_ds):
         now_dt = get_datetime_string()
@@ -514,8 +915,162 @@ class BloomWorkflowStep(BloomObj):
         self.session.commit()
         return child_wfs
 
-    def do_action_fill_plate_directed(self, wfs_euid, action, action_ds):
-        pass
+    def do_action_fill_plate_directed(self, wfs_euid, action_ds):
+        # Legacy compatibility alias
+        return self.do_action_plate_create_fill_directed(wfs_euid, action_ds)
+
+    def do_action_move_instances_to_queue(self, wfs_euid, action_ds):
+        queue_step = self.get_by_euid(wfs_euid)
+        workflow_obj = self._get_parent_workflow_for_step(queue_step)
+        target_queue_subtype = (
+            str(action_ds.get("target_queue_subtype", "")).strip()
+            or str(
+                action_ds.get("captured_data", {}).get("target_queue_subtype", "")
+            ).strip()
+        )
+        if not target_queue_subtype:
+            raise Exception("Missing target queue subtype for queue move action")
+
+        destination_queue = self._get_or_create_queue_step(
+            workflow_obj, target_queue_subtype
+        )
+        source_refs = self._parse_instance_refs(action_ds)
+
+        for source_ref in source_refs:
+            instance_obj = self._resolve_instance_reference(source_ref)
+            source_lineage = None
+            for lineage in instance_obj.child_of_lineages:
+                if lineage.is_deleted:
+                    continue
+                parent = lineage.parent_instance
+                if parent is None or getattr(parent, "is_deleted", False):
+                    continue
+                if parent.euid == queue_step.euid:
+                    source_lineage = lineage
+                    break
+            if source_lineage is None:
+                raise Exception(
+                    f"Instance {instance_obj.euid} is not currently in source queue {queue_step.euid}"
+                )
+
+            self._ensure_lineage(destination_queue.euid, instance_obj.euid)
+            self.delete_obj(source_lineage)
+
+        self.session.commit()
+        return destination_queue
+
+    def do_action_plate_create_fill_auto(self, wfs_euid, action_ds):
+        queue_step = self.get_by_euid(wfs_euid)
+        source_refs = self._parse_instance_refs(action_ds)
+        plate_obj = self._create_plate_instance("fixed-plate-96")
+        self._fill_plate_from_sources(queue_step, plate_obj, source_refs)
+        self.session.commit()
+        return plate_obj
+
+    def do_action_plate_create_fill_directed(self, wfs_euid, action_ds):
+        queue_step = self.get_by_euid(wfs_euid)
+        mapping_rows = self._parse_mapping_rows(action_ds)
+        source_refs = self._parse_reference_tokens(
+            self._merge_captured_text(
+                action_ds.get("captured_data", {}),
+                ("instance_refs", "instance_refs_file_text", "instance_refs_file"),
+            )
+        )
+        if not source_refs:
+            source_refs = [source_ref for source_ref, _ in mapping_rows]
+        source_ref_set = set(source_refs)
+        for source_ref, _ in mapping_rows:
+            if source_ref not in source_ref_set:
+                raise Exception(
+                    f"Directed mapping source '{source_ref}' was not provided in source refs"
+                )
+
+        plate_obj = self._create_plate_instance("fixed-plate-96")
+        self._fill_plate_from_sources(
+            queue_step,
+            plate_obj,
+            source_refs,
+            directed_mapping=mapping_rows,
+        )
+        self.session.commit()
+        return plate_obj
+
+    def do_action_existing_plate_fill_auto(self, wfs_euid, action_ds):
+        queue_step = self.get_by_euid(wfs_euid)
+        captured = action_ds.get("captured_data", {})
+        destination_plate_euid = str(captured.get("destination_plate_euid", "")).strip()
+        if not destination_plate_euid:
+            raise Exception("Missing destination plate EUID")
+        plate_obj = self.get_by_euid(destination_plate_euid)
+        if (
+            plate_obj is None
+            or plate_obj.category != "container"
+            or plate_obj.type != "plate"
+            or plate_obj.is_deleted
+        ):
+            raise Exception(f"Destination plate not found: {destination_plate_euid}")
+
+        source_refs = self._parse_instance_refs(action_ds)
+        self._fill_plate_from_sources(queue_step, plate_obj, source_refs)
+        self.session.commit()
+        return plate_obj
+
+    def do_action_existing_plate_fill_directed(self, wfs_euid, action_ds):
+        queue_step = self.get_by_euid(wfs_euid)
+        captured = action_ds.get("captured_data", {})
+        destination_plate_euid = str(captured.get("destination_plate_euid", "")).strip()
+        if not destination_plate_euid:
+            raise Exception("Missing destination plate EUID")
+        plate_obj = self.get_by_euid(destination_plate_euid)
+        if (
+            plate_obj is None
+            or plate_obj.category != "container"
+            or plate_obj.type != "plate"
+            or plate_obj.is_deleted
+        ):
+            raise Exception(f"Destination plate not found: {destination_plate_euid}")
+
+        mapping_rows = self._parse_mapping_rows(action_ds)
+        source_refs = self._parse_reference_tokens(
+            self._merge_captured_text(
+                captured, ("instance_refs", "instance_refs_file_text", "instance_refs_file")
+            )
+        )
+        if not source_refs:
+            source_refs = [source_ref for source_ref, _ in mapping_rows]
+        source_ref_set = set(source_refs)
+        for source_ref, _ in mapping_rows:
+            if source_ref not in source_ref_set:
+                raise Exception(
+                    f"Directed mapping source '{source_ref}' was not provided in source refs"
+                )
+
+        self._fill_plate_from_sources(
+            queue_step,
+            plate_obj,
+            source_refs,
+            directed_mapping=mapping_rows,
+        )
+        self.session.commit()
+        return plate_obj
+
+    def do_action_save_quant_data(self, wfs_euid, action_ds):
+        queue_step = self.get_by_euid(wfs_euid)
+        quant_rows = self._parse_quant_rows(action_ds)
+        updated_wells = {}
+
+        for plate_euid, well_address, quant_value in quant_rows:
+            well_obj = self._resolve_well_by_plate_and_address(plate_euid, well_address)
+            props = well_obj.json_addl.setdefault("properties", {})
+            props["quant_value"] = quant_value
+            flag_modified(well_obj, "json_addl")
+            updated_wells[well_obj.euid] = well_obj
+
+        self._route_instances_to_library_prep_queues(
+            queue_step, list(updated_wells.values())
+        )
+        self.session.commit()
+        return list(updated_wells.values())
 
     def do_action_add_container_to_assay_q(self, obj_euid, action_ds):
         # This action should be coming to us from a TRI ... kind of breaking my model... how to deal with this?
@@ -580,62 +1135,39 @@ class BloomWorkflowStep(BloomObj):
                     f"Selected assay '{assay_selection}' is not a valid active workflow/assay instance"
                 )
 
-        # Weak. using step number as a proxy for the ready step.
-        def _active_workflow_steps(workflow_obj):
-            for lineage in workflow_obj.parent_of_lineages:
-                child = lineage.child_instance
-                if lineage.is_deleted or child is None:
-                    continue
-                if getattr(child, "is_deleted", False):
-                    continue
-                if child.category != "workflow_step":
-                    continue
-                yield child
-
-        def _step_number(step_obj):
-            json_addl = step_obj.json_addl if isinstance(step_obj.json_addl, dict) else {}
-            props = json_addl.get("properties", {})
-            return props.get("step_number")
-
-        def _step_sort_key(step_obj):
-            step_number = _step_number(step_obj)
-            try:
-                return (int(step_number), step_obj.euid)
-            except (TypeError, ValueError):
-                return (10**9, step_obj.euid)
-
         wfs = ""
 
         try:
-            candidate_steps = list(_active_workflow_steps(wf))
-            for child_step in candidate_steps:
-                if str(_step_number(child_step)) == "1":
-                    wfs = child_step
-                    break
-
-            if wfs == "" and candidate_steps:
-                candidate_steps.sort(key=_step_sort_key)
-                wfs = candidate_steps[0]
-                self.logger.warning(
-                    "No step_number=1 found for assay workflow %s; using %s (step_number=%s)",
-                    wf.euid,
-                    wfs.euid,
-                    _step_number(wfs),
-                )
-
-            if wfs == "":
-                # Legacy seeded assay workflows can exist without any workflow_step
-                # children. Create a default queue step so this action still works.
-                wfs = self.create_instance_by_code(
-                    "workflow_step/queue/all-purpose/1.0",
-                    {"json_addl": {"properties": {"step_number": "1"}}},
-                )
-                self.create_generic_instance_lineage_by_euids(wf.euid, wfs.euid)
-                self.logger.info(
-                    "Created fallback queue step %s for assay workflow %s",
-                    wfs.euid,
-                    wf.euid,
-                )
+            extraction_batch_steps = self._get_workflow_steps(
+                wf, subtype="extraction-batch-eligible"
+            )
+            if extraction_batch_steps:
+                wfs = extraction_batch_steps[0]
+            else:
+                # Create the expected ingress queue topology on demand when missing.
+                try:
+                    wfs = self._get_or_create_queue_step(wf, "extraction-batch-eligible")
+                    self.logger.info(
+                        "Created extraction ingress queue step %s for assay workflow %s",
+                        wfs.euid,
+                        wf.euid,
+                    )
+                except Exception:
+                    candidate_steps = self._get_workflow_steps(wf)
+                    if candidate_steps:
+                        wfs = candidate_steps[0]
+                        self.logger.warning(
+                            "Fell back to first available queue %s for assay workflow %s",
+                            wfs.euid,
+                            wf.euid,
+                        )
+                    else:
+                        wfs = self._get_or_create_queue_step(wf, "all-purpose")
+                        self.logger.info(
+                            "Created fallback queue step %s for assay workflow %s",
+                            wfs.euid,
+                            wf.euid,
+                        )
         except Exception as e:
             self.logger.exception(f"ERROR: {e}")
             self.session.rollback()

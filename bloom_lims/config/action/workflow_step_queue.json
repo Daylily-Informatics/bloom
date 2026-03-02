@@ -231,5 +231,246 @@
         "curr_user": ""
       }
     }
+  },
+  "add-to-blood-gdna-extraction-queue": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Add to Blood to gDNA Extraction Queue",
+        "method_name": "do_action_move_instances_to_queue",
+        "target_queue_subtype": "blood-to-gdna-extraction-eligible",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_instance_refs": "Instance Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "add-to-buccal-gdna-extraction-queue": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Add to Buccal to gDNA Extraction Queue",
+        "method_name": "do_action_move_instances_to_queue",
+        "target_queue_subtype": "buccal-to-gdna-extraction-eligible",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_instance_refs": "Instance Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "add-gdna-to-gdna-normalization-queue": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Add gDNA to gDNA Normalization Queue",
+        "method_name": "do_action_move_instances_to_queue",
+        "target_queue_subtype": "input-gdna-normalization-eligible",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_instance_refs": "Instance Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "plate-create-fill-auto": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Plate Create & Fill Auto",
+        "method_name": "do_action_plate_create_fill_auto",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "plate-create-fill-directed": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Plate Create & Fill Directed",
+        "method_name": "do_action_plate_create_fill_directed",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />",
+          "_mapping_csv_text": "Directed Mapping CSV (source_ref,destination_well):<textarea required name=&quot;mapping_csv_text&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_mapping_csv_file": "Or Upload Mapping CSV: <input type=&quot;file&quot; name=&quot;mapping_csv_file&quot; accept=&quot;.csv,.txt&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "existing-plate-fill-auto": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Existing Plate Fill Auto",
+        "method_name": "do_action_existing_plate_fill_auto",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_destination_plate_euid": "Destination Plate EUID: <input required type=&quot;text&quot; name=&quot;destination_plate_euid&quot; />",
+          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "existing-plate-fill-directed": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Existing Plate Fill Directed",
+        "method_name": "do_action_existing_plate_fill_directed",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_destination_plate_euid": "Destination Plate EUID: <input required type=&quot;text&quot; name=&quot;destination_plate_euid&quot; />",
+          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />",
+          "_mapping_csv_text": "Directed Mapping CSV (source_ref,destination_well):<textarea required name=&quot;mapping_csv_text&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_mapping_csv_file": "Or Upload Mapping CSV: <input type=&quot;file&quot; name=&quot;mapping_csv_file&quot; accept=&quot;.csv,.txt&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
+  },
+  "save-quant-data": {
+    "1.0": {
+      "action_template": {
+        "action_name": "Save Quant Data",
+        "method_name": "do_action_save_quant_data",
+        "action_executed": "0",
+        "max_executions": "-1",
+        "action_enabled": "1",
+        "capture_data": "yes",
+        "captured_data": {
+          "_quant_csv_text": "Quant CSV (plate_euid,well_address,quant_value):<textarea required name=&quot;quant_csv_text&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
+          "_quant_csv_file": "Or Upload Quant CSV: <input type=&quot;file&quot; name=&quot;quant_csv_file&quot; accept=&quot;.csv,.txt&quot; />"
+        },
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "action_user": [],
+        "printer_opts": {
+          "printer_name": "",
+          "label_style": ""
+        },
+        "simple_value": "",
+        "curr_user": ""
+      },
+      "properties": {
+        "name": "",
+        "comments": ""
+      }
+    }
   }
 }

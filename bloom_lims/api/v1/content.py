@@ -19,7 +19,7 @@ from bloom_lims.schemas import (
     SuccessResponse,
 )
 from bloom_lims.exceptions import NotFoundError, ValidationError
-from .dependencies import require_api_auth, APIUser
+from .dependencies import APIUser, require_read, require_write
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def list_content(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """List content objects with optional filters."""
     try:
@@ -84,7 +84,7 @@ async def list_content(
 
 
 @router.get("/{euid}")
-async def get_content(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_content(euid: str, user: APIUser = Depends(require_read)):
     """Get content by EUID."""
     try:
         bdb = get_bdb(user.email)
@@ -117,7 +117,7 @@ async def get_content(euid: str, user: APIUser = Depends(require_api_auth)):
 
 
 @router.post("/samples", response_model=Dict[str, Any])
-async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(require_write)):
     """Create a new sample."""
     try:
         bdb = get_bdb(user.email)
@@ -145,7 +145,7 @@ async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(requir
 
 
 @router.post("/specimens", response_model=Dict[str, Any])
-async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(require_write)):
     """Create a new specimen."""
     try:
         bdb = get_bdb(user.email)
@@ -173,7 +173,7 @@ async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(re
 
 
 @router.post("/reagents", response_model=Dict[str, Any])
-async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(require_write)):
     """Create a new reagent."""
     try:
         bdb = get_bdb(user.email)
@@ -204,7 +204,7 @@ async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(requ
 async def update_content(
     euid: str,
     data: ContentUpdateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Update content."""
     try:
@@ -249,7 +249,7 @@ async def update_content(
 async def delete_content(
     euid: str,
     hard_delete: bool = Query(False, description="Permanently delete"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Delete content (soft delete by default)."""
     try:
@@ -278,4 +278,3 @@ async def delete_content(
     except Exception as e:
         logger.error(f"Error deleting content {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

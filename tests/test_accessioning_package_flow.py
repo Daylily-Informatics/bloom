@@ -7,6 +7,7 @@ import html
 import json
 import os
 import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -45,6 +46,25 @@ def _find_action_by_method(instance, method_name: str):
             if action_ds.get("method_name") == method_name:
                 return group_name, action_name, copy.deepcopy(action_ds)
     raise AssertionError(f"No action found for method {method_name}")
+
+
+def _find_action(instance, method_name: str = None, action_display_name: str = None):
+    action_groups = (
+        instance.json_addl.get("action_groups", {})
+        if isinstance(instance.json_addl, dict)
+        else {}
+    )
+    for group_name, group_data in action_groups.items():
+        actions = group_data.get("actions", {}) if isinstance(group_data, dict) else {}
+        for action_name, action_ds in actions.items():
+            if method_name and action_ds.get("method_name") != method_name:
+                continue
+            if action_display_name and action_ds.get("action_name") != action_display_name:
+                continue
+            return group_name, action_name, copy.deepcopy(action_ds)
+    raise AssertionError(
+        f"No action found for method={method_name!r} action_name={action_display_name!r}"
+    )
 
 
 def _run_register_package_action(bwf: BloomWorkflow, workflow):
@@ -91,6 +111,43 @@ def _get_or_create_assay_workflow_with_step_one(bwfs: BloomWorkflowStep):
             return assay
 
     pytest.skip("No workflow/assay instance with step_number=1 available for assay queue test")
+
+
+def _get_assay_instance(bobj: BloomObj, subtype: str, version: str):
+    assays = bobj.query_instance_by_component_v2(
+        category="workflow",
+        type="assay",
+        subtype=subtype,
+        version=version,
+    )
+    if not assays:
+        pytest.skip(f"Missing seeded workflow instance workflow/assay/{subtype}/{version}")
+    return assays[0]
+
+
+def _get_active_queue_step_by_subtype(workflow_obj, subtype: str):
+    for lin in workflow_obj.parent_of_lineages:
+        child = lin.child_instance
+        if lin.is_deleted:
+            continue
+        if child is None or child.is_deleted:
+            continue
+        if child.category == "workflow_step" and child.type == "queue" and child.subtype == subtype:
+            return child
+    return None
+
+
+def _require_queue_template_or_skip(bobj: BloomObj, subtype: str):
+    templates = bobj.query_template_by_component_v2(
+        category="workflow_step",
+        type="queue",
+        subtype=subtype,
+        version="1.0",
+    )
+    if not templates:
+        pytest.skip(
+            f"Missing workflow_step/queue/{subtype}/1.0 template in DB; run bloom db reset -y && bloom db seed"
+        )
 
 
 def _get_assay_workflow_without_steps(bwfs: BloomWorkflowStep):
@@ -339,3 +396,210 @@ def test_add_specimen_to_assay_queue_creates_queue_step_when_assay_has_no_steps(
 
     assert queued_step is not None, "Container should be linked into fallback queue step"
     assert str(queued_step.json_addl.get("properties", {}).get("step_number", "")) == "1"
+
+
+def test_assay_templates_define_extraction_pipeline_layout(bdb_function):
+    project_root = Path(__file__).resolve().parent.parent
+    assay_config = json.loads(
+        (project_root / "bloom_lims/config/workflow/assay.json").read_text(encoding="utf-8")
+    )
+    expected_subtypes = [
+        "extraction-batch-eligible",
+        "blood-to-gdna-extraction-eligible",
+        "buccal-to-gdna-extraction-eligible",
+        "input-gdna-normalization-eligible",
+        "illumina-novaseq-libprep-eligible",
+        "ont-libprep-eligible",
+    ]
+
+    for assay_subtype, assay_version in (("hla-typing", "1.2"), ("carrier-screen", "3.9")):
+        assay_def = assay_config[assay_subtype][assay_version]
+        layout = assay_def.get("instantiation_layouts", [[]])[0]
+        queue_subtypes = []
+        for entry in layout:
+            key = list(entry.keys())[0]
+            parts = key.strip("/").split("/")
+            if len(parts) >= 4 and parts[0] == "workflow_step" and parts[1] == "queue":
+                queue_subtypes.append(parts[2])
+
+        assert queue_subtypes[: len(expected_subtypes)] == expected_subtypes
+        props = assay_def.get("properties", {})
+        assert props.get("library_prep_queue_subtypes") == [
+            "illumina-novaseq-libprep-eligible",
+            "ont-libprep-eligible",
+        ]
+
+
+def test_add_specimen_routes_to_extraction_batch_queue(bdb_function):
+    bobj = BloomWorkflowStep(bdb_function)
+    _require_queue_template_or_skip(bobj, "extraction-batch-eligible")
+    tri = _get_or_create_test_requisition_with_assay_action(bobj)
+    assay = _get_assay_instance(bobj, "hla-typing", "1.2")
+
+    container_templates = bobj.query_template_by_component_v2(
+        category="container",
+        type="tube",
+    )
+    if not container_templates:
+        pytest.skip("Missing container/tube template for assay queue routing test")
+    container = bobj.create_instances(container_templates[0].euid)[0][0]
+    bobj.create_generic_instance_lineage_by_euids(tri.euid, container.euid)
+    bobj.session.commit()
+
+    action_group, action_name, action_ds = _find_action_by_method(
+        tri, "do_action_add_container_to_assay_q"
+    )
+    action_ds.setdefault("captured_data", {})
+    action_ds["captured_data"]["Container EUID"] = container.euid
+    action_ds["captured_data"]["assay_selection"] = assay.euid
+
+    bobj.do_action(
+        tri.euid,
+        action=action_name,
+        action_group=action_group,
+        action_ds=action_ds,
+    )
+    assay = bobj.get_by_euid(assay.euid)
+    queued_step = _get_active_queue_step_by_subtype(assay, "extraction-batch-eligible")
+    assert queued_step is not None
+    assert any(
+        not lin.is_deleted and lin.child_instance.euid == container.euid
+        for lin in queued_step.parent_of_lineages
+    )
+
+
+def test_queue_move_plate_fill_quant_and_fanout(bdb_function):
+    bobj = BloomWorkflowStep(bdb_function)
+    _require_queue_template_or_skip(bobj, "extraction-batch-eligible")
+    _require_queue_template_or_skip(bobj, "blood-to-gdna-extraction-eligible")
+    _require_queue_template_or_skip(bobj, "input-gdna-normalization-eligible")
+    _require_queue_template_or_skip(bobj, "illumina-novaseq-libprep-eligible")
+    _require_queue_template_or_skip(bobj, "ont-libprep-eligible")
+    tri = _get_or_create_test_requisition_with_assay_action(bobj)
+    assay = _get_assay_instance(bobj, "carrier-screen", "3.9")
+
+    tube_templates = bobj.query_template_by_component_v2(category="container", type="tube")
+    specimen_templates = bobj.query_template_by_component_v2(
+        category="content", type="specimen", subtype="blood-whole", version="1.0"
+    )
+    if not tube_templates or not specimen_templates:
+        pytest.skip("Missing required tube/specimen templates for assay extraction pipeline test")
+
+    tube = bobj.create_instances(tube_templates[0].euid)[0][0]
+    specimen = bobj.create_instances(specimen_templates[0].euid)[0][0]
+    bobj.create_generic_instance_lineage_by_euids(tube.euid, specimen.euid)
+    bobj.create_generic_instance_lineage_by_euids(tri.euid, tube.euid)
+    bobj.session.commit()
+
+    add_group, add_action, add_ds = _find_action_by_method(tri, "do_action_add_container_to_assay_q")
+    add_ds.setdefault("captured_data", {})
+    add_ds["captured_data"]["Container EUID"] = tube.euid
+    add_ds["captured_data"]["assay_selection"] = assay.euid
+    bobj.do_action(
+        tri.euid, action=add_action, action_group=add_group, action_ds=add_ds
+    )
+    assay = bobj.get_by_euid(assay.euid)
+    extraction_queue = _get_active_queue_step_by_subtype(assay, "extraction-batch-eligible")
+    assert extraction_queue is not None
+    assert extraction_queue.subtype == "extraction-batch-eligible"
+
+    move_group, move_action, move_ds = _find_action(
+        extraction_queue,
+        method_name="do_action_move_instances_to_queue",
+        action_display_name="Add to Blood to gDNA Extraction Queue",
+    )
+    move_ds.setdefault("captured_data", {})
+    move_ds["captured_data"]["instance_refs"] = tube.euid
+    blood_queue = bobj.do_action(
+        extraction_queue.euid,
+        action=move_action,
+        action_group=move_group,
+        action_ds=move_ds,
+    )
+    blood_queue = bobj.get_by_euid(blood_queue.euid)
+    assert blood_queue.subtype == "blood-to-gdna-extraction-eligible"
+    assert any(
+        lin.is_deleted and lin.parent_instance.euid == extraction_queue.euid
+        for lin in tube.child_of_lineages
+    )
+    assert any(
+        not lin.is_deleted and lin.parent_instance.euid == blood_queue.euid
+        for lin in tube.child_of_lineages
+    )
+
+    to_norm_group, to_norm_action, to_norm_ds = _find_action(
+        blood_queue,
+        method_name="do_action_move_instances_to_queue",
+        action_display_name="Add gDNA to gDNA Normalization Queue",
+    )
+    to_norm_ds.setdefault("captured_data", {})
+    to_norm_ds["captured_data"]["instance_refs"] = tube.euid
+    norm_queue = bobj.do_action(
+        blood_queue.euid,
+        action=to_norm_action,
+        action_group=to_norm_group,
+        action_ds=to_norm_ds,
+    )
+    norm_queue = bobj.get_by_euid(norm_queue.euid)
+    assert norm_queue.subtype == "input-gdna-normalization-eligible"
+
+    plate_group, plate_action, plate_ds = _find_action(
+        norm_queue, method_name="do_action_plate_create_fill_auto"
+    )
+    plate_ds.setdefault("captured_data", {})
+    plate_ds["captured_data"]["instance_refs"] = tube.euid
+    created_plate = bobj.do_action(
+        norm_queue.euid,
+        action=plate_action,
+        action_group=plate_group,
+        action_ds=plate_ds,
+    )
+    created_plate = bobj.get_by_euid(created_plate.euid)
+    assert created_plate.type == "plate"
+    assert created_plate.subtype == "fixed-plate-96"
+
+    linked_wells = []
+    for lin in tube.parent_of_lineages:
+        if lin.is_deleted:
+            continue
+        child = lin.child_instance
+        if child.type != "well":
+            continue
+        if any(
+            not wl.is_deleted and wl.parent_instance.euid == created_plate.euid
+            for wl in child.child_of_lineages
+        ):
+            linked_wells.append(child)
+    assert linked_wells, "Expected at least one destination well linked from source tube"
+    target_well = linked_wells[0]
+    well_address = target_well.json_addl.get("cont_address", {}).get("name", "")
+    assert well_address
+
+    quant_group, quant_action, quant_ds = _find_action(
+        norm_queue, method_name="do_action_save_quant_data"
+    )
+    quant_ds.setdefault("captured_data", {})
+    quant_ds["captured_data"]["quant_csv_text"] = f"{created_plate.euid},{well_address},4.2"
+    bobj.do_action(
+        norm_queue.euid,
+        action=quant_action,
+        action_group=quant_group,
+        action_ds=quant_ds,
+    )
+
+    refreshed_well = bobj.get_by_euid(target_well.euid)
+    assert float(refreshed_well.json_addl.get("properties", {}).get("quant_value")) == pytest.approx(4.2)
+
+    assay = bobj.get_by_euid(assay.euid)
+    illumina_q = _get_active_queue_step_by_subtype(assay, "illumina-novaseq-libprep-eligible")
+    ont_q = _get_active_queue_step_by_subtype(assay, "ont-libprep-eligible")
+    assert illumina_q is not None
+    assert ont_q is not None
+    assert any(
+        not lin.is_deleted and lin.parent_instance.euid == illumina_q.euid
+        for lin in refreshed_well.child_of_lineages
+    )
+    assert any(
+        not lin.is_deleted and lin.parent_instance.euid == ont_q.euid
+        for lin in refreshed_well.child_of_lineages
+    )

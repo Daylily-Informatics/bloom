@@ -104,22 +104,86 @@ function showCapturedDataFormFromDataAttributes(button) {
     }
 }
 
-function submitCapturedDataForm(formId, actionName, stepEuid, actionDataJson, actionGroup) {
+function readFileAsText(file) {
+    if (!file) {
+        return Promise.resolve('');
+    }
+    if (typeof file.text === 'function') {
+        return file.text();
+    }
+    return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function() {
+            resolve(reader.result || '');
+        };
+        reader.onerror = function() {
+            reject(reader.error || new Error('Unable to read selected file'));
+        };
+        reader.readAsText(file);
+    });
+}
+
+async function submitCapturedDataForm(formId, actionName, stepEuid, actionDataJson, actionGroup) {
     var formContainer = document.getElementById(formId);
+    if (!formContainer) {
+        return;
+    }
     var form = formContainer.querySelector('form');
     var formData = new FormData(form);
-    var updatedActionData = {};
     var actionData = JSON.parse(unescape(actionDataJson));
 
-    formData.forEach(function(value, key){
-        actionData['captured_data'][key] = value;
-    });
+    try {
+        var entries = [];
+        formData.forEach(function(value, key) {
+            entries.push([key, value]);
+        });
 
-    // Now call the original function with updated data
-    performWorkflowStepAction(stepEuid, actionData, actionName, actionGroup);
+        for (var i = 0; i < entries.length; i++) {
+            var key = entries[i][0];
+            var value = entries[i][1];
 
-    // Remove the form from the DOM
-    formContainer.remove();
+            if (value instanceof File) {
+                if (!value.name || value.size === 0) {
+                    continue;
+                }
+                var fileText = await readFileAsText(value);
+                actionData['captured_data'][key + '_name'] = value.name;
+                actionData['captured_data'][key + '_text'] = fileText;
+
+                // For fields ending in _file, also append contents to the
+                // corresponding text key so server handlers can read one key.
+                if (key.endsWith('_file')) {
+                    var textKey = key.slice(0, -5);
+                    var prior = actionData['captured_data'][textKey] || '';
+                    actionData['captured_data'][textKey] = prior
+                        ? (String(prior) + '\n' + fileText)
+                        : fileText;
+                }
+                continue;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(actionData['captured_data'], key)) {
+                if (Array.isArray(actionData['captured_data'][key])) {
+                    actionData['captured_data'][key].push(value);
+                } else {
+                    actionData['captured_data'][key] = [actionData['captured_data'][key], value];
+                }
+            } else {
+                actionData['captured_data'][key] = value;
+            }
+        }
+
+        // Now call the original function with updated data
+        performWorkflowStepAction(stepEuid, actionData, actionName, actionGroup);
+
+        // Remove the form from the DOM
+        formContainer.remove();
+    } catch (error) {
+        console.error('Error submitting action form:', error);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', error.message || 'Unable to submit form data');
+        }
+    }
 }
 
 function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {

@@ -22,6 +22,12 @@ async def get_current_user(user: APIUser = Depends(require_api_auth)):
         "id": user.user_id,
         "email": user.email,
         "role": user.role,
+        "roles": user.roles,
+        "groups": user.groups,
+        "permissions": user.permissions,
+        "auth_source": user.auth_source,
+        "token_scope": user.token_scope,
+        "token_id": user.token_id,
     }
 
 
@@ -36,4 +42,3 @@ async def logout():
         "success": True,
         "message": "Logged out successfully",
     }
-
