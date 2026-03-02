@@ -1,52 +1,72 @@
 {% extends "modern/base.html" %}
 
-{% block title %}Search Results - BLOOM LIMS{% endblock %}
+{% block title %}Search - BLOOM LIMS{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1><i class="fas fa-search"></i> Search Results</h1>
+    <h1><i class="fas fa-search"></i> Unified Search</h1>
     <p class="text-muted">
-      {% if results %}Found {{ results | length }} results for "{{ query }}"{% else %}Enter a search query{% endif %}
+      {% if search_response.total > 0 %}
+      Showing {{ results | length }} of {{ search_response.total }} result(s)
+      {% elif query or types or record_types %}
+      No results found
+      {% else %}
+      Search instances, templates, lineage, and audit records
+      {% endif %}
     </p>
   </div>
   <div class="page-actions">
-    {% if results %}
-    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('tsv')" title="Export as TSV">
+    {% if search_response.total > 0 %}
+    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('tsv')">
       <i class="fas fa-file-csv"></i> Download TSV
     </button>
-    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('json')" title="Export as JSON">
-      <i class="fas fa-file-code"></i> Dump to JSON
+    <button type="button" class="btn btn-outline btn-sm" onclick="exportResults('json')">
+      <i class="fas fa-file-code"></i> Download JSON
     </button>
     {% endif %}
-    <a href="/legacy/" class="btn btn-outline btn-sm" title="Legacy view">
-      <i class="fas fa-history"></i> Legacy
-    </a>
   </div>
 </div>
 
-<!-- Search Form -->
 <div class="card mb-lg">
   <div class="card-body">
-    <form action="/search" method="GET" class="search-form" id="searchForm">
+    <form action="/search" method="GET" id="searchForm">
       <div class="form-group mb-md">
         <label class="form-label">Search Query</label>
-        <input type="text" class="form-input" name="q" id="searchQuery" value="{{ query }}" placeholder="Search by EUID, name, type, or metadata...">
+        <input
+          type="text"
+          class="form-input"
+          name="q"
+          id="searchQuery"
+          value="{{ query }}"
+          placeholder="Search by EUID, name, type, subtype, or metadata"
+        >
       </div>
+
       <div class="form-group mb-md">
-        <label class="form-label">Object Types</label>
-        <div class="type-checkboxes">
-          {% set selected_types = types.split(',') if types else [] %}
-          <label class="checkbox-label"><input type="checkbox" name="types" value="container" {% if 'container' in selected_types %}checked{% endif %}> Containers</label>
-          <label class="checkbox-label"><input type="checkbox" name="types" value="content" {% if 'content' in selected_types %}checked{% endif %}> Content</label>
-          <label class="checkbox-label"><input type="checkbox" name="types" value="workflow" {% if 'workflow' in selected_types %}checked{% endif %}> Workflows</label>
-          <label class="checkbox-label"><input type="checkbox" name="types" value="equipment" {% if 'equipment' in selected_types %}checked{% endif %}> Equipment</label>
-          <label class="checkbox-label"><input type="checkbox" name="types" value="file" {% if 'file' in selected_types %}checked{% endif %}> Files</label>
-          <label class="checkbox-label"><input type="checkbox" name="types" value="file_set" {% if 'file_set' in selected_types %}checked{% endif %}> File Sets</label>
-          <label class="checkbox-label"><input type="checkbox" name="types" value="subject" {% if 'subject' in selected_types %}checked{% endif %}> Subjects</label>
+        <label class="form-label">Object Categories</label>
+        <div class="filter-grid">
+          {% for category in ['container', 'content', 'workflow', 'equipment', 'file', 'file_set', 'subject', 'data'] %}
+          <label class="checkbox-label">
+            <input type="checkbox" class="types-filter" value="{{ category }}" {% if category in selected_types %}checked{% endif %}>
+            <span>{{ category }}</span>
+          </label>
+          {% endfor %}
         </div>
-        <small class="text-muted">Leave all unchecked to search all types</small>
       </div>
+
+      <div class="form-group mb-md">
+        <label class="form-label">Record Types</label>
+        <div class="filter-grid">
+          {% for record_type in ['instance', 'template', 'lineage', 'audit'] %}
+          <label class="checkbox-label">
+            <input type="checkbox" class="record-type-filter" value="{{ record_type }}" {% if record_type in selected_record_types %}checked{% endif %}>
+            <span>{{ record_type }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">
           <i class="fas fa-search"></i> Search
@@ -59,56 +79,112 @@
   </div>
 </div>
 
-<!-- Results -->
+{% if search_response.facets.record_type %}
+<div class="card mb-lg">
+  <div class="card-body">
+    <h3 class="card-title mb-sm"><i class="fas fa-chart-bar"></i> Facets</h3>
+    <div class="facet-row">
+      {% for key, value in search_response.facets.record_type.items() %}
+      <span class="facet-chip">{{ key }}: {{ value }}</span>
+      {% endfor %}
+    </div>
+    {% if search_response.facets.category %}
+    <div class="facet-row mt-sm">
+      {% for key, value in search_response.facets.category.items() %}
+      <span class="facet-chip facet-chip-category">{{ key }}: {{ value }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if search_response.truncated %}
+    <p class="text-warning mt-sm">Results were truncated by the configured scan cap.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 {% if results %}
 <div class="card">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-table"></i> Results</h3>
-    <div class="result-actions">
-      <span class="text-muted text-sm">{{ results | length }} items</span>
-    </div>
+    <span class="text-muted text-sm">Page {{ search_response.page }} of {{ search_response.total_pages }}</span>
   </div>
   <div class="card-body">
     <div class="table-container">
       <table class="table">
         <thead>
           <tr>
-            <th>EUID</th>
+            <th>Record</th>
+            <th>Category</th>
             <th>Type</th>
             <th>Name</th>
             <th>Status</th>
-            <th>Created</th>
+            <th>Timestamp</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for result in results %}
+          {% set metadata = result.metadata if result.metadata else {} %}
+          {% set detail_euid = result.euid or metadata.get('rel_table_euid_fk', '') %}
           <tr>
-            <td><a href="/euid_details?euid={{ result.euid }}" class="badge badge-euid">{{ result.euid }}</a></td>
             <td>
-              <span class="badge badge-{% if result.category == 'workflow' %}info{% elif result.category == 'container' %}success{% elif result.category == 'content' %}warning{% elif result.category == 'equipment' %}error{% else %}info{% endif %}">
-                {{ result.category }}
-              </span>
-              <span class="text-muted text-sm">{{ result.type }}/{{ result.subtype }}</span>
+              <div class="text-sm"><strong>{{ result.record_type }}</strong></div>
+              {% if detail_euid %}
+              <a href="/euid_details?euid={{ detail_euid }}" class="badge badge-euid">{{ detail_euid }}</a>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
             </td>
-            <td>{{ result.name | default('-') }}</td>
-            <td><span class="badge badge-{% if result.bstatus == 'active' %}success{% elif result.bstatus == 'complete' %}info{% else %}warning{% endif %}">{{ result.bstatus }}</span></td>
-            <td class="text-muted text-sm">{{ result.created_dt.strftime('%Y-%m-%d %H:%M') if result.created_dt else '-' }}</td>
-            <td><a href="/euid_details?euid={{ result.euid }}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a></td>
+            <td>{{ result.category or '-' }}</td>
+            <td>
+              <span>{{ result.type or '-' }}</span>
+              <span class="text-muted text-sm">/{{ result.subtype or '-' }}</span>
+            </td>
+            <td>{{ result.name or '-' }}</td>
+            <td>{{ result.status or '-' }}</td>
+            <td class="text-muted text-sm">{{ result.timestamp or result.created_dt or '-' }}</td>
+            <td>
+              {% if detail_euid %}
+              <a href="/euid_details?euid={{ detail_euid }}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    {% if search_response.total_pages > 1 %}
+    <div class="pagination-row mt-md">
+      {% if search_response.page > 1 %}
+      <a
+        class="btn btn-outline btn-sm"
+        href="/search?q={{ query | urlencode }}&types={{ types | urlencode }}&record_types={{ record_types | urlencode }}&page={{ search_response.page - 1 }}"
+      >
+        Previous
+      </a>
+      {% endif %}
+      {% if search_response.page < search_response.total_pages %}
+      <a
+        class="btn btn-outline btn-sm"
+        href="/search?q={{ query | urlencode }}&types={{ types | urlencode }}&record_types={{ record_types | urlencode }}&page={{ search_response.page + 1 }}"
+      >
+        Next
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 </div>
-{% elif query %}
+{% elif query or types or record_types %}
 <div class="card">
   <div class="card-body">
     <div class="empty-state">
       <div class="empty-state-icon"><i class="fas fa-search"></i></div>
       <h3>No Results Found</h3>
-      <p class="text-muted">Try adjusting your search query or filters</p>
+      <p class="text-muted">Try adjusting your query, category, or record type filters.</p>
     </div>
   </div>
 </div>
@@ -117,8 +193,8 @@
   <div class="card-body">
     <div class="empty-state">
       <div class="empty-state-icon"><i class="fas fa-search"></i></div>
-      <h3>Enter a Search Query</h3>
-      <p class="text-muted">Search across all BLOOM objects by EUID, name, type, or metadata</p>
+      <h3>Enter Search Criteria</h3>
+      <p class="text-muted">You can search free text and combine category/record-type filters.</p>
     </div>
   </div>
 </div>
@@ -127,68 +203,140 @@
 
 {% block extra_css %}
 <style>
-.search-form { width: 100%; }
-.type-checkboxes {
-  display: flex; flex-wrap: wrap; gap: var(--spacing-md);
-  padding: var(--spacing-sm); background: var(--color-gray-700);
+.filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-gray-700);
   border-radius: var(--radius-sm);
 }
 .checkbox-label {
-  display: flex; align-items: center; gap: var(--spacing-xs);
-  cursor: pointer; font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+  font-size: 0.875rem;
 }
-.checkbox-label input[type="checkbox"] {
-  width: 16px; height: 16px; accent-color: var(--color-highlight);
+.form-actions {
+  display: flex;
+  gap: var(--spacing-sm);
 }
-.form-actions { display: flex; gap: var(--spacing-sm); }
-.table-container { overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-gray-600); }
-.table th { background: var(--color-gray-700); font-weight: 600; font-size: 0.875rem; text-transform: uppercase; color: var(--color-gray-300); }
-.table tbody tr:hover { background: var(--color-gray-700); }
-.empty-state { text-align: center; padding: var(--spacing-2xl); }
-.empty-state-icon { font-size: 3rem; color: var(--color-gray-500); margin-bottom: var(--spacing-md); }
+.facet-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+.facet-chip {
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-gray-700);
+  font-size: 0.8rem;
+}
+.facet-chip-category {
+  background: var(--color-gray-600);
+}
+.table-container {
+  overflow-x: auto;
+}
+.empty-state {
+  text-align: center;
+  padding: var(--spacing-2xl);
+}
+.empty-state-icon {
+  font-size: 3rem;
+  color: var(--color-gray-500);
+  margin-bottom: var(--spacing-md);
+}
+.pagination-row {
+  display: flex;
+  justify-content: space-between;
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function getSelectedTypes() {
-  const checkboxes = document.querySelectorAll('input[name="types"]:checked');
-  return Array.from(checkboxes).map(cb => cb.value).join(',');
-}
-
-function exportResults(format) {
-  const query = document.getElementById('searchQuery').value;
-  if (!query) {
-    BloomToast.warning('No Query', 'Enter a search query first');
-    return;
-  }
-  const types = getSelectedTypes();
-  let url = `/api/v1/search/export?q=${encodeURIComponent(query)}&format=${format}`;
-  if (types) url += `&types=${encodeURIComponent(types)}`;
-  window.location.href = url;
+function collectValues(selector) {
+  return Array.from(document.querySelectorAll(selector + ':checked')).map((elem) => elem.value);
 }
 
 function clearFilters() {
   document.getElementById('searchQuery').value = '';
-  document.querySelectorAll('input[name="types"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.types-filter, .record-type-filter').forEach((elem) => {
+    elem.checked = false;
+  });
 }
 
-// Convert checkboxes to comma-separated types param on form submit
-document.getElementById('searchForm').addEventListener('submit', function(e) {
-  const checkboxes = document.querySelectorAll('input[name="types"]:checked');
-  if (checkboxes.length > 0) {
-    // Remove individual checkboxes from form submission
-    checkboxes.forEach(cb => cb.removeAttribute('name'));
-    // Add hidden input with comma-separated types
-    const hidden = document.createElement('input');
-    hidden.type = 'hidden';
-    hidden.name = 'types';
-    hidden.value = Array.from(checkboxes).map(cb => cb.value).join(',');
-    this.appendChild(hidden);
+function appendHidden(form, name, value) {
+  const hidden = document.createElement('input');
+  hidden.type = 'hidden';
+  hidden.name = name;
+  hidden.value = value;
+  form.appendChild(hidden);
+}
+
+document.getElementById('searchForm').addEventListener('submit', function onSubmit() {
+  this.querySelectorAll('input[name="types"], input[name="record_types"]').forEach((elem) => elem.remove());
+
+  const categories = collectValues('.types-filter');
+  const recordTypes = collectValues('.record-type-filter');
+
+  if (categories.length > 0) {
+    appendHidden(this, 'types', categories.join(','));
+  }
+  if (recordTypes.length > 0) {
+    appendHidden(this, 'record_types', recordTypes.join(','));
   }
 });
+
+async function exportResults(format) {
+  const query = document.getElementById('searchQuery').value;
+  const categories = collectValues('.types-filter');
+  const recordTypes = collectValues('.record-type-filter');
+
+  const payload = {
+    search: {
+      query: query,
+      categories: categories,
+      record_types: recordTypes,
+      page: 1,
+      page_size: 500,
+      max_scan: 10000,
+      sort_by: 'timestamp',
+      sort_order: 'desc'
+    },
+    format: format,
+    include_metadata: true,
+    max_export_rows: 10000
+  };
+
+  try {
+    const response = await fetch('/api/v1/search/v2/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error('Export failed with status ' + response.status);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const contentDisposition = response.headers.get('Content-Disposition') || '';
+    const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/);
+    link.href = url;
+    link.download = fileNameMatch ? fileNameMatch[1] : ('bloom_search_v2.' + format);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error(error);
+    alert('Export failed. Please try again.');
+  }
+}
 </script>
 {% endblock %}
-

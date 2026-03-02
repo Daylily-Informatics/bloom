@@ -36,6 +36,7 @@ class TestAPIRoot:
         data = response.json()
         assert "version" in data
         assert "endpoints" in data
+        assert "search_v2" in data["endpoints"]
 
 
 class TestObjectsAPI:
@@ -206,6 +207,7 @@ class TestSearchAPI:
         """Test search with a query returns results."""
         response = client.get("/api/v1/search/?q=test")
         assert response.status_code == 200
+        assert response.headers.get("deprecation") == "true"
         data = response.json()
         assert "items" in data
         assert "total" in data
@@ -230,9 +232,61 @@ class TestSearchAPI:
         """Test search export as JSON."""
         response = client.get("/api/v1/search/export?q=test&format=json")
         assert response.status_code == 200
+        assert response.headers.get("deprecation") == "true"
         assert "application/json" in response.headers.get("content-type", "")
         data = response.json()
         assert "items" in data
+
+
+class TestSearchAPIV2:
+    """Tests for /api/v1/search/v2 endpoints."""
+
+    def test_search_v2_query(self, client):
+        payload = {
+            "query": "test",
+            "record_types": ["instance", "template"],
+            "page": 1,
+            "page_size": 25,
+        }
+        response = client.post("/api/v1/search/v2/query", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "facets" in data
+        assert "record_type" in data["facets"]
+        assert data["page"] == 1
+
+    def test_search_v2_export_json(self, client):
+        payload = {
+            "search": {
+                "query": "test",
+                "record_types": ["instance"],
+                "page": 1,
+                "page_size": 100,
+            },
+            "format": "json",
+            "include_metadata": True,
+            "max_export_rows": 1000,
+        }
+        response = client.post("/api/v1/search/v2/export", json=payload)
+        assert response.status_code == 200
+        assert "application/json" in response.headers.get("content-type", "")
+
+    def test_search_v2_export_tsv(self, client):
+        payload = {
+            "search": {
+                "query": "test",
+                "record_types": ["instance"],
+                "page": 1,
+                "page_size": 100,
+            },
+            "format": "tsv",
+            "include_metadata": False,
+            "max_export_rows": 1000,
+        }
+        response = client.post("/api/v1/search/v2/export", json=payload)
+        assert response.status_code == 200
+        assert "text/tab-separated-values" in response.headers.get("content-type", "")
 
 
 class TestBulkContainerAPI:
@@ -1199,3 +1253,55 @@ class TestWorksetsAPI:
             data = response.json()
             assert "euid" in data
             assert "anchor_euid" in data
+
+
+class TestTrackingAPI:
+    """Tests for /api/v1/tracking endpoints."""
+
+    def test_track_fedex_supports_track_ops_meta(self, client):
+        """FedEx tracking should work with new tracker method names."""
+
+        class TrackerNew:
+            def track_ops_meta(self, _tracking_number):
+                return [
+                    {
+                        "status": "IN_TRANSIT",
+                        "transit_time_sec": 7200,
+                        "origin_state": "CA",
+                        "ship_date": "2026-03-01",
+                        "delivery_date": "2026-03-03",
+                    }
+                ]
+
+        with patch("bloom_lims.api.v1.tracking._get_fedex_tracker", return_value=TrackerNew()):
+            response = client.get("/api/v1/tracking/track/123456789?carrier=FedEx")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["carrier"] == "FedEx"
+        assert data["status"] == "IN_TRANSIT"
+        assert data["transit_time_hours"] == 2.0
+
+    def test_track_fedex_supports_legacy_method(self, client):
+        """FedEx tracking should remain compatible with legacy method names."""
+
+        class TrackerLegacy:
+            def get_fedex_ops_meta_ds(self, _tracking_number):
+                return [
+                    {
+                        "Delivery_Status": "DELIVERED",
+                        "Transit_Time_sec": 3600,
+                        "Origin_State": "WA",
+                        "Ship_Date": "2026-02-28",
+                        "Delivery_Date": "2026-03-01",
+                    }
+                ]
+
+        with patch("bloom_lims.api.v1.tracking._get_fedex_tracker", return_value=TrackerLegacy()):
+            response = client.get("/api/v1/tracking/track/987654321?carrier=FedEx")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["carrier"] == "FedEx"
+        assert data["status"] == "DELIVERED"
+        assert data["transit_time_hours"] == 1.0

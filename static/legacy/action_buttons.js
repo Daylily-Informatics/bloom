@@ -1,5 +1,14 @@
 // sharedFunctions.js
 
+function decodeHtmlEntities(value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    var decoder = document.createElement('textarea');
+    decoder.innerHTML = String(value);
+    return decoder.value;
+}
+
 function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, actionGroup) {
     try {
         var uniqueFormId = stepEuid + '-' + actionName + actionGroup + '-form';
@@ -20,14 +29,21 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
                 var formContainer = document.createElement('div');
                 formContainer.id = uniqueFormId;
                 formContainer.style.display = 'block'; // Ensure the form is visible when first created
+                formContainer.style.flexBasis = '100%';
+                formContainer.style.width = '100%';
+                formContainer.style.marginTop = '0.75rem';
+                formContainer.style.padding = '0.75rem';
+                formContainer.style.border = '1px solid rgba(148, 163, 184, 0.35)';
+                formContainer.style.borderRadius = '0.5rem';
+                formContainer.style.background = 'rgba(15, 23, 42, 0.45)';
 
                 var formHTML = '<form>';
                 for (var key in actionData['captured_data']) {
                     var value = actionData['captured_data'][key];
 
                     if (key.startsWith('_')) {
-                        // If key starts with '_', append the value directly
-                        formHTML += actionData['captured_data'][key];
+                        // Key-prefixed values are authored as HTML snippets and may be entity-encoded.
+                        formHTML += decodeHtmlEntities(value);
                     } else {
                         // Check if value is an array or a string
                         if (Array.isArray(value)) {
@@ -37,7 +53,7 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
                             });
                         } else {
                             // Handle string values
-                            formHTML += key + '<input type="text" name="' + key + '" value="' + value + '"><br>';
+                            formHTML += key + '<input type="text" name="' + key + '" value="' + decodeHtmlEntities(value) + '"><br>';
                         }
                     }
                 }
@@ -45,11 +61,46 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
                 formHTML += '<ul><button class="actionSubmit" onclick="submitCapturedDataForm(\'' + uniqueFormId + '\', \'' + actionName + '\', \'' + stepEuid + '\', \'' + escape(JSON.stringify(actionData)) + '\', \'' + actionGroup + '\')">Submit</button><hr></ul>';
 
                 formContainer.innerHTML = formHTML;
-                button.insertAdjacentElement('afterend', formContainer);
+
+                var parent = button.parentElement;
+                if (parent && window.getComputedStyle(parent).display.indexOf('flex') !== -1) {
+                    parent.insertAdjacentElement('afterend', formContainer);
+                } else {
+                    button.insertAdjacentElement('afterend', formContainer);
+                }
             }
         }
     } catch (e) {
         console.error('Error parsing action data JSON:', e);
+    }
+}
+
+function showCapturedDataFormFromDataAttributes(button) {
+    try {
+        var rawActionData = button.getAttribute('data-action-json');
+        if (!rawActionData) {
+            throw new Error('Missing data-action-json');
+        }
+
+        var actionData;
+        try {
+            actionData = JSON.parse(rawActionData);
+        } catch (parseError) {
+            // Some browser/cache combinations may leave HTML entities encoded.
+            var decoder = document.createElement('textarea');
+            decoder.innerHTML = rawActionData;
+            actionData = JSON.parse(decoder.value);
+        }
+        var stepEuid = button.getAttribute('data-euid') || '';
+        var actionName = button.getAttribute('data-action-name') || '';
+        var actionGroup = button.getAttribute('data-action-group') || '';
+
+        showCapturedDataForm(button, actionData, stepEuid, actionName, actionGroup);
+    } catch (e) {
+        console.error('Error reading action data attributes:', e);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', e.message || 'Unable to open action form');
+        }
     }
 }
 
@@ -81,17 +132,34 @@ function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {
         },
         body: JSON.stringify({ action_group: actionGroup, euid: stepEuid, action: action, ds: ds })
     })
-    .then(response => {
-        if (response.ok) {
-            console.log('Response OK');
-            return response.json();
+    .then(async response => {
+        var contentType = response.headers.get('content-type') || '';
+        var payload = null;
+        if (contentType.indexOf('application/json') !== -1) {
+            payload = await response.json();
         } else {
-            console.log('Response not OK');
-            throw new Error('Network response was not ok.');
+            payload = await response.text();
         }
+
+        if (response.ok) {
+            console.log('Response OK', payload);
+            return payload;
+        }
+
+        var message = 'Action failed';
+        if (payload && typeof payload === 'object') {
+            message = payload.detail || payload.message || message;
+        } else if (typeof payload === 'string' && payload.trim() !== '') {
+            message = payload;
+        }
+        throw new Error(message);
     })
     .then(data => {
         console.log('Success:', data);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.success === 'function') {
+            var msg = (data && data.message) ? data.message : 'Action completed';
+            window.BloomToast.success('Action Complete', msg, 2000);
+        }
         // Add a slight delay before reloading
         setTimeout(function() {
             window.location.reload();
@@ -99,9 +167,9 @@ function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {
     })
     .catch((error) => {
         console.error('Error:', error);
-        setTimeout(function() {
-            window.location.reload();
-        }, 500); // Waits for 500 milliseconds
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', error.message || 'Request failed');
+        }
     });
 }
 
@@ -192,4 +260,3 @@ function toggleJSONDisplay(rowId) {
         button.textContent = 'Show JSON';
     }
 }
-

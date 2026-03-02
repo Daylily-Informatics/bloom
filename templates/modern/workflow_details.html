@@ -106,6 +106,33 @@
         background: var(--color-gray-600);
         border-radius: var(--radius-sm);
     }
+    .child-type-chips {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        align-items: center;
+    }
+    .child-type-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 999px;
+        background: var(--color-gray-600);
+        color: var(--color-gray-200);
+        font-size: 0.7rem;
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+    .child-type-chip i {
+        font-size: 0.7rem;
+    }
+    .child-type-chip .chip-count {
+        font-weight: 700;
+    }
+    .child-type-chip .chip-label {
+        opacity: 0.9;
+    }
     .step-links {
         display: flex;
         gap: 0.25rem;
@@ -433,9 +460,6 @@
         <a href="/dindex2?globalStartNodeEUID={{ workflow.euid }}" target="bloom_dag" class="btn btn-outline btn-sm" title="View DAG">
             <i class="fas fa-project-diagram"></i> DAG
         </a>
-        <a href="/legacy/workflow_details?workflow_euid={{ workflow.euid }}" class="btn btn-outline btn-sm" title="Legacy view">
-            <i class="fas fa-history"></i> Legacy
-        </a>
     </div>
 </div>
 
@@ -451,7 +475,11 @@
             <div class="action-group-name">{{ group_value.group_name }}</div>
             {% for action_key, action_value in group_value.actions.items() %}
             <button class="action-btn"
-                    onclick="showCapturedDataForm(this, {{ action_value }}, '{{ workflow.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                    data-action-json="{{ action_value | tojson | e }}"
+                    data-euid="{{ workflow.euid }}"
+                    data-action-name="{{ action_key }}"
+                    data-action-group="{{ group_key }}"
+                    onclick="showCapturedDataFormFromDataAttributes(this)"
                     {% if action_value.action_enabled == "0" %}disabled{% endif %}>
                 {{ action_value.action_name }}
             </button>
@@ -491,7 +519,11 @@
                     <span class="action-group-name" style="font-size: 0.75rem; color: var(--color-gray-400);">{{ group_value.group_name }}:</span>
                     {% for action_key, action_value in group_value.actions.items() %}
                     <button class="action-btn btn btn-outline btn-sm"
-                            onclick="showCapturedDataForm(this, {{ action_value | tojson }}, '{{ trx.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                            data-action-json="{{ action_value | tojson | e }}"
+                            data-euid="{{ trx.euid }}"
+                            data-action-name="{{ action_key }}"
+                            data-action-group="{{ group_key }}"
+                            onclick="showCapturedDataFormFromDataAttributes(this)"
                             {% if action_value.action_enabled == "0" %}disabled style="opacity: 0.5;"{% endif %}>
                         {{ action_value.action_name }}
                     </button>
@@ -519,22 +551,31 @@
 {% set workflow_children = [] %}
 {% set container_children = [] %}
 {% set content_children = [] %}
+{% set child_type_counts = {} %}
 {% if step.parent_of_lineages %}
     {% for child_lineage in step.get_sorted_parent_of_lineages(['container_instance', 'content_instance']) %}
         {% set child = child_lineage.child_instance %}
         {% if child.category == 'workflow_step' %}
             {% set _ = workflow_children.append(child) %}
+            {% set child_type_key = child.type or child.category or 'unknown' %}
+            {% set _ = child_type_counts.update({child_type_key: child_type_counts.get(child_type_key, 0) + 1}) %}
         {% elif child.category == 'content' %}
             {% set _ = content_children.append(child) %}
+            {% set child_type_key = child.type or child.category or 'unknown' %}
+            {% set _ = child_type_counts.update({child_type_key: child_type_counts.get(child_type_key, 0) + 1}) %}
         {% else %}
             {# container category #}
             {% set _ = container_children.append(child) %}
+            {% set child_type_key = child.type or child.category or 'unknown' %}
+            {% set _ = child_type_counts.update({child_type_key: child_type_counts.get(child_type_key, 0) + 1}) %}
             {# Also collect contents FROM this container #}
             {% if child.parent_of_lineages %}
                 {% for content_lineage in child.parent_of_lineages %}
                     {% set content = content_lineage.child_instance %}
                     {% if content.category == 'content' %}
                         {% set _ = content_children.append(content) %}
+                        {% set content_type_key = content.type or content.category or 'unknown' %}
+                        {% set _ = child_type_counts.update({content_type_key: child_type_counts.get(content_type_key, 0) + 1}) %}
                     {% endif %}
                 {% endfor %}
             {% endif %}
@@ -567,14 +608,27 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if container_children|length > 0 %}
-                    <span class="badge bg-info ms-2" title="Linked containers">
-                        <i class="fas fa-box"></i> {{ container_children|length }}
-                    </span>
-                    {% endif %}
-                    {% if content_children|length > 0 %}
-                    <span class="badge bg-success ms-2" title="Linked contents (samples, reagents, etc.)">
-                        <i class="fas fa-vial"></i> {{ content_children|length }}
+                    {% if child_type_counts|length > 0 %}
+                    <span class="child-type-chips ms-2" title="Child instance type counts">
+                        {% for child_type, child_count in child_type_counts|dictsort %}
+                        <span class="child-type-chip" data-child-type="{{ child_type }}" title="{{ child_type }}: {{ child_count }}">
+                            {% if child_type in ['package'] %}
+                            <i class="fas fa-box"></i>
+                            {% elif child_type in ['plate', 'rack'] %}
+                            <i class="fas fa-th"></i>
+                            {% elif child_type in ['tube', 'vial', 'well'] %}
+                            <i class="fas fa-vial"></i>
+                            {% elif child_type in ['sample', 'reagent', 'control'] %}
+                            <i class="fas fa-flask"></i>
+                            {% elif child_type in ['queue', 'workflow_step', 'workflow', 'assay', 'accessioning-steps'] %}
+                            <i class="fas fa-list-ol"></i>
+                            {% else %}
+                            <i class="fas fa-cube"></i>
+                            {% endif %}
+                            <span class="chip-count">{{ child_count }}</span>
+                            <span class="chip-label">{{ child_type | replace('-', ' ') | replace('_', ' ') }}</span>
+                        </span>
+                        {% endfor %}
                     </span>
                     {% endif %}
                 </div>
@@ -599,7 +653,11 @@
                         <div class="action-group-name">{{ group_value.group_name }}</div>
                         {% for action_key, action_value in group_value.actions.items() %}
                         <button class="action-btn"
-                                onclick="showCapturedDataForm(this, {{ action_value }}, '{{ step.euid }}', '{{ action_key }}', '{{ group_key }}')"
+                                data-action-json="{{ action_value | tojson | e }}"
+                                data-euid="{{ step.euid }}"
+                                data-action-name="{{ action_key }}"
+                                data-action-group="{{ group_key }}"
+                                onclick="showCapturedDataFormFromDataAttributes(this)"
                                 {% if action_value.action_enabled == "0" %}disabled{% endif %}>
                             {{ action_value.action_name }}
                         </button>
@@ -795,6 +853,44 @@
 <script src="/static/legacy/action_buttons.js"></script>
 
 <script>
+// Fallback action handler in case cached legacy JS lacks the newer helper.
+if (typeof window.showCapturedDataFormFromDataAttributes !== 'function') {
+    window.showCapturedDataFormFromDataAttributes = function(button) {
+        try {
+            var rawActionData = button.getAttribute('data-action-json');
+            if (!rawActionData) {
+                throw new Error('Missing data-action-json');
+            }
+
+            var actionData;
+            try {
+                actionData = JSON.parse(rawActionData);
+            } catch (parseError) {
+                var decoder = document.createElement('textarea');
+                decoder.innerHTML = rawActionData;
+                actionData = JSON.parse(decoder.value);
+            }
+
+            if (typeof window.showCapturedDataForm !== 'function') {
+                throw new Error('showCapturedDataForm is unavailable');
+            }
+
+            window.showCapturedDataForm(
+                button,
+                actionData,
+                button.getAttribute('data-euid') || '',
+                button.getAttribute('data-action-name') || '',
+                button.getAttribute('data-action-group') || ''
+            );
+        } catch (error) {
+            console.error('Error opening action form:', error);
+            if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+                window.BloomToast.error('Action Error', error.message || 'Unable to open action form');
+            }
+        }
+    };
+}
+
 // Toggle child containers visibility for a step
 function toggleChildContainers(stepEuid) {
     const list = document.getElementById('container-list-' + stepEuid);

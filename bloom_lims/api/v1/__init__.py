@@ -27,6 +27,7 @@ from .lineages import router as lineages_router
 from .file_sets import router as file_sets_router
 from .stats import router as stats_router
 from .search import router as search_router
+from .search_v2 import router as search_v2_router
 from .object_creation import router as object_creation_router
 from .worksets import router as worksets_router
 from .tracking import router as tracking_router
@@ -52,6 +53,7 @@ router.include_router(lineages_router)
 router.include_router(file_sets_router)
 router.include_router(stats_router)
 router.include_router(search_router)
+router.include_router(search_v2_router)
 router.include_router(object_creation_router)
 router.include_router(worksets_router)
 router.include_router(tracking_router)
@@ -81,8 +83,8 @@ async def api_v1_info():
             "file_sets": "/api/v1/file-sets",
             "stats": "/api/v1/stats",
             "search": "/api/v1/search",
+            "search_v2": "/api/v1/search/v2",
             "object_creation": "/api/v1/object-creation",
             "worksets": "/api/v1/worksets",
         },
     }
-

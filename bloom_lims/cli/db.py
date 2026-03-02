@@ -1,294 +1,292 @@
-"""Database management commands for BLOOM CLI."""
+"""Database management commands for BLOOM CLI (TapDB-orchestrated)."""
 
+from __future__ import annotations
+
+import importlib
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import List
 
 import click
 from rich.console import Console
-from rich.panel import Panel
+
+from bloom_lims.core.template_seed import seed_bloom_templates
+from bloom_lims.config import (
+    apply_runtime_environment,
+    get_settings,
+    get_tapdb_db_config,
+)
 
 console = Console()
 
-# Get project root
-PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-# PostgreSQL settings (match install_postgres.sh)
-PGDATA = PROJECT_ROOT / "bloom_lims" / "database"
-PGPORT = os.environ.get("PGPORT", "5445")
-PGHOST = os.environ.get("PGHOST", "localhost")
-PGDATABASE = os.environ.get("PGDATABASE", "bloom")
+def _bloom_root() -> Path:
+    return Path(__file__).resolve().parents[2]
 
 
-def _get_database_url() -> str:
-    """Get or build DATABASE_URL."""
-    url = os.environ.get("DATABASE_URL")
-    if url:
-        return url
-    user = os.environ.get("PGUSER", "bloom")
-    return f"postgresql://{user}@{PGHOST}:{PGPORT}/{PGDATABASE}"
+def _resolve_tapdb_schema_source() -> Path | None:
+    """Locate tapdb_schema.sql from installed package or local dev checkouts."""
+    candidates: List[Path] = []
 
+    try:
+        tapdb_pkg = importlib.import_module("daylily_tapdb")
+        pkg_file = Path(tapdb_pkg.__file__).resolve()
+        # Handle editable/dev installs and wheel installs.
+        candidates.extend(
+            [
+                pkg_file.parents[1] / "schema" / "tapdb_schema.sql",
+                pkg_file.parents[2] / "schema" / "tapdb_schema.sql",
+            ]
+        )
+    except Exception:
+        pass
 
-def _is_pg_running() -> bool:
-    """Check if PostgreSQL is running."""
-    if not PGDATA.exists():
-        return False
-    result = subprocess.run(
-        ["pg_ctl", "-D", str(PGDATA), "status"],
-        capture_output=True,
-        text=True,
+    root = _bloom_root()
+    candidates.extend(
+        [
+            root.parent / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
+            root.parent / "daylily" / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
+        ]
     )
-    return result.returncode == 0
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _ensure_schema_available_for_bloom_root() -> None:
+    """Ensure tapdb schema is visible when running tapdb from bloom repo root."""
+    target = _bloom_root() / "schema" / "tapdb_schema.sql"
+    if target.exists():
+        return
+
+    source = _resolve_tapdb_schema_source()
+    if source is None:
+        return
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.symlink_to(source)
+    except Exception:
+        shutil.copy2(source, target)
+
+
+def _tapdb_base_cmd() -> List[str]:
+    """Run tapdb via module entrypoint to avoid PATH dependency issues."""
+    return [sys.executable, "-m", "daylily_tapdb.cli"]
+
+
+def _runtime_env() -> dict:
+    """Build normalized runtime env for tapdb commands."""
+    settings = get_settings()
+    ctx = apply_runtime_environment(settings)
+
+    env = os.environ.copy()
+    env.setdefault("TAPDB_ENV", ctx.env)
+    env.setdefault("TAPDB_DATABASE_NAME", ctx.database_name)
+    if ctx.config_path:
+        env.setdefault("TAPDB_CONFIG_PATH", ctx.config_path)
+    env.setdefault("AWS_PROFILE", ctx.aws_profile)
+    env.setdefault("AWS_REGION", ctx.aws_region)
+    env.setdefault("AWS_DEFAULT_REGION", ctx.aws_region)
+    return env
+
+
+def _current_env() -> str:
+    return _runtime_env().get("TAPDB_ENV", "dev").strip().lower()
+
+
+def _local_pg_port(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_PORT"
+    return (
+        env.get(scoped_key)
+        or env.get("BLOOM_TAPDB_LOCAL_PG_PORT")
+        or "5566"
+    ).strip()
+
+
+def _run_tapdb(args: List[str], check: bool = True) -> int:
+    cmd = _tapdb_base_cmd() + args
+    env = _runtime_env()
+    result = subprocess.run(cmd, env=env)
+    if check and result.returncode != 0:
+        raise SystemExit(result.returncode)
+    return result.returncode
+
+
+def _seed_bloom_templates() -> None:
+    """Seed Bloom legacy template configs into TAPDB generic_template."""
+    summary = seed_bloom_templates()
+    console.print(
+        "[cyan]Bloom template seed:[/cyan] "
+        f"loaded={summary.templates_loaded}, "
+        f"inserted={summary.inserted}, "
+        f"updated={summary.updated}, "
+        f"prefixes={summary.prefixes_ensured}"
+    )
 
 
 @click.group()
 def db():
-    """Database management commands."""
+    """Database management commands routed through daylily-tapdb."""
     pass
 
 
 @db.command("init")
-@click.option('--force', '-f', is_flag=True, help='Force re-initialization (removes existing data)')
-def db_init(force):
-    """Initialize PostgreSQL database from scratch.
+@click.option("--force", "-f", is_flag=True, help="Force re-initialization")
+def db_init(force: bool):
+    """Initialize database/runtime via tapdb orchestration."""
+    env_name = _current_env()
+    console.print(f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]")
 
-    This runs the full installation script which:
-    - Initializes PostgreSQL data directory
-    - Creates the bloom database and role
-    - Applies TapDB schema
-    - Applies BLOOM prefix sequences
-    - Seeds the database with templates
-    """
-    install_script = PROJECT_ROOT / "bloom_lims" / "env" / "install_postgres.sh"
+    if env_name in {"dev", "test"}:
+        _ensure_schema_available_for_bloom_root()
+        local_port = _local_pg_port(env_name)
+        console.print(
+            f"[cyan]Using local TapDB PostgreSQL port {local_port} for env={env_name}[/cyan]"
+        )
+        _run_tapdb(["pg", "init", env_name], check=False)
+        _run_tapdb(["pg", "start-local", env_name, "--port", local_port])
+        setup_args = ["db", "setup", env_name, "--include-workflow"]
+        if force:
+            setup_args.append("--force")
+        _run_tapdb(setup_args)
+        _seed_bloom_templates()
+        return
 
-    if not install_script.exists():
-        console.print(f"[red]✗[/red] Install script not found: {install_script}")
-        raise SystemExit(1)
+    create_args = ["db", "create", env_name]
+    if force:
+        create_args.append("--force")
+    _run_tapdb(create_args, check=False)
 
-    # Check if database already exists
-    if PGDATA.exists():
-        if not force:
-            console.print(f"[yellow]⚠[/yellow] PostgreSQL data directory already exists at:")
-            console.print(f"   {PGDATA}")
-            console.print()
-            console.print("Options:")
-            console.print("  • Use [cyan]bloom db init --force[/cyan] to remove and reinitialize")
-            console.print("  • Use [cyan]bloom db reset[/cyan] to clear data but keep the database")
-            console.print("  • Use [cyan]bloom db start[/cyan] if the database is already set up")
-            raise SystemExit(1)
-        else:
-            console.print("[yellow]⚠[/yellow] Removing existing database...")
-            # Stop PostgreSQL if running
-            if _is_pg_running():
-                subprocess.run(
-                    ["pg_ctl", "-D", str(PGDATA), "stop", "-m", "fast"],
-                    capture_output=True,
-                )
-            # Remove data directory
-            import shutil
-            shutil.rmtree(PGDATA)
-            console.print("[green]✓[/green] Existing database removed")
+    setup_args = ["db", "setup", env_name, "--include-workflow"]
+    _ensure_schema_available_for_bloom_root()
+    if force:
+        setup_args.append("--force")
+    _run_tapdb(setup_args)
+    _seed_bloom_templates()
 
-    console.print("[cyan]Initializing PostgreSQL database...[/cyan]")
-    console.print()
 
-    # Run the install script with 'skip' argument (skips conda env creation)
-    # We need to source it in a bash shell
-    result = subprocess.run(
-        ["bash", "-c", f"source {install_script} skip"],
-        cwd=PROJECT_ROOT,
-        env={**os.environ, "PGDATA": str(PGDATA)},
+@db.command("auth-setup")
+@click.option("--pool-name", default="", help="Optional Cognito pool name override")
+@click.option("--region", default="us-east-1", help="AWS region for Cognito setup")
+@click.option("--port", type=int, default=8912, show_default=True, help="Bloom HTTPS port")
+@click.option(
+    "--domain-prefix",
+    default="",
+    help="Optional Cognito Hosted UI domain prefix override",
+)
+def db_auth_setup(pool_name: str, region: str, port: int, domain_prefix: str):
+    """Create/reuse Cognito app client for BLOOM with fixed app name 'bloom'."""
+    env_name = _current_env()
+    callback_url = f"https://localhost:{port}/auth/callback"
+    logout_url = f"https://localhost:{port}/"
+    args = [
+        "cognito",
+        "setup",
+        env_name,
+        "--client-name",
+        "bloom",
+        "--callback-url",
+        callback_url,
+        "--logout-url",
+        logout_url,
+        "--region",
+        region,
+    ]
+    if pool_name.strip():
+        args.extend(["--pool-name", pool_name.strip()])
+    if domain_prefix.strip():
+        args.extend(["--domain-prefix", domain_prefix.strip()])
+
+    console.print(
+        "[cyan]Configuring Cognito for BLOOM[/cyan] "
+        f"(env={env_name}, client-name=bloom, callback={callback_url})"
     )
-
-    if result.returncode == 0:
-        console.print()
-        console.print("[green]✓[/green] Database initialization complete!")
-        console.print()
-        console.print("Next steps:")
-        console.print("  • [cyan]bloom db status[/cyan]  - Verify database connection")
-        console.print("  • [cyan]bloom gui[/cyan]        - Start the web UI")
-    else:
-        console.print()
-        console.print("[red]✗[/red] Database initialization failed")
-        console.print("Check the output above for errors.")
-        raise SystemExit(1)
+    _run_tapdb(args)
 
 
 @db.command("start")
 def db_start():
-    """Start PostgreSQL server."""
-    if not PGDATA.exists():
-        console.print("[yellow]PostgreSQL data directory not found.[/yellow]")
-        console.print("Run [cyan]source bloom_lims/env/install_postgres.sh[/cyan] to initialize.")
-        raise SystemExit(1)
-
-    if _is_pg_running():
-        console.print(f"[green]✓[/green] PostgreSQL is already running on port {PGPORT}")
-        return
-
-    console.print(f"[cyan]Starting PostgreSQL on port {PGPORT}...[/cyan]")
-    log_file = PGDATA / "postgresql.log"
-    result = subprocess.run(
-        ["pg_ctl", "-D", str(PGDATA), "-l", str(log_file), "-o", f"-p {PGPORT}", "start"],
-        cwd=PROJECT_ROOT,
-    )
-
-    if result.returncode == 0:
-        console.print(f"[green]✓[/green] PostgreSQL started")
-        console.print(f"   DATABASE_URL=[cyan]{_get_database_url()}[/cyan]")
+    """Start runtime PostgreSQL service via tapdb."""
+    env_name = _current_env()
+    if env_name in {"dev", "test"}:
+        _run_tapdb(["pg", "start-local", env_name, "--port", _local_pg_port(env_name)])
     else:
-        console.print("[red]✗[/red] Failed to start PostgreSQL")
-        raise SystemExit(1)
+        _run_tapdb(["pg", "start"])
 
 
 @db.command("stop")
 def db_stop():
-    """Stop PostgreSQL server."""
-    if not PGDATA.exists():
-        console.print(f"[red]PostgreSQL data directory not found at {PGDATA}[/red]")
-        raise SystemExit(1)
-
-    console.print("[cyan]Stopping PostgreSQL...[/cyan]")
-    result = subprocess.run(
-        ["pg_ctl", "-D", str(PGDATA), "stop", "-m", "fast"],
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode == 0:
-        console.print("[green]✓[/green] PostgreSQL stopped")
+    """Stop runtime PostgreSQL service via tapdb."""
+    env_name = _current_env()
+    if env_name in {"dev", "test"}:
+        _run_tapdb(["pg", "stop-local", env_name])
     else:
-        console.print("[yellow]⚠[/yellow] PostgreSQL was not running")
+        _run_tapdb(["pg", "stop"])
 
 
 @db.command("status")
 def db_status():
-    """Show database status."""
-    try:
-        from bloom_lims.db import BLOOMdb3
-        from bloom_lims.config import get_settings
-
-        settings = get_settings()
-        console.print(f"[bold]Database Configuration:[/bold]")
-        console.print(f"  Host: {settings.database.host}:{settings.database.port}")
-        console.print(f"  Database: {settings.database.database}")
-        console.print(f"  User: {settings.database.user}")
-        console.print(f"  Pool Size: {settings.database.pool_size}")
-
-        # Test connection
-        with BLOOMdb3(echo_sql=False) as bdb:
-            from sqlalchemy import text
-            result = bdb.session.execute(text("SELECT 1")).fetchone()
-            if result:
-                console.print(f"\n[green]✓[/green] Database connection successful")
-
-                # Get table counts
-                for table in ['generic_template', 'generic_instance', 'generic_instance_lineage']:
-                    count_result = bdb.session.execute(
-                        text(f"SELECT COUNT(*) FROM {table}")
-                    ).fetchone()
-                    console.print(f"  {table}: {count_result[0]} rows")
-
-    except Exception as e:
-        console.print(f"[red]✗[/red] Database connection failed: {e}")
-        raise SystemExit(1)
+    """Show schema/database status via tapdb."""
+    env_name = _current_env()
+    _run_tapdb(["info"])
+    _run_tapdb(["db", "schema", "status", env_name])
 
 
 @db.command("migrate")
-@click.option('--revision', default='head', help='Target revision (default: head)')
-def db_migrate(revision):
-    """Run database migrations."""
-    try:
-        from alembic.config import Config
-        from alembic import command
-
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, revision)
-        console.print("[green]✓[/green] Migrations completed successfully")
-    except Exception as e:
-        console.print(f"[red]✗[/red] Migration failed: {e}")
-        raise SystemExit(1)
+@click.option("--revision", default="head", help="Ignored; tapdb manages migration targets")
+def db_migrate(revision: str):
+    """Run schema migrations via tapdb."""
+    env_name = _current_env()
+    if revision != "head":
+        console.print("[yellow]Revision argument is ignored; using tapdb managed migrations.[/yellow]")
+    _ensure_schema_available_for_bloom_root()
+    _run_tapdb(["db", "schema", "migrate", env_name])
 
 
 @db.command("seed")
 def db_seed():
-    """Load seed data from template JSON files."""
-    console.print("[cyan]Seeding database from templates...[/cyan]")
-    seed_script = PROJECT_ROOT / "seed_db_containersGeneric.py"
-
-    if not seed_script.exists():
-        console.print(f"[red]✗[/red] Seed script not found: {seed_script}")
-        raise SystemExit(1)
-
-    # Seed actions first (required by other templates)
-    config_dir = PROJECT_ROOT / "bloom_lims" / "config"
-    action_files = sorted(config_dir.glob("*/action/*.json"))
-    other_files = sorted([f for f in config_dir.glob("*/*.json")
-                          if "/action/" not in str(f) and f.name != "metadata.json"])
-
-    console.print(f"  Seeding {len(action_files)} action templates...")
-    for json_file in action_files:
-        result = subprocess.run(
-            [sys.executable, str(seed_script), str(json_file)],
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            console.print(f"[red]✗[/red] Failed to seed: {json_file.name}")
-            raise SystemExit(result.returncode)
-
-    console.print(f"  Seeding {len(other_files)} other templates...")
-    for json_file in other_files:
-        result = subprocess.run(
-            [sys.executable, str(seed_script), str(json_file)],
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            console.print(f"[red]✗[/red] Failed to seed: {json_file.name}")
-            raise SystemExit(result.returncode)
-
-    console.print("[green]✓[/green] Seed complete")
+    """Seed template data via tapdb."""
+    env_name = _current_env()
+    _run_tapdb(["db", "data", "seed", env_name, "--include-workflow"])
+    _seed_bloom_templates()
 
 
 @db.command("shell")
 def db_shell():
-    """Open psql shell connected to BLOOM database."""
-    console.print(f"[cyan]Connecting to {PGDATABASE} on port {PGPORT}...[/cyan]")
-    os.execvp("psql", ["psql", "-h", PGHOST, "-p", PGPORT, "-d", PGDATABASE])
+    """Show active DB target and open Aurora connection when applicable."""
+    env_name = _current_env()
+    cfg = get_tapdb_db_config(env_name=env_name)
+    console.print(f"[bold]Active TapDB target:[/bold] {cfg['host']}:{cfg['port']}/{cfg['database']}")
+    if cfg.get("engine_type") == "aurora":
+        _run_tapdb(["aurora", "connect", env_name])
+        return
+
+    console.print("[yellow]Use `tapdb info` for current context and target details.[/yellow]")
+    _run_tapdb(["info"])
 
 
 @db.command("reset")
-@click.option('--yes', '-y', is_flag=True, help='Skip confirmation')
-def db_reset(yes):
-    """Drop and rebuild database (DESTRUCTIVE)."""
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def db_reset(yes: bool):
+    """Reset schema/data and rebuild via tapdb (DESTRUCTIVE)."""
+    env_name = _current_env()
+
     if not yes:
-        console.print("[yellow]⚠️  WARNING: This will DROP ALL DATA and reset the database![/yellow]")
-        console.print("[yellow]This action cannot be undone.[/yellow]")
-        console.print()
+        console.print("[yellow]⚠️  WARNING: This will DROP ALL DATA and rebuild the schema.[/yellow]")
         if not click.confirm("Are you sure you want to continue?"):
             console.print("[dim]Aborted.[/dim]")
             return
 
-    console.print("[cyan]Resetting database...[/cyan]")
-
-    # Run the clear and rebuild script (located in project root)
-    rebuild_script = PROJECT_ROOT / "clear_and_rebuild_postgres.sh"
-
-    if rebuild_script.exists():
-        console.print("  [yellow]→[/yellow] Running clear_and_rebuild_postgres.sh...")
-        # Pass --yes flag if user confirmed
-        cmd = ["bash", str(rebuild_script)]
-        if yes:
-            cmd.append("--yes")
-        result = subprocess.run(cmd, cwd=PROJECT_ROOT)
-        if result.returncode == 0:
-            console.print("[green]✓[/green] Database reset complete!")
-        else:
-            console.print("[red]✗[/red] Database reset failed")
-            raise SystemExit(1)
-    else:
-        console.print(f"[red]✗[/red] Reset script not found: {rebuild_script}")
-        raise SystemExit(1)
-
+    args = ["db", "schema", "reset", env_name, "--force"]
+    _ensure_schema_available_for_bloom_root()
+    _run_tapdb(args)
+    setup_args = ["db", "setup", env_name, "--include-workflow", "--force"]
+    _run_tapdb(setup_args)
+    _seed_bloom_templates()

@@ -83,16 +83,13 @@ def _build_cognito_dependency():
         from daylily_cognito.auth import CognitoAuth
         from daylily_cognito.fastapi import create_auth_dependency
 
-        # Reuse Bloom's existing config loader for Cognito settings
-        from bloom_lims.config import get_settings
+        from auth.cognito.client import get_cognito_auth
 
-        settings = get_settings()
-        auth_cfg = settings.auth
-
+        auth_cfg = get_cognito_auth().config
         cognito = CognitoAuth(
-            region=auth_cfg.cognito_region,
-            user_pool_id=auth_cfg.cognito_user_pool_id,
-            app_client_id=auth_cfg.cognito_client_id,
+            region=auth_cfg.region,
+            user_pool_id=auth_cfg.user_pool_id,
+            app_client_id=auth_cfg.client_id,
         )
         return create_auth_dependency(cognito)
     except Exception as exc:
@@ -217,4 +214,3 @@ async def optional_api_auth(
         return await get_api_user(request, credentials, x_api_key)
     except HTTPException:
         return None
-

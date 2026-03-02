@@ -93,6 +93,31 @@ class BloomObj:
         self.session = bdb.session
         self.Base = bdb.Base
 
+    def _fetch_fedex_tracking_ops_meta(self, tracking_number):
+        """Fetch FedEx metadata across carrier-tracking API versions."""
+        if not self.track_fedex:
+            return []
+
+        if hasattr(self.track_fedex, "track_ops_meta"):
+            data = self.track_fedex.track_ops_meta(tracking_number)
+        elif hasattr(self.track_fedex, "get_fedex_ops_meta_ds"):
+            data = self.track_fedex.get_fedex_ops_meta_ds(tracking_number)
+        elif hasattr(self.track_fedex, "track"):
+            data = self.track_fedex.track(tracking_number)
+        else:
+            raise AttributeError(
+                "FedEx tracker supports neither 'track_ops_meta', "
+                "'get_fedex_ops_meta_ds', nor 'track'"
+            )
+
+        if data is None:
+            return []
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return [data]
+        return [dict(data)]
+
 
     def _rebuild_printer_json(self, lab="BLOOM"):
         self.zpld.probe_zebra_printers_add_to_printers_json(lab=lab)
@@ -283,12 +308,41 @@ class BloomObj:
     # I am of two minds re: if actions should be full objects, or pseudo-objects as they are now...
     def _create_action_ds(self, action_imports):
         ret_ds = {}
-        for group in action_imports:
+
+        if not isinstance(action_imports, dict):
+            return ret_ds
+
+        normalized_groups = action_imports
+
+        # TapDB action imports can be a flat map: {name: "category/type/subtype/version"}.
+        # Normalize to Bloom's grouped format for downstream processing.
+        if all(isinstance(v, str) for v in action_imports.values()):
+            flat_actions = {}
+            for template_code in action_imports.values():
+                code = template_code if str(template_code).endswith("/") else f"{template_code}/"
+                flat_actions[code] = {}
+            normalized_groups = {
+                "core": {
+                    "group_order": "1",
+                    "group_name": "Core Actions",
+                    "actions": flat_actions,
+                }
+            }
+
+        for group in normalized_groups:
+            group_cfg = normalized_groups.get(group, {})
+            if not isinstance(group_cfg, dict):
+                continue
+
+            actions_cfg = group_cfg.get("actions", {})
+            if not isinstance(actions_cfg, dict):
+                continue
+
             ret_ds[group] = {}
             ret_ds[group]["actions"] = {}
-            ret_ds[group]["group_order"] = action_imports[group]["group_order"]
-            ret_ds[group]["group_name"] = action_imports[group]["group_name"]
-            for ai in action_imports[group]["actions"]:
+            ret_ds[group]["group_order"] = str(group_cfg.get("group_order", "1"))
+            ret_ds[group]["group_name"] = str(group_cfg.get("group_name", group))
+            for ai in actions_cfg:
                 sl = ai.lstrip("/").split("/")
                 category = None if sl[0] == "*" else sl[0]
                 type_name = None if sl[1] == "*" else sl[1]
@@ -298,16 +352,26 @@ class BloomObj:
                 res = self.query_template_by_component_v2(
                     category, type_name, subtype, version
                 )
-                print(ai)
                 if len(res) == 0:
                     raise Exception(f"Action import {ai} not found in database")
 
                 for r in res:
                     action_key = f"{r.category}/{r.type}/{r.subtype}/{r.version}"
+                    action_payload = None
+                    if isinstance(r.json_addl, dict):
+                        # Bloom legacy templates store "action_template"; newer TapDB
+                        # core actions use "action_definition".
+                        action_payload = r.json_addl.get("action_template") or r.json_addl.get(
+                            "action_definition"
+                        )
+                    if action_payload is None:
+                        self.logger.warning(
+                            "Skipping action import %s: no action_template/action_definition",
+                            action_key,
+                        )
+                        continue
 
-                    ret_ds[group]["actions"][action_key] = r.json_addl[
-                        "action_template"
-                    ]
+                    ret_ds[group]["actions"][action_key] = action_payload
 
                     #  I'm allowing overrides to the action properties FROM
                     # The non-action object action definition.  Its mostly shaky b/c the overrides are applied to all actions
@@ -316,7 +380,7 @@ class BloomObj:
                     # this is to be used mostly for the assay links for test requisitions
                     _update_recursive(
                         ret_ds[group]["actions"][action_key],
-                        action_imports[group]["actions"][ai],
+                        actions_cfg.get(ai, {}),
                     )
 
         return ret_ds
@@ -1307,34 +1371,46 @@ class BloomObj:
 
         #'workflow_step_to_attach_as_child': {'workflow_step/queue/all-purpose/1.0/': {'json_addl': {'properties': {'name': 'hey user, SET THIS NAME ',
 
-        active_workset_q_wfs = ""
+        queue_definitions = action_ds.get("workflow_step_to_attach_as_child", {})
+        if not queue_definitions:
+            raise Exception(
+                "Missing workflow_step_to_attach_as_child definition for package registration action"
+            )
+
+        queue_layout = list(queue_definitions.keys())[0]
         (category, type_name, subtype, version) = (
-            list(action_ds["workflow_step_to_attach_as_child"].keys())[0]
-            .lstrip("/")
-            .rstrip("/")
-            .split("/")
+            queue_layout.lstrip("/").rstrip("/").split("/")
         )
+
+        active_workset_q_wfs = ""
         for pwf_child_lin in wf.parent_of_lineages:
+            if pwf_child_lin.is_deleted:
+                continue
             if (
                 pwf_child_lin.child_instance.type == type_name
                 and pwf_child_lin.child_instance.subtype == subtype
             ):
                 active_workset_q_wfs = pwf_child_lin.child_instance
                 break
+
+        # TapDB-seeded workflows may not materialize queue children at creation time.
+        # Create and attach the queue step on-demand so Register Package still works.
         if active_workset_q_wfs == "":
-            self.logger.exception(
-                f"ERROR: {action_ds['workflow_step_to_attach_as_child'].keys()}"
+            queue_defaults = queue_definitions.get(queue_layout, {})
+            active_workset_q_wfs = self.create_instance_by_code(
+                queue_layout, queue_defaults
             )
-            raise Exception(
-                f"ERROR: {action_ds['workflow_step_to_attach_as_child'].keys()}"
+            self.create_generic_instance_lineage_by_euids(
+                wf.euid, active_workset_q_wfs.euid
             )
+            self.session.commit()
 
         # 1001897582860000245100773464327825
         fx_opsmd = {}
 
         if self.track_fedex:
             try:
-                fx_opsmd = self.track_fedex.get_fedex_ops_meta_ds(
+                fx_opsmd = self._fetch_fedex_tracking_ops_meta(
                     action_ds["captured_data"]["Tracking Number"]
                 )
                 # Check the transit time is calculated

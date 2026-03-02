@@ -1,0 +1,65 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Help - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-circle-question"></i> BLOOM GUI Help</h1>
+    <p class="text-muted">Quick reference for navigation, authentication, and support.</p>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-compass"></i> Navigation</h3>
+    </div>
+    <div class="card-body">
+      <p>Use the top navigation to move between assays, workflows, equipment, reagents, and admin tools.</p>
+      <p>The <strong>Tools</strong> menu contains search and bulk container creation.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-lock"></i> Authentication</h3>
+    </div>
+    <div class="card-body">
+      <p>Sign in is handled by AWS Cognito and returns to <code>/auth/callback</code>.</p>
+      <p>If sign-in fails, check the callback URL and app client configuration for this environment.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-life-ring"></i> Support</h3>
+    </div>
+    <div class="card-body">
+      {% if gui_meta.support_email %}
+      <p>Contact support at <a href="mailto:{{ gui_meta.support_email }}">{{ gui_meta.support_email }}</a>.</p>
+      {% else %}
+      <p>Support email is not configured. Set <code>ui.support_email</code> in Bloom config.</p>
+      {% endif %}
+      <p>Include browser, URL, timestamp, and relevant EUIDs when reporting issues.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fab fa-github"></i> Repository</h3>
+    </div>
+    <div class="card-body">
+      <p>Source code and issues:</p>
+      <p>
+        <a href="{{ gui_meta.github_repo_url }}" target="_blank" rel="noopener">
+          {{ gui_meta.github_repo_url }}
+        </a>
+      </p>
+      <p class="text-muted text-sm">
+        Running: v{{ gui_meta.version }} | {{ gui_meta.branch }} | {{ gui_meta.tag }} | {{ gui_meta.hash }}
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

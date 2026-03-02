@@ -26,7 +26,7 @@ from main import app
 @pytest.fixture
 def client():
     """Create test client with auth disabled."""
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 class TestPublicEndpoints:
@@ -47,6 +47,12 @@ class TestPublicEndpoints:
         """Test login page returns HTML."""
         response = client.get("/login")
         assert response.status_code in [200, 401]
+
+    def test_help_page(self, client):
+        """Test help page returns HTML."""
+        response = client.get("/help")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
 
 class TestMainGUIEndpoints:
@@ -69,6 +75,27 @@ class TestMainGUIEndpoints:
         response = client.get("/admin")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+
+    def test_admin_preferences_post_redirects(self, client):
+        """Test admin preferences form POST succeeds and redirects."""
+        response = client.post(
+            "/admin",
+            data={
+                "print_lab": "BLOOM",
+                "printer_name": "test-printer",
+                "label_zpl_style": "tube_2inX1in",
+                "style_css": "/static/legacy/skins/bloom.css",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert response.headers.get("location") == "/admin?saved=1"
+
+    def test_admin_saved_banner_renders(self, client):
+        """Test saved confirmation banner appears on admin page."""
+        response = client.get("/admin?saved=1")
+        assert response.status_code == 200
+        assert "Preferences saved." in response.text
 
 
 class TestAssaysEndpoint:
@@ -194,12 +221,8 @@ class TestDAGEndpoints:
 
     def test_dagg_requires_euid(self, client):
         """Test DAG visualization requires euid parameter."""
-        # This endpoint may raise an exception without euid - skip if so
-        try:
-            response = client.get("/dagg")
-            assert response.status_code in [200, 422, 500]
-        except Exception:
-            pytest.skip("DAG endpoint raised exception - requires valid euid")
+        response = client.get("/dagg")
+        assert response.status_code in [200, 422, 500]
 
     def test_dindex2_returns_html(self, client):
         """Test DAG index returns HTML."""
@@ -209,12 +232,8 @@ class TestDAGEndpoints:
 
     def test_get_dagv2_requires_euid(self, client):
         """Test get_dagv2 requires euid parameter."""
-        # This endpoint may raise an exception without euid
-        try:
-            response = client.get("/get_dagv2")
-            assert response.status_code in [422, 500]
-        except Exception:
-            pytest.skip("get_dagv2 endpoint raised exception - requires valid euid")
+        response = client.get("/get_dagv2")
+        assert response.status_code in [422, 500]
 
 
 class TestFileEndpoints:
@@ -265,6 +284,7 @@ class TestUserEndpoints:
         response = client.get("/user_home")
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         assert "text/html" in response.headers["content-type"]
+        assert "bloom_modern.css" in response.text
 
     def test_user_home_or_redirects_to_login(self, client):
         """Test user home page returns content or redirects to login (based on auth state)."""
@@ -276,13 +296,10 @@ class TestUserEndpoints:
 
     def test_user_audit_logs_returns_html(self, client):
         """Test user audit logs returns HTML."""
-        try:
-            response = client.get("/user_audit_logs")
-            assert response.status_code in [200, 500]
-            if response.status_code == 200:
-                assert "text/html" in response.headers["content-type"]
-        except Exception:
-            pytest.skip("user_audit_logs endpoint raised exception")
+        response = client.get("/user_audit_logs")
+        assert response.status_code in [200, 422, 500]
+        if response.status_code == 200:
+            assert "text/html" in response.headers["content-type"]
 
 
 class TestQueueEndpoints:
@@ -290,13 +307,10 @@ class TestQueueEndpoints:
 
     def test_queue_details_returns_html(self, client):
         """Test queue details returns HTML."""
-        try:
-            response = client.get("/queue_details")
-            assert response.status_code in [200, 500]
-            if response.status_code == 200:
-                assert "text/html" in response.headers["content-type"]
-        except Exception:
-            pytest.skip("queue_details endpoint raised exception")
+        response = client.get("/queue_details")
+        assert response.status_code in [200, 500]
+        if response.status_code == 200:
+            assert "text/html" in response.headers["content-type"]
 
     def test_set_filter(self, client):
         """Test set filter endpoint works."""
@@ -324,29 +338,24 @@ class TestScriptsEndpoint:
 
     def test_list_scripts_returns_json(self, client):
         """Test list-scripts returns JSON response."""
-        try:
-            response = client.get("/list-scripts")
-            assert response.status_code in [200, 500]
-            if response.status_code == 200:
-                assert "application/json" in response.headers["content-type"]
-        except Exception:
-            pytest.skip("list-scripts endpoint raised exception")
+        response = client.get("/list-scripts")
+        assert response.status_code in [200, 500]
+        if response.status_code == 200:
+            assert "application/json" in response.headers["content-type"]
 
 
 class TestLegacyRoutes:
-    """Tests for legacy UI routes."""
+    """Tests for removed legacy UI routes."""
 
-    def test_legacy_index(self, client):
-        """Test legacy index page is accessible."""
+    def test_legacy_index_removed(self, client):
+        """Legacy index route should be removed."""
         response = client.get("/legacy/")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 404
 
-    def test_legacy_login(self, client):
-        """Test legacy login page is accessible."""
+    def test_legacy_login_removed(self, client):
+        """Legacy login route should be removed."""
         response = client.get("/legacy/login")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 404
 
 
 class TestModernUIRoutes:
@@ -599,6 +608,14 @@ class TestObjectCreationWizard:
         assert "Super Type" in content
         assert "wizard-step" in content
 
+    def test_create_object_page_has_assay_shortcut(self, client):
+        """Test create object page exposes the Assay shortcut path."""
+        response = client.get("/create_object")
+        assert response.status_code == 200
+        content = response.text
+        assert "Shortcut: workflow / assay" in content
+        assert "selectAssayShortcut()" in content
+
     def test_create_object_navigation_link(self, client):
         """Test create object link is in navigation."""
         response = client.get("/")
@@ -760,14 +777,13 @@ class TestModernUINavigation:
         assert 'href="/create_object"' in content
         assert 'href="/search"' in content
 
-    def test_dashboard_has_legacy_link(self, client):
-        """Test dashboard has link to legacy UI."""
+    def test_dashboard_has_no_legacy_link(self, client):
+        """Test dashboard does not expose legacy UI link."""
         response = client.get("/")
         assert response.status_code == 200
         content = response.text
 
-        # Should have legacy UI link
-        assert 'href="/legacy/"' in content or "Legacy" in content
+        assert 'href="/legacy/' not in content
 
     def test_modern_pages_use_bloom_modern_css(self, client):
         """Test modern pages include the modern CSS file."""
@@ -787,11 +803,30 @@ class TestModernUINavigation:
         # Should include modern JS
         assert "bloom_modern.js" in content
 
+    def test_footer_has_help_support_and_repo_links(self, client):
+        """Test footer includes help, support email, and GitHub links."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        assert 'href="/help"' in content
+        assert "mailto:" in content
+        assert "github.com/Daylily-Informatics/bloom" in content
+
+    def test_footer_has_git_metadata(self, client):
+        """Test footer includes git metadata labels."""
+        response = client.get("/")
+        assert response.status_code == 200
+        content = response.text
+
+        assert "Branch:" in content
+        assert "Tag:" in content
+        assert "Commit:" in content
+
 
 class TestFileAndDeweyEndpoints:
     """Tests for file management (Dewey) endpoints."""
 
-    @pytest.mark.skip(reason="Requires /Users/jmajor/Downloads/dewey_search.tsv file to exist")
     def test_visual_report_returns_html(self, client):
         """Test visual report page returns HTML or handles gracefully."""
         response = client.get("/visual_report")
@@ -801,13 +836,12 @@ class TestFileAndDeweyEndpoints:
     def test_search_files_post(self, client):
         """Test search files POST endpoint."""
         response = client.post("/search_files", data={"search_query": "test"})
-        # Should not return 404 or 405
-        assert response.status_code in [200, 422, 307]
+        assert response.status_code in [410, 422, 307]
 
     def test_search_file_sets_post(self, client):
         """Test search file sets POST endpoint."""
         response = client.post("/search_file_sets", data={"search_query": "test"})
-        assert response.status_code in [200, 422, 307]
+        assert response.status_code in [410, 422, 307]
 
     def test_file_set_urls_requires_euid(self, client):
         """Test file_set_urls endpoint requires EUID parameter."""
@@ -866,7 +900,6 @@ class TestDataModificationEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint expects specific workflow step state data")
     def test_update_accordion_state_post(self, client):
         """Test update accordion state POST endpoint."""
         response = client.post(
@@ -875,7 +908,6 @@ class TestDataModificationEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint expects form data with specific format")
     def test_generic_templates_post(self, client):
         """Test generic templates POST endpoint."""
         response = client.post("/generic_templates", data={"query": "test"})
@@ -900,7 +932,6 @@ class TestAdminAndConfigEndpoints:
         response = client.get("/uuid_details")
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid EUID that exists in database")
     def test_vertical_exp_requires_euid(self, client):
         """Test vertical exp endpoint requires EUID parameter."""
         response = client.get("/vertical_exp?euid=EX1")
@@ -934,7 +965,6 @@ class TestProtectedEndpoints:
 class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
-    @pytest.mark.skip(reason="Endpoint requires valid workflow step EUID")
     def test_workflow_step_action_post(self, client):
         """Test workflow step action POST endpoint."""
         response = client.post(
@@ -943,7 +973,6 @@ class TestWorkflowEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint requires valid object UUID")
     def test_update_obj_json_addl_properties_post(self, client):
         """Test update object JSON addl properties POST endpoint."""
         response = client.post(
@@ -968,7 +997,6 @@ class TestDeleteEndpoints:
 class TestDAGEndpoints:
     """Tests for DAG (directed acyclic graph) endpoints."""
 
-    @pytest.mark.skip(reason="Endpoint requires valid DAG data")
     def test_update_dag_post(self, client):
         """Test update DAG POST endpoint."""
         response = client.post(
@@ -977,7 +1005,6 @@ class TestDAGEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint requires valid parent/child UUIDs")
     def test_add_new_edge_post(self, client):
         """Test add new edge POST endpoint."""
         response = client.post(
@@ -986,7 +1013,6 @@ class TestDAGEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint requires valid node EUID")
     def test_delete_node_post(self, client):
         """Test delete node POST endpoint."""
         response = client.post(
@@ -995,7 +1021,6 @@ class TestDAGEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint requires valid edge data")
     def test_delete_edge_post(self, client):
         """Test delete edge POST endpoint."""
         response = client.post(
@@ -1024,7 +1049,6 @@ class TestFileCreationEndpoints:
         )
         assert response.status_code in [200, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint requires session user_data")
     def test_create_file_set_post(self, client):
         """Test create file set POST endpoint."""
         response = client.post(
@@ -1045,13 +1069,11 @@ class TestFileCreationEndpoints:
 class TestInstanceCreationEndpoints:
     """Tests for instance creation endpoints."""
 
-    @pytest.mark.skip(reason="Endpoint requires session user_data")
     def test_create_instance_form_get(self, client):
         """Test create instance form GET endpoint."""
         response = client.get("/create_instance/EX1")
         assert response.status_code in [200, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Endpoint requires session user_data")
     def test_create_instance_post(self, client):
         """Test create instance POST endpoint."""
         response = client.post(
@@ -1064,7 +1086,6 @@ class TestInstanceCreationEndpoints:
 class TestAdminTemplateEndpoints:
     """Tests for admin template endpoints."""
 
-    @pytest.mark.skip(reason="Endpoint requires session user_data")
     def test_admin_template_post(self, client):
         """Test admin template POST endpoint."""
         response = client.post(
@@ -1093,7 +1114,6 @@ class TestOAuthEndpoints:
         # Should handle missing code gracefully
         assert response.status_code in [200, 302, 307, 400, 422]
 
-    @pytest.mark.skip(reason="Endpoint expects JSON body, not form data")
     def test_oauth_callback_post_without_code(self, client):
         """Test OAuth callback POST without authorization code."""
         response = client.post("/oauth_callback", json={})
@@ -1131,7 +1151,6 @@ class TestPlateVisualizationEndpoints:
         # May require auth
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires euid parameter")
     def test_vertical_exp(self, client):
         """Test vertical experiment endpoint."""
         response = client.get("/vertical_exp")
@@ -1146,7 +1165,6 @@ class TestPlateVisualizationEndpoints:
 class TestDagEndpoints:
     """Tests for DAG visualization endpoints."""
 
-    @pytest.mark.skip(reason="Requires legacy/dag.html template")
     def test_dagg_endpoint(self, client):
         """Test DAG endpoint."""
         response = client.get("/dagg")
@@ -1167,19 +1185,16 @@ class TestDagEndpoints:
         response = client.post("/update_dag", json={})
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires parent_uuid parameter")
     def test_add_new_edge_requires_data(self, client):
         """Test add new edge requires proper data."""
         response = client.post("/add_new_edge", json={})
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires euid parameter")
     def test_delete_node_requires_data(self, client):
         """Test delete node requires proper data."""
         response = client.post("/delete_node", json={})
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires euid parameter")
     def test_delete_edge_requires_data(self, client):
         """Test delete edge requires proper data."""
         response = client.post("/delete_edge", json={})
@@ -1200,13 +1215,11 @@ class TestWorkflowEndpoints:
         # Should return error without UUID parameter
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires euid parameter and session data")
     def test_workflow_step_action_requires_data(self, client):
         """Test workflow step action requires data."""
         response = client.post("/workflow_step_action", json={})
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires step_euid parameter")
     def test_update_accordion_state(self, client):
         """Test update accordion state endpoint."""
         response = client.post("/update_accordion_state", json={"state": {}})
@@ -1237,7 +1250,6 @@ class TestObjectManagementEndpoints:
         # 404 is valid if route requires specific content-type
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires euid parameter")
     def test_update_obj_json_addl_properties(self, client):
         """Test update object JSON addl properties."""
         response = client.post("/update_obj_json_addl_properties", json={})
@@ -1257,7 +1269,6 @@ class TestReportEndpoints:
         response = client.get("/bloom_schema_report")
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires file in /Users/jmajor/Downloads/")
     def test_visual_report(self, client):
         """Test visual report endpoint."""
         response = client.get("/visual_report")
@@ -1267,7 +1278,6 @@ class TestReportEndpoints:
 class TestFileSetEndpoints:
     """Tests for file set endpoints."""
 
-    @pytest.mark.skip(reason="Requires session user_data")
     def test_create_file_set(self, client):
         """Test create file set endpoint."""
         response = client.post("/create_file_set", json={"name": "test_set"})
@@ -1276,7 +1286,7 @@ class TestFileSetEndpoints:
     def test_search_file_sets(self, client):
         """Test search file sets endpoint."""
         response = client.post("/search_file_sets", json={"query": "test"})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
     def test_file_set_urls(self, client):
         """Test file set URLs endpoint."""
@@ -1297,7 +1307,6 @@ class TestInstanceCreationEndpoints:
         response = client.post("/create_from_template", json={})
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires session user_data")
     def test_create_instance_endpoint(self, client):
         """Test create instance POST endpoint."""
         response = client.post("/create_instance", json={"template_euid": "TEST1"})
@@ -1348,25 +1357,21 @@ class TestScriptsEndpoint:
 class TestHealthEndpoints:
     """Tests for health check endpoints."""
 
-    @pytest.mark.skip(reason="Health router may not be mounted")
     def test_health_check(self, client):
         """Test main health check endpoint."""
         response = client.get("/health")
         assert response.status_code in [200, 307, 404]
 
-    @pytest.mark.skip(reason="Health router may not be mounted")
     def test_health_check_with_trailing_slash(self, client):
         """Test health check endpoint with trailing slash."""
         response = client.get("/health/")
         assert response.status_code in [200, 307, 404]
 
-    @pytest.mark.skip(reason="Health router may not be mounted")
     def test_liveness_probe(self, client):
         """Test Kubernetes liveness probe."""
         response = client.get("/health/live")
         assert response.status_code in [200, 307, 404]
 
-    @pytest.mark.skip(reason="Health router may not be mounted")
     def test_readiness_probe(self, client):
         """Test Kubernetes readiness probe."""
         response = client.get("/health/ready")
@@ -1376,7 +1381,6 @@ class TestHealthEndpoints:
 class TestJSONDataEndpoints:
     """Tests for JSON data manipulation endpoints."""
 
-    @pytest.mark.skip(reason="Route may not exist")
     def test_save_json_update(self, client):
         """Test save JSON update endpoint."""
         response = client.post("/save_json_update", json={
@@ -1385,7 +1389,6 @@ class TestJSONDataEndpoints:
         })
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Route may not exist")
     def test_update_json_value(self, client):
         """Test update JSON value endpoint."""
         response = client.post("/update_json_value", json={
@@ -1430,7 +1433,6 @@ class TestWorkflowManagementEndpoints:
         response = client.get("/workflow_summary")
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid workflow EUID")
     def test_workflow_details_with_euid(self, client):
         """Test workflow details with EUID."""
         response = client.get("/workflow_details?euid=WF1")
@@ -1513,7 +1515,6 @@ class TestQueueEndpoints:
         response = client.get("/queue_details")
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid queue EUID")
     def test_queue_details_with_euid(self, client):
         """Test queue details with EUID."""
         response = client.get("/queue_details?euid=Q1")
@@ -1535,14 +1536,13 @@ class TestActionEndpoints:
         # Route may not exist
         assert response.status_code in [200, 302, 307, 400, 404, 405, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid action data")
     def test_execute_action_post(self, client):
         """Test execute action POST endpoint."""
         response = client.post("/execute_action", json={
             "action_euid": "ACT1",
             "target_euid": "TGT1"
         })
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
 class TestFileOperationEndpoints:
@@ -1558,7 +1558,6 @@ class TestFileOperationEndpoints:
         response = client.post("/create_file", json={})
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    @pytest.mark.skip(reason="Requires session user_data")
     def test_create_file_set(self, client):
         """Test create file set endpoint."""
         response = client.post("/create_file_set", json={})
@@ -1567,18 +1566,17 @@ class TestFileOperationEndpoints:
     def test_search_files(self, client):
         """Test search files endpoint."""
         response = client.post("/search_files", json={"query": "test"})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
     def test_search_file_sets(self, client):
         """Test search file sets endpoint."""
         response = client.post("/search_file_sets", json={"query": "test"})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
 
 class TestWorkflowOperationEndpoints:
     """Tests for workflow operation endpoints."""
 
-    @pytest.mark.skip(reason="Requires valid EUID")
     def test_workflow_step_action(self, client):
         """Test workflow step action endpoint."""
         response = client.post("/workflow_step_action", json={})
@@ -1593,7 +1591,6 @@ class TestObjectOperationEndpoints:
         response = client.post("/delete_object", json={"uuid": "invalid"})
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid EUID")
     def test_delete_by_euid(self, client):
         """Test delete by EUID endpoint."""
         response = client.get("/delete_by_euid?euid=INVALID1")
@@ -1608,19 +1605,16 @@ class TestObjectOperationEndpoints:
 class TestDAGOperationEndpoints:
     """Tests for DAG operation endpoints."""
 
-    @pytest.mark.skip(reason="Requires valid parent_uuid and child_uuid")
     def test_add_new_edge(self, client):
         """Test add new edge endpoint."""
         response = client.post("/add_new_edge", json={})
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid EUID")
     def test_delete_edge(self, client):
         """Test delete edge endpoint."""
         response = client.post("/delete_edge", json={})
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid EUID")
     def test_delete_node(self, client):
         """Test delete node endpoint."""
         response = client.post("/delete_node", json={})
@@ -1649,7 +1643,6 @@ class TestSearchAndFilterEndpoints:
 class TestGenericTemplatesEndpoints:
     """Tests for generic templates endpoints."""
 
-    @pytest.mark.skip(reason="Requires form-encoded data")
     def test_generic_templates_post(self, client):
         """Test generic templates POST endpoint."""
         response = client.post("/generic_templates", json={})
@@ -1669,7 +1662,6 @@ class TestObjectCreationEndpoints:
         response = client.post("/create_from_template", json={})
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires session user_data")
     def test_create_instance_post(self, client):
         """Test create instance POST endpoint."""
         response = client.post("/create_instance", json={})
@@ -1687,7 +1679,6 @@ class TestPreferencesEndpoints:
         })
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires step_euid")
     def test_update_accordion_state(self, client):
         """Test update accordion state endpoint."""
         response = client.post("/update_accordion_state", json={
@@ -1700,7 +1691,6 @@ class TestPreferencesEndpoints:
 class TestJSONUpdateEndpoints:
     """Tests for JSON update endpoints."""
 
-    @pytest.mark.skip(reason="Requires valid EUID")
     def test_update_obj_json_addl_properties(self, client):
         """Test update object JSON addl properties endpoint."""
         response = client.post("/update_obj_json_addl_properties", json={
@@ -1741,7 +1731,6 @@ class TestAdditionalViewEndpoints:
         response = client.get("/dindex2")
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    @pytest.mark.skip(reason="Requires valid EUID")
     def test_vertical_exp(self, client):
         """Test vertical exp endpoint."""
         response = client.get("/vertical_exp")

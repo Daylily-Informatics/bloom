@@ -1,7 +1,8 @@
 <div class="form-section">
     <h5><i class="fas fa-folder-open me-2"></i> Search File Sets</h5>
     
-    <form id="searchFileSetForm" action="/search_file_sets" method="post" enctype="multipart/form-data">
+    <form id="searchFileSetForm" action="/search" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="search_target" value="file_set">
         <div class="row g-3">
             {% for field in ui_search_fields_fset %}
                 {% if field.name not in ["tags", "xxx"] %}
@@ -52,11 +53,11 @@
     
     <hr class="my-3">
     
-    <form id="searchFileSetFormALL" action="/search_file_sets" method="post" enctype="multipart/form-data">
+    <form id="searchFileSetFormALL" action="/search" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="search_target" value="file_set">
         <input type="hidden" name="is_greedy" value="yes">
         <button type="submit" class="btn btn-outline">
             <i class="fas fa-list me-1"></i> Return All File Sets
         </button>
     </form>
 </div>
-

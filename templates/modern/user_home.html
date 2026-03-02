@@ -1,0 +1,161 @@
+{% extends "modern/base.html" %}
+{% block title %}User Home - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-user"></i> User Home</h1>
+    <p class="text-muted">Profile, session context, and personal preferences</p>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-id-badge"></i> User Information</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Email</span><span class="info-val font-mono">{{ user_data.get('email', '') }}</span></div>
+        <div class="info-row"><span class="info-key">Role</span><span class="info-val">{{ user_data.get('role', 'user') }}</span></div>
+        <div class="info-row"><span class="info-key">Skin</span><span class="info-val font-mono">{{ user_data.get('style_css', '/static/legacy/skins/bloom.css') }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-clock-rotate-left"></i> Session</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Last Login</span><span class="info-val">{{ session_data.get('last_login', 'N/A') }}</span></div>
+        <div class="info-row"><span class="info-key">Duration</span><span class="info-val">{{ session_data.get('session_duration', 'N/A') }}</span></div>
+        <div class="info-row"><span class="info-key">Login Count</span><span class="info-val">{{ session_data.get('login_count', 'N/A') }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: var(--spacing-lg);">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-sliders"></i> Preferences</h3>
+    </div>
+    <div class="card-body">
+      <div class="form-group">
+        <label class="form-label" for="style_css">UI Skin CSS</label>
+        <select id="style_css" class="form-select" onchange="updatePreferenceAndReload('style_css', this.value)">
+          {% for css_file in css_files %}
+          <option value="{{ css_file }}" {% if user_data.get('style_css') == css_file %}selected{% endif %}>{{ css_file }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="print_lab">Default Print Lab</label>
+        <select id="print_lab" class="form-select" onchange="updatePreferenceAndReload('print_lab', this.value)">
+          {% for option in printer_info.get('print_lab', []) %}
+          <option value="{{ option }}" {% if user_data.get('print_lab') == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="printer_name">Default Printer</label>
+        <select id="printer_name" class="form-select" onchange="updatePreferenceAndReload('printer_name', this.value)">
+          {% for option in printer_info.get('printer_name', []) %}
+          <option value="{{ option }}" {% if user_data.get('printer_name') == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="label_zpl_style">Label Style</label>
+        <select id="label_zpl_style" class="form-select" onchange="updatePreferenceAndReload('label_zpl_style', this.value)">
+          {% for option in printer_info.get('label_zpl_style', []) %}
+          <option value="{{ option }}" {% if user_data.get('label_zpl_style') == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-globe"></i> Environment</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Cognito Domain</span><span class="info-val font-mono">{{ cognito_details.get('domain', 'N/A') }}</span></div>
+        <div class="info-row"><span class="info-key">User Pool</span><span class="info-val font-mono">{{ cognito_details.get('user_pool_id', 'N/A') }}</span></div>
+        <div class="info-row"><span class="info-key">Client ID</span><span class="info-val font-mono">{{ cognito_details.get('client_id', 'N/A') }}</span></div>
+        <div class="info-row"><span class="info-key">Domains</span><span class="info-val">{{ whitelisted_domains }}</span></div>
+        <div class="info-row"><span class="info-key">S3 Prefix</span><span class="info-val font-mono"><a href="https://us-east-1.console.aws.amazon.com/s3/buckets/{{ s3_bucket_prefix }}" target="_blank" rel="noopener">{{ s3_bucket_prefix }}</a></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: var(--spacing-lg);">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-boxes-stacked"></i> Software Versions</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">BLOOM</span><span class="info-val">{{ bloom_version }}</span></div>
+        <div class="info-row"><span class="info-key">Carrier Tracking</span><span class="info-val">{{ fedex_version }}</span></div>
+        <div class="info-row"><span class="info-key">Zebra</span><span class="info-val">{{ zebra_printer_version }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-link"></i> Actions</h3>
+    </div>
+    <div class="card-body">
+      <div class="action-list">
+        <a class="btn btn-outline" href="/user_audit_logs?username={{ user_data.get('email', '') }}">
+          <i class="fas fa-clipboard-list"></i> View My Audit Logs
+        </a>
+        <a class="btn btn-outline" href="/admin">
+          <i class="fas fa-cog"></i> Open Admin
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.info-grid { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.info-row { display: flex; gap: var(--spacing-sm); font-size: 0.875rem; }
+.info-key { color: var(--color-gray-400); min-width: 120px; }
+.info-val { color: var(--color-gray-200); word-break: break-word; }
+.font-mono { font-family: var(--font-mono); }
+.action-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function updatePreferenceAndReload(key, value) {
+  try {
+    const response = await fetch('/update_preference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value })
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.status !== 'success') {
+      throw new Error(payload.message || 'Preference update failed');
+    }
+    window.location.reload();
+  } catch (error) {
+    if (window.BloomToast && window.BloomToast.error) {
+      window.BloomToast.error('Preference Error', error.message || 'Update failed');
+    }
+  }
+}
+</script>
+{% endblock %}

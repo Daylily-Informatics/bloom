@@ -1,6 +1,7 @@
 """Utility commands for BLOOM CLI."""
 
-import os
+from __future__ import annotations
+
 import subprocess
 import sys
 from pathlib import Path
@@ -8,95 +9,83 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-console = Console()
+from bloom_lims.config import apply_runtime_environment, get_settings
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain.base import BloomObj
 
-# Get project root
+console = Console()
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-PGDATA = PROJECT_ROOT / "bloom_lims" / "database"
 SERVER_LOG_DIR = Path.home() / ".bloom" / "logs"
+TAPDB_LOG_DIR = Path.home() / ".config" / "tapdb" / "logs"
 
 
 @click.command()
 def shell():
     """Open interactive Python shell with BLOOM loaded."""
     console.print("[cyan]Starting BLOOM interactive shell...[/cyan]")
-    console.print()
-    
-    # Create startup script
-    startup_code = '''
-import sys
-sys.path.insert(0, ".")
-
-from bloom_lims.db import BLOOMdb3
-from bloom_lims.config import get_settings
-from bloom_lims.bobjs.core import BloomObj
-
-print("\\n[BLOOM Shell] Objects available:")
-print("  bdb      - BLOOMdb3 instance")
-print("  bobj     - BloomObj instance")
-print("  settings - BLOOM settings")
-print()
-
-bdb = BLOOMdb3()
-bobj = BloomObj(bdb)
-settings = get_settings()
-'''
-    
-    # Use IPython if available, otherwise standard Python
     try:
         import IPython
-        IPython.start_ipython(argv=[], user_ns={
-            'BLOOMdb3': __import__('bloom_lims.db', fromlist=['BLOOMdb3']).BLOOMdb3,
-            'BloomObj': __import__('bloom_lims.bobjs.core', fromlist=['BloomObj']).BloomObj,
-            'get_settings': __import__('bloom_lims.config', fromlist=['get_settings']).get_settings,
-        })
+
+        bdb = BLOOMdb3()
+        bobj = BloomObj(bdb)
+        settings = get_settings()
+        IPython.start_ipython(
+            argv=[],
+            user_ns={
+                "BLOOMdb3": BLOOMdb3,
+                "BloomObj": BloomObj,
+                "bdb": bdb,
+                "bobj": bobj,
+                "settings": settings,
+            },
+        )
     except ImportError:
-        # Fall back to standard Python REPL
         import code
-        exec(startup_code)
-        code.interact(local=locals())
+
+        bdb = BLOOMdb3()
+        bobj = BloomObj(bdb)
+        settings = get_settings()
+        code.interact(local={"BLOOMdb3": BLOOMdb3, "BloomObj": BloomObj, "bdb": bdb, "bobj": bobj, "settings": settings})
 
 
 @click.command()
-@click.option('--lines', '-n', default=50, type=int, help='Number of lines to show')
-@click.option('--follow', '-f', is_flag=True, help='Follow log output')
-@click.option('--service', '-s', type=click.Choice(['server', 'postgres', 'all']), default='all', 
-              help='Service to show logs for')
-def logs(lines, follow, service):
-    """View BLOOM service logs."""
-    log_files = []
-    
-    # Check for server logs
-    if service in ['server', 'all']:
-        if SERVER_LOG_DIR.exists():
-            server_logs = sorted(SERVER_LOG_DIR.glob("server_*.log"), reverse=True)
-            if server_logs:
-                log_files.append(('Server', server_logs[0]))
-    
-    if service in ['postgres', 'all']:
-        pg_log = PGDATA / "postgresql.log"
-        if pg_log.exists():
-            log_files.append(('PostgreSQL', pg_log))
-    
+@click.option("--lines", "-n", default=50, type=int, help="Number of lines to show")
+@click.option("--follow", "-f", is_flag=True, help="Follow log output")
+@click.option(
+    "--service",
+    "-s",
+    type=click.Choice(["server", "tapdb", "all"]),
+    default="all",
+    help="Service to show logs for",
+)
+def logs(lines: int, follow: bool, service: str):
+    """View BLOOM and tapdb operation logs."""
+    log_files: list[tuple[str, Path]] = []
+
+    if service in ["server", "all"] and SERVER_LOG_DIR.exists():
+        server_logs = sorted(SERVER_LOG_DIR.glob("server_*.log"), reverse=True)
+        if server_logs:
+            log_files.append(("Server", server_logs[0]))
+
+    if service in ["tapdb", "all"]:
+        tapdb_log = TAPDB_LOG_DIR / "db_operations.log"
+        if tapdb_log.exists():
+            log_files.append(("TapDB", tapdb_log))
+
     if not log_files:
         console.print("[yellow]No log files found.[/yellow]")
-        console.print()
-        console.print("Logs are available for:")
         console.print("  • Server: [cyan]~/.bloom/logs/server_*.log[/cyan]")
-        console.print("  • PostgreSQL: [cyan]bloom_lims/database/postgresql.log[/cyan]")
+        console.print("  • TapDB: [cyan]~/.config/tapdb/logs/db_operations.log[/cyan]")
         return
-    
+
     for name, log_file in log_files:
         console.print(f"[bold]{name} Logs[/bold]: {log_file}")
         console.print()
-        
         if follow:
             console.print("[dim](Press Ctrl+C to stop)[/dim]")
-            console.print()
             try:
                 subprocess.run(["tail", "-f", "-n", str(lines), str(log_file)])
             except KeyboardInterrupt:
                 console.print()
         else:
             subprocess.run(["tail", "-n", str(lines), str(log_file)])
-

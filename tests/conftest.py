@@ -32,7 +32,12 @@ def pytest_configure(config):
     """Configure pytest environment."""
     # Set test database port if not already set
     if "PGPORT" not in os.environ:
-        os.environ["PGPORT"] = "5445"
+        try:
+            from bloom_lims.config import get_tapdb_db_config
+
+            os.environ["PGPORT"] = str(get_tapdb_db_config().get("port") or "5566")
+        except Exception:
+            os.environ["PGPORT"] = "5566"
 
     # Disable SQL echo during tests unless explicitly enabled
     if "ECHO_SQL" not in os.environ:
@@ -241,4 +246,3 @@ def pytest_collection_modifyitems(config, items):
         # Mark API tests
         if "api" in str(item.fspath) or "api" in item.name.lower():
             item.add_marker(pytest.mark.api)
-

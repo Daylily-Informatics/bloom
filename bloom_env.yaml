@@ -38,8 +38,11 @@ dependencies:
   - fd-find
   - rclone
   - gunicorn
+  - psutil>=5.9.0
   - pip:
-    - -e ../daylily-tapdb
+    - daylily-tapdb==0.1.15
+    # Optional local override for development:
+    # - -e ../../daylily/daylily-tapdb
     - -e ../daylily-cognito
     - zebra_day==2.1.4
     - daylily-carrier-tracking==0.1.0

@@ -105,17 +105,18 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 - **Barcode/label printing**: Integration with Zebra label printers via zebra_day
 - **FedEx tracking**: Package tracking integration via fedex_tracking_day
 - **Multi-interface support**: FastAPI REST API and standard+admin user web page
+- **Unified Search v2**: Cross-record search (`instance/template/lineage/audit`) with JSON/TSV export (`docs/SEARCH_V2.md`)
 
 ### Technology Stack
 - **Language**: Python 3.12+
-- **Database**: PostgreSQL 15+ (via SQLAlchemy ORM)
+- **Database Runtime**: daylily-tapdb (local PostgreSQL for dev/test, Aurora PostgreSQL for prod)
 - **Web Frameworks**: FastAPI (primary)
 - **Storage**: AWS S3 / Supabase Storage
-- **Authentication**: Supabase Auth (OAuth2 with social providers)
+- **Authentication**: AWS Cognito via daylily-cognito/daycog
 - **Label Printing**: zebra_day library
 - **Package Tracking**: fedex_tracking_day library
 - **Validation**: Pydantic v2 with pydantic-settings
-- **Migrations**: Alembic
+- **Schema Management**: TapDB-managed schema lifecycle
 
 ---
 
@@ -124,7 +125,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 
 #### Core Infrastructure
 - **Domain-Driven Architecture**: Clean separation into 8 domain modules (`bloom_lims/domain/`)
-- **Database Migrations**: Alembic integration with baseline migration (`bloom_lims/migrations/`)
+- **Database Lifecycle**: TapDB-managed schema and runtime operations (`tapdb db ...`, `tapdb pg ...`)
 - **Pydantic Schema Validation**: 10 schema modules for comprehensive input validation (`bloom_lims/schemas/`)
 - **Structured Exception Handling**: Typed exception hierarchy (`bloom_lims/exceptions.py`, `bloom_lims/core/exceptions.py`)
 - **Session Management**: Context managers, `_TransactionContext`, proper rollback in `BLOOMdb3`
@@ -157,7 +158,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 #### Developer Experience
 - **Cross-Platform CI/CD**: GitHub Actions for macOS, Ubuntu, CentOS
 - **Comprehensive Logging**: Structured logging with rotation
-- **CLI Tools**: `bloom-backup`, `bloom` command-line interfaces
+- **CLI Tools**: `bloom` command-line interface (TapDB-backed DB commands)
 - **Interactive Shell**: `bloom_shell.py` for development
 
 ### In Queue 📋
@@ -167,7 +168,7 @@ BLOOM (Bioinformatics Laboratory Operations and Object Management) is a Laborato
 - [ ] **Async Operations**: Non-blocking operations for high-throughput automation
 - [ ] **Rate Limiting**: API request limiting middleware
 - [ ] **Batch Operations**: Bulk processing API endpoints
-- [x] **Read Replicas**: Database scaling with read replicas (`bloom_lims/core/read_replicas.py`)
+- [x] **Read Session Compatibility**: TapDB-backed read/write session router compatibility (`bloom_lims/core/read_replicas.py`)
 
 #### User Engagement
 - [ ] **Plugin Architecture**: Custom extensions without core code changes
@@ -1194,22 +1195,21 @@ logging:
 Override any YAML setting with environment variables using `BLOOM_` prefix and `__` for nesting:
 
 ```bash
-export BLOOM_DATABASE__HOST=localhost
-export BLOOM_DATABASE__PORT=5445
+export BLOOM_TAPDB__ENV=dev
+export BLOOM_TAPDB__DATABASE_NAME=bloom
 export BLOOM_AUTH__COGNITO_REGION=us-east-1
 export BLOOM_DEBUG=true
 ```
 
 ### 13.4 Database Connection
 
-The database URL is constructed automatically from configuration:
+The active database target is resolved from TapDB runtime context:
 
 ```python
-from bloom_lims.config import get_settings
+from bloom_lims.config import get_tapdb_db_config
 
-settings = get_settings()
-db_url = settings.database.connection_string
-# postgresql://bloom@localhost:5445/bloom
+cfg = get_tapdb_db_config()
+# {'host': 'localhost', 'port': 5445, 'database': 'bloom', ...}
 ```
 
 ### 13.5 Printer Configuration
@@ -1324,20 +1324,10 @@ volumes:
 ### 14.2 Database Initialization
 
 ```bash
-# Create database
-createdb bloom_lims
-
-# Initialize schema (SQLAlchemy creates tables)
-python -c "from bloom_lims.db import BLOOMdb3; BLOOMdb3()"
-
-# Load initial templates
-python -c "
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3
-
-bobj = BloomObj(BLOOMdb3())
-bobj.load_templates_from_directory('bloom_lims/templates/')
-"
+# Activate environment and initialize tapdb-managed runtime/schema
+source bloom_activate.sh
+bloom db init
+bloom db seed
 ```
 
 ### 14.3 Running Services
@@ -1419,11 +1409,11 @@ _assumes you have completed the prerequisites_
 git clone git@github.com:Daylily-Informatics/bloom.git
 cd bloom
 
-# This will attempt to build the conda env, install postgres, the database, build the schema and start postgres
-source bloom_lims/env/install_postgres.sh
-
 # Activate the BLOOM environment (use this for all future sessions)
 source bloom_activate.sh
+
+# Initialize local TapDB runtime + schema for BLOOM namespace
+bloom db init
 
 # Start the Bloom LIMS UI
 bloom gui
@@ -1528,23 +1518,13 @@ __note:__ all commands below are expected to be run from a shell with the BLOOM 
 source bloom_activate.sh
 ```
 
-### Drop The Entire Database (Loose All Data!) > Rebuild The Database / Re-seed With All Accessible JSON Templates
+### Drop/Rebuild DB (Destructive)
 
-**The steps are wrapped in a script, please see [clear_and_rebuild_postgres.sh](bloom_lims/env/clear_and_rebuild_postgres.sh).**
-
-It is executed as follows:
+Use TapDB-backed BLOOM CLI commands:
 ```bash
-source clear_and_rebuild_postgres.sh
+bloom db reset --yes
+bloom db seed
 ```
-
-#### Stop pgsql
-- `bloom db stop` or `source bloom_lims/bin/stop_bloom_db.sh`
-
-#### Remove the db
-- `rm -rf bloom_lims/database/*`
-
-#### Rebuild the schema
--  `source bloom_lims/env/install_postgres.sh skip` the skip will skip building the conda env. This will start pgsql in the env, and build the schema.
 
 #### Build LIMS Workflows With Autogen Objects
 Similar to `pytest`, but more extensive. Useful for development and smoke testing. Run the accessioning/extraction workflow generator:

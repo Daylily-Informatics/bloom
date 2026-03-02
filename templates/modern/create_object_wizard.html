@@ -300,6 +300,7 @@ const state = {
 
 // Icon mapping for super types
 const superTypeIcons = {
+    'assay': 'fa-flask-vial',
     'container': 'fa-box',
     'content': 'fa-flask',
     'equipment': 'fa-microscope',
@@ -326,7 +327,15 @@ async function loadSuperTypes() {
         const grid = document.getElementById('super-type-grid');
 
         if (data.categories && data.categories.length > 0) {
-            grid.innerHTML = data.categories.map(st => `
+            const assayShortcutCard = `
+                <div class="super-type-card" onclick="selectAssayShortcut()">
+                    <i class="fas ${superTypeIcons.assay}"></i>
+                    <div class="type-name">Assay</div>
+                    <div class="type-count">Shortcut: workflow / assay</div>
+                </div>
+            `;
+
+            grid.innerHTML = assayShortcutCard + data.categories.map(st => `
                 <div class="super-type-card" onclick="selectSuperType('${st.name}', '${st.display_name}')">
                     <i class="fas ${superTypeIcons[st.name] || 'fa-cube'}"></i>
                     <div class="type-name">${st.display_name}</div>
@@ -340,6 +349,21 @@ async function loadSuperTypes() {
         console.error('Error loading categories:', e);
         document.getElementById('super-type-grid').innerHTML = '<p class="text-error">Error loading categories</p>';
     }
+}
+
+async function selectAssayShortcut() {
+    state.superType = 'workflow';
+    state.type = 'assay';
+    state.subType = null;
+    state.version = null;
+    state.template = null;
+
+    document.getElementById('selected-super-type-badge').textContent = 'Workflow';
+    document.getElementById('selected-super-type-name').textContent = 'Workflow';
+    document.getElementById('selected-type-badge').textContent = 'Workflow / Assay';
+
+    goToStep(3);
+    await loadSubTypes();
 }
 
 async function selectSuperType(name, displayName) {
@@ -537,4 +561,3 @@ function resetWizard() {
 }
 </script>
 {% endblock %}
-

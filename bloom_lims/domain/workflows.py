@@ -519,11 +519,11 @@ class BloomWorkflowStep(BloomObj):
 
     def do_action_add_container_to_assay_q(self, obj_euid, action_ds):
         # This action should be coming to us from a TRI ... kind of breaking my model... how to deal with this?
-
-        category = action_ds["captured_data"]["assay_selection"].split("/")[0]
-        type_name = action_ds["captured_data"]["assay_selection"].split("/")[1]
-        subtype = action_ds["captured_data"]["assay_selection"].split("/")[2]
-        version = action_ds["captured_data"]["assay_selection"].split("/")[3]
+        assay_selection = str(
+            action_ds.get("captured_data", {}).get("assay_selection", "")
+        ).strip()
+        if not assay_selection:
+            raise Exception("Missing assay selection")
 
         cont_euid = action_ds["captured_data"]["Container EUID"]
 
@@ -541,34 +541,101 @@ class BloomWorkflowStep(BloomObj):
             self.session.rollback()
             raise e
 
-        results = self.query_instance_by_component_v2(
-            category, type_name, subtype, version
-        )
-
-        if len(results) != 1:
-            self.logger.exception(
-                f"Could not find SINGLE assay instance for {category}/{type_name}/{subtype}/{version}"
+        wf = None
+        selection_parts = assay_selection.lstrip("/").rstrip("/").split("/")
+        # Backward-compatible support for legacy layout-coded selection values.
+        if len(selection_parts) == 4 and selection_parts[0] == "workflow":
+            category, type_name, subtype, version = selection_parts
+            results = self.query_instance_by_component_v2(
+                category, type_name, subtype, version
             )
-            self.logger.exception(
-                f"Could not find SINGLE assay instance for {category}/{type_name}/{subtype}/{version}"
-            )
-            self.logger.exception(
-                f"Could not find SINGLE assay instance for {category}/{type_name}/{subtype}/{version}"
-            )
+            if len(results) == 0:
+                raise Exception(
+                    f"Could not find assay instance for {category}/{type_name}/{subtype}/{version}"
+                )
+            if len(results) > 1:
+                # Prefer active instance if multiple are present.
+                active_results = [res for res in results if str(res.bstatus) == "active"]
+                wf = active_results[0] if active_results else results[0]
+                self.logger.warning(
+                    "Multiple assay instances for %s/%s/%s/%s; using %s",
+                    category,
+                    type_name,
+                    subtype,
+                    version,
+                    wf.euid,
+                )
+            else:
+                wf = results[0]
+        else:
+            # New preferred behavior: assay_selection is selected workflow EUID.
+            wf = self.get_by_euid(assay_selection)
+            if (
+                wf is None
+                or wf.category != "workflow"
+                or wf.type != "assay"
+                or wf.is_deleted
+            ):
+                raise Exception(
+                    f"Selected assay '{assay_selection}' is not a valid active workflow/assay instance"
+                )
 
         # Weak. using step number as a proxy for the ready step.
-        wf = results[0]
+        def _active_workflow_steps(workflow_obj):
+            for lineage in workflow_obj.parent_of_lineages:
+                child = lineage.child_instance
+                if lineage.is_deleted or child is None:
+                    continue
+                if getattr(child, "is_deleted", False):
+                    continue
+                if child.category != "workflow_step":
+                    continue
+                yield child
+
+        def _step_number(step_obj):
+            json_addl = step_obj.json_addl if isinstance(step_obj.json_addl, dict) else {}
+            props = json_addl.get("properties", {})
+            return props.get("step_number")
+
+        def _step_sort_key(step_obj):
+            step_number = _step_number(step_obj)
+            try:
+                return (int(step_number), step_obj.euid)
+            except (TypeError, ValueError):
+                return (10**9, step_obj.euid)
+
         wfs = ""
 
         try:
-            for wwfi in wf.parent_of_lineages:
-                if wwfi.child_instance.json_addl["properties"]["step_number"] in [
-                    1,
-                    "1",
-                ]:
-                    wfs = wwfi.child_instance
+            candidate_steps = list(_active_workflow_steps(wf))
+            for child_step in candidate_steps:
+                if str(_step_number(child_step)) == "1":
+                    wfs = child_step
+                    break
+
+            if wfs == "" and candidate_steps:
+                candidate_steps.sort(key=_step_sort_key)
+                wfs = candidate_steps[0]
+                self.logger.warning(
+                    "No step_number=1 found for assay workflow %s; using %s (step_number=%s)",
+                    wf.euid,
+                    wfs.euid,
+                    _step_number(wfs),
+                )
+
             if wfs == "":
-                raise Exception(f"Could not find workflow step for {wf.euid}")
+                # Legacy seeded assay workflows can exist without any workflow_step
+                # children. Create a default queue step so this action still works.
+                wfs = self.create_instance_by_code(
+                    "workflow_step/queue/all-purpose/1.0",
+                    {"json_addl": {"properties": {"step_number": "1"}}},
+                )
+                self.create_generic_instance_lineage_by_euids(wf.euid, wfs.euid)
+                self.logger.info(
+                    "Created fallback queue step %s for assay workflow %s",
+                    wfs.euid,
+                    wf.euid,
+                )
         except Exception as e:
             self.logger.exception(f"ERROR: {e}")
             self.session.rollback()
@@ -576,6 +643,8 @@ class BloomWorkflowStep(BloomObj):
 
         # Prevent adding duplicate to queue
         for cur_ci in wfs.parent_of_lineages:
+            if cur_ci.is_deleted or getattr(cur_ci.child_instance, "is_deleted", False):
+                continue
             if cont_euid == cur_ci.child_instance.euid:
                 self.logger.exception(
                     f"Container {cont_euid} already in assay queue {wf.euid}"

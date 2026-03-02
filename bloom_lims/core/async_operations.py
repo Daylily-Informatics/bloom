@@ -33,20 +33,16 @@ import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
 from sqlalchemy.orm import Session
 
 from bloom_lims.config import get_settings
+from bloom_lims.db import BLOOMdb3
 
 logger = logging.getLogger(__name__)
 
@@ -83,90 +79,167 @@ class TaskResult(Generic[T]):
 class AsyncDatabaseSession:
     """
     Async database session manager for non-blocking operations.
-    
-    Uses SQLAlchemy's async support with asyncpg driver.
+
+    This is a compatibility wrapper around TapDB-managed sync sessions. It
+    preserves async call-sites without Bloom owning async engine creation.
     """
-    
-    _engine = None
-    _session_factory = None
-    
+
     def __init__(
         self,
         connection_string: Optional[str] = None,
         pool_size: int = 5,
         max_overflow: int = 10,
         echo: bool = False,
+        app_username: str = "bloom-async",
     ):
-        """
-        Initialize async database session.
-        
-        Args:
-            connection_string: Async database URL (postgresql+asyncpg://...)
-            pool_size: Connection pool size
-            max_overflow: Max connections above pool_size
-            echo: Log SQL statements
-        """
-        settings = get_settings()
-        
-        if connection_string is None:
-            connection_string = settings.database.async_connection_string
-        
-        self._create_engine_if_needed(
-            connection_string,
-            pool_size,
-            max_overflow,
-            echo,
-        )
-    
-    @classmethod
-    def _create_engine_if_needed(
-        cls,
-        connection_string: str,
-        pool_size: int,
-        max_overflow: int,
-        echo: bool,
-    ):
-        """Create async engine singleton."""
-        if cls._engine is None:
-            cls._engine = create_async_engine(
-                connection_string,
-                pool_size=pool_size,
-                max_overflow=max_overflow,
-                echo=echo,
-                pool_pre_ping=True,
+        self.app_username = app_username
+        self._bdb: Optional[BLOOMdb3] = None
+        self._session: Optional[Session] = None
+
+        # Legacy args are accepted for compatibility but ignored in tapdb mode.
+        if connection_string:
+            logger.warning(
+                "AsyncDatabaseSession.connection_string is ignored; "
+                "TapDB runtime config is authoritative."
             )
-            cls._session_factory = async_sessionmaker(
-                cls._engine,
-                class_=AsyncSession,
-                expire_on_commit=False,
+        if pool_size != 5 or max_overflow != 10 or echo:
+            logger.warning(
+                "AsyncDatabaseSession pool/echo options are ignored in tapdb mode."
             )
-            logger.info("Created async database engine")
-    
+
+    async def __aenter__(self) -> "AsyncSessionProxy":
+        self._bdb = BLOOMdb3(app_username=self.app_username)
+        self._session = self._bdb.new_session()
+        return AsyncSessionProxy(self._session)
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        if not self._session:
+            return False
+        try:
+            if exc_type:
+                await asyncio.to_thread(self._session.rollback)
+            else:
+                await asyncio.to_thread(self._session.commit)
+        finally:
+            await asyncio.to_thread(self._session.close)
+            if self._bdb:
+                self._bdb.close()
+            self._session = None
+            self._bdb = None
+        return False
+
     @asynccontextmanager
     async def session(self):
         """Get an async session context."""
-        async with self._session_factory() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-    
+        async with self as session:
+            yield session
+
     async def execute(self, query: str, params: Optional[Dict] = None) -> Any:
         """Execute a raw SQL query."""
         async with self.session() as session:
-            result = await session.execute(text(query), params or {})
-            return result
-    
-    @classmethod
-    async def close(cls):
-        """Close the async engine."""
-        if cls._engine:
-            await cls._engine.dispose()
-            cls._engine = None
-            cls._session_factory = None
-            logger.info("Closed async database engine")
+            return await session.execute(query, params or {})
+
+    @staticmethod
+    async def close():
+        """Compatibility no-op (sessions are scoped per context)."""
+        return
+
+
+class AsyncSessionProxy:
+    """Awaitable wrapper around a sync SQLAlchemy Session."""
+
+    def __init__(self, session: Session):
+        self._session = session
+
+    @property
+    def sync_session(self) -> Session:
+        return self._session
+
+    async def execute(self, statement: Any, params: Optional[Dict] = None) -> Any:
+        def _execute():
+            if isinstance(statement, str):
+                return self._session.execute(text(statement), params or {})
+            return self._session.execute(statement, params or {})
+
+        return await asyncio.to_thread(_execute)
+
+    async def add(self, obj: Any) -> None:
+        await asyncio.to_thread(self._session.add, obj)
+
+    async def add_all(self, objects: List[Any]) -> None:
+        await asyncio.to_thread(self._session.add_all, objects)
+
+    async def flush(self) -> None:
+        await asyncio.to_thread(self._session.flush)
+
+    async def commit(self) -> None:
+        await asyncio.to_thread(self._session.commit)
+
+    async def rollback(self) -> None:
+        await asyncio.to_thread(self._session.rollback)
+
+    async def close(self) -> None:
+        await asyncio.to_thread(self._session.close)
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._session, name)
+        if callable(attr):
+            async def _async_call(*args, **kwargs):
+                return await asyncio.to_thread(attr, *args, **kwargs)
+
+            return _async_call
+        return attr
+
+
+def _unwrap_sync_session(session: Any) -> Session:
+    if isinstance(session, AsyncSessionProxy):
+        return session.sync_session
+    return session
+
+
+async def async_query(
+    session: Any,
+    model: Any,
+    filters: Optional[Dict[str, Any]] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> List[Any]:
+    """Run a non-blocking ORM query against a TapDB-managed sync session."""
+
+    sync_session = _unwrap_sync_session(session)
+
+    def _run():
+        query = sync_session.query(model)
+        for key, value in (filters or {}).items():
+            query = query.filter(getattr(model, key) == value)
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return query.all()
+
+    return await asyncio.to_thread(_run)
+
+
+async def async_bulk_insert(
+    session: Any,
+    objects: List[Any],
+    chunk_size: int = 1000,
+) -> int:
+    """Insert objects in chunks using TapDB-managed sync sessions."""
+
+    sync_session = _unwrap_sync_session(session)
+
+    def _run() -> int:
+        inserted = 0
+        for i in range(0, len(objects), chunk_size):
+            chunk = objects[i : i + chunk_size]
+            sync_session.add_all(chunk)
+            sync_session.flush()
+            inserted += len(chunk)
+        return inserted
+
+    return await asyncio.to_thread(_run)
 
 
 class BackgroundTaskManager:
@@ -536,4 +609,3 @@ async def parallel_execute(
         coroutines.append(run_with_semaphore(func, args, kwargs))
 
     return await asyncio.gather(*coroutines)
-

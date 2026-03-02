@@ -72,6 +72,29 @@ def _get_fedex_tracker():
         return None
 
 
+def _fetch_fedex_ops_meta(tracker, tracking_number: str):
+    """Fetch normalized ops metadata across carrier-tracking library versions."""
+    if hasattr(tracker, "track_ops_meta"):
+        data = tracker.track_ops_meta(tracking_number)
+    elif hasattr(tracker, "get_fedex_ops_meta_ds"):
+        data = tracker.get_fedex_ops_meta_ds(tracking_number)
+    elif hasattr(tracker, "track"):
+        data = tracker.track(tracking_number)
+    else:
+        raise AttributeError(
+            "FedEx tracker supports neither 'track_ops_meta', "
+            "'get_fedex_ops_meta_ds', nor 'track'"
+        )
+
+    if data is None:
+        return []
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        return [data]
+    return [dict(data)]
+
+
 @router.get("/carriers")
 async def list_carriers():
     """List available carriers."""
@@ -117,18 +140,22 @@ async def _track_package(tracking_number: str, carrier: str) -> TrackingResponse
             )
         
         try:
-            result = tracker.get_fedex_ops_meta_ds(tracking_number)
+            result = _fetch_fedex_ops_meta(tracker, tracking_number)
             if result and len(result) > 0:
                 data = result[0]
-                transit_sec = data.get("Transit_Time_sec")
+                transit_raw = data.get("Transit_Time_sec", data.get("transit_time_sec"))
+                try:
+                    transit_sec = float(transit_raw) if transit_raw is not None else None
+                except (TypeError, ValueError):
+                    transit_sec = None
                 return TrackingResponse(
                     tracking_number=tracking_number,
                     carrier=carrier,
-                    status=data.get("status", "Unknown"),
+                    status=data.get("status", data.get("Delivery_Status", "Unknown")),
                     transit_time_hours=round(transit_sec / 3600, 1) if transit_sec else None,
-                    origin_state=data.get("origin_state"),
-                    ship_date=data.get("ship_date"),
-                    delivery_date=data.get("delivery_date"),
+                    origin_state=data.get("origin_state", data.get("Origin_State")),
+                    ship_date=data.get("ship_date", data.get("Ship_Date")),
+                    delivery_date=data.get("delivery_date", data.get("Delivery_Date")),
                     raw_data=data,
                 )
             else:
@@ -151,4 +178,3 @@ async def _track_package(tracking_number: str, carrier: str) -> TrackingResponse
         carrier=carrier,
         error=f"{carrier} tracking not yet implemented"
     )
-
