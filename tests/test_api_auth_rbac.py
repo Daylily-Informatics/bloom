@@ -3,6 +3,7 @@
 import os
 import sys
 import uuid
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -127,6 +128,23 @@ def test_user_tokens_endpoints_create_list_usage_revoke(client):
     assert revoke_response.status_code == 200
     revoked = revoke_response.json()
     assert revoked["token"]["status"] == "REVOKED"
+
+
+def test_user_tokens_default_expiry_is_48_hours(client):
+    response = client.post(
+        "/api/v1/user-tokens",
+        json={
+            "token_name": f"pytest-default-expiry-{uuid.uuid4()}",
+            "scope": "internal_ro",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+
+    created_at = datetime.fromisoformat(payload["token"]["created_at"])
+    expires_at = datetime.fromisoformat(payload["token"]["expires_at"])
+    lifetime = expires_at - created_at
+    assert timedelta(hours=47, minutes=55) <= lifetime <= timedelta(hours=48, minutes=5)
 
 
 def test_admin_group_membership_endpoints_list_add_get_delete(client):

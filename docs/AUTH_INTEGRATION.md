@@ -83,10 +83,11 @@ Bloom reads Atlas references via configured service credentials:
 - `BLOOM_ATLAS__VERIFY_SSL` (default `true`)
 
 Lookups:
-- order: `/api/orders/{order_number}`
-- patient: `/api/patients/{patient_id}`
-- shipment/package: `/api/shipments/{shipment_number}`
-- kit barcode: direct `/api/testkits/{barcode}` if available, otherwise `/api/search/v2/query` fallback
+- preferred order: `/api/integrations/bloom/v1/lookups/orders/{order_number}`
+- preferred patient: `/api/integrations/bloom/v1/lookups/patients/{patient_id}`
+- preferred shipment/package: `/api/integrations/bloom/v1/lookups/shipments/{shipment_number}`
+- preferred testkit barcode: `/api/integrations/bloom/v1/lookups/testkits/{barcode}`
+- legacy fallbacks (with warning logs): `/api/orders/*`, `/api/patients/*`, `/api/shipments/*`, `/api/testkits/*`, then `/api/search/v2/query` for testkit fallback
 
 Cache behavior:
 - successful lookups are TTL-cached
@@ -107,4 +108,3 @@ Behavior summary:
 - ensures container linkage
 - stores references at `json_addl.properties.atlas_refs`
 - supports idempotent create via `Idempotency-Key` header
-

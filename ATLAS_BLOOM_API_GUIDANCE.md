@@ -40,6 +40,17 @@ Token management endpoints:
 Recommended token scope for Atlas write flows:
 - `internal_rw` (or `admin`)
 
+## 2.1 Atlas Lookup Endpoints (Bloom Validation)
+
+Bloom should validate Atlas references using Atlas integration lookup routes first:
+
+1. `GET /api/integrations/bloom/v1/lookups/orders/{order_number}`
+2. `GET /api/integrations/bloom/v1/lookups/patients/{patient_id}`
+3. `GET /api/integrations/bloom/v1/lookups/shipments/{shipment_number}`
+4. `GET /api/integrations/bloom/v1/lookups/testkits/{kit_barcode}`
+
+For transition diagnostics only, Bloom may fallback to legacy Atlas paths with warning logs.
+
 ## 3. Template Discovery (Dynamic)
 
 Atlas can discover available categories/types/subtypes via:
@@ -326,4 +337,3 @@ Retry guidance for Atlas:
 
 Atlas should not send saliva as a specimen template code in production integration until Bloom exposes a saliva-specific template.  
 Current supported specimen template choices for this guide are blood and buccal only.
-

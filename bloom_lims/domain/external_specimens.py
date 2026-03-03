@@ -42,10 +42,13 @@ class ExternalSpecimenService:
 
         atlas_refs, atlas_meta = self._validate_atlas_refs(payload.atlas_refs)
 
-        specimen = self.bobj.create_instance_by_code(
-            self._normalize_template_code(payload.specimen_template_code),
-            {"json_addl": {"properties": payload.properties or {}}},
-        )
+        try:
+            specimen = self.bobj.create_instance_by_code(
+                self._normalize_template_code(payload.specimen_template_code),
+                {"json_addl": {"properties": payload.properties or {}}},
+            )
+        except Exception as exc:
+            raise ValueError(str(exc)) from exc
         if specimen is None:
             raise ValueError("Failed to create specimen instance")
 
@@ -75,7 +78,7 @@ class ExternalSpecimenService:
         return self._to_response(specimen, created=True)
 
     def get_specimen(self, specimen_euid: str) -> ExternalSpecimenResponse:
-        specimen = self.bobj.get_by_euid(specimen_euid)
+        specimen = self._safe_get_by_euid(specimen_euid)
         if specimen is None or specimen.is_deleted:
             raise ValueError(f"Specimen not found: {specimen_euid}")
         if specimen.category != "content":
@@ -88,7 +91,7 @@ class ExternalSpecimenService:
         specimen_euid: str,
         payload: ExternalSpecimenUpdateRequest,
     ) -> ExternalSpecimenResponse:
-        specimen = self.bobj.get_by_euid(specimen_euid)
+        specimen = self._safe_get_by_euid(specimen_euid)
         if specimen is None or specimen.is_deleted:
             raise ValueError(f"Specimen not found: {specimen_euid}")
         if specimen.category != "content":
@@ -111,7 +114,7 @@ class ExternalSpecimenService:
         self._write_props(specimen, specimen_props)
 
         if payload.container_euid:
-            container = self.bobj.get_by_euid(payload.container_euid)
+            container = self._safe_get_by_euid(payload.container_euid)
             if container is None or container.is_deleted:
                 raise ValueError(f"Container not found: {payload.container_euid}")
             if container.category != "container":
@@ -168,24 +171,27 @@ class ExternalSpecimenService:
         specimen_name: str,
     ):
         if container_euid:
-            container = self.bobj.get_by_euid(container_euid)
+            container = self._safe_get_by_euid(container_euid)
             if container is None or container.is_deleted:
                 raise ValueError(f"Container not found: {container_euid}")
             if container.category != "container":
                 raise ValueError(f"EUID is not a container: {container_euid}")
             return container
 
-        container = self.bobj.create_instance_by_code(
-            self._normalize_template_code(container_template_code),
-            {"json_addl": {"properties": {"name": f"{specimen_name} container"}}},
-        )
+        try:
+            container = self.bobj.create_instance_by_code(
+                self._normalize_template_code(container_template_code),
+                {"json_addl": {"properties": {"name": f"{specimen_name} container"}}},
+            )
+        except Exception as exc:
+            raise ValueError(str(exc)) from exc
         if container is None:
             raise ValueError("Failed to create container for specimen")
         return container
 
     def _ensure_container_link(self, container_euid: str, specimen_euid: str) -> None:
-        container = self.bobj.get_by_euid(container_euid)
-        specimen = self.bobj.get_by_euid(specimen_euid)
+        container = self._safe_get_by_euid(container_euid)
+        specimen = self._safe_get_by_euid(specimen_euid)
         if container is None or specimen is None:
             return
         for lineage in container.parent_of_lineages:
@@ -332,3 +338,11 @@ class ExternalSpecimenService:
         instance.json_addl = payload
         flag_modified(instance, "json_addl")
 
+    def _safe_get_by_euid(self, euid: str):
+        try:
+            return self.bobj.get_by_euid(euid)
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "not found" in msg or "no template found" in msg:
+                return None
+            raise

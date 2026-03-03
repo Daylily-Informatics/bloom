@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
+from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
     ContainerCreateSchema,
     ContainerUpdateSchema,
@@ -34,6 +35,30 @@ def get_bdb(username: str = "api-user"):
     """Get database connection."""
     from bloom_lims.db import BLOOMdb3
     return BLOOMdb3(app_username=username)
+
+
+def _container_event_payload(container, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = {
+        "euid": container.euid,
+        "container_euid": container.euid,
+        "uuid": str(container.uuid),
+        "name": container.name,
+        "category": container.category,
+        "type": container.type,
+        "subtype": container.subtype,
+        "status": container.bstatus,
+        "is_deleted": bool(getattr(container, "is_deleted", False)),
+    }
+    json_addl = container.json_addl
+    if isinstance(json_addl, str):
+        try:
+            json_addl = json_lib.loads(json_addl)
+        except Exception:
+            json_addl = {}
+    payload["json_addl"] = json_addl if isinstance(json_addl, dict) else {}
+    if extra:
+        payload.update(extra)
+    return payload
 
 
 @router.get("/", response_model=Dict[str, Any])
@@ -157,6 +182,8 @@ async def create_container(
         else:
             raise HTTPException(status_code=400, detail="template_euid is required")
 
+        emit_bloom_event("container.created", _container_event_payload(container))
+
         return {
             "success": True,
             "euid": container.euid,
@@ -188,17 +215,60 @@ async def update_container(
         if not container:
             raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
 
+        prev_status = container.bstatus
+
         if data.name is not None:
             container.name = data.name
         if data.status is not None:
             container.bstatus = data.status
+        if data.is_deleted is not None:
+            container.is_deleted = data.is_deleted
+
+        json_addl_dirty = False
+        existing = container.json_addl or {}
+        if isinstance(existing, str):
+            try:
+                existing = json_lib.loads(existing)
+            except Exception:
+                existing = {}
+        if not isinstance(existing, dict):
+            existing = {}
+
         if data.json_addl is not None:
-            existing = container.json_addl or {}
             existing.update(data.json_addl)
+            json_addl_dirty = True
+
+        if data.metadata is not None:
+            props = existing.get("properties")
+            if not isinstance(props, dict):
+                props = {}
+            existing_metadata = props.get("metadata")
+            if not isinstance(existing_metadata, dict):
+                existing_metadata = {}
+            merged_metadata = dict(existing_metadata)
+            merged_metadata.update(data.metadata)
+            props["metadata"] = merged_metadata
+            existing["properties"] = props
+            json_addl_dirty = True
+
+        if json_addl_dirty:
             container.json_addl = existing
             flag_modified(container, "json_addl")
 
         bdb.session.commit()
+        payload = _container_event_payload(container)
+        emit_bloom_event("container.updated", payload)
+        if prev_status != container.bstatus:
+            emit_bloom_event(
+                "container.status_changed",
+                _container_event_payload(
+                    container,
+                    {
+                        "previous_status": prev_status,
+                        "current_status": container.bstatus,
+                    },
+                ),
+            )
 
         return {
             "success": True,
@@ -229,11 +299,17 @@ async def delete_container(
         if not container:
             raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
 
+        event_payload = _container_event_payload(
+            container,
+            {"hard_delete": hard_delete, "is_deleted": True},
+        )
         if hard_delete:
             bc.delete_obj(container)
         else:
             container.is_deleted = True
             bdb.session.commit()
+
+        emit_bloom_event("container.deleted", event_payload)
 
         return {
             "success": True,
@@ -245,6 +321,16 @@ async def delete_container(
     except Exception as e:
         logger.error(f"Error deleting container {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{euid}", response_model=Dict[str, Any])
+async def patch_container(
+    euid: str,
+    data: ContainerUpdateSchema,
+    user: APIUser = Depends(require_write),
+):
+    """Compatibility alias for Atlas integration clients."""
+    return await update_container(euid=euid, data=data, user=user)
 
 
 @router.post("/{container_euid}/contents")

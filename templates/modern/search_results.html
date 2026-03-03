@@ -110,15 +110,15 @@
   </div>
   <div class="card-body">
     <div class="table-container">
-      <table class="table">
+      <table class="table" data-search-results-table="true">
         <thead>
           <tr>
-            <th>Record</th>
-            <th>Category</th>
-            <th>Type</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Timestamp</th>
+            <th class="sortable-col" data-sort-index="0">Record</th>
+            <th class="sortable-col" data-sort-index="1">Category</th>
+            <th class="sortable-col" data-sort-index="2">Type</th>
+            <th class="sortable-col" data-sort-index="3">Name</th>
+            <th class="sortable-col" data-sort-index="4">Status</th>
+            <th class="sortable-col" data-sort-index="5">Timestamp</th>
             <th></th>
           </tr>
         </thead>
@@ -252,6 +252,26 @@
   display: flex;
   justify-content: space-between;
 }
+.sortable-col {
+  cursor: pointer;
+  user-select: none;
+}
+.sortable-col::after {
+  content: "\f0dc";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  margin-left: var(--spacing-xs);
+  font-size: 0.75rem;
+  opacity: 0.35;
+}
+.sortable-col.sort-asc::after {
+  content: "\f0de";
+  opacity: 1;
+}
+.sortable-col.sort-desc::after {
+  content: "\f0dd";
+  opacity: 1;
+}
 </style>
 {% endblock %}
 
@@ -275,6 +295,74 @@ function appendHidden(form, name, value) {
   hidden.value = value;
   form.appendChild(hidden);
 }
+
+function compareCellValues(aRaw, bRaw) {
+  const aText = (aRaw || '').trim().replace(/\s+/g, ' ');
+  const bText = (bRaw || '').trim().replace(/\s+/g, ' ');
+
+  const aTimestamp = Date.parse(aText);
+  const bTimestamp = Date.parse(bText);
+  if (!Number.isNaN(aTimestamp) && !Number.isNaN(bTimestamp)) {
+    return aTimestamp - bTimestamp;
+  }
+
+  const aNumeric = Number(aText.replace(/,/g, ''));
+  const bNumeric = Number(bText.replace(/,/g, ''));
+  if (aText !== '' && bText !== '' && !Number.isNaN(aNumeric) && !Number.isNaN(bNumeric)) {
+    return aNumeric - bNumeric;
+  }
+
+  return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function enableSearchResultSorting() {
+  const table = document.querySelector('[data-search-results-table="true"]');
+  if (!table) {
+    return;
+  }
+
+  const body = table.querySelector('tbody');
+  if (!body) {
+    return;
+  }
+
+  let activeSortIndex = null;
+  let activeSortDirection = 'asc';
+  const sortableHeaders = table.querySelectorAll('th.sortable-col[data-sort-index]');
+
+  sortableHeaders.forEach((header) => {
+    header.addEventListener('click', function onHeaderClick() {
+      const columnIndex = Number(this.dataset.sortIndex);
+      if (Number.isNaN(columnIndex)) {
+        return;
+      }
+
+      if (activeSortIndex === columnIndex) {
+        activeSortDirection = activeSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        activeSortIndex = columnIndex;
+        activeSortDirection = 'asc';
+      }
+
+      const rows = Array.from(body.querySelectorAll('tr'));
+      rows.sort((rowA, rowB) => {
+        const aCell = rowA.cells[columnIndex];
+        const bCell = rowB.cells[columnIndex];
+        const result = compareCellValues(
+          aCell ? aCell.innerText : '',
+          bCell ? bCell.innerText : ''
+        );
+        return activeSortDirection === 'asc' ? result : -result;
+      });
+
+      rows.forEach((row) => body.appendChild(row));
+      sortableHeaders.forEach((th) => th.classList.remove('sort-asc', 'sort-desc'));
+      this.classList.add(activeSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', enableSearchResultSorting);
 
 document.getElementById('searchForm').addEventListener('submit', function onSubmit() {
   this.querySelectorAll('input[name="types"], input[name="record_types"]').forEach((elem) => elem.remove());

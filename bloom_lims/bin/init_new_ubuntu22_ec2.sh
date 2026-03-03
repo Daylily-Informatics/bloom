@@ -88,7 +88,7 @@ bloom gui  # or: source run_bloomui.sh (edit gunicorn command for external IP)
 TERM_OUT="""
 (BLOOM) ubuntu@ip-172-31-7-22:~/projects/git/bloom$ source run_bloomui.sh
 INFO:     Will watch for changes in these directories: ['/home/ubuntu/projects/git/bloom']
-INFO:     Uvicorn running on https://127.0.0.1:8912 (Press CTRL+C to quit)
+INFO:     Uvicorn running on https://localhost:8912 (Press CTRL+C to quit)
 INFO:     Started reloader process [6128] using StatReload
 INFO:     Started server process [6130]
 INFO:     Waiting for application startup.

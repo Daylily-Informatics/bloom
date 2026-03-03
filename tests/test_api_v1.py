@@ -80,6 +80,43 @@ class TestContainersAPI:
         response = client.get("/api/v1/containers/NONEXISTENT_EUID")
         assert response.status_code == 404
 
+    def test_patch_container_alias_accepts_metadata(self, client):
+        """Test PATCH /containers compatibility alias and metadata mapping."""
+        subtypes_resp = client.get("/api/v1/object-creation/subtypes?category=container&type=tube")
+        assert subtypes_resp.status_code == 200
+        subtypes = subtypes_resp.json().get("subtypes", [])
+        assert subtypes
+
+        subtype = next((item for item in subtypes if item.get("name") == "tube-generic-10ml"), subtypes[0])
+        versions = subtype.get("versions", [])
+        assert versions
+        version = "1.0" if "1.0" in versions else versions[0]
+
+        create_resp = client.post(
+            "/api/v1/object-creation/create",
+            json={
+                "category": "container",
+                "type": "tube",
+                "subtype": subtype["name"],
+                "version": version,
+                "name": "patch-alias-test-container",
+            },
+        )
+        assert create_resp.status_code == 200
+        container_euid = create_resp.json()["euid"]
+
+        patch_resp = client.patch(
+            f"/api/v1/containers/{container_euid}",
+            json={"status": "in_progress", "metadata": {"atlas_sync": "ok"}},
+        )
+        assert patch_resp.status_code == 200
+
+        get_resp = client.get(f"/api/v1/containers/{container_euid}")
+        assert get_resp.status_code == 200
+        payload = get_resp.json()
+        assert payload["status"] == "in_progress"
+        assert payload["json_addl"]["properties"]["metadata"]["atlas_sync"] == "ok"
+
 
 class TestContentAPI:
     """Tests for /api/v1/content endpoints."""

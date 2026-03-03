@@ -4,6 +4,7 @@ import os
 import json
 import subprocess
 import copy
+import socket
 from typing import Dict, List
 from pathlib import Path
 import random
@@ -16,7 +17,7 @@ import json
 import logging
 import requests
 import shutil
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import pandas 
 
@@ -527,6 +528,45 @@ async def require_auth(request: Request):
     return request.session["user_data"]
 
 
+def _resolve_auth_email(auth: Dict, request: Request) -> str:
+    """Resolve active user email from dependency auth payload or session."""
+    if isinstance(auth, dict) and auth.get("email"):
+        return auth["email"]
+    return request.session.get("user_data", {}).get("email", "anonymous")
+
+
+def _resolve_auth_role(auth: Dict, request: Request) -> str:
+    """Resolve active user role from dependency auth payload or session."""
+    if isinstance(auth, dict) and auth.get("role"):
+        return str(auth["role"])
+    return str(request.session.get("user_data", {}).get("role", "user"))
+
+
+def _require_graph_admin(auth: Dict, request: Request) -> None:
+    """Enforce admin-only graph mutations."""
+    role = _resolve_auth_role(auth, request)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
+
+def _is_tapdb_reachable(timeout_seconds: float = 0.75) -> bool:
+    """Fast TCP reachability check to avoid blocking UI routes on dead DB endpoints."""
+    try:
+        from bloom_lims.config import get_tapdb_db_config
+
+        cfg = get_tapdb_db_config()
+        host = str(cfg.get("host", "")).strip()
+        port_raw = cfg.get("port", "")
+        port = int(str(port_raw).strip()) if str(port_raw).strip() else 0
+        if not host or port <= 0:
+            return False
+
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True
+    except Exception:
+        return False
+
+
 @app.exception_handler(RequireAuthException)
 async def auth_exception_handler(_request: Request, _exc: RequireAuthException):
     # Redirect the user to the login page
@@ -546,48 +586,52 @@ async def auth_exception_handler(_request: Request, _exc: RequireAuthException):
 async def modern_dashboard(request: Request, _=Depends(require_auth)):
     """Modern dashboard - main entry point for the application."""
     user_data = request.session.get("user_data", {})
-    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
-
-    # Gather dashboard statistics
-    try:
-        assays_total = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False, is_singleton=True
-        ).count()
-
-        workflows_active = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False
-        ).count()
-
-        equipment_total = bobdb.session.query(bobdb.Base.classes.equipment_instance).filter_by(
-            is_deleted=False
-        ).count()
-
-        reagents_total = bobdb.session.query(bobdb.Base.classes.content_instance).filter(
-            bobdb.Base.classes.content_instance.is_deleted == False,
-            bobdb.Base.classes.content_instance.subtype.like('%reagent%')
-        ).count()
-    except Exception:
-        assays_total = workflows_active = equipment_total = reagents_total = 0
-
     stats = {
-        "assays_total": assays_total,
-        "workflows_active": workflows_active,
-        "equipment_total": equipment_total,
-        "reagents_total": reagents_total,
+        "assays_total": 0,
+        "workflows_active": 0,
+        "equipment_total": 0,
+        "reagents_total": 0,
     }
+    recent_assays = []
+    active_workflows = []
+    db_unavailable = not _is_tapdb_reachable()
 
-    # Get recent items
-    try:
-        recent_assays = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False, is_singleton=True
-        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
-
-        active_workflows = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False
-        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
-    except Exception:
-        recent_assays = []
-        active_workflows = []
+    if not db_unavailable:
+        try:
+            bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+            stats = {
+                "assays_total": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False, is_singleton=True)
+                .count(),
+                "workflows_active": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False)
+                .count(),
+                "equipment_total": bobdb.session.query(bobdb.Base.classes.equipment_instance)
+                .filter_by(is_deleted=False)
+                .count(),
+                "reagents_total": bobdb.session.query(bobdb.Base.classes.content_instance)
+                .filter(
+                    bobdb.Base.classes.content_instance.is_deleted == False,
+                    bobdb.Base.classes.content_instance.subtype.like('%reagent%')
+                )
+                .count(),
+            }
+            recent_assays = (
+                bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False, is_singleton=True)
+                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
+                .limit(5)
+                .all()
+            )
+            active_workflows = (
+                bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False)
+                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
+                .limit(5)
+                .all()
+            )
+        except Exception:
+            db_unavailable = True
 
     template = templates.get_template("modern/dashboard.html")
     context = {
@@ -596,6 +640,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
         "stats": stats,
         "recent_assays": recent_assays,
         "active_workflows": active_workflows,
+        "db_unavailable": db_unavailable,
     }
 
     return HTMLResponse(content=template.render(context), status_code=200)
@@ -1172,6 +1217,17 @@ async def Acalculate_cogs_children(euid, request: Request, _auth=Depends(require
     except Exception as e:
         return json.dumps({"success": False, "message": str(e)})
 
+
+@app.get("/calculate_cogs_parents")
+async def calculate_cogs_parents(euid, request: Request, _auth=Depends(require_auth)):
+    try:
+        bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        cogs_value = round(bobdb.get_cogs_to_produce_euid(euid), 2)
+        return json.dumps({"success": True, "cogs_value": cogs_value})
+    except Exception as e:
+        return json.dumps({"success": False, "message": str(e)})
+
+
 @app.post("/query_by_euids", response_class=HTMLResponse)
 async def query_by_euids(request: Request, file_euids: str = Form(...)):
     try:
@@ -1220,16 +1276,6 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
             udat=user_data,
         )
         return HTMLResponse(content=content)
-
-
-async def calculate_cogs_parents(euid, request: Request, _auth=Depends(require_auth)):
-    try:
-        bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]))
-        cogs_value = round(bobdb.get_cogs_to_produce_euid(euid), 2)
-        return json.dumps({"success": True, "cogs_value": cogs_value})
-    except Exception as e:
-        return json.dumps({"success": False, "message": str(e)})
-
 
 @app.get("/set_filter")
 async def set_filter(request: Request, _auth=Depends(require_auth), curr_val="off"):
@@ -1514,6 +1560,28 @@ async def dag_explorer_redirect(request: Request):
     """Redirect /dag_explorer to /dindex2 with query params preserved."""
     query_params = str(request.query_params)
     url = "/dindex2" + ("?" + query_params if query_params else "")
+    return RedirectResponse(url=url, status_code=307)
+
+
+@app.get("/graph")
+async def graph_redirect(request: Request):
+    """
+    Redirect /graph to /dindex2 with normalized query params.
+
+    Supports:
+    - New params: start_euid, depth
+    - Legacy params: globalStartNodeEUID, globalFilterLevel
+    """
+    params = dict(request.query_params)
+
+    if "start_euid" in params and "globalStartNodeEUID" not in params:
+        params["globalStartNodeEUID"] = params["start_euid"]
+    if "depth" in params and "globalFilterLevel" not in params:
+        params["globalFilterLevel"] = params["depth"]
+
+    url = "/dindex2"
+    if params:
+        url = f"{url}?{urlencode(params)}"
     return RedirectResponse(url=url, status_code=307)
 
 
@@ -2196,6 +2264,7 @@ def delete_by_euid(request: Request, euid, _auth=Depends(require_auth)):
 
 @app.post("/delete_object")
 async def delete_object(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /delete_object used; prefer DELETE /api/object/{euid}")
     data = await request.json()
     euid = data.get("euid")
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -2207,6 +2276,7 @@ async def delete_object(request: Request, _auth=Depends(require_auth)):
         return {
             "status": "success",
             "message": f"Delete object performed for EUID {euid}",
+            "deprecated": True,
         }
     except Exception as e:
         # Object might already be deleted, try to find it in deleted items
@@ -2220,6 +2290,7 @@ async def delete_object(request: Request, _auth=Depends(require_auth)):
                 return {
                     "status": "success",
                     "message": f"Object {euid} was already soft-deleted",
+                    "deprecated": True,
                 }
         except Exception:
             pass
@@ -2368,31 +2439,382 @@ async def dagg(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=content)
 
 
+GRAPH_CATEGORY_COLORS = {
+    "workflow": "#00FF7F",
+    "workflow_step": "#ADFF2F",
+    "container": "#8B00FF",
+    "content": "#00BFFF",
+    "equipment": "#FF4500",
+    "data": "#FFD700",
+    "actor": "#FF69B4",
+    "action": "#FF8C00",
+    "test_requisition": "#FFA500",
+    "health_event": "#DC143C",
+    "file": "#00FF00",
+    "subject": "#9370DB",
+    "object_set": "#FF6347",
+    "generic": "#FF1493",
+}
+
+GRAPH_SUBTYPE_COLORS = {
+    "well": "#70658C",
+    "file_set": "#228080",
+}
+
+
+def _graph_node_color(category: str, obj_type: str, subtype: str) -> str:
+    if obj_type in GRAPH_SUBTYPE_COLORS:
+        return GRAPH_SUBTYPE_COLORS[obj_type]
+    if subtype in GRAPH_SUBTYPE_COLORS:
+        return GRAPH_SUBTYPE_COLORS[subtype]
+    return GRAPH_CATEGORY_COLORS.get(category, "#888888")
+
+
+def _normalize_graph_request_params(
+    start_euid: str | None,
+    depth: int | None,
+    legacy_start: str | None,
+    legacy_depth: int | None,
+) -> tuple[str, int]:
+    resolved_start = (start_euid or legacy_start or "AY1").strip() or "AY1"
+
+    try:
+        resolved_depth = int(depth if depth is not None else legacy_depth if legacy_depth is not None else 4)
+    except (TypeError, ValueError):
+        resolved_depth = 4
+
+    resolved_depth = max(1, min(resolved_depth, 10))
+    return resolved_start, resolved_depth
+
+
+def _build_graph_elements_for_start(bobj: BloomObj, start_euid: str, depth: int) -> tuple[list, list]:
+    instance_result = {}
+    lineage_result = {}
+
+    for row in bobj.fetch_graph_data_by_node_depth(start_euid, depth):
+        node_euid = row[0]
+        if node_euid not in [None, "", "None"]:
+            instance_result[node_euid] = {
+                "euid": row[0],
+                "name": row[2],
+                "type": row[3],
+                "category": row[4],
+                "subtype": row[5],
+                "version": row[6],
+            }
+
+        lineage_euid = row[8]
+        if lineage_euid not in [None, "", "None"]:
+            lineage_result[lineage_euid] = {
+                "parent_euid": row[9],
+                "child_euid": row[10],
+                "lineage_euid": lineage_euid,
+                "relationship_type": row[11] or "generic",
+            }
+
+    nodes = []
+    for key in sorted(instance_result.keys()):
+        node = instance_result[key]
+        color = _graph_node_color(node["category"], node["type"], node["subtype"])
+        nodes.append(
+            {
+                "data": {
+                    "id": str(node["euid"]),
+                    "euid": str(node["euid"]),
+                    "name": node["name"] or str(node["euid"]),
+                    "type": node["type"],
+                    "obj_type": node["type"],
+                    "btype": node["type"],  # Legacy compatibility
+                    "category": node["category"],
+                    "subtype": node["subtype"],
+                    "b_sub_type": node["subtype"],  # Legacy compatibility
+                    "version": node["version"],
+                    "color": color,
+                }
+            }
+        )
+
+    edges = []
+    for key in sorted(lineage_result.keys()):
+        edge = lineage_result[key]
+        edges.append(
+            {
+                "data": {
+                    "id": str(edge["lineage_euid"]),
+                    # Directionality in graph view: child -> parent
+                    "source": str(edge["child_euid"]),
+                    "target": str(edge["parent_euid"]),
+                    "relationship_type": str(edge["relationship_type"]),
+                }
+            }
+        )
+
+    return nodes, edges
+
+
 @app.get("/dindex2", response_class=HTMLResponse)
 async def dindex2(
     request: Request,
-    globalFilterLevel=6,
-    globalZoom=0,
-    globalStartNodeEUID=None,
+    globalFilterLevel: int = Query(default=6),
+    globalZoom: float = Query(default=0),
+    globalStartNodeEUID: str | None = Query(default=None),
+    start_euid: str | None = Query(default=None),
+    depth: int | None = Query(default=None, ge=1, le=10),
     auth=Depends(require_auth),
 ):
     """DAG Explorer - Interactive graph visualization of object relationships."""
-    dag_data = generate_dag_json_from_all_objects_v2(
-        request=request, euid=globalStartNodeEUID, depth=globalFilterLevel
+    resolved_start_euid, resolved_depth = _normalize_graph_request_params(
+        start_euid=start_euid,
+        depth=depth,
+        legacy_start=globalStartNodeEUID,
+        legacy_depth=globalFilterLevel,
     )
-    user_data = request.session.get("user_data", {})
+    user_data = auth if isinstance(auth, dict) else request.session.get("user_data", {})
+    user_role = _resolve_auth_role(auth, request)
 
-    # Use modern template
     template = templates.get_template("modern/dag_explorer.html")
     context = {
         "request": request,
-        "globalFilterLevel": globalFilterLevel,
+        "globalFilterLevel": resolved_depth,
         "globalZoom": globalZoom,
-        "globalStartNodeEUID": globalStartNodeEUID,
-        "dag_data": dag_data,
+        "globalStartNodeEUID": resolved_start_euid,
+        "start_euid": resolved_start_euid,
+        "depth": resolved_depth,
+        "is_admin": user_role == "admin",
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(**context))
+
+
+@app.get("/api/graph/data")
+async def api_graph_data(
+    request: Request,
+    start_euid: str | None = Query(default=None),
+    depth: int = Query(default=4, ge=1, le=10),
+    auth=Depends(require_auth),
+):
+    """Fetch Cytoscape graph data centered on a start node."""
+    resolved_start_euid, resolved_depth = _normalize_graph_request_params(
+        start_euid=start_euid,
+        depth=depth,
+        legacy_start=None,
+        legacy_depth=None,
+    )
+    user_email = _resolve_auth_email(auth, request)
+    logging.info(
+        "Graph data request start_euid=%s depth=%s user=%s",
+        resolved_start_euid,
+        resolved_depth,
+        user_email,
+    )
+
+    try:
+        bobj = BloomObj(BLOOMdb3(app_username=user_email))
+        nodes, edges = _build_graph_elements_for_start(bobj, resolved_start_euid, resolved_depth)
+        return {
+            "elements": {"nodes": nodes, "edges": edges},
+            "meta": {"start_euid": resolved_start_euid, "depth": resolved_depth},
+        }
+    except Exception as exc:
+        logging.error(
+            "Graph data request failed start_euid=%s depth=%s user=%s error=%s",
+            resolved_start_euid,
+            resolved_depth,
+            user_email,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to load graph data")
+
+
+@app.get("/api/object/{euid}")
+async def api_graph_object_detail(
+    request: Request,
+    euid: str,
+    auth=Depends(require_auth),
+):
+    """Get object details (instance/template/lineage) by EUID for graph panel."""
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+    instance_cls = bobj.Base.classes.generic_instance
+
+    try:
+        obj = bobj.get_by_euid(euid)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
+
+    object_kind = "instance"
+    if isinstance(obj, bobj.Base.classes.generic_template):
+        object_kind = "template"
+    elif isinstance(obj, bobj.Base.classes.generic_instance_lineage):
+        object_kind = "lineage"
+
+    payload = {
+        "uuid": str(obj.uuid),
+        "euid": obj.euid,
+        "name": obj.name,
+        "type": object_kind,
+        "obj_type": getattr(obj, "type", ""),
+        "btype": getattr(obj, "type", ""),
+        "category": getattr(obj, "category", ""),
+        "subtype": getattr(obj, "subtype", ""),
+        "b_sub_type": getattr(obj, "subtype", ""),
+        "version": getattr(obj, "version", ""),
+        "bstatus": getattr(obj, "bstatus", ""),
+        "json_addl": getattr(obj, "json_addl", {}) or {},
+        "created_dt": obj.created_dt.isoformat() if getattr(obj, "created_dt", None) else None,
+        "modified_dt": obj.modified_dt.isoformat() if getattr(obj, "modified_dt", None) else None,
+    }
+
+    if object_kind == "lineage":
+        parent_obj = (
+            bobj.session.query(instance_cls)
+            .filter(instance_cls.uuid == obj.parent_instance_uuid)
+            .first()
+        )
+        child_obj = (
+            bobj.session.query(instance_cls)
+            .filter(instance_cls.uuid == obj.child_instance_uuid)
+            .first()
+        )
+        payload["relationship_type"] = getattr(obj, "relationship_type", "generic") or "generic"
+        # Graph directionality is child -> parent
+        payload["source"] = child_obj.euid if child_obj else None
+        payload["target"] = parent_obj.euid if parent_obj else None
+
+    return payload
+
+
+@app.post("/api/lineage")
+async def api_graph_create_lineage(
+    request: Request,
+    auth=Depends(require_auth),
+):
+    """Create a lineage edge between two instance EUIDs (admin only)."""
+    _require_graph_admin(auth, request)
+    data = await request.json()
+
+    parent_euid = (data.get("parent_euid") or "").strip()
+    child_euid = (data.get("child_euid") or "").strip()
+    relationship_type = (data.get("relationship_type") or "generic").strip() or "generic"
+
+    if not parent_euid or not child_euid:
+        raise HTTPException(status_code=400, detail="parent_euid and child_euid are required")
+    if parent_euid == child_euid:
+        raise HTTPException(status_code=400, detail="parent_euid and child_euid must differ")
+
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+    instance_cls = bobj.Base.classes.generic_instance
+    lineage_cls = bobj.Base.classes.generic_instance_lineage
+
+    parent_obj = (
+        bobj.session.query(instance_cls)
+        .filter(instance_cls.euid == parent_euid, instance_cls.is_deleted == False)
+        .first()
+    )
+    child_obj = (
+        bobj.session.query(instance_cls)
+        .filter(instance_cls.euid == child_euid, instance_cls.is_deleted == False)
+        .first()
+    )
+    if parent_obj is None:
+        raise HTTPException(status_code=404, detail=f"Parent not found: {parent_euid}")
+    if child_obj is None:
+        raise HTTPException(status_code=404, detail=f"Child not found: {child_euid}")
+
+    existing = (
+        bobj.session.query(lineage_cls)
+        .filter(
+            lineage_cls.parent_instance_uuid == parent_obj.uuid,
+            lineage_cls.child_instance_uuid == child_obj.uuid,
+            lineage_cls.relationship_type == relationship_type,
+            lineage_cls.is_deleted == False,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Lineage already exists: {child_euid} -> {parent_euid} ({relationship_type})",
+        )
+
+    try:
+        new_lineage = bobj.create_generic_instance_lineage_by_euids(
+            parent_instance_euid=parent_euid,
+            child_instance_euid=child_euid,
+            relationship_type=relationship_type,
+        )
+        bobj.session.flush()
+        bobj.session.commit()
+        logging.info(
+            "Graph lineage created euid=%s parent=%s child=%s rel=%s user=%s",
+            new_lineage.euid,
+            parent_euid,
+            child_euid,
+            relationship_type,
+            user_email,
+        )
+        return {"success": True, "euid": str(new_lineage.euid), "uuid": str(new_lineage.uuid)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        bobj.session.rollback()
+        logging.error(
+            "Graph lineage create failed parent=%s child=%s rel=%s user=%s error=%s",
+            parent_euid,
+            child_euid,
+            relationship_type,
+            user_email,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to create lineage")
+
+
+@app.delete("/api/object/{euid}")
+async def api_graph_delete_object(
+    request: Request,
+    euid: str,
+    hard_delete: bool = False,
+    auth=Depends(require_auth),
+):
+    """Soft-delete an object by EUID for graph operations (admin only)."""
+    _require_graph_admin(auth, request)
+
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+
+    try:
+        obj = bobj.get_by_euid(euid)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
+
+    try:
+        bobj.delete(obj)
+        bobj.session.flush()
+        bobj.session.commit()
+        logging.info(
+            "Graph object deleted euid=%s hard_delete_requested=%s user=%s",
+            euid,
+            hard_delete,
+            user_email,
+        )
+        return {
+            "success": True,
+            "message": f"Object {euid} soft-deleted",
+            "hard_delete_applied": False,
+        }
+    except Exception as exc:
+        bobj.session.rollback()
+        logging.error(
+            "Graph object delete failed euid=%s user=%s error=%s",
+            euid,
+            user_email,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to delete object")
 
 
 def add_new_node(request: Request, _auth=Depends(require_auth)):
@@ -2698,6 +3120,7 @@ def get_dag(request: Request, _auth=Depends(require_auth)):
 async def get_dagv2(
     request: Request, _euid="AY1", _depth=6, _auth=Depends(require_auth)
 ):
+    logging.warning("Deprecated endpoint /get_dagv2 used; prefer GET /api/graph/data")
     dag_fn = request.session.get("user_data", {}).get("dag_fnv2", "")
     dag_data = {"elements": {"nodes": [], "edges": []}}
     if dag_fn and os.path.exists(dag_fn):
@@ -2717,6 +3140,7 @@ async def update_dag(request: Request, _auth=Depends(require_auth)):
 
 @app.post("/add_new_edge")
 async def add_new_edge(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /add_new_edge used; prefer POST /api/lineage")
     input_data = await request.json()  # Corrected call to request.json()
     parent_euid = input_data["parent_uuid"]
     child_euid = input_data["child_uuid"]
@@ -2725,11 +3149,12 @@ async def add_new_edge(request: Request, _auth=Depends(require_auth)):
     new_edge = bobj.create_generic_instance_lineage_by_euids(parent_euid, child_euid)
     bobj.session.flush()
     bobj.session.commit()
-    return {"euid": str(new_edge.euid)}
+    return {"euid": str(new_edge.euid), "deprecated": True}
 
 
 @app.post("/delete_node")
 async def delete_node(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /delete_node used; prefer DELETE /api/object/{euid}")
     input_data = await request.json()
     node_euid = input_data["euid"]
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -2740,11 +3165,13 @@ async def delete_node(request: Request, _auth=Depends(require_auth)):
     return {
         "status": "success",
         "message": "Node and associated lineage records deleted successfully.",
+        "deprecated": True,
     }
 
 
 @app.post("/delete_edge")
 async def delete_edge(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /delete_edge used; prefer DELETE /api/object/{euid}")
     input_data = await request.json()
     edge_euid = input_data["euid"]
 
@@ -2754,7 +3181,11 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
         bobdb.delete(edge)
         bobdb.session.flush()
         bobdb.session.commit()
-        return {"status": "success", "message": "Edge deleted successfully."}
+        return {
+            "status": "success",
+            "message": "Edge deleted successfully.",
+            "deprecated": True,
+        }
     except Exception as e:
         # Edge might already be deleted
         try:
@@ -2767,6 +3198,7 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
                 return {
                     "status": "success",
                     "message": f"Edge {edge_euid} was already soft-deleted",
+                    "deprecated": True,
                 }
         except Exception:
             pass

@@ -19,7 +19,7 @@ router = APIRouter(prefix="/user-tokens", tags=["User API Tokens"])
 class TokenCreateRequest(BaseModel):
     token_name: str = Field(..., min_length=3, max_length=120)
     scope: str = Field(default="internal_ro")
-    expires_in_days: int = Field(default=90, ge=1, le=3650)
+    expires_in_days: int = Field(default=2, ge=1, le=3650)
     note: str | None = None
 
 
@@ -190,4 +190,3 @@ async def get_user_token_usage(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     finally:
         bdb.close()
-

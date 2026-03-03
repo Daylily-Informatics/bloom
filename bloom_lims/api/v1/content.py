@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
     SampleCreateSchema,
     SpecimenCreateSchema,
@@ -31,6 +32,25 @@ def get_bdb(username: str = "api-user"):
     """Get database connection."""
     from bloom_lims.db import BLOOMdb3
     return BLOOMdb3(app_username=username)
+
+
+def _specimen_content_event_payload(content, extra: dict | None = None) -> dict:
+    payload = {
+        "euid": content.euid,
+        "specimen_euid": content.euid,
+        "uuid": str(content.uuid),
+        "specimen_uuid": str(content.uuid),
+        "name": content.name,
+        "category": content.category,
+        "type": content.type,
+        "subtype": content.subtype,
+        "status": content.bstatus,
+        "json_addl": content.json_addl if isinstance(content.json_addl, dict) else {},
+        "is_deleted": bool(getattr(content, "is_deleted", False)),
+    }
+    if extra:
+        payload.update(extra)
+    return payload
 
 
 @router.get("/", response_model=Dict[str, Any])
@@ -218,6 +238,8 @@ async def update_content(
         if not content:
             raise HTTPException(status_code=404, detail=f"Content not found: {euid}")
 
+        prev_status = content.bstatus
+
         if data.name is not None:
             content.name = data.name
         if data.status is not None:
@@ -232,6 +254,19 @@ async def update_content(
             flag_modified(content, "json_addl")
 
         bdb.session.commit()
+        if content.type == "specimen":
+            emit_bloom_event("specimen.updated", _specimen_content_event_payload(content))
+            if prev_status != content.bstatus:
+                emit_bloom_event(
+                    "specimen.status_changed",
+                    _specimen_content_event_payload(
+                        content,
+                        {
+                            "previous_status": prev_status,
+                            "current_status": content.bstatus,
+                        },
+                    ),
+                )
 
         return {
             "success": True,
@@ -262,11 +297,21 @@ async def delete_content(
         if not content:
             raise HTTPException(status_code=404, detail=f"Content not found: {euid}")
 
+        event_payload = None
+        if content.type == "specimen":
+            event_payload = _specimen_content_event_payload(
+                content,
+                {"hard_delete": hard_delete, "is_deleted": True},
+            )
+
         if hard_delete:
             bc.delete_obj(content)
         else:
             content.is_deleted = True
             bdb.session.commit()
+
+        if event_payload is not None:
+            emit_bloom_event("specimen.deleted", event_payload)
 
         return {
             "success": True,

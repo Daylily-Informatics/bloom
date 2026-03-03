@@ -8,6 +8,13 @@
   <p class="text-muted">Welcome{% if udat.email %}, {{ udat.email.split('@')[0] }}{% endif %}</p>
 </div>
 
+{% if db_unavailable %}
+<div class="alert alert-warning mb-lg">
+  <i class="fas fa-triangle-exclamation"></i>
+  Database is currently unreachable. You are logged in, but live counts and recent items are temporarily unavailable.
+</div>
+{% endif %}
+
 <!-- Quick Stats -->
 <div class="grid grid-4 mb-lg">
   <a href="/assays" class="stat-card">
@@ -145,4 +152,3 @@ if (typeof BloomConfig !== 'undefined' && BloomConfig.refreshInterval) {
 }
 </script>
 {% endblock %}
-

@@ -119,6 +119,24 @@ auth:
   max_sessions_per_user: 5
 
 # -----------------------------------------------------------------------------
+# Atlas Integration
+# -----------------------------------------------------------------------------
+atlas:
+  base_url: ""                  # e.g., https://atlas.example.org
+  token: ""                     # Bearer token used for Atlas lookup APIs
+  timeout_seconds: 10
+  cache_ttl_seconds: 300
+  verify_ssl: true
+
+  # Bloom -> Atlas outbound event webhook configuration
+  organization_id: ""           # Atlas org UUID to include in webhook payloads
+  events_enabled: false
+  events_path: "/api/integrations/bloom/v1/events"
+  webhook_secret: ""            # Shared secret for X-Bloom-Signature HMAC
+  events_timeout_seconds: 10
+  events_max_retries: 2
+
+# -----------------------------------------------------------------------------
 # Logging Configuration
 # -----------------------------------------------------------------------------
 logging:

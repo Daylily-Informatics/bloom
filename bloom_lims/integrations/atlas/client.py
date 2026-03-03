@@ -35,17 +35,49 @@ class AtlasClient:
     def is_configured(self) -> bool:
         return bool(self.base_url and self.token)
 
+    def _get_with_fallback(self, preferred_path: str, fallback_path: str, *, label: str) -> dict[str, Any]:
+        try:
+            return self._get_json(preferred_path)
+        except AtlasClientError:
+            logger.warning(
+                "Atlas preferred lookup path failed for %s; falling back to legacy path (%s -> %s)",
+                label,
+                preferred_path,
+                fallback_path,
+            )
+            return self._get_json(fallback_path)
+
     def get_order(self, order_number: str) -> dict[str, Any]:
-        return self._get_json(f"/api/orders/{order_number}")
+        return self._get_with_fallback(
+            f"/api/integrations/bloom/v1/lookups/orders/{order_number}",
+            f"/api/orders/{order_number}",
+            label="order lookup",
+        )
 
     def get_patient(self, patient_id: str) -> dict[str, Any]:
-        return self._get_json(f"/api/patients/{patient_id}")
+        return self._get_with_fallback(
+            f"/api/integrations/bloom/v1/lookups/patients/{patient_id}",
+            f"/api/patients/{patient_id}",
+            label="patient lookup",
+        )
 
     def get_shipment(self, shipment_number: str) -> dict[str, Any]:
-        return self._get_json(f"/api/shipments/{shipment_number}")
+        return self._get_with_fallback(
+            f"/api/integrations/bloom/v1/lookups/shipments/{shipment_number}",
+            f"/api/shipments/{shipment_number}",
+            label="shipment lookup",
+        )
 
     def get_testkit(self, kit_barcode: str) -> dict[str, Any]:
-        # Preferred direct route if Atlas exposes it.
+        # Preferred org-scoped integration lookup route.
+        try:
+            return self._get_json(f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}")
+        except AtlasClientError:
+            logger.warning(
+                "Atlas preferred integration testkit lookup failed; falling back to legacy paths"
+            )
+
+        # Secondary fallback direct route if Atlas exposes it.
         try:
             return self._get_json(f"/api/testkits/{kit_barcode}")
         except AtlasClientError:
@@ -127,4 +159,3 @@ class AtlasClient:
         if not isinstance(payload, dict):
             raise AtlasClientError("Atlas response must be a JSON object")
         return payload
-

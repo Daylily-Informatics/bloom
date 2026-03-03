@@ -77,7 +77,7 @@ class AtlasService:
         except AtlasClientError as exc:
             with self._cache_lock:
                 entry = self._cache.get(key)
-                if entry and entry.expires_at > now:
+                if entry:
                     return AtlasLookupResult(
                         key=key,
                         payload=entry.payload,
@@ -102,4 +102,3 @@ class AtlasService:
             stale=False,
             fetched_at=fetched_at,
         )
-

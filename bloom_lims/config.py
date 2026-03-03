@@ -227,6 +227,30 @@ class AtlasSettings(BaseModel):
     timeout_seconds: int = Field(default=10, description="Atlas API timeout seconds")
     cache_ttl_seconds: int = Field(default=300, description="Atlas response cache TTL in seconds")
     verify_ssl: bool = Field(default=True, description="Verify Atlas TLS certificates")
+    organization_id: str = Field(
+        default="",
+        description="Atlas organization/tenant UUID used for outbound Bloom events",
+    )
+    events_enabled: bool = Field(
+        default=False,
+        description="Enable outbound Bloom->Atlas webhook event delivery",
+    )
+    events_path: str = Field(
+        default="/api/integrations/bloom/v1/events",
+        description="Atlas webhook path for Bloom events",
+    )
+    webhook_secret: str = Field(
+        default="",
+        description="Shared HMAC secret for Bloom webhook signatures",
+    )
+    events_timeout_seconds: int = Field(
+        default=10,
+        description="Timeout (seconds) for outbound Bloom webhook delivery",
+    )
+    events_max_retries: int = Field(
+        default=2,
+        description="Maximum retry count for outbound Bloom webhook delivery",
+    )
 
 
 class LoggingSettings(BaseModel):
@@ -359,6 +383,46 @@ class BloomSettings(BaseSettings):
         yaml_config = _load_yaml_config()
         merged = _deep_merge(yaml_config, kwargs)
         super().__init__(**merged)
+        self._apply_environment_overrides()
+
+    def _apply_environment_overrides(self) -> None:
+        """Apply selected env overrides after YAML merge.
+
+        YAML values are currently passed as init kwargs, which take precedence
+        over env vars in Pydantic settings resolution. We explicitly apply
+        runtime env overrides for Atlas integration settings so local process
+        configuration can be adjusted without editing config files.
+        """
+        atlas_base_url = os.environ.get("BLOOM_ATLAS__BASE_URL")
+        if atlas_base_url is not None:
+            self.atlas.base_url = atlas_base_url
+
+        atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
+        if atlas_token is not None:
+            self.atlas.token = atlas_token
+
+        atlas_timeout = os.environ.get("BLOOM_ATLAS__TIMEOUT_SECONDS")
+        if atlas_timeout is not None:
+            try:
+                self.atlas.timeout_seconds = int(atlas_timeout)
+            except ValueError:
+                pass
+
+        atlas_cache_ttl = os.environ.get("BLOOM_ATLAS__CACHE_TTL_SECONDS")
+        if atlas_cache_ttl is not None:
+            try:
+                self.atlas.cache_ttl_seconds = int(atlas_cache_ttl)
+            except ValueError:
+                pass
+
+        atlas_verify_ssl = os.environ.get("BLOOM_ATLAS__VERIFY_SSL")
+        if atlas_verify_ssl is not None:
+            self.atlas.verify_ssl = str(atlas_verify_ssl).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
 
     @field_validator("environment")
     @classmethod

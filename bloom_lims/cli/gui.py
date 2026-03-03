@@ -1,6 +1,7 @@
 """GUI/Web UI commands for BLOOM CLI."""
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -52,19 +53,67 @@ def _get_pid() -> int | None:
     return None
 
 
+def _ensure_https_certs() -> tuple[Path, Path]:
+    """Ensure localhost TLS cert/key exist; generate with mkcert if missing."""
+    certs_dir = PROJECT_ROOT / "certs"
+    certs_dir.mkdir(parents=True, exist_ok=True)
+    cert_file = certs_dir / "cert.pem"
+    key_file = certs_dir / "key.pem"
+
+    if cert_file.exists() and key_file.exists():
+        return cert_file, key_file
+
+    mkcert_bin = shutil.which("mkcert")
+    if not mkcert_bin:
+        console.print("[red]✗[/red]  mkcert is required to generate localhost HTTPS certificates.")
+        raise SystemExit(1)
+
+    try:
+        subprocess.run(
+            [mkcert_bin, "-install"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            [
+                mkcert_bin,
+                "-key-file",
+                str(key_file),
+                "-cert-file",
+                str(cert_file),
+                "localhost",
+            ],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        console.print(f"[red]✗[/red]  Failed to generate HTTPS certificates with mkcert: {stderr}")
+        raise SystemExit(1)
+
+    if not (cert_file.exists() and key_file.exists()):
+        console.print("[red]✗[/red]  mkcert did not produce cert.pem/key.pem in certs/")
+        raise SystemExit(1)
+    return cert_file, key_file
+
+
 @click.command()
-@click.option('--port', '-p', default=8911, type=int, help='Port to run on (default: 8911)')
-@click.option('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
+@click.option('--port', '-p', default=8912, type=int, help='Port to run on (default: 8912)')
 @click.option('--reload', '-r', is_flag=True, help='Enable auto-reload for development')
-@click.option('--https', is_flag=True, help='Enable HTTPS (requires certs in certs/)')
 @click.option('--background/--foreground', '-b/-f', default=True, help='Run in background (default)')
-def gui(port, host, reload, https, background):
+def gui(port, reload, background):
     """Start the BLOOM web UI."""
     _ensure_dir()
+    host = "localhost"
+    protocol = "https"
+    cert_file, key_file = _ensure_https_certs()
 
     pid = _get_pid()
     if pid:
-        protocol = "https" if https else "http"
         console.print(f"[yellow]⚠[/yellow]  Server already running (PID {pid})")
         console.print(f"   URL: [cyan]{protocol}://{host}:{port}[/cyan]")
         console.print("   Use [cyan]bloom stop[/cyan] to stop or [cyan]bloom logs[/cyan] to view logs")
@@ -73,14 +122,8 @@ def gui(port, host, reload, https, background):
     cmd = [sys.executable, "-m", "uvicorn", "main:app", "--host", host, "--port", str(port)]
     if reload:
         cmd.append("--reload")
-    if https:
-        certs_dir = PROJECT_ROOT / "certs"
-        if not (certs_dir / "key.pem").exists():
-            console.print("[red]✗[/red] HTTPS certificates not found in certs/")
-            raise SystemExit(1)
-        cmd.extend(["--ssl-keyfile", str(certs_dir / "key.pem"), "--ssl-certfile", str(certs_dir / "cert.pem")])
+    cmd.extend(["--ssl-keyfile", str(key_file), "--ssl-certfile", str(cert_file)])
 
-    protocol = "https" if https else "http"
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
@@ -134,4 +177,3 @@ def stop():
     except PermissionError:
         console.print(f"[red]✗[/red]  Permission denied stopping PID {pid}")
         raise SystemExit(1)
-

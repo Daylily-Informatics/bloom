@@ -154,7 +154,6 @@ class TestWorkflowEndpoints:
         response = client.get("/workflow_details")
         assert response.status_code == 422
 
-
 class TestEquipmentEndpoints:
     """Tests for equipment-related endpoints."""
 
@@ -389,6 +388,14 @@ class TestModernUIRoutes:
         response = client.get("/search?q=test&types=container,content")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+
+    def test_search_page_includes_sortable_headers_script(self, client):
+        """Test search page includes client-side sortable table behavior."""
+        response = client.get("/search")
+        assert response.status_code == 200
+        content = response.text
+        assert "enableSearchResultSorting" in content
+        assert "sortable-col" in content
 
     def test_bulk_create_containers_page_renders(self, client):
         """Test bulk create containers page renders correctly."""
@@ -940,6 +947,12 @@ class TestAdminAndConfigEndpoints:
 
 class TestCalculationEndpoints:
     """Tests for calculation endpoints."""
+
+    def test_calculate_cogs_parents(self, client):
+        """Test calculate COGS parents endpoint."""
+        response = client.get("/calculate_cogs_parents")
+        # Should handle missing parameters
+        assert response.status_code in [200, 307, 400, 422, 500]
 
     def test_calculate_cogs_children(self, client):
         """Test calculate COGS children endpoint."""
@@ -1750,3 +1763,13 @@ class TestAdditionalViewEndpoints:
         """Test lims endpoint."""
         response = client.get("/lims")
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+
+
+class TestWorkflowQueryParamCompatibility:
+    """Compatibility tests for workflow query parameter names."""
+
+    def test_workflow_details_accepts_workflow_euid_param(self, client):
+        """workflow_details should accept workflow_euid query parameter (new workflow UI contract)."""
+        response = client.get("/workflow_details?workflow_euid=NONEXISTENT_WORKFLOW_EUID")
+        # The route may render an error for missing workflow, but should not fail validation.
+        assert response.status_code != 422

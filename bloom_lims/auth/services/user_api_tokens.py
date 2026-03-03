@@ -38,7 +38,7 @@ TOKEN_STATUS_REVOKED = "REVOKED"
 class TokenCreateInput:
     token_name: str
     scope: str
-    expires_in_days: int = 90
+    expires_in_days: int = 2
     note: str | None = None
 
 
@@ -109,7 +109,7 @@ class UserAPITokenService:
         if scope not in allowed_scopes:
             raise PermissionError(f"Scope '{scope}' is not allowed for actor role set")
 
-        expires_in_days = max(1, min(int(payload.expires_in_days or 90), 3650))
+        expires_in_days = max(1, min(int(payload.expires_in_days or 2), 3650))
         plaintext = self.generate_plaintext_token()
         token_hash = self.hash_token(plaintext)
         now = datetime.now(UTC)
@@ -285,4 +285,3 @@ class UserAPITokenService:
             fallback_role=Role.INTERNAL_READ_ONLY.value,
         )
         return constrain_roles_by_scope(owner.roles, token.scope), owner.groups
-
