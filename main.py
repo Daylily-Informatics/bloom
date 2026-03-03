@@ -3,9 +3,12 @@ import httpx
 import os
 import json
 import subprocess
-from typing import List
+import copy
+import socket
+from typing import Dict, List
 from pathlib import Path
 import random
+from html import escape as html_escape
 
 import csv
 import os
@@ -14,6 +17,7 @@ import json
 import logging
 import requests
 import shutil
+from urllib.parse import quote, urlencode
 
 import pandas 
 
@@ -22,20 +26,24 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime, timedelta, date
 
-# Set AWS_PROFILE from config if not already set
-def _init_aws_profile():
-    """Set AWS_PROFILE env var from YAML config if not already set."""
-    if os.environ.get("AWS_PROFILE"):
-        return  # Already set via environment
+# Initialize runtime context from BLOOM + TAPDB config.
+def _init_runtime_context():
+    """Apply AWS/TAPDB runtime context and validate tapdb version policy."""
     try:
-        from bloom_lims.config import get_settings
-        settings = get_settings()
-        if settings.aws.profile:
-            os.environ["AWS_PROFILE"] = settings.aws.profile
-    except Exception:
-        pass
+        from bloom_lims.config import (
+            apply_runtime_environment,
+            assert_tapdb_version,
+            get_settings,
+        )
 
-_init_aws_profile()  
+        settings = get_settings()
+        apply_runtime_environment(settings)
+        assert_tapdb_version()
+    except Exception as exc:
+        logging.warning("Runtime context initialization warning: %s", exc)
+
+
+_init_runtime_context()
 
 
 # The following three lines allow for dropping embed() in to block and present an IPython shell
@@ -133,6 +141,7 @@ from bloom_lims.bobjs import (
     BloomFileSet,
     BloomFileReference
 )
+from bloom_lims.search import SearchRequest, SearchService
 
 from bloom_lims.bvars import BloomVars
 from bloom_lims.api import api_v1_router, RateLimitMiddleware
@@ -141,10 +150,30 @@ BVARS = BloomVars()
 BASE_DIR = Path("./served_data").resolve()  # Base directory for serving files
 
 from auth.cognito.client import (
+    CognitoAuth,
     CognitoConfigurationError,
     CognitoTokenError,
     get_cognito_auth,
 )
+
+
+def _get_request_cognito_auth(request: Request) -> CognitoAuth:
+    """Resolve Cognito auth with request-origin callback/logout URLs."""
+    try:
+        from bloom_lims.config import get_settings
+
+        settings = get_settings()
+        callback_url = str(request.url_for("auth_callback_get"))
+        logout_url = str(request.base_url).rstrip("/") + "/"
+        return CognitoAuth.from_settings(
+            settings.auth,
+            expected_callback_url=callback_url,
+            expected_logout_url=logout_url,
+        )
+    except CognitoConfigurationError:
+        raise
+    except Exception:
+        return get_cognito_auth()
 
 
 # Default user preferences (no longer file-based, stored in session only)
@@ -156,6 +185,63 @@ DEFAULT_USER_PREFERENCES = {
 templates = Environment(loader=FileSystemLoader("templates"))
 # Add tojson filter for JSON serialization in templates
 templates.filters['tojson'] = lambda x: json.dumps(x)
+
+
+def _run_git_command(*args: str) -> str:
+    """Run a git command from repo root and return stripped stdout."""
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2,
+        )
+        return result.stdout.strip()
+    except Exception:
+        return ""
+
+
+def _resolve_gui_metadata() -> Dict[str, str]:
+    """Resolve footer/help metadata from config and local git state."""
+    app_name = "BLOOM LIMS"
+    version = "dev"
+    support_email = ""
+    github_repo_url = "https://github.com/Daylily-Informatics/bloom"
+
+    try:
+        from bloom_lims.config import get_settings
+
+        settings = get_settings()
+        app_name = settings.app_name
+        version = settings.api.version
+        support_email = settings.ui.support_email
+        github_repo_url = settings.ui.github_repo_url
+    except Exception:
+        pass
+
+    branch = _run_git_command("rev-parse", "--abbrev-ref", "HEAD") or "unknown"
+    commit_hash = _run_git_command("rev-parse", "--short", "HEAD") or "unknown"
+    tag = _run_git_command("describe", "--tags", "--exact-match")
+    if not tag:
+        tag = _run_git_command("describe", "--tags", "--abbrev=0")
+    if not tag:
+        tag = "none"
+
+    return {
+        "app_name": app_name,
+        "version": version,
+        "branch": branch,
+        "tag": tag,
+        "hash": commit_hash,
+        "support_email": support_email,
+        "github_repo_url": github_repo_url,
+    }
+
+
+GUI_METADATA = _resolve_gui_metadata()
+templates.globals["gui_meta"] = GUI_METADATA
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -426,7 +512,7 @@ async def require_auth(request: Request):
         return request
 
     try:
-        get_cognito_auth()
+        _get_request_cognito_auth(request)
     except CognitoConfigurationError as exc:
         msg = f"Cognito configuration missing. Check ~/.config/bloom/bloom-config.yaml or BLOOM_AUTH__* env vars. ({exc})"
         logging.error(msg)
@@ -440,6 +526,45 @@ async def require_auth(request: Request):
         request.session["user_data"]["role"] = "user"
 
     return request.session["user_data"]
+
+
+def _resolve_auth_email(auth: Dict, request: Request) -> str:
+    """Resolve active user email from dependency auth payload or session."""
+    if isinstance(auth, dict) and auth.get("email"):
+        return auth["email"]
+    return request.session.get("user_data", {}).get("email", "anonymous")
+
+
+def _resolve_auth_role(auth: Dict, request: Request) -> str:
+    """Resolve active user role from dependency auth payload or session."""
+    if isinstance(auth, dict) and auth.get("role"):
+        return str(auth["role"])
+    return str(request.session.get("user_data", {}).get("role", "user"))
+
+
+def _require_graph_admin(auth: Dict, request: Request) -> None:
+    """Enforce admin-only graph mutations."""
+    role = _resolve_auth_role(auth, request)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
+
+def _is_tapdb_reachable(timeout_seconds: float = 0.75) -> bool:
+    """Fast TCP reachability check to avoid blocking UI routes on dead DB endpoints."""
+    try:
+        from bloom_lims.config import get_tapdb_db_config
+
+        cfg = get_tapdb_db_config()
+        host = str(cfg.get("host", "")).strip()
+        port_raw = cfg.get("port", "")
+        port = int(str(port_raw).strip()) if str(port_raw).strip() else 0
+        if not host or port <= 0:
+            return False
+
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True
+    except Exception:
+        return False
 
 
 @app.exception_handler(RequireAuthException)
@@ -461,48 +586,52 @@ async def auth_exception_handler(_request: Request, _exc: RequireAuthException):
 async def modern_dashboard(request: Request, _=Depends(require_auth)):
     """Modern dashboard - main entry point for the application."""
     user_data = request.session.get("user_data", {})
-    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
-
-    # Gather dashboard statistics
-    try:
-        assays_total = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False, is_singleton=True
-        ).count()
-
-        workflows_active = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False
-        ).count()
-
-        equipment_total = bobdb.session.query(bobdb.Base.classes.equipment_instance).filter_by(
-            is_deleted=False
-        ).count()
-
-        reagents_total = bobdb.session.query(bobdb.Base.classes.content_instance).filter(
-            bobdb.Base.classes.content_instance.is_deleted == False,
-            bobdb.Base.classes.content_instance.subtype.like('%reagent%')
-        ).count()
-    except Exception:
-        assays_total = workflows_active = equipment_total = reagents_total = 0
-
     stats = {
-        "assays_total": assays_total,
-        "workflows_active": workflows_active,
-        "equipment_total": equipment_total,
-        "reagents_total": reagents_total,
+        "assays_total": 0,
+        "workflows_active": 0,
+        "equipment_total": 0,
+        "reagents_total": 0,
     }
+    recent_assays = []
+    active_workflows = []
+    db_unavailable = not _is_tapdb_reachable()
 
-    # Get recent items
-    try:
-        recent_assays = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False, is_singleton=True
-        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
-
-        active_workflows = bobdb.session.query(bobdb.Base.classes.workflow_instance).filter_by(
-            is_deleted=False
-        ).order_by(bobdb.Base.classes.workflow_instance.created_dt.desc()).limit(5).all()
-    except Exception:
-        recent_assays = []
-        active_workflows = []
+    if not db_unavailable:
+        try:
+            bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
+            stats = {
+                "assays_total": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False, is_singleton=True)
+                .count(),
+                "workflows_active": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False)
+                .count(),
+                "equipment_total": bobdb.session.query(bobdb.Base.classes.equipment_instance)
+                .filter_by(is_deleted=False)
+                .count(),
+                "reagents_total": bobdb.session.query(bobdb.Base.classes.content_instance)
+                .filter(
+                    bobdb.Base.classes.content_instance.is_deleted == False,
+                    bobdb.Base.classes.content_instance.subtype.like('%reagent%')
+                )
+                .count(),
+            }
+            recent_assays = (
+                bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False, is_singleton=True)
+                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
+                .limit(5)
+                .all()
+            )
+            active_workflows = (
+                bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                .filter_by(is_deleted=False)
+                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
+                .limit(5)
+                .all()
+            )
+        except Exception:
+            db_unavailable = True
 
     template = templates.get_template("modern/dashboard.html")
     context = {
@@ -511,6 +640,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
         "stats": stats,
         "recent_assays": recent_assays,
         "active_workflows": active_workflows,
+        "db_unavailable": db_unavailable,
     }
 
     return HTMLResponse(content=template.render(context), status_code=200)
@@ -531,58 +661,133 @@ async def create_object_wizard(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=template.render(context), status_code=200)
 
 
-@app.get("/search", response_class=HTMLResponse)
-async def modern_search(
-    request: Request,
-    q: str = Query("", description="Search query"),
-    types: str = Query("", description="Comma-separated types to search"),
-    _=Depends(require_auth),
-):
-    """Modern search page with multi-type search and export."""
+@app.get("/help", response_class=HTMLResponse)
+async def help_page(request: Request):
+    """GUI help and support page."""
     user_data = request.session.get("user_data", {})
-    results = []
+    template = templates.get_template("modern/help.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user": user_data,
+    }
+    return HTMLResponse(content=template.render(context), status_code=200)
 
-    if q:
-        bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
-        from sqlalchemy import or_
-        from sqlalchemy.sql import cast
-        from sqlalchemy.types import String
 
-        gi = bobdb.Base.classes.generic_instance
-        query_obj = bobdb.session.query(gi)
-        query_obj = query_obj.filter(gi.is_deleted == False)
+def _parse_csv_param(raw_value: str) -> List[str]:
+    return [token.strip().lower() for token in (raw_value or "").split(",") if token.strip()]
 
-        # Filter by categories if specified
-        if types:
-            type_list = [t.strip().lower() for t in types.split(",") if t.strip()]
-            if type_list:
-                query_obj = query_obj.filter(gi.category.in_(type_list))
 
-        # Search across multiple fields
-        search_pattern = f"%{q}%"
-        query_obj = query_obj.filter(
-            or_(
-                gi.euid.ilike(search_pattern),
-                gi.name.ilike(search_pattern),
-                gi.type.ilike(search_pattern),
-                gi.subtype.ilike(search_pattern),
-                cast(gi.json_addl, String).ilike(search_pattern),
-            )
-        )
+def _render_search_page(
+    *,
+    request: Request,
+    user_data: Dict,
+    search_request: SearchRequest | None,
+    query_value: str,
+    categories_value: str,
+    record_types_value: str,
+) -> HTMLResponse:
+    search_payload = {
+        "query": query_value,
+        "items": [],
+        "total": 0,
+        "page": 1,
+        "page_size": 50,
+        "total_pages": 1,
+        "sort_by": "timestamp",
+        "sort_order": "desc",
+        "truncated": False,
+        "facets": {"record_type": {}, "category": {}},
+    }
 
-        # Order by created_dt descending, limit to 500
-        query_obj = query_obj.order_by(gi.created_dt.desc()).limit(500)
-        results = query_obj.all()
+    if search_request is not None:
+        service = SearchService(username=user_data.get("email", "anonymous"))
+        search_payload = service.search(search_request).model_dump(mode="json")
 
     template = templates.get_template("modern/search_results.html")
     context = {
         "request": request,
         "udat": user_data,
-        "query": q,
-        "types": types,
-        "results": results,
+        "query": query_value,
+        "types": categories_value,
+        "record_types": record_types_value,
+        "results": search_payload.get("items", []),
+        "search_response": search_payload,
+        "selected_types": _parse_csv_param(categories_value),
+        "selected_record_types": _parse_csv_param(record_types_value),
     }
     return HTMLResponse(content=template.render(context), status_code=200)
+
+
+@app.get("/search", response_class=HTMLResponse)
+async def modern_search(
+    request: Request,
+    q: str = Query("", description="Search query"),
+    types: str = Query("", description="Comma-separated categories to search"),
+    record_types: str = Query("", description="Comma-separated record types to search"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    sort_by: str = Query("timestamp"),
+    sort_order: str = Query("desc"),
+    _=Depends(require_auth),
+):
+    """Unified search page backed by search v2 service."""
+    user_data = request.session.get("user_data", {})
+    categories = _parse_csv_param(types)
+    selected_record_types = _parse_csv_param(record_types)
+
+    has_filters = bool(q.strip() or categories or selected_record_types)
+    search_request = None
+    if has_filters:
+        search_request = SearchRequest(
+            query=q,
+            categories=categories,
+            record_types=selected_record_types,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            max_scan=10000,
+        )
+
+    return _render_search_page(
+        request=request,
+        user_data=user_data,
+        search_request=search_request,
+        query_value=q,
+        categories_value=types,
+        record_types_value=record_types,
+    )
+
+
+@app.post("/search", response_class=HTMLResponse)
+async def modern_search_from_dewey(
+    request: Request,
+    _=Depends(require_auth),
+):
+    """Handle Dewey metadata searches via unified search v2 service."""
+    user_data = request.session.get("user_data", {})
+    form = await request.form()
+    form_data = {}
+    for key in form.keys():
+        values = form.getlist(key)
+        form_data[key] = values if len(values) > 1 else values[0]
+
+    target = str(form_data.get("search_target", "file")).strip().lower()
+    service = SearchService(username=user_data.get("email", "anonymous"))
+    search_request = service.build_dewey_request(form_data, target=target)
+
+    query_value = search_request.query
+    categories_value = ",".join(search_request.categories)
+    record_types_value = ",".join(search_request.record_types)
+    return _render_search_page(
+        request=request,
+        user_data=user_data,
+        search_request=search_request,
+        query_value=query_value,
+        categories_value=categories_value,
+        record_types_value=record_types_value,
+    )
 
 
 @app.get("/bulk_create_containers", response_class=HTMLResponse)
@@ -591,20 +796,6 @@ async def modern_bulk_create_containers(request: Request, _=Depends(require_auth
     user_data = request.session.get("user_data", {})
     template = templates.get_template("modern/bulk_create_containers.html")
     context = {"request": request, "udat": user_data}
-    return HTMLResponse(content=template.render(context), status_code=200)
-
-
-# =============================================================================
-# LEGACY UI ROUTES (preserved for backward compatibility)
-# =============================================================================
-
-@app.get("/legacy/", response_class=HTMLResponse)
-async def legacy_index(request: Request):
-    """Legacy index page."""
-    template = templates.get_template("legacy/index.html")
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-    context = {"request": request, "style": style, "udat": user_data}
     return HTMLResponse(content=template.render(context), status_code=200)
 
 
@@ -626,13 +817,14 @@ async def index2(request: Request, _=Depends(require_auth)):
 async def get_login_page(request: Request):
     """Modern login page."""
     user_data = request.session.get("user_data", {})
+    auth_error = request.query_params.get("error")
 
     # When OAuth is disabled (testing), use placeholder URL
     if os.environ.get("BLOOM_OAUTH", "yes") == "no":
         cognito_login_url = "#auth-disabled"
     else:
         try:
-            cognito = get_cognito_auth()
+            cognito = _get_request_cognito_auth(request)
             cognito_login_url = cognito.config.authorize_url
         except CognitoConfigurationError as exc:
             raise MissingCognitoEnvVarsException(str(exc)) from exc
@@ -643,40 +835,107 @@ async def get_login_page(request: Request):
         "request": request,
         "udat": user_data,
         "cognito_login_url": cognito_login_url,
+        "auth_error": auth_error,
         "version": "1.0.0",
     }
     return HTMLResponse(content=template.render(context))
 
 
-@app.get("/legacy/login", include_in_schema=False)
-async def get_legacy_login_page(request: Request):
-    """Legacy login page."""
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+def _login_error_redirect(error_message: str) -> RedirectResponse:
+    msg = (error_message or "authentication_failed").strip()
+    return RedirectResponse(url=f"/login?error={quote(msg)}", status_code=303)
 
-    # When OAuth is disabled (testing), use placeholder URL
-    if os.environ.get("BLOOM_OAUTH", "yes") == "no":
-        cognito_login_url = "#auth-disabled"
-    else:
-        try:
-            cognito = get_cognito_auth()
-            cognito_login_url = cognito.config.authorize_url
-        except CognitoConfigurationError as exc:
-            raise MissingCognitoEnvVarsException(str(exc)) from exc
 
-    template = templates.get_template("legacy/login.html")
-    context = {
-        "request": request,
-        "style": style,
-        "udat": user_data,
-        "cognito_authorize_url": cognito_login_url,
-    }
-    return HTMLResponse(content=template.render(context))
+async def _complete_cognito_login(
+    request: Request,
+    *,
+    id_token: str | None,
+    access_token: str | None,
+) -> RedirectResponse:
+    if not id_token and not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Cognito tokens provided.",
+        )
+
+    try:
+        cognito = _get_request_cognito_auth(request)
+        decoded_token = cognito.validate_token(id_token or access_token)
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
+    except CognitoTokenError as exc:
+        logging.error(f"Unable to validate Cognito token: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Cognito token"
+        ) from exc
+
+    primary_email = decoded_token.get("email") or decoded_token.get("username")
+    if not primary_email:
+        primary_email = decoded_token.get("cognito:username")
+
+    if not primary_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to determine email from Cognito token",
+        )
+
+    allowed_domains = get_allowed_domains()
+    # Handle block all sentinel (when COGNITO_WHITELIST_DOMAINS="")
+    if allowed_domains == ["__BLOCK_ALL__"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email domain authentication is not enabled"
+        )
+    # Check against whitelist if not empty (empty = allow all)
+    if allowed_domains:
+        user_domain = primary_email.split("@")[-1]
+        if user_domain not in allowed_domains:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email domain not allowed"
+            )
+
+    user_data = get_user_preferences(primary_email)
+    user_data.update(
+        {
+            "id_token": id_token,
+            "access_token": access_token,
+            "cognito_username": decoded_token.get("cognito:username"),
+            "cognito_sub": decoded_token.get("sub"),
+        }
+    )
+    request.session["user_data"] = user_data
+
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/oauth_callback")
 async def oauth_callback_get(request: Request):
-    """Handle OAuth implicit flow callback - parse URL fragment and POST tokens."""
+    """Handle OAuth callback for code flow (preferred) and implicit fallback."""
+    callback_error = request.query_params.get("error")
+    if callback_error:
+        callback_description = request.query_params.get("error_description")
+        return _login_error_redirect(callback_description or callback_error)
+
+    auth_code = request.query_params.get("code")
+    if auth_code:
+        try:
+            cognito = _get_request_cognito_auth(request)
+            token_payload = cognito.exchange_authorization_code(auth_code)
+            return await _complete_cognito_login(
+                request,
+                id_token=token_payload.get("id_token"),
+                access_token=token_payload.get("access_token"),
+            )
+        except HTTPException as exc:
+            return _login_error_redirect(str(exc.detail))
+        except CognitoConfigurationError as exc:
+            raise MissingCognitoEnvVarsException(str(exc)) from exc
+        except CognitoTokenError as exc:
+            logging.error("Authorization code exchange failed: %s", exc)
+            return _login_error_redirect(str(exc))
+
+    # Implicit fallback to support existing hosted UI clients.
     html_content = """<!DOCTYPE html>
 <html>
 <head><title>Processing login...</title></head>
@@ -725,63 +984,23 @@ async def oauth_callback(request: Request):
     body = await request.json()
     access_token = body.get("access_token") or body.get("accessToken")
     id_token = body.get("id_token")
-
-    if not id_token and not access_token:
-        return JSONResponse(
-            content={"message": "No Cognito tokens provided."},
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-
-    try:
-        cognito = get_cognito_auth()
-        decoded_token = cognito.validate_token(id_token or access_token)
-    except CognitoConfigurationError as exc:
-        raise MissingCognitoEnvVarsException(str(exc)) from exc
-    except CognitoTokenError as exc:
-        logging.error(f"Unable to validate Cognito token: {exc}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Cognito token"
-        ) from exc
-
-    primary_email = decoded_token.get("email") or decoded_token.get("username")
-    if not primary_email:
-        primary_email = decoded_token.get("cognito:username")
-
-    if not primary_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to determine email from Cognito token",
-        )
-
-    allowed_domains = get_allowed_domains()
-    # Handle block all sentinel (when COGNITO_WHITELIST_DOMAINS="")
-    if allowed_domains == ["__BLOCK_ALL__"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email domain authentication is not enabled"
-        )
-    # Check against whitelist if not empty (empty = allow all)
-    if allowed_domains:
-        user_domain = primary_email.split("@")[-1]
-        if user_domain not in allowed_domains:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email domain not allowed"
-            )
-
-    user_data = get_user_preferences(primary_email)
-    user_data.update(
-        {
-            "id_token": id_token,
-            "access_token": access_token,
-            "cognito_username": decoded_token.get("cognito:username"),
-            "cognito_sub": decoded_token.get("sub"),
-        }
+    return await _complete_cognito_login(
+        request,
+        id_token=id_token,
+        access_token=access_token,
     )
-    request.session["user_data"] = user_data
 
-    # Redirect to home page or dashboard
-    return RedirectResponse(url="/", status_code=303)
+
+@app.get("/auth/callback")
+async def auth_callback_get(request: Request):
+    """Alias for daycog/daylily-cognito callback convention."""
+    return await oauth_callback_get(request)
+
+
+@app.post("/auth/callback")
+async def auth_callback(request: Request):
+    """Alias for daycog/daylily-cognito callback convention."""
+    return await oauth_callback(request)
 
 
 @app.post("/login", include_in_schema=False)
@@ -808,7 +1027,7 @@ async def logout(request: Request, response: Response):
 
         cognito_logout_url = "/"
         try:
-            cognito_logout_url = get_cognito_auth().config.logout_url
+            cognito_logout_url = _get_request_cognito_auth(request).config.logout_url
         except CognitoConfigurationError as exc:
             logging.error(f"Cognito configuration missing during logout: {exc}")
 
@@ -868,7 +1087,6 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
     # Initialize your database object with the user's email
     bobdb = BloomObj(BLOOMdb3(app_username=user_email))
     ay_ds = {}
-    print("\n\n\nAAAAAAAA\n\n\n")
     for i in (
         bobdb.session.query(bobdb.Base.classes.workflow_instance)
         .filter_by(is_deleted=False, is_singleton=True)
@@ -877,7 +1095,6 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
         if show_type == "all" or i.json_addl.get("assay_type", "all") == show_type:
             ay_ds[i.euid] = i
 
-    print("\n\n\n\n\nBBBBBB\n\n\n\n")
     assays = []
     ay_dss = {}
     atype = {}
@@ -892,11 +1109,15 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
     for i in sorted(ay_ds.keys()):
         assays.append(ay_ds[i])
         ay_dss[i] = {
-            "Instantaneous COGS": 0
+            "Instantaneous COGS": 0,
+            "tot": 0,
+            "tit_s": 0,
+            "tot_fx": 0,
+            "inprog": 0,
+            "complete": 0,
+            "exception": 0,
+            "avail": 0,
         }  # round(bobdb.get_cost_of_euid_children(i),2)}
-        ay_dss[i]["tot"] = 0
-        ay_dss[i]["tit_s"] = 0
-        ay_dss[i]["tot_fx"] = 0
 
         for q in ay_ds[i].parent_of_lineages:
             # Skip soft-deleted lineages
@@ -912,7 +1133,17 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
                     except Exception as e:
                         print(e)
             wset = ""
-            n = q.child_instance.json_addl["properties"]["name"]
+            child_json = (
+                q.child_instance.json_addl
+                if isinstance(q.child_instance.json_addl, dict)
+                else {}
+            )
+            child_props = (
+                child_json.get("properties", {})
+                if isinstance(child_json.get("properties", {}), dict)
+                else {}
+            )
+            n = str(child_props.get("name", ""))
             if n.startswith("In"):
                 wset = "inprog"
             elif n.startswith("Comple"):
@@ -923,7 +1154,8 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
                 wset = "avail"
             # Filter out soft-deleted lineages from count
             lins = [lin for lin in q.child_instance.parent_of_lineages.all() if not lin.is_deleted]
-            ay_dss[i][wset] = len(lins)
+            if wset:
+                ay_dss[i][wset] = len(lins)
             lctr = 0
             lctr_max = 150
             for llin in lins:
@@ -948,13 +1180,11 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
         except Exception as e:
             ay_dss[i]["avg_d_fx"] = "na"
 
+        complete_n = int(ay_dss[i].get("complete", 0))
+        exception_n = int(ay_dss[i].get("exception", 0))
         ay_dss[i]["conv"] = (
-            round(
-                float(ay_dss[i]["complete"])
-                / float(ay_dss[i]["complete"] + ay_dss[i]["exception"]),
-                2,
-            )
-            if ay_dss[i]["complete"] + ay_dss[i]["exception"] > 0
+            round(float(complete_n) / float(complete_n + exception_n), 2)
+            if (complete_n + exception_n) > 0
             else "na"
         )
         ay_dss[i]["wsetp"] = (
@@ -986,6 +1216,17 @@ async def Acalculate_cogs_children(euid, request: Request, _auth=Depends(require
         return json.dumps({"success": True, "cogs_value": cogs_value})
     except Exception as e:
         return json.dumps({"success": False, "message": str(e)})
+
+
+@app.get("/calculate_cogs_parents")
+async def calculate_cogs_parents(euid, request: Request, _auth=Depends(require_auth)):
+    try:
+        bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+        cogs_value = round(bobdb.get_cogs_to_produce_euid(euid), 2)
+        return json.dumps({"success": True, "cogs_value": cogs_value})
+    except Exception as e:
+        return json.dumps({"success": False, "message": str(e)})
+
 
 @app.post("/query_by_euids", response_class=HTMLResponse)
 async def query_by_euids(request: Request, file_euids: str = Form(...)):
@@ -1035,16 +1276,6 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
             udat=user_data,
         )
         return HTMLResponse(content=content)
-
-
-async def calculate_cogs_parents(euid, request: Request, _auth=Depends(require_auth)):
-    try:
-        bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]))
-        cogs_value = round(bobdb.get_cogs_to_produce_euid(euid), 2)
-        return json.dumps({"success": True, "cogs_value": cogs_value})
-    except Exception as e:
-        return json.dumps({"success": False, "message": str(e)})
-
 
 @app.get("/set_filter")
 async def set_filter(request: Request, _auth=Depends(require_auth), curr_val="off"):
@@ -1141,7 +1372,7 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     # Cognito information (non-sensitive)
     cognito_info = {}
     try:
-        cognito = get_cognito_auth()
+        cognito = _get_request_cognito_auth(request)
         cognito_info = {
             "region": cognito.config.region,
             "user_pool_id": cognito.config.user_pool_id,
@@ -1175,8 +1406,35 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "dependency_info": dependency_info,
         "cognito_info": cognito_info,
         "db_info": db_info,
+        "saved": request.query_params.get("saved") == "1",
     }
     return HTMLResponse(content=template.render(context))
+
+
+@app.post("/admin")
+async def admin_update_preferences(request: Request, _auth=Depends(require_auth)):
+    """Update admin preference form values and redirect back to admin page."""
+    form = await request.form()
+    editable_keys = ("print_lab", "printer_name", "label_zpl_style", "style_css")
+
+    auth_email = ""
+    if isinstance(_auth, dict):
+        auth_email = _auth.get("email", "")
+    if "user_data" not in request.session:
+        request.session["user_data"] = get_user_preferences(auth_email)
+
+    updated_keys = []
+    for key in editable_keys:
+        value = form.get(key)
+        if value is not None and str(value).strip() != "":
+            request.session["user_data"][key] = str(value)
+            updated_keys.append(key)
+
+    accepts = request.headers.get("accept", "").lower()
+    if "application/json" in accepts:
+        return {"status": "success", "updated_keys": updated_keys}
+
+    return RedirectResponse(url="/admin?saved=1", status_code=303)
 
 
 @app.post("/update_preference")
@@ -1305,6 +1563,28 @@ async def dag_explorer_redirect(request: Request):
     return RedirectResponse(url=url, status_code=307)
 
 
+@app.get("/graph")
+async def graph_redirect(request: Request):
+    """
+    Redirect /graph to /dindex2 with normalized query params.
+
+    Supports:
+    - New params: start_euid, depth
+    - Legacy params: globalStartNodeEUID, globalFilterLevel
+    """
+    params = dict(request.query_params)
+
+    if "start_euid" in params and "globalStartNodeEUID" not in params:
+        params["globalStartNodeEUID"] = params["start_euid"]
+    if "depth" in params and "globalFilterLevel" not in params:
+        params["globalFilterLevel"] = params["depth"]
+
+    url = "/dindex2"
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    return RedirectResponse(url=url, status_code=307)
+
+
 # ==================== End URL Aliases ====================
 
 
@@ -1326,9 +1606,11 @@ async def workflow_summary(request: Request, _auth=Depends(require_auth)):
     )
 
     for wf in workflows:
-        wf_type = wf.type
-        wf_status = wf.bstatus
-        wf_created_dt = wf.created_dt.date()
+        wf_type = wf.type or "unknown"
+        wf_status = wf.bstatus or "queued"
+        if isinstance(wf.json_addl, dict):
+            wf_status = wf.json_addl.get("status", wf_status) or wf_status
+        wf_created_dt = wf.created_dt.date() if wf.created_dt else datetime.utcnow().date()
 
         stats = workflow_statistics[wf_type]
         stats["status_counts"][wf_status] += 1
@@ -1337,6 +1619,10 @@ async def workflow_summary(request: Request, _auth=Depends(require_auth)):
 
     workflow_statistics = {k: dict(v) for k, v in workflow_statistics.items()}
     unique_workflow_types = list(workflow_statistics.keys())
+    workflow_status_totals = defaultdict(int)
+    for wf_stats in workflow_statistics.values():
+        for status_name, count in wf_stats.get("status_counts", {}).items():
+            workflow_status_totals[status_name] += count
 
     user_data = request.session.get("user_data", {})
 
@@ -1348,6 +1634,7 @@ async def workflow_summary(request: Request, _auth=Depends(require_auth)):
         "workflows": workflows,
         "workflow_statistics": workflow_statistics,
         "unique_workflow_types": unique_workflow_types,
+        "workflow_status_totals": dict(workflow_status_totals),
     }
     return HTMLResponse(content=template.render(context))
 
@@ -1588,6 +1875,70 @@ async def get_related_plates(request: Request, main_plate, _auth=Depends(require
     return related_plates
 
 
+def _build_assay_selection_html(bobdb: BloomObj) -> str:
+    """Render a dynamic assay selection dropdown from live workflow/assay instances."""
+    assay_workflows = bobdb.query_instance_by_component_v2(category="workflow", type="assay")
+    assay_workflows = [wf for wf in assay_workflows if not getattr(wf, "is_deleted", False)]
+    assay_workflows.sort(
+        key=lambda wf: (
+            str(getattr(wf, "subtype", "") or "").lower(),
+            str(getattr(wf, "version", "") or ""),
+            str(getattr(wf, "name", "") or "").lower(),
+            str(getattr(wf, "euid", "") or ""),
+        )
+    )
+
+    options = []
+    for wf in assay_workflows:
+        props = wf.json_addl.get("properties", {}) if isinstance(wf.json_addl, dict) else {}
+        display_name = (
+            props.get("name")
+            if isinstance(props, dict)
+            else None
+        ) or wf.name or wf.subtype or wf.euid
+        label = f"{display_name} ({wf.subtype} v{wf.version}) [{wf.euid}]"
+        options.append(
+            f'<option value="{html_escape(str(wf.euid), quote=True)}">{html_escape(str(label))}</option>'
+        )
+
+    if not options:
+        options.append('<option value="" disabled selected>No assay workflows available</option>')
+
+    return '<select name="assay_selection" required>' + "".join(options) + "</select>"
+
+
+def _hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
+    """
+    Replace dynamic captured_data placeholders with live values for UI action forms.
+    Currently supported:
+      - ___workflow/assay/ -> dropdown of live workflow/assay instances
+    """
+    if not isinstance(action_groups, dict):
+        return {}
+
+    hydrated = copy.deepcopy(action_groups)
+    assay_selection_html = None
+
+    for group_data in hydrated.values():
+        if not isinstance(group_data, dict):
+            continue
+        actions = group_data.get("actions", {})
+        if not isinstance(actions, dict):
+            continue
+        for action_data in actions.values():
+            if not isinstance(action_data, dict):
+                continue
+            captured = action_data.get("captured_data", {})
+            if not isinstance(captured, dict):
+                continue
+            if "___workflow/assay/" in captured:
+                if assay_selection_html is None:
+                    assay_selection_html = _build_assay_selection_html(bobdb)
+                captured["___workflow/assay/"] = assay_selection_html
+
+    return hydrated
+
+
 @app.get("/plate_visualization", response_class=HTMLResponse)
 async def plate_visualization(
     request: Request, plate_euid, _auth=Depends(require_auth)
@@ -1669,47 +2020,6 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(**context))
-
-
-@app.get("/legacy/database_statistics", response_class=HTMLResponse)
-async def legacy_database_statistics(request: Request, _auth=Depends(require_auth)):
-    """Legacy database statistics page."""
-    user_data = request.session.get("user_data", {})
-    if not user_data:
-        return RedirectResponse(url="/login")
-
-    bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
-
-    def get_stats(days):
-        cutoff_date = datetime.now() - timedelta(days=days)
-        return (
-            bobdb.session.query(
-                bobdb.Base.classes.generic_instance.subtype,
-                func.count(bobdb.Base.classes.generic_instance.uuid),
-            )
-            .filter(
-                bobdb.Base.classes.generic_instance.created_dt >= cutoff_date,
-                bobdb.Base.classes.generic_instance.is_deleted == False,
-            )
-            .group_by(bobdb.Base.classes.generic_instance.subtype)
-            .all()
-        )
-
-    stats_1d = get_stats(1)
-    stats_7d = get_stats(7)
-    stats_30d = get_stats(30)
-
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/database_statistics.html").render(
-        request=request,
-        stats_1d=stats_1d,
-        stats_7d=stats_7d,
-        stats_30d=stats_30d,
-        style=style,
-        udat=user_data,
-    )
-    return HTMLResponse(content=content)
 
 
 @app.post("/save_json_addl_key")
@@ -1833,6 +2143,12 @@ async def euid_details(
 
         # Determine if user is admin
         is_admin = user_data.get("role", "user") == "admin"
+        action_groups = {}
+        if isinstance(obj.json_addl, dict):
+            action_groups = _hydrate_dynamic_action_groups(
+                obj.json_addl.get("action_groups", {}),
+                bobdb,
+            )
 
         # Use modern template
         template = templates.get_template("modern/euid_details.html")
@@ -1847,6 +2163,7 @@ async def euid_details(
             "udat": user_data,
             "subjects_for_object": subjects_for_object,
             "is_admin": is_admin,
+            "action_groups": action_groups,
         }
         return HTMLResponse(content=template.render(context))
 
@@ -1947,6 +2264,7 @@ def delete_by_euid(request: Request, euid, _auth=Depends(require_auth)):
 
 @app.post("/delete_object")
 async def delete_object(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /delete_object used; prefer DELETE /api/object/{euid}")
     data = await request.json()
     euid = data.get("euid")
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -1958,6 +2276,7 @@ async def delete_object(request: Request, _auth=Depends(require_auth)):
         return {
             "status": "success",
             "message": f"Delete object performed for EUID {euid}",
+            "deprecated": True,
         }
     except Exception as e:
         # Object might already be deleted, try to find it in deleted items
@@ -1971,6 +2290,7 @@ async def delete_object(request: Request, _auth=Depends(require_auth)):
                 return {
                     "status": "success",
                     "message": f"Object {euid} was already soft-deleted",
+                    "deprecated": True,
                 }
         except Exception:
             pass
@@ -1996,27 +2316,6 @@ async def workflow_details(
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(**context))
-
-
-@app.get("/legacy/workflow_details", response_class=HTMLResponse)
-async def legacy_workflow_details(
-    request: Request, workflow_euid, _auth=Depends(require_auth)
-):
-    """Legacy workflow details page."""
-    bwfdb = BloomWorkflow(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    workflow = bwfdb.get_sorted_euid(workflow_euid)
-    accordion_states = dict(request.session)
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/workflow_details.html").render(
-        request=request,
-        workflow=workflow,
-        accordion_states=accordion_states,
-        style=style,
-        udat=user_data,
-    )
-    return HTMLResponse(content=content)
 
 
 @app.post("/update_accordion_state")
@@ -2140,58 +2439,382 @@ async def dagg(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=content)
 
 
+GRAPH_CATEGORY_COLORS = {
+    "workflow": "#00FF7F",
+    "workflow_step": "#ADFF2F",
+    "container": "#8B00FF",
+    "content": "#00BFFF",
+    "equipment": "#FF4500",
+    "data": "#FFD700",
+    "actor": "#FF69B4",
+    "action": "#FF8C00",
+    "test_requisition": "#FFA500",
+    "health_event": "#DC143C",
+    "file": "#00FF00",
+    "subject": "#9370DB",
+    "object_set": "#FF6347",
+    "generic": "#FF1493",
+}
+
+GRAPH_SUBTYPE_COLORS = {
+    "well": "#70658C",
+    "file_set": "#228080",
+}
+
+
+def _graph_node_color(category: str, obj_type: str, subtype: str) -> str:
+    if obj_type in GRAPH_SUBTYPE_COLORS:
+        return GRAPH_SUBTYPE_COLORS[obj_type]
+    if subtype in GRAPH_SUBTYPE_COLORS:
+        return GRAPH_SUBTYPE_COLORS[subtype]
+    return GRAPH_CATEGORY_COLORS.get(category, "#888888")
+
+
+def _normalize_graph_request_params(
+    start_euid: str | None,
+    depth: int | None,
+    legacy_start: str | None,
+    legacy_depth: int | None,
+) -> tuple[str, int]:
+    resolved_start = (start_euid or legacy_start or "AY1").strip() or "AY1"
+
+    try:
+        resolved_depth = int(depth if depth is not None else legacy_depth if legacy_depth is not None else 4)
+    except (TypeError, ValueError):
+        resolved_depth = 4
+
+    resolved_depth = max(1, min(resolved_depth, 10))
+    return resolved_start, resolved_depth
+
+
+def _build_graph_elements_for_start(bobj: BloomObj, start_euid: str, depth: int) -> tuple[list, list]:
+    instance_result = {}
+    lineage_result = {}
+
+    for row in bobj.fetch_graph_data_by_node_depth(start_euid, depth):
+        node_euid = row[0]
+        if node_euid not in [None, "", "None"]:
+            instance_result[node_euid] = {
+                "euid": row[0],
+                "name": row[2],
+                "type": row[3],
+                "category": row[4],
+                "subtype": row[5],
+                "version": row[6],
+            }
+
+        lineage_euid = row[8]
+        if lineage_euid not in [None, "", "None"]:
+            lineage_result[lineage_euid] = {
+                "parent_euid": row[9],
+                "child_euid": row[10],
+                "lineage_euid": lineage_euid,
+                "relationship_type": row[11] or "generic",
+            }
+
+    nodes = []
+    for key in sorted(instance_result.keys()):
+        node = instance_result[key]
+        color = _graph_node_color(node["category"], node["type"], node["subtype"])
+        nodes.append(
+            {
+                "data": {
+                    "id": str(node["euid"]),
+                    "euid": str(node["euid"]),
+                    "name": node["name"] or str(node["euid"]),
+                    "type": node["type"],
+                    "obj_type": node["type"],
+                    "btype": node["type"],  # Legacy compatibility
+                    "category": node["category"],
+                    "subtype": node["subtype"],
+                    "b_sub_type": node["subtype"],  # Legacy compatibility
+                    "version": node["version"],
+                    "color": color,
+                }
+            }
+        )
+
+    edges = []
+    for key in sorted(lineage_result.keys()):
+        edge = lineage_result[key]
+        edges.append(
+            {
+                "data": {
+                    "id": str(edge["lineage_euid"]),
+                    # Directionality in graph view: child -> parent
+                    "source": str(edge["child_euid"]),
+                    "target": str(edge["parent_euid"]),
+                    "relationship_type": str(edge["relationship_type"]),
+                }
+            }
+        )
+
+    return nodes, edges
+
+
 @app.get("/dindex2", response_class=HTMLResponse)
 async def dindex2(
     request: Request,
-    globalFilterLevel=6,
-    globalZoom=0,
-    globalStartNodeEUID=None,
+    globalFilterLevel: int = Query(default=6),
+    globalZoom: float = Query(default=0),
+    globalStartNodeEUID: str | None = Query(default=None),
+    start_euid: str | None = Query(default=None),
+    depth: int | None = Query(default=None, ge=1, le=10),
     auth=Depends(require_auth),
 ):
     """DAG Explorer - Interactive graph visualization of object relationships."""
-    dag_data = generate_dag_json_from_all_objects_v2(
-        request=request, euid=globalStartNodeEUID, depth=globalFilterLevel
+    resolved_start_euid, resolved_depth = _normalize_graph_request_params(
+        start_euid=start_euid,
+        depth=depth,
+        legacy_start=globalStartNodeEUID,
+        legacy_depth=globalFilterLevel,
     )
-    user_data = request.session.get("user_data", {})
+    user_data = auth if isinstance(auth, dict) else request.session.get("user_data", {})
+    user_role = _resolve_auth_role(auth, request)
 
-    # Use modern template
     template = templates.get_template("modern/dag_explorer.html")
     context = {
         "request": request,
-        "globalFilterLevel": globalFilterLevel,
+        "globalFilterLevel": resolved_depth,
         "globalZoom": globalZoom,
-        "globalStartNodeEUID": globalStartNodeEUID,
-        "dag_data": dag_data,
+        "globalStartNodeEUID": resolved_start_euid,
+        "start_euid": resolved_start_euid,
+        "depth": resolved_depth,
+        "is_admin": user_role == "admin",
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(**context))
 
 
-@app.get("/legacy/dindex2", response_class=HTMLResponse)
-async def legacy_dindex2(
+@app.get("/api/graph/data")
+async def api_graph_data(
     request: Request,
-    globalFilterLevel=6,
-    globalZoom=0,
-    globalStartNodeEUID=None,
+    start_euid: str | None = Query(default=None),
+    depth: int = Query(default=4, ge=1, le=10),
     auth=Depends(require_auth),
 ):
-    """Legacy DAG Explorer page."""
-    dag_data = generate_dag_json_from_all_objects_v2(
-        request=request, euid=globalStartNodeEUID, depth=globalFilterLevel
+    """Fetch Cytoscape graph data centered on a start node."""
+    resolved_start_euid, resolved_depth = _normalize_graph_request_params(
+        start_euid=start_euid,
+        depth=depth,
+        legacy_start=None,
+        legacy_depth=None,
     )
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+    user_email = _resolve_auth_email(auth, request)
+    logging.info(
+        "Graph data request start_euid=%s depth=%s user=%s",
+        resolved_start_euid,
+        resolved_depth,
+        user_email,
+    )
 
-    content = templates.get_template("legacy/dindex2.html").render(
-        request=request,
-        style=style,
-        globalFilterLevel=globalFilterLevel,
-        globalZoom=globalZoom,
-        globalStartNodeEUID=globalStartNodeEUID,
-        dag_data=dag_data,
-        udat=user_data,
+    try:
+        bobj = BloomObj(BLOOMdb3(app_username=user_email))
+        nodes, edges = _build_graph_elements_for_start(bobj, resolved_start_euid, resolved_depth)
+        return {
+            "elements": {"nodes": nodes, "edges": edges},
+            "meta": {"start_euid": resolved_start_euid, "depth": resolved_depth},
+        }
+    except Exception as exc:
+        logging.error(
+            "Graph data request failed start_euid=%s depth=%s user=%s error=%s",
+            resolved_start_euid,
+            resolved_depth,
+            user_email,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to load graph data")
+
+
+@app.get("/api/object/{euid}")
+async def api_graph_object_detail(
+    request: Request,
+    euid: str,
+    auth=Depends(require_auth),
+):
+    """Get object details (instance/template/lineage) by EUID for graph panel."""
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+    instance_cls = bobj.Base.classes.generic_instance
+
+    try:
+        obj = bobj.get_by_euid(euid)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
+
+    object_kind = "instance"
+    if isinstance(obj, bobj.Base.classes.generic_template):
+        object_kind = "template"
+    elif isinstance(obj, bobj.Base.classes.generic_instance_lineage):
+        object_kind = "lineage"
+
+    payload = {
+        "uuid": str(obj.uuid),
+        "euid": obj.euid,
+        "name": obj.name,
+        "type": object_kind,
+        "obj_type": getattr(obj, "type", ""),
+        "btype": getattr(obj, "type", ""),
+        "category": getattr(obj, "category", ""),
+        "subtype": getattr(obj, "subtype", ""),
+        "b_sub_type": getattr(obj, "subtype", ""),
+        "version": getattr(obj, "version", ""),
+        "bstatus": getattr(obj, "bstatus", ""),
+        "json_addl": getattr(obj, "json_addl", {}) or {},
+        "created_dt": obj.created_dt.isoformat() if getattr(obj, "created_dt", None) else None,
+        "modified_dt": obj.modified_dt.isoformat() if getattr(obj, "modified_dt", None) else None,
+    }
+
+    if object_kind == "lineage":
+        parent_obj = (
+            bobj.session.query(instance_cls)
+            .filter(instance_cls.uuid == obj.parent_instance_uuid)
+            .first()
+        )
+        child_obj = (
+            bobj.session.query(instance_cls)
+            .filter(instance_cls.uuid == obj.child_instance_uuid)
+            .first()
+        )
+        payload["relationship_type"] = getattr(obj, "relationship_type", "generic") or "generic"
+        # Graph directionality is child -> parent
+        payload["source"] = child_obj.euid if child_obj else None
+        payload["target"] = parent_obj.euid if parent_obj else None
+
+    return payload
+
+
+@app.post("/api/lineage")
+async def api_graph_create_lineage(
+    request: Request,
+    auth=Depends(require_auth),
+):
+    """Create a lineage edge between two instance EUIDs (admin only)."""
+    _require_graph_admin(auth, request)
+    data = await request.json()
+
+    parent_euid = (data.get("parent_euid") or "").strip()
+    child_euid = (data.get("child_euid") or "").strip()
+    relationship_type = (data.get("relationship_type") or "generic").strip() or "generic"
+
+    if not parent_euid or not child_euid:
+        raise HTTPException(status_code=400, detail="parent_euid and child_euid are required")
+    if parent_euid == child_euid:
+        raise HTTPException(status_code=400, detail="parent_euid and child_euid must differ")
+
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+    instance_cls = bobj.Base.classes.generic_instance
+    lineage_cls = bobj.Base.classes.generic_instance_lineage
+
+    parent_obj = (
+        bobj.session.query(instance_cls)
+        .filter(instance_cls.euid == parent_euid, instance_cls.is_deleted == False)
+        .first()
     )
-    return HTMLResponse(content=content)
+    child_obj = (
+        bobj.session.query(instance_cls)
+        .filter(instance_cls.euid == child_euid, instance_cls.is_deleted == False)
+        .first()
+    )
+    if parent_obj is None:
+        raise HTTPException(status_code=404, detail=f"Parent not found: {parent_euid}")
+    if child_obj is None:
+        raise HTTPException(status_code=404, detail=f"Child not found: {child_euid}")
+
+    existing = (
+        bobj.session.query(lineage_cls)
+        .filter(
+            lineage_cls.parent_instance_uuid == parent_obj.uuid,
+            lineage_cls.child_instance_uuid == child_obj.uuid,
+            lineage_cls.relationship_type == relationship_type,
+            lineage_cls.is_deleted == False,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Lineage already exists: {child_euid} -> {parent_euid} ({relationship_type})",
+        )
+
+    try:
+        new_lineage = bobj.create_generic_instance_lineage_by_euids(
+            parent_instance_euid=parent_euid,
+            child_instance_euid=child_euid,
+            relationship_type=relationship_type,
+        )
+        bobj.session.flush()
+        bobj.session.commit()
+        logging.info(
+            "Graph lineage created euid=%s parent=%s child=%s rel=%s user=%s",
+            new_lineage.euid,
+            parent_euid,
+            child_euid,
+            relationship_type,
+            user_email,
+        )
+        return {"success": True, "euid": str(new_lineage.euid), "uuid": str(new_lineage.uuid)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        bobj.session.rollback()
+        logging.error(
+            "Graph lineage create failed parent=%s child=%s rel=%s user=%s error=%s",
+            parent_euid,
+            child_euid,
+            relationship_type,
+            user_email,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to create lineage")
+
+
+@app.delete("/api/object/{euid}")
+async def api_graph_delete_object(
+    request: Request,
+    euid: str,
+    hard_delete: bool = False,
+    auth=Depends(require_auth),
+):
+    """Soft-delete an object by EUID for graph operations (admin only)."""
+    _require_graph_admin(auth, request)
+
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+
+    try:
+        obj = bobj.get_by_euid(euid)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
+
+    try:
+        bobj.delete(obj)
+        bobj.session.flush()
+        bobj.session.commit()
+        logging.info(
+            "Graph object deleted euid=%s hard_delete_requested=%s user=%s",
+            euid,
+            hard_delete,
+            user_email,
+        )
+        return {
+            "success": True,
+            "message": f"Object {euid} soft-deleted",
+            "hard_delete_applied": False,
+        }
+    except Exception as exc:
+        bobj.session.rollback()
+        logging.error(
+            "Graph object delete failed euid=%s user=%s error=%s",
+            euid,
+            user_email,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to delete object")
 
 
 def add_new_node(request: Request, _auth=Depends(require_auth)):
@@ -2258,15 +2881,16 @@ async def user_home(request: Request):
 
     bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")), cfg_printers=True, cfg_fedex=True)
 
-    # Directory containing the CSS files
-    skins_directory = "static/skins"
-    try:
-        css_files = [f"{skins_directory}/{file}" for file in os.listdir(skins_directory) if file.endswith(".css")]
-    except FileNotFoundError:
+    skins_directory = Path("static/legacy/skins")
+    if skins_directory.exists():
+        css_files = [
+            f"/static/legacy/skins/{css_file.name}"
+            for css_file in sorted(skins_directory.glob("*.css"))
+        ]
+    else:
         css_files = []
 
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-    dest_section = request.query_params.get("dest_section", {"section": ""})  # Example value
+    dest_section = request.query_params.get("dest_section", "")
 
     if "print_lab" in user_data:
         bobdb.get_lab_printers(user_data["print_lab"])
@@ -2281,9 +2905,17 @@ async def user_home(request: Request):
 
     # Fetching version details
     from bloom_lims._version import get_version
+    import importlib.metadata
+
     bloom_version = get_version()
-    fedex_version = os.popen("pip freeze | grep fedex_tracking_day | cut -d = -f 3").readline().rstrip()
-    zebra_printer_version = os.popen("pip freeze | grep zebra-day | cut -d = -f 3").readline().rstrip()
+    try:
+        fedex_version = importlib.metadata.version("daylily-carrier-tracking")
+    except importlib.metadata.PackageNotFoundError:
+        fedex_version = "Not installed"
+    try:
+        zebra_printer_version = importlib.metadata.version("zebra_day")
+    except importlib.metadata.PackageNotFoundError:
+        zebra_printer_version = "Not installed"
 
     # When OAuth is disabled (testing), use placeholder Cognito details
     if os.environ.get("BLOOM_OAUTH", "yes") == "no":
@@ -2294,7 +2926,7 @@ async def user_home(request: Request):
         }
     else:
         try:
-            cognito = get_cognito_auth()
+            cognito = _get_request_cognito_auth(request)
             cognito_details = {
                 "domain": cognito.config.domain,
                 "user_pool_id": cognito.config.user_pool_id,
@@ -2304,23 +2936,23 @@ async def user_home(request: Request):
             raise MissingCognitoEnvVarsException(str(exc)) from exc
 
     # HARDCODED THE BUCKET PREFIX INT to 0 here and elsewhere using the same pattern.  Reconsider the zero detection (and prob remove it)
-    content = templates.get_template("legacy/user_home.html").render(
-        request=request,
-        user_data=user_data,
-        session_data=session_data,  # Pass session_data to template
-        css_files=css_files,
-        style=style,
-        dest_section=dest_section,
-        whitelisted_domains=" , ".join(get_allowed_domains()) or "all",
-        s3_bucket_prefix=os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!")+"0",
-        cognito_details=cognito_details,
-        printer_info=printer_info,
-        bloom_version=bloom_version,
-        fedex_version=fedex_version,
-        zebra_printer_version=zebra_printer_version,
-        udat=user_data
-    )
-    return HTMLResponse(content=content)
+    template = templates.get_template("modern/user_home.html")
+    context = {
+        "request": request,
+        "user_data": user_data,
+        "session_data": session_data,
+        "css_files": css_files,
+        "dest_section": dest_section,
+        "whitelisted_domains": " , ".join(get_allowed_domains()) or "all",
+        "s3_bucket_prefix": os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!") + "0",
+        "cognito_details": cognito_details,
+        "printer_info": printer_info,
+        "bloom_version": bloom_version,
+        "fedex_version": fedex_version,
+        "zebra_printer_version": zebra_printer_version,
+        "udat": user_data,
+    }
+    return HTMLResponse(content=template.render(context))
 
 
 def generate_dag_json_from_all_objects_v2(
@@ -2488,6 +3120,7 @@ def get_dag(request: Request, _auth=Depends(require_auth)):
 async def get_dagv2(
     request: Request, _euid="AY1", _depth=6, _auth=Depends(require_auth)
 ):
+    logging.warning("Deprecated endpoint /get_dagv2 used; prefer GET /api/graph/data")
     dag_fn = request.session.get("user_data", {}).get("dag_fnv2", "")
     dag_data = {"elements": {"nodes": [], "edges": []}}
     if dag_fn and os.path.exists(dag_fn):
@@ -2507,6 +3140,7 @@ async def update_dag(request: Request, _auth=Depends(require_auth)):
 
 @app.post("/add_new_edge")
 async def add_new_edge(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /add_new_edge used; prefer POST /api/lineage")
     input_data = await request.json()  # Corrected call to request.json()
     parent_euid = input_data["parent_uuid"]
     child_euid = input_data["child_uuid"]
@@ -2515,11 +3149,12 @@ async def add_new_edge(request: Request, _auth=Depends(require_auth)):
     new_edge = bobj.create_generic_instance_lineage_by_euids(parent_euid, child_euid)
     bobj.session.flush()
     bobj.session.commit()
-    return {"euid": str(new_edge.euid)}
+    return {"euid": str(new_edge.euid), "deprecated": True}
 
 
 @app.post("/delete_node")
 async def delete_node(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /delete_node used; prefer DELETE /api/object/{euid}")
     input_data = await request.json()
     node_euid = input_data["euid"]
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -2530,11 +3165,13 @@ async def delete_node(request: Request, _auth=Depends(require_auth)):
     return {
         "status": "success",
         "message": "Node and associated lineage records deleted successfully.",
+        "deprecated": True,
     }
 
 
 @app.post("/delete_edge")
 async def delete_edge(request: Request, _auth=Depends(require_auth)):
+    logging.warning("Deprecated endpoint /delete_edge used; prefer DELETE /api/object/{euid}")
     input_data = await request.json()
     edge_euid = input_data["euid"]
 
@@ -2544,7 +3181,11 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
         bobdb.delete(edge)
         bobdb.session.flush()
         bobdb.session.commit()
-        return {"status": "success", "message": "Edge deleted successfully."}
+        return {
+            "status": "success",
+            "message": "Edge deleted successfully.",
+            "deprecated": True,
+        }
     except Exception as e:
         # Edge might already be deleted
         try:
@@ -2557,6 +3198,7 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
                 return {
                     "status": "success",
                     "message": f"Edge {edge_euid} was already soft-deleted",
+                    "deprecated": True,
                 }
         except Exception:
             pass
@@ -3030,6 +3672,15 @@ async def search_files(
     created_datetime_end: str = Form(None),
     creating_user: List[str] = Form(None),
 ):
+    return JSONResponse(
+        status_code=410,
+        content={
+            "detail": (
+                "Legacy /search_files endpoint has been removed. "
+                "Use POST /search (GUI Dewey flow) or POST /api/v1/search/v2/query."
+            )
+        },
+    )
     
     form_data = {
     "euid": euid,
@@ -3278,6 +3929,15 @@ async def search_file_sets(
     ref_type: List[str] = Form(None),
     creating_user: List[str] = Form(None),
 ):
+    return JSONResponse(
+        status_code=410,
+        content={
+            "detail": (
+                "Legacy /search_file_sets endpoint has been removed. "
+                "Use POST /search (GUI Dewey flow) or POST /api/v1/search/v2/query."
+            )
+        },
+    )
 
     form_data = {
             "name": name,

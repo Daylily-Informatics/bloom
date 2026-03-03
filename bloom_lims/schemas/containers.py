@@ -105,6 +105,10 @@ class ContainerUpdateSchema(BloomBaseSchema):
     barcode: Optional[str] = Field(None, max_length=100)
     status: Optional[str] = Field(None, max_length=50)
     json_addl: Optional[Dict[str, Any]] = Field(None)
+    metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Atlas compatibility alias mapped to json_addl.properties.metadata",
+    )
     is_deleted: Optional[bool] = Field(None)
 
 
@@ -158,4 +162,3 @@ class BulkPlaceInContainerSchema(BloomBaseSchema):
     @classmethod
     def validate_container_euid(cls, v):
         return validate_euid(v)
-

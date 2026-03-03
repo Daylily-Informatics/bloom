@@ -904,8 +904,18 @@ pre {
 }
 
 .footer-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
   font-size: 0.875rem;
   color: var(--color-gray-400);
+}
+
+.footer-mainline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
 }
 
 .footer-version {
@@ -913,8 +923,21 @@ pre {
   color: var(--color-gray-500);
 }
 
+.footer-gitline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.footer-meta-chip {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
 .footer-right {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
 }
 
@@ -1059,4 +1082,3 @@ pre {
   white-space: nowrap;
   border-width: 0;
 }
-

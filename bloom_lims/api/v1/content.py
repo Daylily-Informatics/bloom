@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
     SampleCreateSchema,
     SpecimenCreateSchema,
@@ -19,7 +20,7 @@ from bloom_lims.schemas import (
     SuccessResponse,
 )
 from bloom_lims.exceptions import NotFoundError, ValidationError
-from .dependencies import require_api_auth, APIUser
+from .dependencies import APIUser, require_read, require_write
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,25 @@ def get_bdb(username: str = "api-user"):
     return BLOOMdb3(app_username=username)
 
 
+def _specimen_content_event_payload(content, extra: dict | None = None) -> dict:
+    payload = {
+        "euid": content.euid,
+        "specimen_euid": content.euid,
+        "uuid": str(content.uuid),
+        "specimen_uuid": str(content.uuid),
+        "name": content.name,
+        "category": content.category,
+        "type": content.type,
+        "subtype": content.subtype,
+        "status": content.bstatus,
+        "json_addl": content.json_addl if isinstance(content.json_addl, dict) else {},
+        "is_deleted": bool(getattr(content, "is_deleted", False)),
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
 @router.get("/", response_model=Dict[str, Any])
 async def list_content(
     content_type: Optional[str] = Query(None, description="Filter by type (sample, specimen, reagent)"),
@@ -40,7 +60,7 @@ async def list_content(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """List content objects with optional filters."""
     try:
@@ -84,7 +104,7 @@ async def list_content(
 
 
 @router.get("/{euid}")
-async def get_content(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_content(euid: str, user: APIUser = Depends(require_read)):
     """Get content by EUID."""
     try:
         bdb = get_bdb(user.email)
@@ -117,7 +137,7 @@ async def get_content(euid: str, user: APIUser = Depends(require_api_auth)):
 
 
 @router.post("/samples", response_model=Dict[str, Any])
-async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(require_write)):
     """Create a new sample."""
     try:
         bdb = get_bdb(user.email)
@@ -145,7 +165,7 @@ async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(requir
 
 
 @router.post("/specimens", response_model=Dict[str, Any])
-async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(require_write)):
     """Create a new specimen."""
     try:
         bdb = get_bdb(user.email)
@@ -173,7 +193,7 @@ async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(re
 
 
 @router.post("/reagents", response_model=Dict[str, Any])
-async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(require_write)):
     """Create a new reagent."""
     try:
         bdb = get_bdb(user.email)
@@ -204,7 +224,7 @@ async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(requ
 async def update_content(
     euid: str,
     data: ContentUpdateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Update content."""
     try:
@@ -217,6 +237,8 @@ async def update_content(
 
         if not content:
             raise HTTPException(status_code=404, detail=f"Content not found: {euid}")
+
+        prev_status = content.bstatus
 
         if data.name is not None:
             content.name = data.name
@@ -232,6 +254,19 @@ async def update_content(
             flag_modified(content, "json_addl")
 
         bdb.session.commit()
+        if content.type == "specimen":
+            emit_bloom_event("specimen.updated", _specimen_content_event_payload(content))
+            if prev_status != content.bstatus:
+                emit_bloom_event(
+                    "specimen.status_changed",
+                    _specimen_content_event_payload(
+                        content,
+                        {
+                            "previous_status": prev_status,
+                            "current_status": content.bstatus,
+                        },
+                    ),
+                )
 
         return {
             "success": True,
@@ -249,7 +284,7 @@ async def update_content(
 async def delete_content(
     euid: str,
     hard_delete: bool = Query(False, description="Permanently delete"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Delete content (soft delete by default)."""
     try:
@@ -262,11 +297,21 @@ async def delete_content(
         if not content:
             raise HTTPException(status_code=404, detail=f"Content not found: {euid}")
 
+        event_payload = None
+        if content.type == "specimen":
+            event_payload = _specimen_content_event_payload(
+                content,
+                {"hard_delete": hard_delete, "is_deleted": True},
+            )
+
         if hard_delete:
             bc.delete_obj(content)
         else:
             content.is_deleted = True
             bdb.session.commit()
+
+        if event_payload is not None:
+            emit_bloom_event("specimen.deleted", event_payload)
 
         return {
             "success": True,
@@ -278,4 +323,3 @@ async def delete_content(
     except Exception as e:
         logger.error(f"Error deleting content {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from .dependencies import require_api_auth, APIUser
+from .dependencies import APIUser, require_read, require_write
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ async def list_workflows(
     workflow_type: Optional[str] = Query(None, description="Filter by type"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """
     List workflows with optional filters.
@@ -67,7 +67,7 @@ async def list_workflows(
 
 
 @router.get("/{euid}")
-async def get_workflow(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_workflow(euid: str, user: APIUser = Depends(require_read)):
     """
     Get a workflow by EUID.
     """
@@ -101,7 +101,7 @@ async def get_workflow(euid: str, user: APIUser = Depends(require_api_auth)):
 async def advance_workflow(
     euid: str,
     step_result: Optional[Dict[str, Any]] = None,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """
     Advance a workflow to the next step.
@@ -139,7 +139,7 @@ async def advance_workflow(
 async def create_workflow(
     template_euid: str = Query(..., description="Template EUID to create workflow from"),
     name: Optional[str] = Query(None, description="Workflow name"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """
     Create a new workflow from a template.
@@ -185,7 +185,7 @@ async def update_workflow(
     name: Optional[str] = Query(None, description="New workflow name"),
     status: Optional[str] = Query(None, description="New workflow status"),
     json_addl: Optional[Dict[str, Any]] = None,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """
     Update a workflow.
@@ -228,7 +228,7 @@ async def update_workflow(
 
 
 @router.get("/{euid}/steps", response_model=Dict[str, Any])
-async def get_workflow_steps(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_workflow_steps(euid: str, user: APIUser = Depends(require_read)):
     """
     Get all steps for a workflow.
     """
@@ -274,4 +274,3 @@ async def get_workflow_steps(euid: str, user: APIUser = Depends(require_api_auth
     except Exception as e:
         logger.error(f"Error getting workflow steps {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

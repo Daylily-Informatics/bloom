@@ -28,9 +28,10 @@
         
         <!-- Right Column: Search by Metadata -->
         <div class="col-lg-8">
-            <form id="searchFileForm" data-form="search" action="/search_files" method="post" enctype="multipart/form-data">
+            <form id="searchFileForm" data-form="search" action="/search" method="post" enctype="multipart/form-data">
                 <h6>Search by Metadata</h6>
                 <input type="hidden" value="" id="euid" name="euid">
+                <input type="hidden" name="search_target" value="file">
                 
                 <div class="mb-3">
                     <label class="form-label">Greedy Search</label>
@@ -101,4 +102,3 @@
         </div>
     </div>
 </div>
-

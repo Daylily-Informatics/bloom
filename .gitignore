@@ -9,6 +9,8 @@ __pycache__/
 
 certs
 
+postgres_data/
+
 # Test artifacts
 dag_*.json
 

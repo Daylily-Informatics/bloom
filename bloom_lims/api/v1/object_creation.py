@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from bloom_lims.integrations.atlas.events import emit_bloom_event
 from .dependencies import require_api_auth, APIUser
 
 
@@ -354,6 +355,23 @@ async def create_object(
 
         bdb.session.commit()
 
+        if new_instance.category == "container":
+            emit_bloom_event(
+                "container.created",
+                {
+                    "euid": new_instance.euid,
+                    "container_euid": new_instance.euid,
+                    "uuid": str(new_instance.uuid),
+                    "name": new_instance.name,
+                    "category": new_instance.category,
+                    "type": new_instance.type,
+                    "subtype": new_instance.subtype,
+                    "status": new_instance.bstatus,
+                    "json_addl": new_instance.json_addl if isinstance(new_instance.json_addl, dict) else {},
+                    "is_deleted": bool(getattr(new_instance, "is_deleted", False)),
+                },
+            )
+
         return CreateObjectResponse(
             euid=new_instance.euid,
             uuid=str(new_instance.uuid),
@@ -368,4 +386,3 @@ async def create_object(
     except Exception as e:
         logger.error(f"Error creating object: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

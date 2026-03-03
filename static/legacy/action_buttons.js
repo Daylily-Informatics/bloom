@@ -1,5 +1,14 @@
 // sharedFunctions.js
 
+function decodeHtmlEntities(value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    var decoder = document.createElement('textarea');
+    decoder.innerHTML = String(value);
+    return decoder.value;
+}
+
 function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, actionGroup) {
     try {
         var uniqueFormId = stepEuid + '-' + actionName + actionGroup + '-form';
@@ -20,14 +29,21 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
                 var formContainer = document.createElement('div');
                 formContainer.id = uniqueFormId;
                 formContainer.style.display = 'block'; // Ensure the form is visible when first created
+                formContainer.style.flexBasis = '100%';
+                formContainer.style.width = '100%';
+                formContainer.style.marginTop = '0.75rem';
+                formContainer.style.padding = '0.75rem';
+                formContainer.style.border = '1px solid rgba(148, 163, 184, 0.35)';
+                formContainer.style.borderRadius = '0.5rem';
+                formContainer.style.background = 'rgba(15, 23, 42, 0.45)';
 
                 var formHTML = '<form>';
                 for (var key in actionData['captured_data']) {
                     var value = actionData['captured_data'][key];
 
                     if (key.startsWith('_')) {
-                        // If key starts with '_', append the value directly
-                        formHTML += actionData['captured_data'][key];
+                        // Key-prefixed values are authored as HTML snippets and may be entity-encoded.
+                        formHTML += decodeHtmlEntities(value);
                     } else {
                         // Check if value is an array or a string
                         if (Array.isArray(value)) {
@@ -37,7 +53,7 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
                             });
                         } else {
                             // Handle string values
-                            formHTML += key + '<input type="text" name="' + key + '" value="' + value + '"><br>';
+                            formHTML += key + '<input type="text" name="' + key + '" value="' + decodeHtmlEntities(value) + '"><br>';
                         }
                     }
                 }
@@ -45,7 +61,13 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
                 formHTML += '<ul><button class="actionSubmit" onclick="submitCapturedDataForm(\'' + uniqueFormId + '\', \'' + actionName + '\', \'' + stepEuid + '\', \'' + escape(JSON.stringify(actionData)) + '\', \'' + actionGroup + '\')">Submit</button><hr></ul>';
 
                 formContainer.innerHTML = formHTML;
-                button.insertAdjacentElement('afterend', formContainer);
+
+                var parent = button.parentElement;
+                if (parent && window.getComputedStyle(parent).display.indexOf('flex') !== -1) {
+                    parent.insertAdjacentElement('afterend', formContainer);
+                } else {
+                    button.insertAdjacentElement('afterend', formContainer);
+                }
             }
         }
     } catch (e) {
@@ -53,22 +75,115 @@ function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, acti
     }
 }
 
-function submitCapturedDataForm(formId, actionName, stepEuid, actionDataJson, actionGroup) {
+function showCapturedDataFormFromDataAttributes(button) {
+    try {
+        var rawActionData = button.getAttribute('data-action-json');
+        if (!rawActionData) {
+            throw new Error('Missing data-action-json');
+        }
+
+        var actionData;
+        try {
+            actionData = JSON.parse(rawActionData);
+        } catch (parseError) {
+            // Some browser/cache combinations may leave HTML entities encoded.
+            var decoder = document.createElement('textarea');
+            decoder.innerHTML = rawActionData;
+            actionData = JSON.parse(decoder.value);
+        }
+        var stepEuid = button.getAttribute('data-euid') || '';
+        var actionName = button.getAttribute('data-action-name') || '';
+        var actionGroup = button.getAttribute('data-action-group') || '';
+
+        showCapturedDataForm(button, actionData, stepEuid, actionName, actionGroup);
+    } catch (e) {
+        console.error('Error reading action data attributes:', e);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', e.message || 'Unable to open action form');
+        }
+    }
+}
+
+function readFileAsText(file) {
+    if (!file) {
+        return Promise.resolve('');
+    }
+    if (typeof file.text === 'function') {
+        return file.text();
+    }
+    return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function() {
+            resolve(reader.result || '');
+        };
+        reader.onerror = function() {
+            reject(reader.error || new Error('Unable to read selected file'));
+        };
+        reader.readAsText(file);
+    });
+}
+
+async function submitCapturedDataForm(formId, actionName, stepEuid, actionDataJson, actionGroup) {
     var formContainer = document.getElementById(formId);
+    if (!formContainer) {
+        return;
+    }
     var form = formContainer.querySelector('form');
     var formData = new FormData(form);
-    var updatedActionData = {};
     var actionData = JSON.parse(unescape(actionDataJson));
 
-    formData.forEach(function(value, key){
-        actionData['captured_data'][key] = value;
-    });
+    try {
+        var entries = [];
+        formData.forEach(function(value, key) {
+            entries.push([key, value]);
+        });
 
-    // Now call the original function with updated data
-    performWorkflowStepAction(stepEuid, actionData, actionName, actionGroup);
+        for (var i = 0; i < entries.length; i++) {
+            var key = entries[i][0];
+            var value = entries[i][1];
 
-    // Remove the form from the DOM
-    formContainer.remove();
+            if (value instanceof File) {
+                if (!value.name || value.size === 0) {
+                    continue;
+                }
+                var fileText = await readFileAsText(value);
+                actionData['captured_data'][key + '_name'] = value.name;
+                actionData['captured_data'][key + '_text'] = fileText;
+
+                // For fields ending in _file, also append contents to the
+                // corresponding text key so server handlers can read one key.
+                if (key.endsWith('_file')) {
+                    var textKey = key.slice(0, -5);
+                    var prior = actionData['captured_data'][textKey] || '';
+                    actionData['captured_data'][textKey] = prior
+                        ? (String(prior) + '\n' + fileText)
+                        : fileText;
+                }
+                continue;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(actionData['captured_data'], key)) {
+                if (Array.isArray(actionData['captured_data'][key])) {
+                    actionData['captured_data'][key].push(value);
+                } else {
+                    actionData['captured_data'][key] = [actionData['captured_data'][key], value];
+                }
+            } else {
+                actionData['captured_data'][key] = value;
+            }
+        }
+
+        // Now call the original function with updated data
+        performWorkflowStepAction(stepEuid, actionData, actionName, actionGroup);
+
+        // Remove the form from the DOM
+        formContainer.remove();
+    } catch (error) {
+        console.error('Error submitting action form:', error);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', error.message || 'Unable to submit form data');
+        }
+    }
 }
 
 function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {
@@ -81,17 +196,34 @@ function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {
         },
         body: JSON.stringify({ action_group: actionGroup, euid: stepEuid, action: action, ds: ds })
     })
-    .then(response => {
-        if (response.ok) {
-            console.log('Response OK');
-            return response.json();
+    .then(async response => {
+        var contentType = response.headers.get('content-type') || '';
+        var payload = null;
+        if (contentType.indexOf('application/json') !== -1) {
+            payload = await response.json();
         } else {
-            console.log('Response not OK');
-            throw new Error('Network response was not ok.');
+            payload = await response.text();
         }
+
+        if (response.ok) {
+            console.log('Response OK', payload);
+            return payload;
+        }
+
+        var message = 'Action failed';
+        if (payload && typeof payload === 'object') {
+            message = payload.detail || payload.message || message;
+        } else if (typeof payload === 'string' && payload.trim() !== '') {
+            message = payload;
+        }
+        throw new Error(message);
     })
     .then(data => {
         console.log('Success:', data);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.success === 'function') {
+            var msg = (data && data.message) ? data.message : 'Action completed';
+            window.BloomToast.success('Action Complete', msg, 2000);
+        }
         // Add a slight delay before reloading
         setTimeout(function() {
             window.location.reload();
@@ -99,9 +231,9 @@ function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {
     })
     .catch((error) => {
         console.error('Error:', error);
-        setTimeout(function() {
-            window.location.reload();
-        }, 500); // Waits for 500 milliseconds
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', error.message || 'Request failed');
+        }
     });
 }
 
@@ -192,4 +324,3 @@ function toggleJSONDisplay(rowId) {
         button.textContent = 'Show JSON';
     }
 }
-

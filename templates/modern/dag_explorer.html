@@ -1,243 +1,314 @@
 {% extends "modern/base.html" %}
 
-{% block title %}DAG Explorer - BLOOM LIMS{% endblock %}
+{% block title %}Graph Explorer - BLOOM LIMS{% endblock %}
 
 {% block extra_css %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
 <style>
-    /* DAG Explorer specific styles */
-    .dag-container {
-        display: flex;
-        gap: var(--spacing-md);
-        height: calc(100vh - 180px);
-        min-height: 500px;
-    }
-    
-    .dag-main {
-        flex: 1;
+    #graph-layout {
         display: flex;
         flex-direction: column;
-        background: var(--color-gray-800);
-        border-radius: var(--radius-md);
-        overflow: hidden;
+        gap: 1rem;
+        width: min(98vw, 1500px);
+        margin: 0 auto;
     }
-    
-    .dag-sidebar {
-        width: 180px;
-        background: var(--color-gray-800);
-        border-radius: var(--radius-md);
-        padding: var(--spacing-md);
+    #cy-container {
+        display: flex;
+        gap: 1rem;
+        width: 100%;
+        height: 82vh;
+        min-height: 600px;
+    }
+    #cy {
+        flex: 1 1 80%;
+        width: 80%;
+        height: 100%;
+        background: var(--color-gray-900);
+        border-radius: 8px;
+        border: 1px solid var(--color-gray-600);
+    }
+    #sidebar {
+        flex: 1 1 20%;
+        width: 20%;
+        min-width: 310px;
+        max-width: 390px;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
         overflow-y: auto;
     }
-    
-    #cy {
-        flex: 1;
-        width: 100%;
-        min-height: 400px;
-        background: var(--color-gray-900);
-        border-radius: var(--radius-md) var(--radius-md) 0 0;
-    }
-    
-    .dag-controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--spacing-sm);
-        padding: var(--spacing-md);
-        background: var(--color-gray-700);
-        border-radius: 0 0 var(--radius-md) var(--radius-md);
-        align-items: center;
-    }
-    
-    .dag-control-group {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-xs);
-        padding: var(--spacing-xs) var(--spacing-sm);
+    .control-panel {
         background: var(--color-gray-800);
-        border-radius: var(--radius-sm);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--color-gray-600);
     }
-    
-    .dag-control-group label {
-        font-size: 0.75rem;
+    .control-panel h3 {
+        margin-bottom: 0.75rem;
+        color: var(--color-gray-100);
+        font-size: 1rem;
+    }
+    .control-group {
+        margin-bottom: 0.75rem;
+    }
+    .control-group label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.85rem;
         color: var(--color-gray-400);
+    }
+    .control-group input,
+    .control-group select {
+        width: 100%;
+        padding: 0.5rem;
+        border-radius: 4px;
+        border: 1px solid var(--color-gray-600);
+        background: var(--color-gray-700);
+        color: var(--color-gray-100);
+    }
+    .btn-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .btn-row .btn {
+        flex: 1 1 auto;
+    }
+    .range-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .range-row span {
+        color: var(--color-gray-300);
+        font-size: 0.85rem;
+        min-width: 2rem;
+        text-align: right;
+    }
+    .type-filter-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.35rem 0.5rem;
+        max-height: 160px;
+        overflow-y: auto;
+    }
+    .type-filter-item {
+        font-size: 0.78rem;
+        color: var(--color-gray-300);
+        display: flex;
+        gap: 0.35rem;
+        align-items: center;
         white-space: nowrap;
     }
-    
-    .dag-control-group input[type="range"] {
-        width: 80px;
-    }
-    
-    .dag-control-group select {
-        font-size: 0.75rem;
-        padding: var(--spacing-xs);
-        background: var(--color-gray-700);
-        border: 1px solid var(--color-gray-600);
-        border-radius: var(--radius-sm);
-        color: var(--color-gray-200);
-    }
-    
-    .dag-control-group input[type="text"] {
-        width: 100px;
-        font-size: 0.75rem;
-        padding: var(--spacing-xs);
-        background: var(--color-gray-700);
-        border: 1px solid var(--color-gray-600);
-        border-radius: var(--radius-sm);
-        color: var(--color-gray-200);
-    }
-    
-    .dag-control-group .btn {
-        font-size: 0.75rem;
-        padding: var(--spacing-xs) var(--spacing-sm);
-    }
-    
-    /* Filter checkboxes */
-    #btypeCheckboxes {
+    .subtype-buttons {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--spacing-xs);
+        gap: 0.35rem;
+        max-height: 180px;
+        overflow-y: auto;
     }
-    
-    #btypeCheckboxes label {
-        font-size: 0.7rem;
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        color: var(--color-gray-300);
-    }
-    
-    /* Sidebar buttons */
-    .subtype-button {
-        display: block;
-        width: 100%;
-        padding: var(--spacing-xs) var(--spacing-sm);
-        margin-bottom: var(--spacing-xs);
-        font-size: 0.7rem;
-        background: var(--color-gray-700);
+    .subtype-chip {
         border: 1px solid var(--color-gray-600);
-        border-radius: var(--radius-sm);
+        border-radius: 999px;
+        background: var(--color-gray-700);
         color: var(--color-gray-300);
+        font-size: 0.72rem;
+        padding: 0.2rem 0.55rem;
         cursor: pointer;
-        text-align: left;
-        transition: all 0.2s ease;
     }
-    
-    .subtype-button:hover {
-        background: var(--color-gray-600);
-        border-color: var(--color-highlight);
-    }
-    
-    .subtype-button-clicked {
+    .subtype-chip.active {
         background: var(--color-highlight);
         color: var(--color-white);
         border-color: var(--color-highlight);
     }
-    
-    /* Node dialog */
-    .node-dialog {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
+    #node-info {
         background: var(--color-gray-800);
+        padding: 1rem;
+        border-radius: 8px;
         border: 1px solid var(--color-gray-600);
-        border-radius: var(--radius-md);
-        padding: var(--spacing-lg);
-        z-index: 1000;
-        min-width: 300px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        min-height: 220px;
+        max-height: 36vh;
+        overflow-y: auto;
     }
-    
-    .node-dialog p {
-        margin-bottom: var(--spacing-sm);
-        color: var(--color-gray-200);
+    #node-info h3 {
+        margin-bottom: 0.75rem;
+        color: var(--color-gray-100);
     }
-    
-    .node-dialog a {
-        color: var(--color-highlight);
-        margin-right: var(--spacing-md);
+    #node-info-content {
+        font-size: 0.9rem;
     }
-    
-    .close-dialog-btn {
-        margin-top: var(--spacing-md);
+    #node-info-content p {
+        margin-bottom: 0.5rem;
     }
-    
-    /* Info box */
-    .info-box {
-        margin-top: var(--spacing-md);
-        padding: var(--spacing-md);
-        background: var(--color-gray-800);
-        border-radius: var(--radius-md);
-        font-size: 0.875rem;
-        color: var(--color-gray-300);
-    }
-
-    /* Help modal */
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1001;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.7);
-    }
-
-    .modal-content {
-        background: var(--color-gray-800);
-        margin: 10% auto;
-        padding: var(--spacing-lg);
-        border: 1px solid var(--color-gray-600);
-        border-radius: var(--radius-md);
-        width: 80%;
-        max-width: 600px;
-        color: var(--color-gray-300);
-    }
-
-    .closeBtn {
+    #node-info-content strong {
         color: var(--color-gray-400);
-        float: right;
-        font-size: 28px;
-        font-weight: bold;
-        cursor: pointer;
     }
-
-    .closeBtn:hover {
-        color: var(--color-white);
+    .details-grid {
+        display: grid;
+        grid-template-columns: minmax(130px, 220px) 1fr;
+        gap: 0.35rem 0.75rem;
+        margin-bottom: 0.8rem;
     }
-
-    /* COGS labels */
-    .cogs-value-label {
-        z-index: 100;
-        font-size: 12px;
-        font-family: 'JetBrains Mono', monospace;
+    .detail-key {
+        color: var(--color-gray-400);
+        font-weight: 600;
+        word-break: break-word;
     }
-
-    /* Hidden utility */
-    .hidden {
-        display: none !important;
+    .detail-value {
+        color: var(--color-gray-100);
+        word-break: break-word;
     }
-
-    /* Responsive */
-    @media screen and (max-width: 768px) {
-        .dag-container {
+    .details-section-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-gray-300);
+        margin: 0.8rem 0 0.35rem 0;
+    }
+    .json-block {
+        margin: 0;
+        padding: 0.65rem;
+        border-radius: 6px;
+        border: 1px solid var(--color-gray-600);
+        background: var(--color-gray-900);
+        font-size: 0.78rem;
+        line-height: 1.35;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    #details-cogs-output {
+        margin-top: 0.55rem;
+        font-size: 0.8rem;
+        color: var(--color-gray-300);
+        min-height: 1.2rem;
+    }
+    #graph-mode-status {
+        margin-top: 0.6rem;
+        padding: 0.5rem 0.6rem;
+        border: 1px solid var(--color-gray-600);
+        border-radius: 6px;
+        font-size: 0.82rem;
+        color: var(--color-gray-300);
+        min-height: 2.1rem;
+    }
+    #graph-mode-status.ok {
+        color: #c9ffd9;
+        border-color: #2f7a4a;
+    }
+    #graph-mode-status.warn {
+        color: #ffd7a8;
+        border-color: #8d6b2f;
+    }
+    #graph-mode-status.error {
+        color: #ffd0d0;
+        border-color: #8b3d3d;
+    }
+    #relationship-dialog,
+    #node-action-dialog,
+    #help-dialog {
+        border: 1px solid var(--color-gray-600);
+        border-radius: 8px;
+        background: var(--color-gray-800);
+        color: var(--color-gray-100);
+        width: min(92vw, 500px);
+    }
+    #relationship-dialog::backdrop,
+    #node-action-dialog::backdrop,
+    #help-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.45);
+    }
+    .dialog-title {
+        margin: 0 0 0.65rem 0;
+        color: var(--color-gray-100);
+        font-size: 1rem;
+    }
+    .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.8rem;
+    }
+    .legacy-dialog-line {
+        margin-bottom: 0.4rem;
+        color: var(--color-gray-300);
+        font-size: 0.85rem;
+    }
+    .legacy-dialog-link-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 0.6rem;
+    }
+    .legacy-cogs-output {
+        margin-top: 0.55rem;
+        font-size: 0.82rem;
+        color: var(--color-gray-300);
+        min-height: 1.4rem;
+    }
+    .help-list {
+        margin: 0;
+        padding-left: 1.15rem;
+        color: var(--color-gray-300);
+        font-size: 0.84rem;
+        line-height: 1.45;
+    }
+    .help-list li {
+        margin-bottom: 0.35rem;
+    }
+    .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+    }
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+    }
+    .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--color-gray-400);
+    }
+    @media (max-width: 980px) {
+        #cy-container {
             flex-direction: column;
             height: auto;
+            min-height: 0;
         }
-
-        .dag-sidebar {
+        #sidebar {
             width: 100%;
-            display: flex;
-            flex-wrap: wrap;
-            gap: var(--spacing-xs);
+            min-width: 0;
+            max-width: none;
+            max-height: 42vh;
         }
-
-        .subtype-button {
-            width: auto;
-        }
-
         #cy {
-            height: 400px;
+            width: 100%;
+            height: 60vh;
+            min-height: 420px;
+        }
+        #node-info {
+            max-height: 45vh;
+        }
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+        .type-filter-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -246,178 +317,197 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title"><i class="fas fa-project-diagram"></i> DAG Explorer</h1>
-        <p class="page-subtitle">Interactive graph visualization of object relationships</p>
-    </div>
-    <div>
-        <a href="/legacy/dindex2?globalStartNodeEUID={{ globalStartNodeEUID }}&globalFilterLevel={{ globalFilterLevel }}"
-           class="btn btn-outline btn-sm">
-            <i class="fas fa-history"></i> Legacy View
-        </a>
+        <h1 class="page-title"><i class="fas fa-project-diagram"></i> Graph Explorer</h1>
+        <p class="page-subtitle">TapDB gesture-compatible Cytoscape graph view with BLOOM legacy tooling restored.</p>
     </div>
 </div>
 
-<div class="dag-container">
-    <div class="dag-main">
-        <!-- Cytoscape container -->
-        <div id="cy"></div>
-
-        <!-- Controls bar -->
-        <div class="dag-controls">
-            <div class="dag-control-group">
-                <label>Filter Class:</label>
-                <div id="btypeCheckboxes"></div>
+<div id="graph-layout">
+    <div id="cy-container">
+        <div id="cy"><div class="loading">Loading graph data...</div></div>
+        <div id="sidebar">
+            <div class="control-panel">
+                <h3>Navigation</h3>
+                <div class="control-group">
+                    <label for="start-euid">Start EUID</label>
+                    <input type="text" id="start-euid" value="{{ start_euid }}" placeholder="e.g., AY-1C">
+                </div>
+                <div class="control-group">
+                    <label for="depth">Depth</label>
+                    <input type="number" id="depth" value="{{ depth }}" min="1" max="10">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-primary btn-sm" onclick="loadGraph()">Load Graph</button>
+                    <button class="btn btn-outline btn-sm" onclick="cy && cy.fit()">Fit</button>
+                </div>
             </div>
 
-            <div class="dag-control-group">
-                <label for="layoutSelect">Layout:</label>
-                <select id="layoutSelect" onchange="changeLayout(this.value)">
-                    <option value="dagre">Hierarchical</option>
-                    <option value="cose">Cose</option>
-                    <option value="breadthfirst">Breadthfirst</option>
-                    <option value="grid">Grid</option>
-                    <option value="circle">Circle</option>
-                    <option value="random">Random</option>
-                    <option value="concentric">Concentric</option>
-                </select>
+            <div class="control-panel">
+                <h3>Search & Find</h3>
+                <div class="control-group">
+                    <label for="search-query">Fuzzy Search (id/name/type/subtype)</label>
+                    <input type="text" id="search-query" placeholder="Type to highlight matches">
+                </div>
+                <div class="control-group">
+                    <label for="find-euid">Find EUID</label>
+                    <input type="text" id="find-euid" placeholder="Exact EUID">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-outline btn-sm" onclick="applySearch(true)">Apply Search</button>
+                    <button class="btn btn-outline btn-sm" onclick="findAndCenterByEuid()">Find</button>
+                </div>
             </div>
 
-            <div class="dag-control-group">
-                <label>Edges ≤</label>
-                <span id="transparencyDisplay">1</span>
-                <input type="range" id="transparencySlider" min="0" max="15" value="1"
-                       oninput="updateNodeTransparency()">
+            <div class="control-panel">
+                <h3>Filters</h3>
+                <div class="control-group">
+                    <label for="transparency-slider">Filter by Connected Edge Count ≤</label>
+                    <div class="range-row">
+                        <input type="range" id="transparency-slider" min="0" max="20" value="1">
+                        <span id="transparency-display">1</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="distance-slider">Relative Distance (0 = all)</label>
+                    <div class="range-row">
+                        <input type="range" id="distance-slider" min="0" max="15" value="0">
+                        <span id="distance-display">0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Type Visibility</label>
+                    <div id="btype-checkboxes" class="type-filter-grid">
+                        <span style="color: var(--color-gray-400); font-size: 0.78rem;">Load graph to populate.</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Subtype Muting</label>
+                    <div id="subtype-buttons" class="subtype-buttons">
+                        <span style="color: var(--color-gray-400); font-size: 0.78rem;">Load graph to populate.</span>
+                    </div>
+                </div>
             </div>
 
-            <div class="dag-control-group">
-                <input type="text" id="euidInput" placeholder="Find EUID...">
-                <button class="btn btn-sm btn-primary" onclick="centerOnEuid()">
-                    <i class="fas fa-search"></i>
-                </button>
+            <div class="control-panel">
+                <h3>Layout</h3>
+                <div class="control-group">
+                    <label for="layout-select">Layout Type</label>
+                    <select id="layout-select" onchange="applyLayout()">
+                        <option value="dagre">Dagre (Hierarchical)</option>
+                        <option value="cose">CoSE (Force-directed)</option>
+                        <option value="breadthfirst">Breadth First</option>
+                        <option value="circle">Circle</option>
+                        <option value="grid">Grid</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="dag-control-group">
-                <label>Distance:</label>
-                <span id="distanceDisplay">0</span>
-                <input type="range" id="distanceSlider" min="0" max="15" value="0"
-                       oninput="filterNodes(this.value)">
+            <div class="control-panel">
+                <h3>Graph Gestures</h3>
+                <div style="font-size: 0.74rem; color: var(--color-gray-400); line-height: 1.42;">
+                    {% if is_admin %}
+                    <div><strong>D + right click</strong>: delete node or edge</div>
+                    <div><strong>L + left click node</strong>: pick child, then click parent to create edge</div>
+                    {% else %}
+                    <div>Graph mutation shortcuts are admin-only.</div>
+                    {% endif %}
+                    <div><strong>3x left click node</strong>: child-wave glow (pink)</div>
+                    <div><strong>3x right click node</strong>: parent-wave glow (aqua)</div>
+                    <div><strong>P + left click node</strong>: COGS to produce (parents)</div>
+                    <div><strong>C + left click node</strong>: COGS of children</div>
+                    <div><strong>N + left click node</strong>: neighborhood expansion</div>
+                    <div><strong>I + left click node</strong>: legacy node action popup</div>
+                </div>
+                <div class="btn-row" style="margin-top: 0.65rem;">
+                    <button class="btn btn-outline btn-sm" onclick="openHelpDialog()">Help</button>
+                </div>
+                <div id="graph-mode-status">Ready.</div>
             </div>
 
-            <button id="helpBtn" class="btn btn-outline btn-sm" title="Help">
-                <i class="fas fa-question"></i>
-            </button>
-
-            <button id="saveButton" class="btn btn-outline btn-sm" title="Save Changes">
-                <i class="fas fa-save"></i> Save
-            </button>
+            <div class="control-panel">
+                <h3>Legend</h3>
+                <div class="legend" id="legend-items">
+                    <span style="color: var(--color-gray-400); font-size: 0.85rem;">Loading...</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="dag-sidebar">
-        <label style="font-size: 0.75rem; color: var(--color-gray-400); margin-bottom: var(--spacing-sm); display: block;">
-            Filter by Type:
-        </label>
-        <div id="bsubtypeButtons"></div>
-    </div>
-</div>
-
-<!-- Node info box -->
-<div class="info-box" id="node-info"></div>
-
-<!-- Node Dialog -->
-<div id="nodeDialog" class="node-dialog" style="display: none;">
-    <p id="nodeEuid">EUID: <span></span></p>
-    <p id="nodeName">Name: <span></span></p>
-    <div style="display: none;">
-        <a id="actionALink" href="">Calculate COGS To Produce</a>
-        $ <span id="actionAOutput"></span>
-    </div>
-    <br>
-    <a id="actionBLink" href="">Calculate COGS Of Children</a>
-    $ <span id="actionBOutput"></span>
-    <br>
-    <a id="euidInfoLink" href="" target="euid">EUID Info</a>
-    <button id="closeDialogButton" class="btn btn-outline close-dialog-btn">Close</button>
-</div>
-
-<!-- Help Modal -->
-<div id="helpModal" class="modal">
-    <div class="modal-content">
-        <span class="closeBtn">&times;</span>
-        <h3 style="margin-bottom: var(--spacing-md);">DAG Explorer Help</h3>
-        <div style="line-height: 1.8;">
-            <p><strong>NODE INFO:</strong> Click node 1x for info box, click node 3x for popup dialog</p>
-            <p><strong>DELETE:</strong> Right click 2x on an edge to delete it; right click 3x on a node to delete it (reflects in database!)</p>
-            <p><strong>CREATE EDGES:</strong> Hold 'L', select a node, continue holding 'L', click a new node to create an edge</p>
-            <p><strong>NEIGHBORS:</strong> Hold 'N' and click a node to highlight its neighbors; each additional click expands the neighborhood</p>
+    <div id="node-info">
+        <h3>Details</h3>
+        <div id="node-info-content">
+            <p style="color: var(--color-gray-400);">Click a node or edge to see details</p>
         </div>
+        <div id="details-cogs-output"></div>
     </div>
 </div>
+
+<dialog id="relationship-dialog">
+    <h3 class="dialog-title">Create Lineage Edge</h3>
+    <p id="relationship-dialog-context"></p>
+    <label for="relationship-type-select" style="font-size: 0.85rem; color: var(--color-gray-400);">Relationship Type</label>
+    <select id="relationship-type-select">
+        <option value="contains">contains</option>
+        <option value="derived_from">derived_from</option>
+        <option value="references">references</option>
+        <option value="depends_on">depends_on</option>
+        <option value="produces">produces</option>
+        <option value="consumes">consumes</option>
+        <option value="generic" selected>generic</option>
+        <option value="related">related</option>
+    </select>
+    <div class="dialog-actions">
+        <button id="relationship-dialog-cancel" type="button" class="btn btn-outline btn-sm">Cancel</button>
+        <button id="relationship-dialog-create" type="button" class="btn btn-primary btn-sm">Create Edge</button>
+    </div>
+</dialog>
+
+<dialog id="node-action-dialog">
+    <h3 class="dialog-title">Node Actions</h3>
+    <div class="legacy-dialog-line"><strong>EUID:</strong> <span id="node-action-euid">-</span></div>
+    <div class="legacy-dialog-line"><strong>Name:</strong> <span id="node-action-name">-</span></div>
+    <div class="legacy-dialog-link-row">
+        <button type="button" class="btn btn-outline btn-sm" onclick="runLegacyDialogCogs('parents')">COGS To Produce</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="runLegacyDialogCogs('children')">COGS Of Children</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="openLegacyDialogObject()">Open EUID Details</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="centerLegacyDialogNode()">Center Node</button>
+    </div>
+    <div class="legacy-cogs-output" id="node-action-cogs-output"></div>
+    <div class="dialog-actions">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeNodeActionDialog()">Close</button>
+    </div>
+</dialog>
+
+<dialog id="help-dialog">
+    <h3 class="dialog-title">Graph Help</h3>
+    <ul class="help-list">
+        <li><strong>D + right click</strong>: delete node/edge (admin only).</li>
+        <li><strong>L + left click node</strong>: select child, then click parent to create edge (admin only).</li>
+        <li><strong>3x left click node</strong>: child-wave glow traversal.</li>
+        <li><strong>3x right click node</strong>: parent-wave glow traversal.</li>
+        <li><strong>P + left click node</strong>: calculate COGS to produce.</li>
+        <li><strong>C + left click node</strong>: calculate COGS of children.</li>
+        <li><strong>N + left click node</strong>: neighborhood highlight; repeated clicks expand depth.</li>
+        <li><strong>I + left click node</strong>: open legacy-style node action popup.</li>
+        <li><strong>Esc</strong>: clear pending lineage selection.</li>
+    </ul>
+    <div class="dialog-actions">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeHelpDialog()">Close</button>
+    </div>
+</dialog>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Cytoscape.js and dagre layout -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.19.0/cytoscape.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-<script src="https://unpkg.com/cytoscape-dagre"></script>
-
-<!-- DAG Explorer Modular JavaScript -->
-<script src="/static/js/dag-explorer/config.js"></script>
-<script src="/static/js/dag-explorer/utils.js"></script>
-<script src="/static/js/dag-explorer/api.js"></script>
-<script src="/static/js/dag-explorer/graph.js"></script>
-<script src="/static/js/dag-explorer/filters.js"></script>
-<script src="/static/js/dag-explorer/events.js"></script>
-<script src="/static/js/dag-explorer/search.js"></script>
-<script src="/static/js/dag-explorer/layout-persistence.js"></script>
-<script src="/static/js/dag-explorer/index.js"></script>
-
 <script>
-// Server-side configuration passed to client
-var globalFilterLevel = parseFloat('{{ globalFilterLevel }}') || 4;
-var globalZoom = parseFloat('{{ globalZoom }}') || 4;
-var globalStartNodeEUID = '{{ globalStartNodeEUID }}' || 'AY1';
-
-// DAG data embedded from server (avoids extra API call)
-var embeddedDagData = {{ dag_data | tojson | safe if dag_data else '{"elements": {"nodes": [], "edges": []}}' }};
-
-// Initialize DAG Explorer when document is ready
-$(document).ready(function() {
-    DAGExplorer.initWithData({
-        filterLevel: globalFilterLevel,
-        zoom: globalZoom,
-        startNodeEUID: globalStartNodeEUID,
-        data: embeddedDagData
-    });
-
-    // Help modal handlers
-    $('#helpBtn').click(function() {
-        $('#helpModal').show();
-    });
-
-    $('.closeBtn').click(function() {
-        $('#helpModal').hide();
-    });
-
-    $(window).click(function(e) {
-        if ($(e.target).is('#helpModal')) {
-            $('#helpModal').hide();
-        }
-    });
-});
-
-// Backward compatibility: expose cy globally for any legacy code
-var cy = null;
-var clickCount = {};
-var currentLayoutName = 'dagre';
-
-// Update cy reference when DAGGraph initializes
-$(document).ready(function() {
-    setTimeout(function() {
-        if (typeof DAGGraph !== 'undefined') {
-            cy = DAGGraph.getInstance();
-        }
-    }, 1000);
+window.BloomGraphConfig = {
+    canEdit: {{ "true" if is_admin else "false" }},
+    graphPath: "/dindex2"
+};
+</script>
+<script src="/static/js/graph.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    initGraphPage();
 });
 </script>
 {% endblock %}

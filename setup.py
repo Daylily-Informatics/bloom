@@ -28,13 +28,13 @@ setup(
     version=get_version(),
     packages=find_packages(),
     install_requires=[
-        # Add dependencies here,
-        # 'pytest',
+        "daylily-tapdb==0.1.21",
+        "daylily-cognito==0.1.24",
+        "psutil>=5.9.0",
     ],
     entry_points={
         "console_scripts": [
             "install-bloom=bloom_lims.thing:main",
-            "bloom-backup=bloom_lims.backup.cli:main",
             "bloom=bloom_lims.cli:main",
         ],
     },

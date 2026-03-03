@@ -131,6 +131,12 @@
       </div>
       
       <div class="login-card">
+        {% if auth_error %}
+        <div class="alert alert-error" style="margin-bottom: 1rem;">
+          <i class="fas fa-triangle-exclamation"></i>
+          Authentication failed: {{ auth_error }}
+        </div>
+        {% endif %}
         <a href="{{ cognito_login_url }}" class="btn btn-primary login-btn">
           <i class="fas fa-sign-in-alt"></i>
           Sign in with AWS Cognito
@@ -143,7 +149,6 @@
       
       <div class="login-footer">
         <p>BLOOM LIMS v{{ version | default('1.0.0') }}</p>
-        <p><a href="/legacy/login">Legacy Login</a></p>
       </div>
     </div>
   </div>
@@ -151,4 +156,3 @@
   <script src="/static/modern/js/bloom_modern.js"></script>
 </body>
 </html>
-

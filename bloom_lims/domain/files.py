@@ -12,6 +12,7 @@ import json
 import logging
 import subprocess
 import socket
+import hashlib
 from datetime import datetime
 from pathlib import Path
 import urllib.parse
@@ -44,8 +45,36 @@ class BloomFile(BloomObj):
         self.bucket_prefix = bucket_prefix
         self.s3_client = boto3.client("s3")
 
+    def _euid_numeric_value(self, euid):
+        euid_str = str(euid or "").strip().upper()
+        if euid_str:
+            # Meridian formats:
+            #   CATEGORY-BODYCHECK
+            #   SANDBOX:CATEGORY-BODYCHECK
+            candidate = euid_str.split(":", 1)[-1]
+            if "-" in candidate:
+                _, body_check = candidate.split("-", 1)
+                if len(body_check) >= 2:
+                    body = body_check[:-1]  # drop checksum char
+                    alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+                    if body and all(ch in alphabet for ch in body):
+                        value = 0
+                        for ch in body:
+                            value = (value * 32) + alphabet.index(ch)
+                        if value > 0:
+                            return value
+
+        # Legacy fallback for historical non-Meridian IDs like GX123.
+        digits = re.sub("[^0-9]", "", euid_str)
+        if digits:
+            return int(digits)
+
+        # Final deterministic fallback for malformed/unexpected IDs.
+        digest = hashlib.sha1(euid_str.encode("utf-8")).digest()
+        return int.from_bytes(digest[:8], byteorder="big", signed=False)
+
     def _derive_bucket_name(self, euid):
-        euid_int = int(re.sub("[^0-9]", "", euid))
+        euid_int = self._euid_numeric_value(euid)
         response = self.s3_client.list_buckets()
         buckets = response["Buckets"]
         matching_buckets = [
@@ -71,7 +100,7 @@ class BloomFile(BloomObj):
 
     def _determine_s3_key(self, euid, data_file_name):
         bucket_name = self._derive_bucket_name(euid)
-        euid_numeric_part = int(re.sub("[^0-9]", "", euid))
+        euid_numeric_part = self._euid_numeric_value(euid)
         response = self.s3_client.list_objects_v2(
             Bucket=bucket_name, Prefix="", Delimiter="/"
         )

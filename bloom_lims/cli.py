@@ -7,8 +7,8 @@ This module redirects to the new Click-based CLI in bloom_lims.cli package.
 Usage:
     bloom --help              Show all available commands
     bloom db status           Show database status
-    bloom db migrate          Run database migrations
-    bloom db seed             Load seed data
+    bloom db migrate          Run tapdb-managed schema migrations
+    bloom db seed             Load tapdb-managed seed data
     bloom gui                 Start the BLOOM web UI
     bloom config              Show current configuration
     bloom info                Show environment info
@@ -22,4 +22,3 @@ from bloom_lims.cli import main
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -83,9 +83,6 @@
             {% set current_user = user or udat %}
             {% if current_user and current_user.email %}
             <span class="text-sm text-muted">{{ current_user.email }}</span>
-            <a href="/legacy/" class="btn btn-outline btn-sm" title="Switch to Legacy UI">
-                <i class="fas fa-history"></i> Legacy
-            </a>
             <a href="/logout" class="btn btn-outline btn-sm">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </a>
@@ -108,12 +105,26 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-left">
-                <span>BLOOM LIMS</span>
-                <span class="footer-version">{{ version if version else 'dev' }}</span>
+                <div class="footer-mainline">
+                    <span>{{ gui_meta.app_name }}</span>
+                    <span class="footer-version">v{{ gui_meta.version }}</span>
+                </div>
+                <div class="footer-gitline">
+                    <span class="footer-meta-chip">Branch: {{ gui_meta.branch }}</span>
+                    <span class="footer-meta-chip">Tag: {{ gui_meta.tag }}</span>
+                    <span class="footer-meta-chip">Commit: {{ gui_meta.hash }}</span>
+                </div>
             </div>
             <div class="footer-right">
-                <a href="/legacy/" class="footer-link">Legacy UI</a>
-                <a href="https://github.com/Daylily-Informatics/bloom" class="footer-link" target="_blank" rel="noopener">
+                <a href="/help" class="footer-link">
+                    <i class="fas fa-circle-question"></i> Help
+                </a>
+                {% if gui_meta.support_email %}
+                <a href="mailto:{{ gui_meta.support_email }}" class="footer-link">
+                    <i class="fas fa-envelope"></i> {{ gui_meta.support_email }}
+                </a>
+                {% endif %}
+                <a href="{{ gui_meta.github_repo_url }}" class="footer-link" target="_blank" rel="noopener">
                     <i class="fab fa-github"></i> GitHub
                 </a>
             </div>
@@ -157,4 +168,3 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
-

@@ -16,6 +16,7 @@ Test Coverage:
 import pytest
 import json
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
 
@@ -767,3 +768,27 @@ class TestBatchOperations:
 
         assert all("transparent" not in n["classes"] for n in nodes)
 
+
+class TestGraphViewerClientContract:
+    """Checks static graph client contract for restored key/click behavior."""
+
+    def test_graph_js_preserves_tapdb_gestures_and_restored_shortcuts(self):
+        graph_js = Path("static/js/graph.js").read_text(encoding="utf-8")
+
+        # TapDB baseline gestures must remain.
+        assert 'key === "d"' in graph_js
+        assert 'key === "l"' in graph_js
+        assert 'registerTapSequence(node.id(), "left")' in graph_js
+        assert 'registerTapSequence(node.id(), "right")' in graph_js
+        assert 'runWaveFromNode(node, "children")' in graph_js
+        assert 'runWaveFromNode(node, "parents")' in graph_js
+
+        # Restored legacy shortcuts (non-conflicting) must exist.
+        assert 'key === "p"' in graph_js
+        assert 'key === "c"' in graph_js
+        assert 'key === "n"' in graph_js
+        assert 'key === "i"' in graph_js
+        assert 'runCogsForEuid("parents", node.id()' in graph_js
+        assert 'runCogsForEuid("children", node.id()' in graph_js
+        assert "runNeighborhoodFromNode(node)" in graph_js
+        assert "openNodeActionDialog(node.data())" in graph_js

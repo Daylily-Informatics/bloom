@@ -3,10 +3,14 @@
 Each CLI command and subcommand has at least one test.
 """
 
+import importlib
+
 import pytest
 from click.testing import CliRunner
 
 from bloom_lims.cli import cli
+
+gui_commands = importlib.import_module("bloom_lims.cli.gui")
 
 
 @pytest.fixture
@@ -121,3 +125,37 @@ class TestDbSubcommands:
         result = runner.invoke(cli, ["db", "shell", "--help"])
         assert result.exit_code == 0
 
+
+class TestGuiLocalhostPolicy:
+    """Tests for localhost-only GUI startup policy."""
+
+    def test_ensure_https_certs_generates_localhost_only_cert(self, tmp_path, monkeypatch):
+        project_root = tmp_path / "project"
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        monkeypatch.setattr(gui_commands, "PROJECT_ROOT", project_root)
+        monkeypatch.setattr(gui_commands.shutil, "which", lambda _: "/usr/local/bin/mkcert")
+
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append(args)
+            if "-key-file" in args and "-cert-file" in args:
+                key_file = args[args.index("-key-file") + 1]
+                cert_file = args[args.index("-cert-file") + 1]
+                with open(key_file, "w", encoding="utf-8") as fh:
+                    fh.write("key")
+                with open(cert_file, "w", encoding="utf-8") as fh:
+                    fh.write("cert")
+            return type("Result", (), {"returncode": 0})()
+
+        monkeypatch.setattr(gui_commands.subprocess, "run", fake_run)
+
+        cert_file, key_file = gui_commands._ensure_https_certs()
+        assert cert_file.exists()
+        assert key_file.exists()
+
+        cert_gen_call = next(call for call in calls if "-key-file" in call)
+        assert "localhost" in cert_gen_call
+        assert "127.0.0.1" not in cert_gen_call
+        assert "::1" not in cert_gen_call

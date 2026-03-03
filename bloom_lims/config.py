@@ -1,37 +1,29 @@
 """
-BLOOM LIMS Configuration Management
-
-Centralized configuration using Pydantic Settings with support for environment
-variable overrides and YAML config files.
+BLOOM LIMS Configuration Management.
 
 Configuration precedence (highest to lowest):
-    1. Environment variables (BLOOM_* prefix)
-    2. User config file (~/.config/bloom/bloom-config.yaml)
-    3. Template defaults
-
-Usage:
-    from bloom_lims.config import get_settings
-
-    settings = get_settings()
-    print(settings.database.host)
-    print(settings.api.pagination_default_size)
+1. Environment variables (BLOOM_* prefix and TAPDB_* runtime context)
+2. User config file (~/.config/bloom/bloom-config.yaml)
+3. Template defaults
 """
 
+import importlib.metadata
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, List, Any, Dict
+from typing import Any, Dict, List, Optional
+
+from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
-# Template is at repo root: config/bloom-config-template.yaml
 TEMPLATE_CONFIG_FILE = Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
 
 
-def _deep_merge(base: Dict, override: Dict) -> Dict:
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """Deep merge two dictionaries. Override values take precedence."""
     result = base.copy()
     for key, value in override.items():
@@ -43,39 +35,31 @@ def _deep_merge(base: Dict, override: Dict) -> Dict:
 
 
 def _load_yaml_config() -> Dict[str, Any]:
-    """
-    Load configuration from YAML files.
-
-    Returns merged config from template and user config.
-    Creates user config directory if missing.
-    """
+    """Load and merge template + user YAML config files."""
     try:
         import yaml
     except ImportError:
         return {}
 
-    config = {}
+    config: Dict[str, Any] = {}
 
-    # Load template defaults
     if TEMPLATE_CONFIG_FILE.exists():
         try:
-            with open(TEMPLATE_CONFIG_FILE) as f:
+            with open(TEMPLATE_CONFIG_FILE, encoding="utf-8") as f:
                 template_config = yaml.safe_load(f) or {}
                 config = template_config
         except Exception:
             pass
 
-    # Create user config dir if missing
     if not USER_CONFIG_DIR.exists():
         try:
             USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         except Exception:
             pass
 
-    # Load user config and merge
     if USER_CONFIG_FILE.exists():
         try:
-            with open(USER_CONFIG_FILE) as f:
+            with open(USER_CONFIG_FILE, encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
                 config = _deep_merge(config, user_config)
         except Exception:
@@ -84,87 +68,87 @@ def _load_yaml_config() -> Dict[str, Any]:
     return config
 
 
-class ReadReplicaSettings(BaseModel):
-    """Configuration for a single read replica."""
+class TapDBSettings(BaseModel):
+    """TapDB runtime targeting configuration."""
 
-    host: str = Field(description="Replica host address")
-    port: int = Field(default=5432, description="Replica port")
-    weight: int = Field(default=1, description="Load balancing weight (higher = more traffic)")
-    max_lag_seconds: int = Field(default=30, description="Maximum acceptable replication lag")
-    enabled: bool = Field(default=True, description="Whether this replica is enabled")
-
-
-class DatabaseSettings(BaseModel):
-    """Database connection configuration."""
-
-    host: str = Field(default="localhost", description="PostgreSQL host")
-    port: int = Field(default=5432, description="PostgreSQL port")
-    database: str = Field(default="bloom_lims", description="Database name")
-    user: str = Field(default="postgres", description="Database user")
-    password: str = Field(default="", description="Database password")
-    pool_size: int = Field(default=5, description="Connection pool size")
-    max_overflow: int = Field(default=10, description="Max pool overflow")
-    pool_timeout: int = Field(default=30, description="Pool connection timeout (seconds)")
-    pool_recycle: int = Field(default=1800, description="Connection recycle time (seconds)")
-    echo: bool = Field(default=False, description="Echo SQL statements")
-
-    # Read replica configuration
-    read_replicas: List[ReadReplicaSettings] = Field(
-        default=[],
-        description="List of read replica configurations for scaling reads"
+    env: str = Field(default="dev", description="TapDB target environment: dev/test/prod")
+    database_name: str = Field(
+        default="bloom",
+        description="TapDB namespace used for config scoping (tapdb-config-<name>.yaml)",
     )
-    enable_read_replicas: bool = Field(
-        default=False,
-        description="Enable read replica routing"
+    config_path: str = Field(
+        default="",
+        description="Optional explicit TAPDB_CONFIG_PATH override",
     )
-    replica_health_check_interval: int = Field(
-        default=30,
-        description="Seconds between replica health checks"
+    local_pg_port: int = Field(
+        default=5566,
+        description="Default local PostgreSQL port for TapDB dev/test runtime",
+    )
+    min_version: str = Field(default="0.1.21", description="Minimum supported daylily-tapdb")
+    max_version_exclusive: str = Field(
+        default="0.2.0",
+        description="Exclusive upper bound for daylily-tapdb",
     )
 
-    @property
-    def connection_string(self) -> str:
-        """Generate SQLAlchemy connection string."""
-        if self.password:
-            return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-        return f"postgresql://{self.user}@{self.host}:{self.port}/{self.database}"
+    @field_validator("env")
+    @classmethod
+    def validate_env(cls, value: str) -> str:
+        env = value.strip().lower()
+        if env not in {"dev", "test", "prod"}:
+            raise ValueError("tapdb.env must be one of: dev, test, prod")
+        return env
 
-    @property
-    def async_connection_string(self) -> str:
-        """Generate async SQLAlchemy connection string."""
-        if self.password:
-            return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-        return f"postgresql+asyncpg://{self.user}@{self.host}:{self.port}/{self.database}"
+    @field_validator("database_name")
+    @classmethod
+    def validate_database_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("tapdb.database_name cannot be empty")
+        return cleaned
+
+    @field_validator("local_pg_port")
+    @classmethod
+    def validate_local_pg_port(cls, value: int) -> int:
+        if value < 1 or value > 65535:
+            raise ValueError("tapdb.local_pg_port must be between 1 and 65535")
+        return value
+
+
+class TapDBRuntimeContext(BaseModel):
+    """Resolved runtime context to pass to daylily-tapdb."""
+
+    env: str
+    database_name: str
+    config_path: str = ""
+    aws_profile: str = "lsmc"
+    aws_region: str = "us-west-2"
 
 
 class StorageSettings(BaseModel):
     """File storage configuration."""
-    
-    # Local storage
+
     upload_dir: str = Field(default="/var/lib/bloom/uploads", description="Upload directory")
     temp_dir: str = Field(default="/tmp/bloom", description="Temporary file directory")
     max_file_size_mb: int = Field(default=100, description="Max upload file size (MB)")
     allowed_extensions: List[str] = Field(
         default=["pdf", "csv", "xlsx", "txt", "json", "png", "jpg", "jpeg"],
-        description="Allowed file extensions"
+        description="Allowed file extensions",
     )
-    
-    # S3/Object storage
+
     s3_bucket: str = Field(default="", description="S3 bucket name")
     s3_prefix: str = Field(default="bloom-files/", description="S3 key prefix")
     s3_region: str = Field(default="us-east-1", description="S3 region")
     s3_endpoint: str = Field(default="", description="S3-compatible endpoint URL")
-    
+
     @property
     def max_file_size_bytes(self) -> int:
-        """Get max file size in bytes."""
         return self.max_file_size_mb * 1024 * 1024
 
 
 def _get_default_api_version() -> str:
-    """Get default API version from _version module."""
     try:
         from bloom_lims._version import get_version
+
         return get_version()
     except ImportError:
         return "0.10.7"
@@ -176,70 +160,118 @@ class APISettings(BaseModel):
     title: str = Field(default="BLOOM LIMS API", description="API title")
     version: str = Field(default_factory=_get_default_api_version, description="API version")
     prefix: str = Field(default="/api/v1", description="API URL prefix")
-    
-    # Pagination
+
     pagination_default_size: int = Field(default=50, description="Default page size")
     pagination_max_size: int = Field(default=1000, description="Maximum page size")
-    
-    # Rate limiting
+
     rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
     rate_limit_requests: int = Field(default=100, description="Requests per window")
     rate_limit_window_seconds: int = Field(default=60, description="Rate limit window")
-    
-    # Timeouts
+
     request_timeout_seconds: int = Field(default=30, description="Request timeout")
     long_running_timeout_seconds: int = Field(default=300, description="Long-running op timeout")
-    
-    # CORS
+
     cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
 
 
 class AWSSettings(BaseModel):
     """AWS configuration."""
-    
-    profile: str = Field(default="", description="AWS profile name (sets AWS_PROFILE env var)")
+
+    profile: str = Field(default="lsmc", description="AWS profile name")
     region: str = Field(default="us-west-2", description="Default AWS region")
+
+
+class UISettings(BaseModel):
+    """UI metadata configuration."""
+
+    support_email: str = Field(
+        default="support@dyly.bio",
+        description="Support contact email shown in the GUI footer/help page",
+    )
+    github_repo_url: str = Field(
+        default="https://github.com/Daylily-Informatics/bloom",
+        description="Repository URL shown in the GUI footer/help page",
+    )
 
 
 class AuthSettings(BaseModel):
     """Authentication configuration."""
-    
-    # Cognito
+
     cognito_user_pool_id: str = Field(default="", description="Cognito user pool ID")
     cognito_client_id: str = Field(default="", description="Cognito app client ID")
     cognito_client_secret: str = Field(default="", description="Cognito app client secret")
     cognito_region: str = Field(default="", description="AWS region for Cognito")
     cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
     cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
-    cognito_logout_redirect_uri: str = Field(
-        default="", description="Cognito logout redirect URI"
-    )
+    cognito_logout_redirect_uri: str = Field(default="", description="Cognito logout redirect URI")
     cognito_scopes: List[str] = Field(
         default_factory=lambda: ["openid", "email", "profile"],
         description="Cognito OAuth scopes",
     )
-    cognito_allowed_domains: List[str] = Field(
-        default_factory=list, description="Allowed email domains"
-    )
-    
-    # JWT
+    cognito_allowed_domains: List[str] = Field(default_factory=list, description="Allowed email domains")
+
     jwt_secret: str = Field(default="", description="JWT secret key")
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
     jwt_expiry_hours: int = Field(default=24, description="JWT token expiry (hours)")
-    
-    # Session
+
     session_timeout_minutes: int = Field(default=30, description="Session timeout")
     max_sessions_per_user: int = Field(default=5, description="Max concurrent sessions")
 
 
+class AtlasSettings(BaseModel):
+    """Atlas integration settings."""
+
+    base_url: str = Field(default="", description="Atlas API base URL")
+    token: str = Field(default="", description="Atlas API bearer token")
+    timeout_seconds: int = Field(default=10, description="Atlas API timeout seconds")
+    cache_ttl_seconds: int = Field(default=300, description="Atlas response cache TTL in seconds")
+    verify_ssl: bool = Field(default=True, description="Verify Atlas TLS certificates")
+    organization_id: str = Field(
+        default="",
+        description="Atlas organization/tenant UUID used for outbound Bloom events",
+    )
+    events_enabled: bool = Field(
+        default=False,
+        description="Enable outbound Bloom->Atlas webhook event delivery",
+    )
+    events_path: str = Field(
+        default="/api/integrations/bloom/v1/events",
+        description="Atlas webhook path for Bloom events",
+    )
+    webhook_secret: str = Field(
+        default="",
+        description="Shared HMAC secret for Bloom webhook signatures",
+    )
+    events_timeout_seconds: int = Field(
+        default=10,
+        description="Timeout (seconds) for outbound Bloom webhook delivery",
+    )
+    events_max_retries: int = Field(
+        default=2,
+        description="Maximum retry count for outbound Bloom webhook delivery",
+    )
+    status_events_timeout_seconds: int = Field(
+        default=10,
+        description="Timeout (seconds) for Bloom -> Atlas test-order status event calls",
+    )
+    status_events_max_retries: int = Field(
+        default=5,
+        description="Maximum retry count for Bloom -> Atlas status event calls",
+    )
+    status_events_backoff_base_seconds: float = Field(
+        default=0.5,
+        description="Base backoff delay in seconds for Bloom -> Atlas status event retries",
+    )
+
+
 class LoggingSettings(BaseModel):
     """Logging configuration."""
-    
+
     level: str = Field(default="INFO", description="Log level")
     format: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        description="Log format"
+        description="Log format",
     )
     json_format: bool = Field(default=False, description="Use JSON log format")
     log_file: str = Field(default="", description="Log file path (empty for stdout)")
@@ -262,25 +294,19 @@ class CacheSettings(BaseModel):
     """Cache configuration for application caching layer."""
 
     enabled: bool = Field(default=True, description="Enable caching")
-    backend: str = Field(
-        default="memory",
-        description="Cache backend: 'memory', 'redis', or 'memcached'"
-    )
-    max_size: int = Field(default=5000, description="Maximum cache entries (memory backend)")
-    default_ttl: int = Field(default=300, description="Default TTL in seconds (5 minutes)")
+    backend: str = Field(default="memory", description="Cache backend: memory, redis, memcached")
+    max_size: int = Field(default=5000, description="Maximum cache entries")
+    default_ttl: int = Field(default=300, description="Default TTL in seconds")
 
-    # TTL settings for different object types (in seconds)
-    template_ttl: int = Field(default=3600, description="Template cache TTL (1 hour)")
-    instance_ttl: int = Field(default=300, description="Instance cache TTL (5 minutes)")
-    lineage_ttl: int = Field(default=300, description="Lineage cache TTL (5 minutes)")
-    query_ttl: int = Field(default=60, description="Query result cache TTL (1 minute)")
+    template_ttl: int = Field(default=3600, description="Template cache TTL")
+    instance_ttl: int = Field(default=300, description="Instance cache TTL")
+    lineage_ttl: int = Field(default=300, description="Lineage cache TTL")
+    query_ttl: int = Field(default=60, description="Query result cache TTL")
 
-    # Cache key prefixes
     template_prefix: str = Field(default="tmpl:", description="Template cache key prefix")
     instance_prefix: str = Field(default="inst:", description="Instance cache key prefix")
     query_prefix: str = Field(default="qry:", description="Query cache key prefix")
 
-    # Redis backend configuration
     redis_host: str = Field(default="localhost", description="Redis server host")
     redis_port: int = Field(default=6379, description="Redis server port")
     redis_db: int = Field(default=0, description="Redis database number")
@@ -288,21 +314,18 @@ class CacheSettings(BaseModel):
     redis_ssl: bool = Field(default=False, description="Enable Redis SSL/TLS")
     redis_cluster: bool = Field(default=False, description="Enable Redis Cluster mode")
 
-    # Memcached backend configuration
     memcached_servers: List[str] = Field(
         default=["localhost:11211"],
-        description="Memcached server addresses"
+        description="Memcached server addresses",
     )
 
 
 class BusinessConstants(BaseModel):
     """Business logic constants extracted from code."""
 
-    # Version defaults
     default_version: str = Field(default="1.0", description="Default object version")
     wildcard_version: str = Field(default="*", description="Wildcard version string")
 
-    # Status values
     status_created: str = Field(default="created", description="Created status")
     status_in_progress: str = Field(default="in_progress", description="In progress status")
     status_complete: str = Field(default="complete", description="Complete status")
@@ -310,66 +333,40 @@ class BusinessConstants(BaseModel):
     status_abandoned: str = Field(default="abandoned", description="Abandoned status")
     status_active: str = Field(default="active", description="Active status")
 
-    # Workflow states
     workflow_state_active: str = Field(default="active", description="Active workflow state")
     workflow_state_paused: str = Field(default="paused", description="Paused workflow state")
     workflow_state_completed: str = Field(default="completed", description="Completed workflow state")
 
-    # Object type prefixes
     template_suffix: str = Field(default="_template", description="Template table suffix")
     instance_suffix: str = Field(default="_instance", description="Instance table suffix")
     lineage_suffix: str = Field(default="_instance_lineage", description="Lineage table suffix")
 
-    # Singleton handling
     singleton_true_values: List[str] = Field(
         default=["1", "true", "True", "yes", "Yes"],
-        description="Values that indicate singleton=True"
+        description="Values that indicate singleton=True",
     )
     singleton_false_values: List[str] = Field(
         default=["0", "false", "False", "no", "No", ""],
-        description="Values that indicate singleton=False"
+        description="Values that indicate singleton=False",
     )
 
-    # Graph/lineage settings
     max_lineage_depth: int = Field(default=10, description="Max depth for lineage queries")
     max_children_per_query: int = Field(default=10000, description="Max children in recursive queries")
 
-    # Default printer settings
     default_label_style: str = Field(default="tube_2inX1in", description="Default label style")
     default_lab_code: str = Field(default="BLOOM", description="Default lab code")
 
-    # Timezone settings
     default_timezone: str = Field(default="US/Eastern", description="Default timezone")
 
-    # Template config paths (relative to bloom_lims)
-    config_base_path: str = Field(
-        default="config",
-        description="Base path for template configuration files"
-    )
+    config_base_path: str = Field(default="config", description="Base path for template configurations")
 
-    # Action execution
-    action_max_executions_unlimited: str = Field(
-        default="-1",
-        description="Value indicating unlimited action executions"
-    )
+    action_max_executions_unlimited: str = Field(default="-1", description="Unlimited action executions")
     action_enabled_true: str = Field(default="1", description="Action enabled value")
     action_enabled_false: str = Field(default="0", description="Action disabled value")
 
 
 class BloomSettings(BaseSettings):
-    """
-    Main settings class for BLOOM LIMS.
-
-    Configuration precedence (highest to lowest):
-        1. Environment variables (BLOOM_* prefix)
-        2. User config file (~/.config/bloom/bloom-config.yaml)
-        3. Template defaults (bloom_lims/config/bloom-config-template.yaml)
-
-    Examples:
-        BLOOM_DATABASE__HOST=localhost
-        BLOOM_DATABASE__PORT=5432
-        BLOOM_API__PAGINATION_DEFAULT_SIZE=100
-    """
+    """Main settings class for BLOOM LIMS."""
 
     model_config = SettingsConfigDict(
         env_prefix="BLOOM_",
@@ -378,117 +375,233 @@ class BloomSettings(BaseSettings):
         extra="ignore",
     )
 
-    # Application info
     app_name: str = Field(default="BLOOM LIMS", description="Application name")
     environment: str = Field(default="development", description="Environment name")
     debug: bool = Field(default=False, description="Debug mode")
 
-    # Nested settings
-    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    tapdb: TapDBSettings = Field(default_factory=TapDBSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    atlas: AtlasSettings = Field(default_factory=AtlasSettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
+    ui: UISettings = Field(default_factory=UISettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
     cache: CacheSettings = Field(default_factory=CacheSettings)
     constants: BusinessConstants = Field(default_factory=BusinessConstants)
 
-    def __init__(self, **kwargs):
-        """Initialize settings with YAML config as base."""
-        # Load YAML config first
+    def __init__(self, **kwargs: Any):
         yaml_config = _load_yaml_config()
-        # Merge with any explicit kwargs (kwargs take precedence)
         merged = _deep_merge(yaml_config, kwargs)
         super().__init__(**merged)
+        self._apply_environment_overrides()
+
+    def _apply_environment_overrides(self) -> None:
+        """Apply selected env overrides after YAML merge.
+
+        YAML values are currently passed as init kwargs, which take precedence
+        over env vars in Pydantic settings resolution. We explicitly apply
+        runtime env overrides for Atlas integration settings so local process
+        configuration can be adjusted without editing config files.
+        """
+        atlas_base_url = os.environ.get("BLOOM_ATLAS__BASE_URL")
+        if atlas_base_url is not None:
+            self.atlas.base_url = atlas_base_url
+
+        atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
+        if atlas_token is not None:
+            self.atlas.token = atlas_token
+
+        atlas_timeout = os.environ.get("BLOOM_ATLAS__TIMEOUT_SECONDS")
+        if atlas_timeout is not None:
+            try:
+                self.atlas.timeout_seconds = int(atlas_timeout)
+            except ValueError:
+                pass
+
+        atlas_cache_ttl = os.environ.get("BLOOM_ATLAS__CACHE_TTL_SECONDS")
+        if atlas_cache_ttl is not None:
+            try:
+                self.atlas.cache_ttl_seconds = int(atlas_cache_ttl)
+            except ValueError:
+                pass
+
+        atlas_verify_ssl = os.environ.get("BLOOM_ATLAS__VERIFY_SSL")
+        if atlas_verify_ssl is not None:
+            self.atlas.verify_ssl = str(atlas_verify_ssl).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
 
     @field_validator("environment")
     @classmethod
-    def validate_environment(cls, v: str) -> str:
-        """Validate environment value."""
+    def validate_environment(cls, value: str) -> str:
+        env = value.lower()
         valid_envs = ["development", "staging", "production", "testing"]
-        if v.lower() not in valid_envs:
+        if env not in valid_envs:
             raise ValueError(f"Environment must be one of: {', '.join(valid_envs)}")
-        return v.lower()
+        return env
 
     @property
     def is_production(self) -> bool:
-        """Check if running in production."""
         return self.environment == "production"
 
     @property
     def is_development(self) -> bool:
-        """Check if running in development."""
         return self.environment == "development"
+
+    # Compatibility aliases for explicit tapdb context naming.
+    @property
+    def tapdb_env(self) -> str:
+        return self.tapdb.env
+
+    @property
+    def tapdb_database_name(self) -> str:
+        return self.tapdb.database_name
+
+    @property
+    def tapdb_config_path(self) -> str:
+        return self.tapdb.config_path
 
 
 @lru_cache()
 def get_settings() -> BloomSettings:
-    """
-    Get cached settings instance.
-
-    Uses lru_cache to ensure settings are only loaded once.
-    Call get_settings.cache_clear() to reload settings.
-
-    Returns:
-        BloomSettings instance with all configuration
-    """
     return BloomSettings()
 
 
+def get_tapdb_runtime_context(settings: Optional[BloomSettings] = None) -> TapDBRuntimeContext:
+    """Resolve active TapDB runtime context from env + config."""
+    settings = settings or get_settings()
+    return TapDBRuntimeContext(
+        env=(os.environ.get("TAPDB_ENV") or settings.tapdb.env).strip().lower(),
+        database_name=(os.environ.get("TAPDB_DATABASE_NAME") or settings.tapdb.database_name).strip(),
+        config_path=(os.environ.get("TAPDB_CONFIG_PATH") or settings.tapdb.config_path).strip(),
+        aws_profile=(os.environ.get("AWS_PROFILE") or settings.aws.profile or "lsmc").strip(),
+        aws_region=(
+            os.environ.get("AWS_REGION")
+            or os.environ.get("AWS_DEFAULT_REGION")
+            or settings.aws.region
+            or "us-west-2"
+        ).strip(),
+    )
+
+
+def apply_runtime_environment(settings: Optional[BloomSettings] = None) -> TapDBRuntimeContext:
+    """Apply normalized TAPDB/AWS runtime environment variables."""
+    settings = settings or get_settings()
+    ctx = get_tapdb_runtime_context(settings=settings)
+
+    os.environ.setdefault("TAPDB_ENV", ctx.env)
+    os.environ.setdefault("TAPDB_DATABASE_NAME", ctx.database_name)
+    if ctx.config_path:
+        os.environ.setdefault("TAPDB_CONFIG_PATH", ctx.config_path)
+
+    # Bloom-local TapDB dev/test should default to a non-standard port so it
+    # can coexist with other local PostgreSQL services on 5432.
+    local_pg_port = str(
+        os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or settings.tapdb.local_pg_port
+    )
+    os.environ.setdefault("BLOOM_TAPDB_LOCAL_PG_PORT", local_pg_port)
+    os.environ.setdefault("TAPDB_DEV_PORT", local_pg_port)
+    os.environ.setdefault("TAPDB_TEST_PORT", local_pg_port)
+
+    os.environ.setdefault("AWS_PROFILE", ctx.aws_profile)
+    os.environ.setdefault("AWS_REGION", ctx.aws_region)
+    os.environ.setdefault("AWS_DEFAULT_REGION", ctx.aws_region)
+
+    return ctx
+
+
+def get_tapdb_db_config(
+    env_name: Optional[str] = None,
+    database_name: Optional[str] = None,
+    config_path: Optional[str] = None,
+) -> Dict[str, str]:
+    """Resolve active DB config via daylily-tapdb config loader."""
+    settings = get_settings()
+    ctx = apply_runtime_environment(settings)
+
+    if database_name:
+        os.environ["TAPDB_DATABASE_NAME"] = database_name
+    if config_path:
+        os.environ["TAPDB_CONFIG_PATH"] = config_path
+
+    target_env = (env_name or ctx.env).strip().lower()
+
+    from daylily_tapdb.cli.db_config import get_db_config_for_env
+
+    return get_db_config_for_env(target_env)
+
+
+def assert_tapdb_version(
+    min_version: Optional[str] = None,
+    max_version_exclusive: Optional[str] = None,
+) -> str:
+    """Assert installed daylily-tapdb version is within the supported range."""
+    settings = get_settings()
+    min_v = Version(min_version or settings.tapdb.min_version)
+    max_v = Version(max_version_exclusive or settings.tapdb.max_version_exclusive)
+
+    try:
+        installed = Version(importlib.metadata.version("daylily-tapdb"))
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise RuntimeError("daylily-tapdb is not installed") from exc
+
+    if installed < min_v or installed >= max_v:
+        raise RuntimeError(
+            f"Unsupported daylily-tapdb version {installed}; expected >= {min_v} and < {max_v}"
+        )
+
+    return str(installed)
+
+
 def validate_settings() -> List[str]:
-    """
-    Validate settings and return list of warnings/issues.
-
-    This should be called on application startup to catch
-    configuration issues early.
-
-    Returns:
-        List of warning messages (empty if all good)
-    """
-    warnings = []
+    """Validate settings and return list of warnings/issues."""
+    warnings: List[str] = []
     settings = get_settings()
 
-    # Check database settings
-    if not settings.database.password and settings.is_production:
-        warnings.append("Database password is not set in production")
+    try:
+        assert_tapdb_version()
+    except Exception as exc:
+        warnings.append(f"TapDB version check failed: {exc}")
 
-    # Check auth settings
-    if not all(
-        [
-            settings.auth.cognito_user_pool_id,
-            settings.auth.cognito_client_id,
-            settings.auth.cognito_region,
-            settings.auth.cognito_domain,
-            settings.auth.cognito_redirect_uri,
-        ]
-    ):
-        warnings.append("Cognito configuration is incomplete")
+    if not settings.auth.cognito_user_pool_id:
+        warnings.append(
+            "Cognito pool binding is missing (auth.cognito_user_pool_id). "
+            "Bloom resolves client/domain/callback from daycog env files."
+        )
 
     if not settings.auth.jwt_secret and settings.is_production:
         warnings.append("JWT secret is not set in production")
 
-    # Check storage settings
     upload_path = Path(settings.storage.upload_dir)
     if not upload_path.exists():
         warnings.append(f"Upload directory does not exist: {settings.storage.upload_dir}")
 
-    # Check for S3 configuration if bucket is specified
-    if settings.storage.s3_bucket:
-        if not os.environ.get("AWS_ACCESS_KEY_ID"):
-            warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
+    if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
+        warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
 
     return warnings
 
 
-# Legacy compatibility - allow direct imports of common values
+# Legacy compatibility
 def get_database_url() -> str:
-    """Get database connection string for backward compatibility."""
-    return get_settings().database.connection_string
+    """Build runtime database URL from TapDB resolved configuration."""
+    cfg = get_tapdb_db_config()
+    auth = cfg["user"]
+    if cfg.get("password"):
+        auth = f"{cfg['user']}:{cfg['password']}"
+
+    url = f"postgresql://{auth}@{cfg['host']}:{cfg['port']}/{cfg['database']}"
+    if cfg.get("engine_type") == "aurora":
+        return f"{url}?sslmode=verify-full"
+    return url
 
 
-def get_cognito_config() -> tuple:
-    """Get Cognito configuration for backward compatibility."""
+def get_cognito_config() -> tuple[str, str, str]:
     settings = get_settings()
     return (
         settings.auth.cognito_region,
@@ -497,34 +610,21 @@ def get_cognito_config() -> tuple:
     )
 
 
-# Config file management utilities
 def get_user_config_path() -> Path:
-    """Get the path to the user's config file."""
     return USER_CONFIG_FILE
 
 
 def get_template_config_path() -> Path:
-    """Get the path to the template config file."""
     return TEMPLATE_CONFIG_FILE
 
 
 def ensure_user_config_exists() -> Path:
-    """
-    Ensure user config directory and file exist.
-
-    Creates ~/.config/bloom/ directory if missing.
-    Copies template to user config if user config doesn't exist.
-
-    Returns:
-        Path to user config file
-    """
+    """Ensure user config directory and file exist."""
     import shutil
 
-    # Create directory
     if not USER_CONFIG_DIR.exists():
         USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Copy template if user config doesn't exist
     if not USER_CONFIG_FILE.exists() and TEMPLATE_CONFIG_FILE.exists():
         shutil.copy(TEMPLATE_CONFIG_FILE, USER_CONFIG_FILE)
 

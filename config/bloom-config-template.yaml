@@ -10,12 +10,13 @@
 #
 # Environment variable format:
 #   - Simple: BLOOM_DEBUG=true
-#   - Nested: BLOOM_DATABASE__HOST=localhost
+#   - Nested: BLOOM_TAPDB__ENV=dev
 # =============================================================================
 
 # AWS SETTINGS
-aws_profile: <profile_name>  # Leave empty to use default profile
-aws_default_region: us-east-1
+aws:
+  profile: "lsmc"
+  region: "us-west-2"
 
 # Application settings
 app_name: "BLOOM LIMS"
@@ -23,24 +24,22 @@ environment: "development"  # development, staging, production, testing
 debug: false
 
 # -----------------------------------------------------------------------------
-# Database Configuration
+# UI Metadata
 # -----------------------------------------------------------------------------
-database:
-  host: "localhost"
-  port: 5445                    # Default BLOOM PostgreSQL port
-  database: "bloom"             # Database name
-  user: "bloom"                 # Database user
-  password: ""                  # Leave empty for peer authentication
-  pool_size: 5                  # Connection pool size
-  max_overflow: 10              # Maximum pool overflow connections
-  pool_timeout: 30              # Pool connection timeout (seconds)
-  pool_recycle: 1800            # Connection recycle time (seconds)
-  echo: false                   # Echo SQL statements to console
+ui:
+  support_email: "support@dyly.bio"
+  github_repo_url: "https://github.com/Daylily-Informatics/bloom"
 
-  # Read replica configuration (optional, for scaling)
-  enable_read_replicas: false
-  read_replicas: []             # List of {host, port, weight, max_lag_seconds, enabled}
-  replica_health_check_interval: 30
+# -----------------------------------------------------------------------------
+# TapDB Runtime Configuration
+# -----------------------------------------------------------------------------
+tapdb:
+  env: "dev"                    # dev, test, prod
+  database_name: "bloom"        # TAPDB_DATABASE_NAME namespace
+  config_path: ""               # Optional TAPDB_CONFIG_PATH override
+  local_pg_port: 5566           # Default local TapDB PostgreSQL port for dev/test
+  min_version: "0.1.21"         # Required minimum daylily-tapdb version
+  max_version_exclusive: "0.2.0"
 
 # -----------------------------------------------------------------------------
 # Storage Configuration
@@ -94,13 +93,16 @@ api:
 # Authentication Configuration
 # -----------------------------------------------------------------------------
 auth:
-  # AWS Cognito (optional)
+  # Cognito pool binding (required for Cognito auth).
+  # Bloom resolves client/domain/callback from daycog env files.
+  # Required Cognito app client name is "bloom" (override via BLOOM_COGNITO_APP_NAME).
+  # Expected callback convention: https://localhost:8912/auth/callback
   cognito_user_pool_id: ""
-  cognito_client_id: ""
-  cognito_region: ""
-  cognito_domain: ""
-  cognito_redirect_uri: ""
-  cognito_logout_redirect_uri: ""
+  cognito_client_id: ""           # Optional explicit override
+  cognito_region: ""              # Optional explicit override
+  cognito_domain: ""              # Optional explicit override
+  cognito_redirect_uri: ""        # Optional explicit override
+  cognito_logout_redirect_uri: "" # Optional explicit override
   cognito_scopes:
     - "openid"
     - "email"
@@ -115,6 +117,27 @@ auth:
   # Session settings
   session_timeout_minutes: 30
   max_sessions_per_user: 5
+
+# -----------------------------------------------------------------------------
+# Atlas Integration
+# -----------------------------------------------------------------------------
+atlas:
+  base_url: ""                  # e.g., https://atlas.example.org
+  token: ""                     # Bearer token used for Atlas lookup APIs
+  timeout_seconds: 10
+  cache_ttl_seconds: 300
+  verify_ssl: true
+  status_events_timeout_seconds: 10
+  status_events_max_retries: 5
+  status_events_backoff_base_seconds: 0.5
+
+  # Bloom -> Atlas outbound event webhook configuration
+  organization_id: ""           # Atlas org UUID to include in webhook payloads
+  events_enabled: false
+  events_path: "/api/integrations/bloom/v1/events"
+  webhook_secret: ""            # Shared secret for X-Bloom-Signature HMAC
+  events_timeout_seconds: 10
+  events_max_retries: 2
 
 # -----------------------------------------------------------------------------
 # Logging Configuration
@@ -191,4 +214,3 @@ constants:
 
   # Template config paths (relative to bloom_lims)
   config_base_path: "config"
-

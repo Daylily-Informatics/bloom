@@ -155,6 +155,8 @@ from .async_operations import (
     BackgroundTaskManager,
     TaskResult,
     TaskStatus,
+    async_query,
+    async_bulk_insert,
     get_task_manager,
     run_async,
     run_in_background,
@@ -267,6 +269,8 @@ __all__ = [
     "BackgroundTaskManager",
     "TaskResult",
     "TaskStatus",
+    "async_query",
+    "async_bulk_insert",
     "get_task_manager",
     "run_async",
     "run_in_background",
@@ -281,4 +285,3 @@ __all__ = [
     "bulk_delete",
     "get_batch_processor",
 ]
-

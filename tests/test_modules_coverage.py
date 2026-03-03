@@ -41,11 +41,6 @@ class TestLoggingConfig:
 class TestHealthModule:
     """Tests for bloom_lims/health.py"""
 
-    @pytest.fixture(autouse=True)
-    def check_psutil(self):
-        """Skip tests if psutil is not available."""
-        pytest.importorskip("psutil")
-
     def test_health_models_import(self):
         """Test that health models can be imported."""
         from bloom_lims.health import (
@@ -85,6 +80,7 @@ class TestHealthModule:
         from datetime import datetime
         response = ReadinessResponse(
             status="ready",
+            ready=True,
             timestamp=datetime.now()
         )
         assert response.status == "ready"
@@ -332,4 +328,3 @@ class TestTapdbAdapter:
         """Test that tapdb_adapter module can be imported."""
         import bloom_lims.tapdb_adapter
         assert bloom_lims.tapdb_adapter is not None
-

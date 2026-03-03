@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
+from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
     ContainerCreateSchema,
     ContainerUpdateSchema,
@@ -22,7 +23,7 @@ from bloom_lims.schemas import (
     SuccessResponse,
 )
 from bloom_lims.exceptions import NotFoundError, ValidationError
-from .dependencies import require_api_auth, APIUser
+from .dependencies import APIUser, require_read, require_write
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,30 @@ def get_bdb(username: str = "api-user"):
     return BLOOMdb3(app_username=username)
 
 
+def _container_event_payload(container, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = {
+        "euid": container.euid,
+        "container_euid": container.euid,
+        "uuid": str(container.uuid),
+        "name": container.name,
+        "category": container.category,
+        "type": container.type,
+        "subtype": container.subtype,
+        "status": container.bstatus,
+        "is_deleted": bool(getattr(container, "is_deleted", False)),
+    }
+    json_addl = container.json_addl
+    if isinstance(json_addl, str):
+        try:
+            json_addl = json_lib.loads(json_addl)
+        except Exception:
+            json_addl = {}
+    payload["json_addl"] = json_addl if isinstance(json_addl, dict) else {}
+    if extra:
+        payload.update(extra)
+    return payload
+
+
 @router.get("/", response_model=Dict[str, Any])
 async def list_containers(
     container_type: Optional[str] = Query(None, description="Filter by type (plate, rack, box)"),
@@ -43,7 +68,7 @@ async def list_containers(
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """List containers with optional filters."""
     try:
@@ -92,7 +117,7 @@ async def list_containers(
 async def get_container(
     euid: str,
     include_contents: bool = Query(False),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """Get a container by EUID, optionally including contents."""
     try:
@@ -142,7 +167,7 @@ async def get_container(
 @router.post("/", response_model=Dict[str, Any])
 async def create_container(
     data: ContainerCreateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Create a new container from a template."""
     try:
@@ -156,6 +181,8 @@ async def create_container(
             container = result[0][0] if isinstance(result, list) else result
         else:
             raise HTTPException(status_code=400, detail="template_euid is required")
+
+        emit_bloom_event("container.created", _container_event_payload(container))
 
         return {
             "success": True,
@@ -174,7 +201,7 @@ async def create_container(
 async def update_container(
     euid: str,
     data: ContainerUpdateSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Update a container."""
     try:
@@ -188,17 +215,60 @@ async def update_container(
         if not container:
             raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
 
+        prev_status = container.bstatus
+
         if data.name is not None:
             container.name = data.name
         if data.status is not None:
             container.bstatus = data.status
+        if data.is_deleted is not None:
+            container.is_deleted = data.is_deleted
+
+        json_addl_dirty = False
+        existing = container.json_addl or {}
+        if isinstance(existing, str):
+            try:
+                existing = json_lib.loads(existing)
+            except Exception:
+                existing = {}
+        if not isinstance(existing, dict):
+            existing = {}
+
         if data.json_addl is not None:
-            existing = container.json_addl or {}
             existing.update(data.json_addl)
+            json_addl_dirty = True
+
+        if data.metadata is not None:
+            props = existing.get("properties")
+            if not isinstance(props, dict):
+                props = {}
+            existing_metadata = props.get("metadata")
+            if not isinstance(existing_metadata, dict):
+                existing_metadata = {}
+            merged_metadata = dict(existing_metadata)
+            merged_metadata.update(data.metadata)
+            props["metadata"] = merged_metadata
+            existing["properties"] = props
+            json_addl_dirty = True
+
+        if json_addl_dirty:
             container.json_addl = existing
             flag_modified(container, "json_addl")
 
         bdb.session.commit()
+        payload = _container_event_payload(container)
+        emit_bloom_event("container.updated", payload)
+        if prev_status != container.bstatus:
+            emit_bloom_event(
+                "container.status_changed",
+                _container_event_payload(
+                    container,
+                    {
+                        "previous_status": prev_status,
+                        "current_status": container.bstatus,
+                    },
+                ),
+            )
 
         return {
             "success": True,
@@ -216,7 +286,7 @@ async def update_container(
 async def delete_container(
     euid: str,
     hard_delete: bool = Query(False, description="Permanently delete"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Delete a container (soft delete by default)."""
     try:
@@ -229,11 +299,17 @@ async def delete_container(
         if not container:
             raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
 
+        event_payload = _container_event_payload(
+            container,
+            {"hard_delete": hard_delete, "is_deleted": True},
+        )
         if hard_delete:
             bc.delete_obj(container)
         else:
             container.is_deleted = True
             bdb.session.commit()
+
+        emit_bloom_event("container.deleted", event_payload)
 
         return {
             "success": True,
@@ -247,11 +323,21 @@ async def delete_container(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/{euid}", response_model=Dict[str, Any])
+async def patch_container(
+    euid: str,
+    data: ContainerUpdateSchema,
+    user: APIUser = Depends(require_write),
+):
+    """Compatibility alias for Atlas integration clients."""
+    return await update_container(euid=euid, data=data, user=user)
+
+
 @router.post("/{container_euid}/contents")
 async def add_content_to_container(
     container_euid: str,
     data: PlaceInContainerSchema,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Add content to a container."""
     try:
@@ -271,7 +357,7 @@ async def add_content_to_container(
 async def remove_content_from_container(
     container_euid: str,
     content_euid: str,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """Remove content from a container."""
     try:
@@ -303,7 +389,7 @@ async def remove_content_from_container(
 @router.get("/{euid}/layout", response_model=Dict[str, Any])
 async def get_container_layout(
     euid: str,
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """Get the layout/wells of a container (for plates)."""
     try:
@@ -358,7 +444,7 @@ async def get_container_layout(
 @router.post("/bulk-create", response_model=Dict[str, Any])
 async def bulk_create_containers(
     file: UploadFile = File(..., description="TSV file with container/content data"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_write),
 ):
     """
     Bulk create containers with content from a TSV file.
@@ -500,4 +586,3 @@ async def bulk_create_containers(
     except Exception as e:
         logger.error(f"Error in bulk container creation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

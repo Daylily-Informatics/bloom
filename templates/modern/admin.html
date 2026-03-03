@@ -9,11 +9,17 @@
     <p class="text-muted">System settings, user preferences, and integrations</p>
   </div>
   <div class="page-actions">
-    <a href="/legacy/admin" class="btn btn-outline btn-sm" title="Legacy view">
-      <i class="fas fa-history"></i> Legacy
-    </a>
   </div>
 </div>
+
+{% if saved %}
+<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-success);">
+  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+    <i class="fas fa-check-circle" style="color: var(--color-success);"></i>
+    <span>Preferences saved.</span>
+  </div>
+</div>
+{% endif %}
 
 <div class="grid grid-2">
   <!-- User Preferences -->
@@ -422,4 +428,3 @@ function trackPackage(event) {
 }
 </script>
 {% endblock %}
-

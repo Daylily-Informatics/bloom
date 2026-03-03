@@ -24,7 +24,7 @@ from bloom_lims.exceptions import (
     DatabaseError,
     create_error_response,
 )
-from .dependencies import require_api_auth, require_admin, APIUser
+from .dependencies import APIUser, require_read, require_write
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ async def list_objects(
     name_contains: Optional[str] = Query(None, description="Filter by name"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
-    user: APIUser = Depends(require_api_auth),
+    user: APIUser = Depends(require_read),
 ):
     """
     List objects with optional filters.
@@ -101,7 +101,7 @@ async def list_objects(
 
 
 @router.get("/{euid}")
-async def get_object(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_object(euid: str, user: APIUser = Depends(require_read)):
     """
     Get a single object by EUID.
     """
@@ -139,7 +139,7 @@ async def get_object(euid: str, user: APIUser = Depends(require_api_auth)):
 
 
 @router.post("/", response_model=Dict[str, Any])
-async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(require_api_auth)):
+async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(require_write)):
     """
     Create a new object.
     """
@@ -179,7 +179,7 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
 async def update_object(
     euid: str,
     data: ObjectUpdateSchema,
-    user: APIUser = Depends(require_admin),
+    user: APIUser = Depends(require_write),
 ):
     """
     Update an existing object. Requires admin privileges.
@@ -256,7 +256,7 @@ async def update_object(
 async def delete_object(
     euid: str,
     hard_delete: bool = Query(False, description="Permanently delete (vs soft delete)"),
-    user: APIUser = Depends(require_admin),
+    user: APIUser = Depends(require_write),
 ):
     """
     Delete an object. Requires admin privileges.
@@ -265,6 +265,9 @@ async def delete_object(
     Use hard_delete=True for permanent deletion (use with caution).
     """
     try:
+        if hard_delete and not user.is_admin:
+            raise HTTPException(status_code=403, detail="Admin privileges required for hard delete")
+
         from bloom_lims.db import BLOOMdb3
         from bloom_lims.bobjs import BloomObj
 
@@ -294,4 +297,3 @@ async def delete_object(
     except Exception as e:
         logger.error(f"Error deleting object {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

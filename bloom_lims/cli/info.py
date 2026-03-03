@@ -1,5 +1,7 @@
 """Information and diagnostic commands for BLOOM CLI."""
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
@@ -9,32 +11,42 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-console = Console()
+from bloom_lims.config import (
+    apply_runtime_environment,
+    assert_tapdb_version,
+    get_settings,
+    get_tapdb_db_config,
+)
 
-# Get project root
+console = Console()
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-PGDATA = PROJECT_ROOT / "bloom_lims" / "database"
 
 
 def _get_version() -> str:
-    """Get version from _version module."""
     try:
         from bloom_lims._version import get_version
+
         return get_version()
     except ImportError:
         return "dev"
 
 
-def _is_pg_running() -> bool:
-    """Check if PostgreSQL is running."""
-    if not PGDATA.exists():
-        return False
-    result = subprocess.run(
-        ["pg_ctl", "-D", str(PGDATA), "status"],
+def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess:
+    env = apply_runtime_environment(get_settings())
+    runtime = os.environ.copy()
+    runtime.setdefault("TAPDB_ENV", env.env)
+    runtime.setdefault("TAPDB_DATABASE_NAME", env.database_name)
+    if env.config_path:
+        runtime.setdefault("TAPDB_CONFIG_PATH", env.config_path)
+    runtime.setdefault("AWS_PROFILE", env.aws_profile)
+    runtime.setdefault("AWS_REGION", env.aws_region)
+    runtime.setdefault("AWS_DEFAULT_REGION", env.aws_region)
+    return subprocess.run(
+        [sys.executable, "-m", "daylily_tapdb.cli"] + args,
+        env=runtime,
         capture_output=True,
         text=True,
     )
-    return result.returncode == 0
 
 
 @click.command()
@@ -45,38 +57,30 @@ def version():
 
 @click.command()
 def info():
-    """Show BLOOM configuration and environment info."""
-    from bloom_lims.config import get_settings, USER_CONFIG_FILE
-    
+    """Show BLOOM configuration and runtime info."""
     settings = get_settings()
-    
+    ctx = apply_runtime_environment(settings)
+    db_cfg = get_tapdb_db_config()
+
     table = Table(title="BLOOM LIMS Info")
     table.add_column("Property", style="cyan")
     table.add_column("Value")
 
-    # Version
     table.add_row("Version", _get_version())
-
-    # Python
     table.add_row("Python", sys.version.split()[0])
-
-    # Project root
     table.add_row("Project Root", str(PROJECT_ROOT))
-
-    # Environment
     table.add_row("Environment", settings.environment)
+    table.add_row("TapDB Env", ctx.env)
+    table.add_row("TapDB Namespace", ctx.database_name)
+    table.add_row("TapDB Target", f"{db_cfg['host']}:{db_cfg['port']}/{db_cfg['database']}")
+    table.add_row("AWS Profile", os.environ.get("AWS_PROFILE", ctx.aws_profile))
+    table.add_row("AWS Region", os.environ.get("AWS_REGION", ctx.aws_region))
 
-    # Config file
-    if USER_CONFIG_FILE.exists():
-        table.add_row("Config File", str(USER_CONFIG_FILE))
-    else:
-        table.add_row("Config File", "[dim]not found (using defaults)[/dim]")
+    try:
+        table.add_row("daylily-tapdb", assert_tapdb_version())
+    except Exception as exc:
+        table.add_row("daylily-tapdb", f"[red]invalid[/red] ({exc})")
 
-    # Database
-    db_url = f"{settings.database.host}:{settings.database.port}/{settings.database.database}"
-    table.add_row("Database", db_url)
-
-    # Conda environment
     conda_env = os.environ.get("CONDA_DEFAULT_ENV", "[dim]not set[/dim]")
     table.add_row("Conda Env", conda_env)
 
@@ -85,37 +89,14 @@ def info():
 
 @click.command()
 def status():
-    """Check status of all BLOOM services."""
-    console.print("[bold]BLOOM Service Status[/bold]")
-    console.print()
-
-    # Check PostgreSQL
-    if PGDATA.exists():
-        if _is_pg_running():
-            console.print("[green]●[/green] PostgreSQL: [green]running[/green]")
-        else:
-            console.print("[dim]○[/dim] PostgreSQL: [dim]stopped[/dim]")
+    """Check DB/runtime status via tapdb."""
+    result = _tapdb_cmd(["db", "schema", "status", apply_runtime_environment(get_settings()).env])
+    if result.returncode == 0:
+        console.print(result.stdout.strip())
     else:
-        console.print("[yellow]○[/yellow] PostgreSQL: [yellow]not initialized[/yellow]")
-
-    # Check database connection
-    try:
-        from bloom_lims.db import BLOOMdb3
-        from sqlalchemy import text
-        with BLOOMdb3(echo_sql=False) as bdb:
-            bdb.session.execute(text("SELECT 1"))
-        console.print("[green]●[/green] Database: [green]connected[/green]")
-    except Exception as e:
-        console.print(f"[red]●[/red] Database: [red]error[/red] - {e}")
-
-    # Check conda environment
-    conda_env = os.environ.get("CONDA_DEFAULT_ENV")
-    if conda_env == "BLOOM":
-        console.print("[green]●[/green] Conda Env: [green]BLOOM active[/green]")
-    elif conda_env:
-        console.print(f"[yellow]●[/yellow] Conda Env: [yellow]{conda_env} (expected BLOOM)[/yellow]")
-    else:
-        console.print("[dim]○[/dim] Conda Env: [dim]not activated[/dim]")
+        console.print(result.stdout.strip())
+        console.print(result.stderr.strip())
+        raise SystemExit(result.returncode)
 
 
 @click.command()
@@ -123,11 +104,10 @@ def doctor():
     """Verify environment, dependencies, and configuration."""
     console.print("[bold]BLOOM Doctor - Environment Check[/bold]")
     console.print()
-    
-    issues = []
-    warnings = []
 
-    # Check Python version
+    issues: list[str] = []
+    warnings: list[str] = []
+
     py_version = sys.version_info
     if py_version >= (3, 12):
         console.print(f"[green]✓[/green] Python {py_version.major}.{py_version.minor}")
@@ -135,7 +115,6 @@ def doctor():
         issues.append(f"Python 3.12+ required, found {py_version.major}.{py_version.minor}")
         console.print(f"[red]✗[/red] Python {py_version.major}.{py_version.minor} (3.12+ required)")
 
-    # Check conda environment
     conda_env = os.environ.get("CONDA_DEFAULT_ENV")
     if conda_env == "BLOOM":
         console.print("[green]✓[/green] Conda environment: BLOOM")
@@ -143,50 +122,36 @@ def doctor():
         warnings.append(f"Not in BLOOM conda environment (current: {conda_env})")
         console.print(f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} (expected: BLOOM)")
 
-    # Check key imports
     for module_name in ["bloom_lims.db", "bloom_lims.config", "daylily_tapdb"]:
         try:
             __import__(module_name)
             console.print(f"[green]✓[/green] Import: {module_name}")
-        except ImportError as e:
-            issues.append(f"Cannot import {module_name}: {e}")
+        except ImportError as exc:
+            issues.append(f"Cannot import {module_name}: {exc}")
             console.print(f"[red]✗[/red] Import: {module_name}")
 
-    # Check PostgreSQL
-    if PGDATA.exists():
-        if _is_pg_running():
-            console.print("[green]✓[/green] PostgreSQL: running")
-        else:
-            warnings.append("PostgreSQL not running")
-            console.print("[yellow]⚠[/yellow] PostgreSQL: stopped (run: bloom db start)")
+    try:
+        tapdb_version = assert_tapdb_version()
+        console.print(f"[green]✓[/green] daylily-tapdb version: {tapdb_version}")
+    except Exception as exc:
+        issues.append(str(exc))
+        console.print(f"[red]✗[/red] daylily-tapdb version check failed: {exc}")
+
+    env_name = apply_runtime_environment(get_settings()).env
+    result = _tapdb_cmd(["db", "schema", "status", env_name])
+    if result.returncode == 0:
+        console.print("[green]✓[/green] TapDB connectivity and schema status")
     else:
-        warnings.append("PostgreSQL not initialized")
-        console.print("[yellow]⚠[/yellow] PostgreSQL: not initialized")
+        issues.append("TapDB schema status check failed")
+        console.print("[red]✗[/red] TapDB schema status")
+        if result.stderr:
+            warnings.append(result.stderr.strip())
 
-    # Check database connection
-    try:
-        from bloom_lims.db import BLOOMdb3
-        from sqlalchemy import text
-        with BLOOMdb3(echo_sql=False) as bdb:
-            bdb.session.execute(text("SELECT 1"))
-        console.print("[green]✓[/green] Database connection")
-    except Exception as e:
-        issues.append(f"Database connection failed: {e}")
-        console.print(f"[red]✗[/red] Database connection")
+    from bloom_lims.config import validate_settings
 
-    # Check config
-    try:
-        from bloom_lims.config import get_settings, validate_settings
-        settings = get_settings()
-        config_warnings = validate_settings()
-        console.print("[green]✓[/green] Configuration loaded")
-        for w in config_warnings:
-            warnings.append(f"Config: {w}")
-    except Exception as e:
-        issues.append(f"Configuration error: {e}")
-        console.print(f"[red]✗[/red] Configuration")
+    for warning in validate_settings():
+        warnings.append(f"Config: {warning}")
 
-    # Summary
     console.print()
     if issues:
         console.print(f"[red]Found {len(issues)} issue(s):[/red]")
@@ -201,4 +166,3 @@ def doctor():
 
     if issues:
         raise SystemExit(1)
-

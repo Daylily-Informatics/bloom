@@ -1,8 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
 
-skip_conda=$1
+source bloom_activate.sh
 
-source bloom_lims/bin/stop_bloom.sh
-rm -rf bloom_lims/database/*
-source bloom_lims/env/install_postgres.sh $skip_conda
-ls ./bloom_lims/config/*/*json | parallel 'python seed_db_containers.py {}' 
+# TapDB-managed reset + setup + seed for local development.
+bloom db stop || true
+bloom db init --force
+bloom db seed
 pytest

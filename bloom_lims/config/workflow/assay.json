@@ -5,7 +5,11 @@
       "properties": {
         "name": "HLA Typing v1.2",
         "comments": "",
-        "lab_code":""
+        "lab_code":"",
+        "library_prep_queue_subtypes": [
+          "illumina-novaseq-libprep-eligible",
+          "ont-libprep-eligible"
+        ]
       },
       "singleton": "1",
       "expected_inputs": [],
@@ -30,12 +34,12 @@
       "instantiation_layouts": [
         [
           {
-            "workflow_step/queue/plasma-isolation-queue-available/1.0/": {
-              "description" : "Ready For Plasma Isolation Queue",
+            "workflow_step/queue/extraction-batch-eligible/1.0/": {
+              "description" : "Extraction Batch Eligible",
               "json_addl": {
-                "description": "Ready For Plasma Isolation Queue",
+                "description": "Extraction Batch Eligible",
                 "properties": {
-                  "name": "Ready For Plasma Isolation Queue",
+                  "name": "Extraction Batch Eligible",
                   "comments": "",
                   "step_number": "1",
                   "lab_code":""
@@ -44,12 +48,12 @@
             }
           },
           {
-            "workflow_step/queue/all-purpose/1.0/": {
-              "description" : "In Progress / Active WorkSets",
+            "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/": {
+              "description" : "Blood To gDNA Extraction Eligible",
               "json_addl": {
-                "description": "In Progress / Active  WorkSets",
+                "description": "Blood To gDNA Extraction Eligible",
                 "properties": {
-                  "name":"In Progress / Active WorkSets",
+                  "name":"Blood To gDNA Extraction Eligible",
                   "comments": "",
                   "step_number": "2",
                   "lab_code":""
@@ -57,14 +61,13 @@
               }
             }
           },
-
           {
-            "workflow_step/queue/plasma-isolation-queue-removed/1.0/": {
-              "description" : "Completed WorkSets",
+            "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/": {
+              "description" : "Buccal To gDNA Extraction Eligible",
               "json_addl": {
-                "description": "Completed WorkSets",
+                "description": "Buccal To gDNA Extraction Eligible",
                 "properties": {
-                  "name":"Completed WorkSets",
+                  "name":"Buccal To gDNA Extraction Eligible",
                   "comments": "",
                   "step_number": "3",
                   "lab_code":""
@@ -73,14 +76,42 @@
             }
           },
           {
-            "workflow_step/queue/plasma-isolation-queue-exception/1.0/": {
-              "description" : "Exception Queue of WorkSets",
+            "workflow_step/queue/input-gdna-normalization-eligible/1.0/": {
+              "description" : "Input gDNA Normalization Eligible",
               "json_addl": {
-                "description": "Exception Queue of WorkSets", 
+                "description": "Input gDNA Normalization Eligible",
                 "properties": {
-                 "name": "Exception Queue of WorkSets", 
+                 "name": "Input gDNA Normalization Eligible",
                   "comments": "",
                   "step_number": "4",
+                  "lab_code":""
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/": {
+              "description" : "Illumina Novaseq LibPrep Eligible",
+              "json_addl": {
+                "description": "Illumina Novaseq LibPrep Eligible",
+                "properties": {
+                  "name": "Illumina Novaseq LibPrep Eligible",
+                  "comments": "",
+                  "step_number": "5",
+                  "lab_code":""
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/ont-libprep-eligible/1.0/": {
+              "description" : "ONT LibPrep Eligible",
+              "json_addl": {
+                "description": "ONT LibPrep Eligible",
+                "properties": {
+                  "name": "ONT LibPrep Eligible",
+                  "comments": "",
+                  "step_number": "6",
                   "lab_code":""
                 }
               }
@@ -97,7 +128,11 @@
       "properties": {
         "name": "Carrier Screen 3.9",
         "comments": "",
-        "lab_code":""
+        "lab_code":"",
+        "library_prep_queue_subtypes": [
+          "illumina-novaseq-libprep-eligible",
+          "ont-libprep-eligible"
+        ]
       },
       "singleton": "1",
       "expected_inputs": [],
@@ -122,12 +157,12 @@
       "instantiation_layouts": [
         [
           {
-            "workflow_step/queue/plasma-isolation-queue-available/1.0/": {
-              "description" : "Ready For Plasma Isolation Queue",
+            "workflow_step/queue/extraction-batch-eligible/1.0/": {
+              "description" : "Extraction Batch Eligible",
               "json_addl": {
-                "description": "Ready For Plasma Isolation Queue",
+                "description": "Extraction Batch Eligible",
                 "properties": {
-                  "name": "Ready For Plasma Isolation Queue",
+                  "name": "Extraction Batch Eligible",
                   "comments": "",
                   "step_number": "1",
                   "lab_code":""
@@ -136,12 +171,12 @@
             }
           },
           {
-            "workflow_step/queue/all-purpose/1.0/": {
-              "description" : "In Progress / Active WorkSets",
+            "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/": {
+              "description" : "Blood To gDNA Extraction Eligible",
               "json_addl": {
-                "description": "In Progress / Active  WorkSets",
+                "description": "Blood To gDNA Extraction Eligible",
                 "properties": {
-                  "name":"In Progress / Active WorkSets",
+                  "name":"Blood To gDNA Extraction Eligible",
                   "comments": "",
                   "step_number": "2",
                   "lab_code":""
@@ -149,14 +184,13 @@
               }
             }
           },
-
           {
-            "workflow_step/queue/plasma-isolation-queue-removed/1.0/": {
-              "description" : "Completed WorkSets",
+            "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/": {
+              "description" : "Buccal To gDNA Extraction Eligible",
               "json_addl": {
-                "description": "Completed WorkSets",
+                "description": "Buccal To gDNA Extraction Eligible",
                 "properties": {
-                  "name":"Completed WorkSets",
+                  "name":"Buccal To gDNA Extraction Eligible",
                   "comments": "",
                   "step_number": "3",
                   "lab_code":""
@@ -165,14 +199,42 @@
             }
           },
           {
-            "workflow_step/queue/plasma-isolation-queue-exception/1.0/": {
-              "description" : "Exception Queue of WorkSets",
+            "workflow_step/queue/input-gdna-normalization-eligible/1.0/": {
+              "description" : "Input gDNA Normalization Eligible",
               "json_addl": {
-                "description": "Exception Queue of WorkSets", 
+                "description": "Input gDNA Normalization Eligible",
                 "properties": {
-                 "name": "Exception Queue of WorkSets", 
+                 "name": "Input gDNA Normalization Eligible",
                   "comments": "",
                   "step_number": "4",
+                  "lab_code":""
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/": {
+              "description" : "Illumina Novaseq LibPrep Eligible",
+              "json_addl": {
+                "description": "Illumina Novaseq LibPrep Eligible",
+                "properties": {
+                  "name": "Illumina Novaseq LibPrep Eligible",
+                  "comments": "",
+                  "step_number": "5",
+                  "lab_code":""
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/ont-libprep-eligible/1.0/": {
+              "description" : "ONT LibPrep Eligible",
+              "json_addl": {
+                "description": "ONT LibPrep Eligible",
+                "properties": {
+                 "name": "ONT LibPrep Eligible",
+                  "comments": "",
+                  "step_number": "6",
                   "lab_code":""
                 }
               }

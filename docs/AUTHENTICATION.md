@@ -1,98 +1,65 @@
-# Bloom Authentication Setup
+# Bloom Authentication (Cognito + daycog)
 
-Bloom LIMS uses AWS Cognito for authentication, sharing a User Pool with lsmc-atlas
-and daylily-ursa for consistent authentication across all three applications.
+Bloom authentication is Cognito-backed and should be managed through TapDB/`tapdb cognito ...` flows.
 
-## Configuration
+## Key Policy
 
-### YAML Configuration (Recommended)
+- Bloom stores only the Cognito pool binding (`auth.cognito_user_pool_id`) in Bloom config.
+- App/domain/client/callback details are resolved from daycog-managed env files.
+- Use pool-scoped daycog env files to avoid cross-app collisions under one OS user.
 
-Create `~/.config/bloom/bloom-config.yaml`:
+Daycog file pattern:
+- `~/.config/daycog/<pool>.<region>.env`
+- `~/.config/daycog/<pool>.<region>.<app>.env`
+
+## Recommended Runtime Context
+
+```bash
+export AWS_PROFILE=lsmc
+export AWS_REGION=us-west-2
+export AWS_DEFAULT_REGION=us-west-2
+export TAPDB_ENV=dev
+export TAPDB_DATABASE_NAME=bloom
+```
+
+## Configure Cognito (via TapDB)
+
+```bash
+# Show current TapDB context
+python -m daylily_tapdb.cli info
+
+# Bind/setup Cognito for active env/namespace.
+# Bloom requires Cognito app client name: bloom
+python -m daylily_tapdb.cli cognito setup dev --client-name bloom
+# Equivalent Bloom wrapper:
+bloom db auth-setup --port 8912 --region us-east-1
+python -m daylily_tapdb.cli cognito status dev
+```
+
+## Callback URL Convention
+
+For Bloom GUI, use:
+- `https://localhost:8912/auth/callback`
+
+Logout URL:
+- `https://localhost:8912/`
+
+## Bloom Config
+
+Example `~/.config/bloom/bloom-config.yaml`:
 
 ```yaml
-# Bloom LIMS Configuration
-app_name: BLOOM LIMS
-environment: development
-
-# Authentication settings
 auth:
-  # Shared Cognito pool (same as lsmc-atlas and daylily-ursa)
-  cognito_user_pool_id: us-west-2_pUqKyIM1N
-  cognito_client_id: 1glmn93pg49bove54r48t48907
-  cognito_client_secret: <your-client-secret>
-  cognito_region: us-west-2
-  cognito_domain: lsmc-shared-dev-puqkyim1n.auth.us-west-2.amazoncognito.com
-  cognito_redirect_uri: http://localhost:8911/oauth_callback
-  cognito_logout_redirect_uri: http://localhost:8911/
-  cognito_scopes:
-    - openid
-    - email
-    - profile
+  cognito_user_pool_id: us-east-1_XXXXXXXXX
 
-  # Email domain whitelist for authentication
-  # Empty list blocks all domains. Use ["*"] to allow all domains.
-  cognito_allowed_domains:
-    - lsmc.bio
-    - lsmc.com
-    - lsmc.life
-    - daylilyinformatics.com
-    - dyly.bio
+tapdb:
+  env: dev
+  database_name: bloom
 ```
 
-### Environment Variables (Legacy)
-
-For backward compatibility, environment variables are still supported:
+## Start Bloom
 
 ```bash
-export COGNITO_USER_POOL_ID=us-west-2_pUqKyIM1N
-export COGNITO_CLIENT_ID=1glmn93pg49bove54r48t48907
-export COGNITO_CLIENT_SECRET=<your-client-secret>
-export COGNITO_REGION=us-west-2
-export COGNITO_DOMAIN=lsmc-shared-dev-puqkyim1n.auth.us-west-2.amazoncognito.com
-export COGNITO_REDIRECT_URI=http://localhost:8911/oauth_callback
-export COGNITO_WHITELIST_DOMAINS=lsmc.bio,lsmc.com,lsmc.life,daylilyinformatics.com,dyly.bio
-```
-
-## Running the Server
-
-```bash
-# Start in foreground (default)
+source bloom_activate.sh
 bloom gui
-
-# Start in background
-bloom gui --background
-
-# Stop background server
-bloom gui stop
-
-# View logs
-bloom logs
 ```
-
-## Shared Cognito Pool
-
-All three applications (lsmc-atlas, bloom, daylily-ursa) share a single Cognito User Pool:
-
-- **Pool ID:** `us-west-2_pUqKyIM1N`
-- **Region:** `us-west-2`
-- **Domain:** `lsmc-shared-dev-puqkyim1n.auth.us-west-2.amazoncognito.com`
-
-This ensures users can authenticate with the same credentials across all applications.
-
-## Email Domain Whitelist
-
-Authentication is restricted to the following email domains:
-- lsmc.bio
-- lsmc.com
-- lsmc.life
-- daylilyinformatics.com
-- dyly.bio
-
-To change the allowed domains, update the `cognito_allowed_domains` list in the
-YAML config file or the `COGNITO_WHITELIST_DOMAINS` environment variable.
-
-## See Also
-
-- [daylily-cognito](https://github.com/Daylily-Informatics/daylily-cognito) - Shared auth library
-- [lsmc-atlas](https://github.com/lsmc-bio/lsmc-atlas) - Atlas configuration
-- [daylily-ursa](https://github.com/Daylily-Informatics/daylily-ursa) - URSA configuration

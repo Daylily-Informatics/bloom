@@ -450,37 +450,31 @@ class TestCoreModuleImports:
 class TestHealthModuleImports:
     """Tests for health module imports."""
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_import_health_router(self):
         """Test health_router import."""
         from bloom_lims.health import health_router
         assert health_router is not None
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_import_component_health(self):
         """Test ComponentHealth import."""
         from bloom_lims.health import ComponentHealth
         assert ComponentHealth is not None
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_import_health_response(self):
         """Test HealthResponse import."""
         from bloom_lims.health import HealthResponse
         assert HealthResponse is not None
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_import_liveness_response(self):
         """Test LivenessResponse import."""
         from bloom_lims.health import LivenessResponse
         assert LivenessResponse is not None
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_import_readiness_response(self):
         """Test ReadinessResponse import."""
         from bloom_lims.health import ReadinessResponse
         assert ReadinessResponse is not None
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_component_health_model(self):
         """Test ComponentHealth model creation."""
         from bloom_lims.health import ComponentHealth
@@ -495,7 +489,6 @@ class TestHealthModuleImports:
         assert component.status == "healthy"
         assert component.latency_ms == 10.5
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_liveness_response_model(self):
         """Test LivenessResponse model creation."""
         from bloom_lims.health import LivenessResponse
@@ -508,7 +501,6 @@ class TestHealthModuleImports:
         assert response.status == "ok"
         assert response.timestamp is not None
 
-    @pytest.mark.skip(reason="Requires psutil which may not be installed")
     def test_get_system_info(self):
         """Test get_system_info function."""
         from bloom_lims.health import get_system_info
@@ -521,25 +513,6 @@ class TestHealthModuleImports:
             for key in expected_keys:
                 if key in info:
                     assert info[key] is not None
-
-
-class TestBackupModuleImports:
-    """Tests for backup module imports."""
-
-    def test_import_backup_manager(self):
-        """Test BackupManager import."""
-        from bloom_lims.backup.backup_manager import BackupManager
-        assert BackupManager is not None
-
-    def test_import_backup_config(self):
-        """Test BackupConfig import."""
-        from bloom_lims.backup.config import BackupConfig
-        assert BackupConfig is not None
-
-    def test_import_storage_backend(self):
-        """Test StorageBackend import."""
-        from bloom_lims.backup.storage import StorageBackend
-        assert StorageBackend is not None
 
 
 class TestDomainBaseImports:
@@ -775,4 +748,3 @@ class TestBaseObjectsImports:
         """Test base objects module import."""
         from bloom_lims.core import base_objects
         assert base_objects is not None
-
