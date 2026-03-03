@@ -337,3 +337,59 @@ Retry guidance for Atlas:
 
 Atlas should not send saliva as a specimen template code in production integration until Bloom exposes a saliva-specific template.  
 Current supported specimen template choices for this guide are blood and buccal only.
+
+## 10. Bloom -> Atlas Query/Status Integration (Internal Bloom Flows)
+
+Bloom-side Atlas query/status calls use:
+
+1. `Authorization: Bearer <atlas_integration_token>`
+2. `X-Atlas-Tenant-Id: <atlas.organization_id>`
+
+In this phase, Bloom treats Atlas calls as single-tenant and resolves tenant UUID from Bloom config (`atlas.organization_id`).
+
+### 10.1 Container EUID -> TRF Context
+
+Bloom calls:
+
+1. `GET /api/integrations/bloom/v1/lookups/containers/{container_euid}/trf-context`
+
+This is used when container-linked specimen operations need Atlas TRF context for order/patient/test-order validation.
+
+### 10.2 Manual Test-Order Status Push From Bloom
+
+Bloom exposes:
+
+1. `POST /api/v1/external/atlas/test-orders/{test_order_id}/status-events`
+
+Request body mirrors Atlas status-event contract:
+
+1. `event_id`
+2. `status` (`IN_PROGRESS|COMPLETED|FAILED|ON_HOLD|CANCELED|REJECTED`)
+3. `occurred_at`
+4. optional: `reason`, `container_euid`, `specimen_euid`, `metadata`
+
+Optional header:
+
+1. `Idempotency-Key`
+
+When omitted, Bloom computes:
+
+1. `sha256("{tenant_id}:{test_order_id}:{event_id}:{status}")`
+
+### 10.3 Status Push Retry Behavior
+
+Bloom retries with exponential backoff + jitter on:
+
+1. `429`
+2. `500`
+3. `502`
+4. `503`
+5. `504`
+
+Bloom does not retry (without request/data/token changes) on:
+
+1. `400`
+2. `401`
+3. `403`
+4. `404`
+5. `409`

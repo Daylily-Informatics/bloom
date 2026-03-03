@@ -84,7 +84,7 @@ class TapDBSettings(BaseModel):
         default=5566,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
-    min_version: str = Field(default="0.1.15", description="Minimum supported daylily-tapdb")
+    min_version: str = Field(default="0.1.21", description="Minimum supported daylily-tapdb")
     max_version_exclusive: str = Field(
         default="0.2.0",
         description="Exclusive upper bound for daylily-tapdb",
@@ -250,6 +250,18 @@ class AtlasSettings(BaseModel):
     events_max_retries: int = Field(
         default=2,
         description="Maximum retry count for outbound Bloom webhook delivery",
+    )
+    status_events_timeout_seconds: int = Field(
+        default=10,
+        description="Timeout (seconds) for Bloom -> Atlas test-order status event calls",
+    )
+    status_events_max_retries: int = Field(
+        default=5,
+        description="Maximum retry count for Bloom -> Atlas status event calls",
+    )
+    status_events_backoff_base_seconds: float = Field(
+        default=0.5,
+        description="Base backoff delay in seconds for Bloom -> Atlas status event retries",
     )
 
 

@@ -18,7 +18,7 @@ gunicorn
 # =============================================================================
 SQLAlchemy>=2.0.19
 psycopg2-binary
-daylily-tapdb==0.1.15
+daylily-tapdb==0.1.21
 # Local editable override for development:
 # -e ../../daylily/daylily-tapdb
 
@@ -31,6 +31,7 @@ pydantic-settings>=2.0.0
 # =============================================================================
 # Authentication & Security
 # =============================================================================
+daylily-cognito==0.1.24
 PyJWT>=2.8.0
 cryptography>=41.0.3
 

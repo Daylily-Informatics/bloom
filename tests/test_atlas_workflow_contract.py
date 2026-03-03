@@ -31,6 +31,9 @@ class _FakeAtlasLookupService:
     def _result(self):
         return SimpleNamespace(from_cache=False, stale=False, fetched_at=datetime.now(UTC))
 
+    def get_required_tenant_id(self):
+        return "00000000-0000-0000-0000-000000000001"
+
     def get_order(self, order_number: str):
         return self._result()
 
@@ -42,6 +45,22 @@ class _FakeAtlasLookupService:
 
     def get_testkit(self, kit_barcode: str):
         return self._result()
+
+    def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+        _ = container_euid
+        _ = tenant_id
+        return SimpleNamespace(
+            payload={
+                "tenant_id": "00000000-0000-0000-0000-000000000001",
+                "order": {},
+                "patient": {},
+                "test_orders": [],
+                "links": {},
+            },
+            from_cache=False,
+            stale=False,
+            fetched_at=datetime.now(UTC),
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -182,6 +201,99 @@ def test_create_specimen_with_existing_container_contract(monkeypatch):
         assert specimen["specimen_euid"]
         assert specimen["container_euid"] == container["euid"]
         assert specimen["atlas_refs"]["order_number"].startswith("ORD-")
+
+
+def test_container_context_validation_mismatch_returns_400(monkeypatch):
+    class _ContextMismatchAtlasService(_FakeAtlasLookupService):
+        def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+            _ = container_euid
+            _ = tenant_id
+            return SimpleNamespace(
+                payload={
+                    "tenant_id": "00000000-0000-0000-0000-000000000001",
+                    "order": {"order_number": "ORD-CONTEXT"},
+                    "patient": {"patient_id": "PAT-CONTEXT"},
+                    "test_orders": [],
+                    "links": {"testkit_barcode": "KIT-CONTEXT"},
+                },
+                from_cache=False,
+                stale=False,
+                fetched_at=datetime.now(UTC),
+            )
+
+    monkeypatch.setattr(external_domain, "AtlasService", lambda: _ContextMismatchAtlasService())
+    app.dependency_overrides[require_external_token_auth] = _token_user
+
+    with TestClient(app) as client:
+        container = _create_container(client, name=f"atlas-context-mismatch-{uuid.uuid4().hex[:8]}")
+        response = client.post(
+            "/api/v1/external/specimens",
+            headers={"Idempotency-Key": f"idem-{uuid.uuid4()}"},
+            json={
+                "specimen_template_code": "content/specimen/blood-whole/1.0",
+                "specimen_name": "context-mismatch",
+                "container_euid": container["euid"],
+                "status": "active",
+                "properties": {"source": "atlas-contract-test"},
+                "atlas_refs": {
+                    "order_number": "ORD-DIFFERENT",
+                    "patient_id": "PAT-DIFFERENT",
+                    "kit_barcode": "KIT-DIFFERENT",
+                },
+            },
+        )
+
+    assert response.status_code == 400
+    assert "mismatch" in response.json()["detail"].lower()
+
+
+def test_container_context_summary_persisted_in_validation_metadata(monkeypatch):
+    class _ContextMatchingAtlasService(_FakeAtlasLookupService):
+        def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+            _ = container_euid
+            _ = tenant_id
+            return SimpleNamespace(
+                payload={
+                    "tenant_id": "00000000-0000-0000-0000-000000000001",
+                    "order": {"order_number": "ORD-MATCH"},
+                    "patient": {"patient_id": "PAT-MATCH"},
+                    "test_orders": [{"test_order_id": "TO-1"}, {"test_order_id": "TO-2"}],
+                    "links": {"testkit_barcode": "KIT-MATCH", "package_number": "PKG-MATCH"},
+                },
+                from_cache=False,
+                stale=False,
+                fetched_at=datetime.now(UTC),
+            )
+
+    monkeypatch.setattr(external_domain, "AtlasService", lambda: _ContextMatchingAtlasService())
+    app.dependency_overrides[require_external_token_auth] = _token_user
+
+    with TestClient(app) as client:
+        container = _create_container(client, name=f"atlas-context-match-{uuid.uuid4().hex[:8]}")
+        created = _create_specimen(
+            client,
+            payload={
+                "specimen_template_code": "content/specimen/blood-whole/1.0",
+                "specimen_name": "context-match",
+                "container_euid": container["euid"],
+                "status": "active",
+                "properties": {"source": "atlas-contract-test"},
+                "atlas_refs": {
+                    "order_number": "ORD-MATCH",
+                    "patient_id": "PAT-MATCH",
+                    "kit_barcode": "KIT-MATCH",
+                    "package_number": "PKG-MATCH",
+                },
+            },
+            idempotency_key=f"idem-{uuid.uuid4()}",
+        )
+
+    validation = created["properties"].get("atlas_validation", {})
+    assert "container_trf_context" in validation
+    summary = validation["container_trf_context"]["summary"]
+    assert summary["order_number"] == "ORD-MATCH"
+    assert summary["patient_id"] == "PAT-MATCH"
+    assert summary["test_order_count"] == 2
 
 
 def test_create_specimen_auto_container_contract(monkeypatch):

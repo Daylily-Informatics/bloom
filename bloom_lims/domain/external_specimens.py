@@ -40,7 +40,10 @@ class ExternalSpecimenService:
             if existing is not None:
                 return self._to_response(existing, created=False)
 
-        atlas_refs, atlas_meta = self._validate_atlas_refs(payload.atlas_refs)
+        atlas_refs, atlas_meta = self._validate_atlas_refs(
+            payload.atlas_refs,
+            container_euid=payload.container_euid,
+        )
 
         try:
             specimen = self.bobj.create_instance_by_code(
@@ -108,7 +111,10 @@ class ExternalSpecimenService:
         if payload.specimen_name:
             specimen_props["name"] = payload.specimen_name
         if payload.atlas_refs is not None:
-            atlas_refs, atlas_meta = self._validate_atlas_refs(payload.atlas_refs)
+            atlas_refs, atlas_meta = self._validate_atlas_refs(
+                payload.atlas_refs,
+                container_euid=payload.container_euid,
+            )
             specimen_props["atlas_refs"] = atlas_refs
             specimen_props["atlas_validation"] = atlas_meta
         self._write_props(specimen, specimen_props)
@@ -226,11 +232,14 @@ class ExternalSpecimenService:
     def _validate_atlas_refs(
         self,
         refs: AtlasReferences,
+        *,
+        container_euid: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         payload = {
             "order_number": refs.order_number,
             "patient_id": refs.patient_id,
             "shipment_number": refs.shipment_number or refs.package_number,
+            "package_number": refs.package_number,
             "kit_barcode": refs.kit_barcode,
         }
         normalized = {
@@ -243,6 +252,24 @@ class ExternalSpecimenService:
 
         validation_meta: dict[str, Any] = {}
         try:
+            if container_euid:
+                tenant_id = self.atlas.get_required_tenant_id()
+                ctx_result = self.atlas.get_container_trf_context(
+                    container_euid,
+                    tenant_id=tenant_id,
+                )
+                self._validate_refs_against_container_context(
+                    refs=normalized,
+                    context=ctx_result.payload,
+                )
+                validation_meta["container_trf_context"] = {
+                    "tenant_id": tenant_id,
+                    "from_cache": ctx_result.from_cache,
+                    "stale": ctx_result.stale,
+                    "fetched_at": ctx_result.fetched_at.isoformat(),
+                    "summary": self._build_container_context_summary(ctx_result.payload),
+                }
+
             if "order_number" in normalized:
                 result = self.atlas.get_order(normalized["order_number"])
                 validation_meta["order"] = {
@@ -275,6 +302,60 @@ class ExternalSpecimenService:
             raise RuntimeError(f"Atlas validation failed: {exc}") from exc
 
         return normalized, validation_meta
+
+    def _validate_refs_against_container_context(
+        self,
+        *,
+        refs: dict[str, str],
+        context: dict[str, Any],
+    ) -> None:
+        order = context.get("order") if isinstance(context.get("order"), dict) else {}
+        patient = context.get("patient") if isinstance(context.get("patient"), dict) else {}
+        links = context.get("links") if isinstance(context.get("links"), dict) else {}
+
+        context_values = {
+            "order_number": str(order.get("order_number") or "").strip(),
+            "patient_id": str(patient.get("patient_id") or "").strip(),
+            "shipment_number": str(links.get("shipment_number") or links.get("package_number") or "").strip(),
+            "package_number": str(links.get("package_number") or "").strip(),
+            "kit_barcode": str(links.get("testkit_barcode") or "").strip(),
+        }
+
+        for key, provided_value in refs.items():
+            if key not in context_values:
+                continue
+            expected_value = context_values[key]
+            if not expected_value:
+                # Atlas may omit optional context links (for example testkit/package).
+                continue
+            if str(provided_value).strip() != expected_value:
+                raise ValueError(
+                    f"Atlas reference mismatch for '{key}': "
+                    f"provided='{provided_value}' context='{expected_value}'"
+                )
+
+    def _build_container_context_summary(self, context: dict[str, Any]) -> dict[str, Any]:
+        order = context.get("order") if isinstance(context.get("order"), dict) else {}
+        patient = context.get("patient") if isinstance(context.get("patient"), dict) else {}
+        links = context.get("links") if isinstance(context.get("links"), dict) else {}
+        test_orders = context.get("test_orders") if isinstance(context.get("test_orders"), list) else []
+        test_order_ids = []
+        for entry in test_orders:
+            if not isinstance(entry, dict):
+                continue
+            test_order_id = str(entry.get("test_order_id") or "").strip()
+            if test_order_id:
+                test_order_ids.append(test_order_id)
+
+        return {
+            "tenant_id": context.get("tenant_id"),
+            "order_number": order.get("order_number"),
+            "patient_id": patient.get("patient_id"),
+            "testkit_barcode": links.get("testkit_barcode"),
+            "package_number": links.get("package_number"),
+            "test_order_count": len(test_order_ids),
+            "test_order_ids": test_order_ids,
+        }
 
     def _to_response(self, specimen, *, created: bool) -> ExternalSpecimenResponse:
         props = self._props(specimen)

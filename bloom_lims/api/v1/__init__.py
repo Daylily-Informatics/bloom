@@ -34,6 +34,7 @@ from .tracking import router as tracking_router
 from .user_api_tokens import router as user_api_tokens_router
 from .admin_auth import router as admin_auth_router
 from .external_specimens import router as external_specimens_router
+from .atlas_bridge import router as atlas_bridge_router
 
 
 # Main v1 router
@@ -63,6 +64,7 @@ router.include_router(tracking_router)
 router.include_router(user_api_tokens_router)
 router.include_router(admin_auth_router)
 router.include_router(external_specimens_router)
+router.include_router(atlas_bridge_router)
 
 
 @router.get("/")
@@ -95,5 +97,6 @@ async def api_v1_info():
             "user_tokens": "/api/v1/user-tokens",
             "admin_auth": "/api/v1/admin/groups",
             "external_specimens": "/api/v1/external/specimens",
+            "external_atlas": "/api/v1/external/atlas",
         },
     }

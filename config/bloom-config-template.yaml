@@ -38,7 +38,7 @@ tapdb:
   database_name: "bloom"        # TAPDB_DATABASE_NAME namespace
   config_path: ""               # Optional TAPDB_CONFIG_PATH override
   local_pg_port: 5566           # Default local TapDB PostgreSQL port for dev/test
-  min_version: "0.1.15"         # Required minimum daylily-tapdb version
+  min_version: "0.1.21"         # Required minimum daylily-tapdb version
   max_version_exclusive: "0.2.0"
 
 # -----------------------------------------------------------------------------
@@ -127,6 +127,9 @@ atlas:
   timeout_seconds: 10
   cache_ttl_seconds: 300
   verify_ssl: true
+  status_events_timeout_seconds: 10
+  status_events_max_retries: 5
+  status_events_backoff_base_seconds: 0.5
 
   # Bloom -> Atlas outbound event webhook configuration
   organization_id: ""           # Atlas org UUID to include in webhook payloads

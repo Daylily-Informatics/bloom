@@ -108,3 +108,35 @@ Behavior summary:
 - ensures container linkage
 - stores references at `json_addl.properties.atlas_refs`
 - supports idempotent create via `Idempotency-Key` header
+
+## Bloom -> Atlas Query/Status Integration
+
+Bloom outbound Atlas query/status flows use the same Atlas integration bearer token and are single-tenant in this phase.
+
+Required config:
+- `BLOOM_ATLAS__BASE_URL`
+- `BLOOM_ATLAS__TOKEN`
+- `BLOOM_ATLAS__ORGANIZATION_ID` (used as `X-Atlas-Tenant-Id`)
+- `BLOOM_ATLAS__TIMEOUT_SECONDS`
+- `BLOOM_ATLAS__VERIFY_SSL`
+- `BLOOM_ATLAS__STATUS_EVENTS_TIMEOUT_SECONDS` (default `10`)
+- `BLOOM_ATLAS__STATUS_EVENTS_MAX_RETRIES` (default `5`)
+- `BLOOM_ATLAS__STATUS_EVENTS_BACKOFF_BASE_SECONDS` (default `0.5`)
+
+Bloom outbound endpoints used:
+- `GET /api/integrations/bloom/v1/lookups/containers/{container_euid}/trf-context`
+- `POST /api/integrations/bloom/v1/test-orders/{test_order_id}/status-events`
+
+Bloom manual bridge endpoint:
+- `POST /api/v1/external/atlas/test-orders/{test_order_id}/status-events`
+
+Manual bridge behavior:
+- requires Bloom token auth and write permission
+- accepts Atlas status-event payload contract
+- accepts optional `Idempotency-Key`
+- computes deterministic idempotency key when header is omitted:
+  - `sha256("{tenant_id}:{test_order_id}:{event_id}:{status}")`
+
+Retry behavior for status pushes:
+- retry: `429`, `500`, `502`, `503`, `504`
+- no retry: `400`, `401`, `403`, `404`, `409`
