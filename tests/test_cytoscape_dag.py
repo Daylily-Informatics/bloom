@@ -147,7 +147,7 @@ class TestNodeColorMapping:
         color = colors.get(unknown_type, default_color)
         assert color == default_color
 
-    def test_sub_type_color_override(self):
+    def test_subtype_color_override(self):
         """Test that subtypes can override main type colors."""
         sub_colors = {
             "well": "#70658c",

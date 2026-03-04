@@ -7,25 +7,21 @@ from datetime import datetime
 from typing import Any, Dict, Generic, List, Optional, TypeVar
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+from daylily_tapdb.euid import validate_euid as tapdb_validate_euid
+
 
 # Type variable for generic paginated responses
 T = TypeVar("T")
-
-
-# EUID validation pattern - matches format like "CX1", "CX123", "WX1000", "MRX42"
-# Enterprise Unique Identifier: 2-3 letter prefix + sequence number (no leading zeros)
-EUID_PATTERN = re.compile(r"^[A-Z]{2,3}[1-9][0-9]*$")
 
 
 def validate_euid(value: str) -> str:
     """
     Validate EUID (Enterprise Unique Identifier) format.
 
-    EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
-    - PREFIX: 2-3 uppercase letters identifying object type (e.g., CX, WX, MRX)
-    - SEQUENCE_NUMBER: Integer with NO leading zeros (critical LIMS design principle)
+    Bloom EUIDs are TapDB/Meridian identifiers, validated using TapDB's
+    reference implementation (`daylily_tapdb.euid.validate_euid`).
 
-    Examples: CX1, CX123, WX1000, MRX42, CWX5
+    Examples: GT-2HP, GX-8J, CX-35, AY-46
 
     Args:
         value: The EUID string to validate
@@ -37,11 +33,12 @@ def validate_euid(value: str) -> str:
         ValueError: If the EUID format is invalid
     """
     value = value.upper().strip()
-    if not EUID_PATTERN.match(value):
+    # Validate as production EUID by default. Sandbox EUIDs (X:TX-1C) are not
+    # currently accepted via the public API contracts.
+    if not tapdb_validate_euid(value, environment="production"):
         raise ValueError(
             f"Invalid EUID format: {value}. "
-            "Expected format: PREFIX + sequence number (e.g., CX123, WX1000). "
-            "No leading zeros allowed in sequence number."
+            "Expected TapDB/Meridian EUID format (e.g., GT-2HP, GX-8J)."
         )
     return value
 
@@ -210,4 +207,3 @@ class DashboardResponseSchema(BloomBaseSchema):
     generated_at: datetime = Field(
         default_factory=datetime.utcnow, description="Response generation timestamp"
     )
-

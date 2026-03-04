@@ -150,6 +150,7 @@ async def create_workflow(
 
         bdb = BLOOMdb3(app_username=user.email)
         bwf = BloomWorkflow(bdb)
+        bwf.set_actor_context(user_id=user.user_id, email=user.email)
 
         # Create workflow from template
         result = bwf.create_instances(template_euid)
@@ -162,6 +163,13 @@ async def create_workflow(
         if name:
             workflow.name = name
             bdb.session.commit()
+
+        bwf.track_user_interaction(
+            workflow.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         return {
             "success": True,
@@ -197,6 +205,7 @@ async def update_workflow(
 
         bdb = BLOOMdb3(app_username=user.email)
         bwf = BloomWorkflow(bdb)
+        bwf.set_actor_context(user_id=user.user_id, email=user.email)
 
         workflow = bwf.get_by_euid(euid)
         if not workflow:
@@ -213,6 +222,12 @@ async def update_workflow(
             flag_modified(workflow, "json_addl")
 
         bdb.session.commit()
+        bwf.track_user_interaction(
+            workflow.euid,
+            relationship_type="user_updated",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         return {
             "success": True,

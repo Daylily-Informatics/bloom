@@ -1,57 +1,27 @@
 {
-  "set_verification_state": {
-    "1.0": {
-      "action_template": {
-        "action_name": "Verify Test Req",
-        "method_name": "do_action_set_verification_state",
-        "action_executed": "0",
-        "max_executions": "1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "comment": "",
-          "Verification Status" : ""
-        },
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
-        },
-        "curr_user": ""
-      },
-      "properties": {
-        "name": "",
-        "comments": ""
-      }
-    }
-  },
   "add_container_to_assay_q": {
     "1.0": {
       "action_template": {
-        "action_name": "Add Specimen to Assay Queue",
-        "method_name": "do_action_add_container_to_assay_q",
-        "action_executed": "0",
-        "max_executions": "-1",
         "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Add Specimen to Assay Queue",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
         "capture_data": "yes",
         "captured_data": {
           "Container EUID": "",
           "___workflow/assay/": "<select name=&quot;assay_selection&quot;><option value=&quot;/add/an/assay/wf&quot;>AddAnAssayInTheObjectActionDef</option></select>"
         },
+        "curr_user": "",
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
+        "max_executions": "-1",
+        "method_name": "do_action_add_container_to_assay_q",
         "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
+          "label_style": "",
+          "printer_name": ""
         },
-        "curr_user": "",
         "workflow_obj": {
           "workflow/assay/generic/1.0": {
             "json_addl": {
@@ -63,8 +33,77 @@
         }
       },
       "properties": {
-        "name": "",
-        "comments": ""
+        "comments": "",
+        "name": ""
+      }
+    }
+  },
+  "add_container_to_assay_q__pan_cancer_panel": {
+    "1.0": {
+      "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Add Specimen to Assay Queue",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Container EUID": "",
+          "___workflow/assay/": "<select name=&quot;assay_selection&quot;><option value=&quot;workflow/assay/hla-typing/1.2&quot;>HLA Typing v1.2</option><option value=&quot;workflow/assay/carrier-screen/3.9&quot;>Carrier Screen v3.9</option></select>"
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_add_container_to_assay_q",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        },
+        "workflow_obj": {
+          "workflow/assay/generic/1.0": {
+            "json_addl": {
+              "properties": {
+                "step_number": "1"
+              }
+            }
+          }
+        }
+      },
+      "properties": {
+        "comments": "",
+        "name": ""
+      }
+    }
+  },
+  "set_verification_state": {
+    "1.0": {
+      "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Verify Test Req",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Verification Status": "",
+          "comment": ""
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "max_executions": "1",
+        "method_name": "do_action_set_verification_state",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        }
+      },
+      "properties": {
+        "comments": "",
+        "name": ""
       }
     }
   }

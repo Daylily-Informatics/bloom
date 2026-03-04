@@ -14,7 +14,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Fallback version if GitHub is unreachable (update when making releases)
-FALLBACK_VERSION = "0.10.7"
+FALLBACK_VERSION = "0.11.2"
 
 # GitHub repo info
 GITHUB_OWNER = "Daylily-Informatics"
@@ -120,4 +120,3 @@ def clear_version_cache() -> None:
 
 # Module-level version for easy import
 __version__ = get_version()
-

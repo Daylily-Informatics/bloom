@@ -22,16 +22,25 @@ class BloomContainer(BloomObj):
         return self.create_instances(template_euid)
 
     def link_content(self, container_euid, content_euid):
-        container = self.get_by_euid(container_euid)
-        content = self.get_by_euid(content_euid)
-        container.contents.append(content)
+        # TapDB models container membership via lineage rows (container as parent,
+        # contained instance/content as child), not an ORM "contents" relationship.
+        self.create_generic_instance_lineage_by_euids(
+            parent_instance_euid=container_euid,
+            child_instance_euid=content_euid,
+            relationship_type="contains",
+        )
         self.session.commit()
 
     def unlink_content(self, container_euid, content_euid):
         container = self.get_by_euid(container_euid)
-        content = self.get_by_euid(content_euid)
-        container.contents.remove(content)
-        self.session.commit()
+        for lineage in getattr(container, "parent_of_lineages", []) or []:
+            if getattr(lineage, "is_deleted", False):
+                continue
+            if lineage.child_instance and lineage.child_instance.euid == content_euid:
+                lineage.is_deleted = True
+                self.session.commit()
+                return
+        raise Exception(f"Content {content_euid} not found in container {container_euid}")
 
 
 class BloomContainerPlate(BloomContainer):

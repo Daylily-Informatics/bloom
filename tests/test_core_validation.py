@@ -275,11 +275,7 @@ class TestTemplateValidator:
                     "1.0": {
                         "singleton": "0",
                         "action_imports": {
-                            "default": {
-                                "actions": {
-                                    "action/generic/test/1.0": {}
-                                }
-                            }
+                            "test_action": "action/generic/test/1.0"
                         }
                     }
                 }
@@ -293,6 +289,37 @@ class TestTemplateValidator:
 
             assert result.files_checked == 1
             assert result.templates_checked == 1
+            assert result.valid is True
+
+    def test_grouped_action_imports_is_rejected(self):
+        """Grouped legacy action_imports format should be rejected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+
+            workflow_dir = tmppath / "workflow"
+            workflow_dir.mkdir()
+
+            template_data = {
+                "test_workflow": {
+                    "1.0": {
+                        "singleton": "0",
+                        "action_imports": {
+                            "default": {
+                                "actions": {"action/generic/test/1.0": {}}
+                            }
+                        },
+                    }
+                }
+            }
+
+            with open(workflow_dir / "test.json", "w") as f:
+                json.dump(template_data, f)
+
+            validator = TemplateValidator(config_path=tmppath)
+            result = validator.validate_all()
+
+            assert result.valid is False
+            assert any("legacy grouped format" in e for e in result.errors)
 
     def test_invalid_json(self):
         """Test handling of invalid JSON files."""

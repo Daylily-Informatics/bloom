@@ -2,77 +2,123 @@
   "download_plate_map": {
     "1.0": {
       "action_template": {
-        "child_workflow_step_obj": {},
-        "new_container_obj": {},
-        "action_name": "Download Plate Map TSV",
-        "method_name": "do_action_download_plate_map",
-        "action_executed": "0",
-        "max_executions": "-1",
         "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Download Plate Map TSV",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
         "capture_data": "no",
         "captured_data": {
           "Carrier Name": "",
           "Tracking Number": ""
         },
+        "child_workflow_step_obj": {},
+        "curr_user": "",
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "curr_user": "",
+        "max_executions": "-1",
+        "method_name": "do_action_download_plate_map",
+        "new_container_obj": {},
         "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
+          "label_style": "",
+          "printer_name": ""
         }
       },
       "properties": {
-        "name": "",
-        "comments": ""
+        "comments": "",
+        "name": ""
       }
     }
   },
   "stamp_plates_into_plate": {
     "1.0": {
       "action_template": {
-        "action_name": "Stamp plates into plate",
-        "method_name": "do_stamp_plates_into_plate",
-        "action_executed": "0",
-        "max_executions": "-1",
         "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "Source Plate EUIDs:<textarea name=&quot;source_barcodes&quot; rows=&quot;6&quot; cols=&quot;30&quot;></textarea><br>",
-          "Destination Plate EUID": ""
-        },
-        "verify_data": "yes",
-        "verify" : {"instance_type" : "container/*/*/*"},
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
+        "action_executed": "0",
+        "action_name": "Stamp plates into plate",
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
-        "curr_user": "",
-        "description": "Stamp 1-* plates into an existing plate. Link the plate and well relationships, and link contents. Assume direct mapping of wells.",
-      "step_properties": {
-        "start_timestamp": "",
-        "end_timestamp": "",
-        "start_operator": "",
-        "end_operator": "",
-        "comments": "",
-        "step_number": ""
-      
-      },
-      "child_workflow_step_obj": {
-        "workflow_step/plate-operations/plate-added-to/*/": {
-          "json_addl": {
-            "properties": {
-              "comments": "",
-              "step_number": "0"
+        "capture_data": "yes",
+        "captured_data": {
+          "Destination Plate EUID": "",
+          "_capture_barcodes": "Source Plate EUIDs:<textarea name=&quot;source_barcodes&quot; rows=&quot;6&quot; cols=&quot;30&quot;></textarea><br>"
+        },
+        "child_workflow_step_obj": {
+          "workflow_step/plate-operations/plate-added-to/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": "",
+                "step_number": "0"
+              }
             }
           }
-        }
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "description": "Stamp 1-* plates into an existing plate. Link the plate and well relationships, and link contents. Assume direct mapping of wells.",
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_stamp_plates_into_plate",
+        "step_properties": {
+          "comments": "",
+          "end_operator": "",
+          "end_timestamp": "",
+          "start_operator": "",
+          "start_timestamp": "",
+          "step_number": ""
+        },
+        "verify": {
+          "instance_type": "container/*/*/*"
+        },
+        "verify_data": "yes"
       }
-    } 
+    }
+  },
+  "stamp_plates_into_plate__extraction_plate_filled": {
+    "1.0": {
+      "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Add Plates to Plate",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Destination Plate EUID": "",
+          "_capture_barcodes": "Source Plate EUIDs:<textarea name=&quot;source_barcodes&quot; rows=&quot;6&quot; cols=&quot;30&quot;></textarea><br>"
+        },
+        "child_workflow_step_obj": {
+          "workflow_step/plate-operations/plate-added-to/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": "",
+                "step_number": "0"
+              }
+            }
+          }
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "description": "Stamp 1-* plates into an existing plate. Link the plate and well relationships, and link contents. Assume direct mapping of wells.",
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_stamp_plates_into_plate",
+        "step_properties": {
+          "comments": "",
+          "end_operator": "",
+          "end_timestamp": "",
+          "start_operator": "",
+          "start_timestamp": "",
+          "step_number": ""
+        },
+        "verify": {
+          "instance_type": "container/*/*/*"
+        },
+        "verify_data": "yes"
+      }
     }
   }
 }

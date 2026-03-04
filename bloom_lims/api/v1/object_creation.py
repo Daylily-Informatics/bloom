@@ -316,6 +316,7 @@ async def create_object(
         from bloom_lims.domain.base import BloomObj
 
         bloom_obj = BloomObj(bdb)
+        bloom_obj.set_actor_context(user_id=user.user_id, email=user.email)
 
         # Query for the template using components
         templates = bloom_obj.query_template_by_component_v2(
@@ -354,6 +355,12 @@ async def create_object(
             )
 
         bdb.session.commit()
+        bloom_obj.track_user_interaction(
+            new_instance.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         if new_instance.category == "container":
             emit_bloom_event(

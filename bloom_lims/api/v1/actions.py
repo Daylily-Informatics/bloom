@@ -25,6 +25,17 @@ def get_bdb(username: str = "api-user"):
     return BLOOMdb3(app_username=username)
 
 
+def _safe_get_by_euid(bobj, euid: str):
+    """BloomObj.get_by_euid raises on missing; normalize to None for API semantics."""
+    try:
+        return bobj.get_by_euid(euid)
+    except Exception as e:
+        msg = str(e).lower()
+        if "no template found" in msg or "not found" in msg:
+            return None
+        raise
+
+
 class AliquotRequest(BaseModel):
     """Request for aliquot action."""
     source_euid: str = Field(..., description="Source content EUID")
@@ -64,7 +75,7 @@ async def create_aliquot(
         from bloom_lims.bobjs import BloomContent
         
         bc = BloomContent(bdb)
-        source = bc.get_by_euid(request.source_euid)
+        source = _safe_get_by_euid(bc, request.source_euid)
         
         if not source:
             raise HTTPException(status_code=404, detail=f"Source not found: {request.source_euid}")
@@ -107,13 +118,13 @@ async def transfer_content(
         bc = BloomContent(bdb)
         bcon = BloomContainer(bdb)
         
-        source = bc.get_by_euid(request.source_euid)
+        source = _safe_get_by_euid(bc, request.source_euid)
         if not source:
             raise HTTPException(status_code=404, detail=f"Source not found: {request.source_euid}")
         
-        destination = bcon.get_by_euid(request.destination_euid)
+        destination = _safe_get_by_euid(bcon, request.destination_euid)
         if not destination:
-            destination = bc.get_by_euid(request.destination_euid)
+            destination = _safe_get_by_euid(bc, request.destination_euid)
         if not destination:
             raise HTTPException(status_code=404, detail=f"Destination not found: {request.destination_euid}")
         
@@ -152,7 +163,7 @@ async def pool_content(
         
         sources = []
         for euid in request.source_euids:
-            source = bc.get_by_euid(euid)
+            source = _safe_get_by_euid(bc, euid)
             if not source:
                 raise HTTPException(status_code=404, detail=f"Source not found: {euid}")
             sources.append(source)
@@ -172,4 +183,3 @@ async def pool_content(
     except Exception as e:
         logger.error(f"Error pooling content: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

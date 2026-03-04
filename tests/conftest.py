@@ -17,6 +17,10 @@ Fixtures:
 """
 
 import os
+import tempfile
+import uuid
+from pathlib import Path
+
 import pytest
 import logging
 from typing import Generator, Optional
@@ -30,6 +34,55 @@ logger = logging.getLogger(__name__)
 # Environment setup for tests
 def pytest_configure(config):
     """Configure pytest environment."""
+    # Enforce TapDB strict namespace mode for tests (v2 config).
+    os.environ.setdefault("TAPDB_CLIENT_ID", "bloom")
+    os.environ.setdefault("TAPDB_DATABASE_NAME", "bloom")
+    os.environ.setdefault("TAPDB_STRICT_NAMESPACE", "1")
+
+    # Provide a deterministic v2 namespaced TapDB config for CI/local runs
+    # so tests do not depend on developer home config.
+    if not (os.environ.get("TAPDB_CONFIG_PATH") or "").strip():
+        local_port = str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566").strip()
+        user = str(os.environ.get("USER") or "postgres").strip()
+        tmp_path = Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{uuid.uuid4().hex}.yaml"
+        tmp_path.write_text(
+            "\n".join(
+                [
+                    "meta:",
+                    "  config_version: 2",
+                    "  client_id: bloom",
+                    "  database_name: bloom",
+                    "environments:",
+                    "  dev:",
+                    "    engine_type: local",
+                    "    host: localhost",
+                    f"    port: \"{local_port}\"",
+                    "    ui_port: \"8912\"",
+                    f"    user: \"{user}\"",
+                    "    password: \"\"",
+                    "    database: \"tapdb_bloom_dev\"",
+                    "    cognito_user_pool_id: \"\"",
+                    "    audit_log_euid_prefix: \"\"",
+                    "    support_email: \"\"",
+                    "  test:",
+                    "    engine_type: local",
+                    "    host: localhost",
+                    f"    port: \"{local_port}\"",
+                    "    ui_port: \"8912\"",
+                    f"    user: \"{user}\"",
+                    "    password: \"\"",
+                    "    database: \"tapdb_bloom_test\"",
+                    "    cognito_user_pool_id: \"\"",
+                    "    audit_log_euid_prefix: \"\"",
+                    "    support_email: \"\"",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        os.chmod(tmp_path, 0o600)
+        os.environ["TAPDB_CONFIG_PATH"] = str(tmp_path)
+
     # Set test database port if not already set
     if "PGPORT" not in os.environ:
         try:

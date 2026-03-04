@@ -1,50 +1,85 @@
 {
   "generic": {
     "1.0": {
-      "description": "Generic File Set",
-      "properties": {
-        "name": "",
-        "comments": "",
-        "lab_code":"",
-        "tag":"",
-        "tags":[],
-        "duration":"",
-        "ref_type":"",
-        "description":"",
-        "creating_user": "",
-        "rclone_config": {}
-      },
-      "ui_form_properties" : [ 
-        {"property_key":"name","form_label":"Set Name", "required": false, "value_type": "string"}, 
-        {"property_key":"description","form_label":"Set Description", "required": false, "value_type":"string"},
-        {"property_key":"tag","form_label":"Tag", "required": false, "value_type":"uid-interactive"},
-        {"property_key":"tags","form_label":"Tags", "required": false, "value_type":"list"},
-        {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"},
-        {"property_key": "ref_type", "form_label":"Ref Type", "required":false, "value_type":"uid-static"},
-        {"property_key": "comments", "form_label": "Comments", "required": false, "value_type": "hidden"}       
-      ],
-      "controlled_properties": { },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "singleton": "0",
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "controlled_properties": {},
+      "description": "Generic File Set",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "comments": "",
+        "creating_user": "",
+        "description": "",
+        "duration": "",
+        "lab_code": "",
+        "name": "",
+        "rclone_config": {},
+        "ref_type": "",
+        "tag": "",
+        "tags": []
+      },
+      "singleton": "0",
+      "ui_form_properties": [
+        {
+          "form_label": "Set Name",
+          "property_key": "name",
+          "required": false,
+          "value_type": "string"
+        },
+        {
+          "form_label": "Set Description",
+          "property_key": "description",
+          "required": false,
+          "value_type": "string"
+        },
+        {
+          "form_label": "Tag",
+          "property_key": "tag",
+          "required": false,
+          "value_type": "uid-interactive"
+        },
+        {
+          "form_label": "Tags",
+          "property_key": "tags",
+          "required": false,
+          "value_type": "list"
+        },
+        {
+          "form_label": "Creating User",
+          "property_key": "creating_user",
+          "required": false,
+          "value_type": "uid-static"
+        },
+        {
+          "form_label": "Ref Type",
+          "property_key": "ref_type",
+          "required": false,
+          "value_type": "uid-static"
+        },
+        {
+          "form_label": "Comments",
+          "property_key": "comments",
+          "required": false,
+          "value_type": "hidden"
+        }
+      ]
     }
   }
 }
- 

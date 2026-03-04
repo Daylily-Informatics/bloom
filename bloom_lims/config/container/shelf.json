@@ -1,52 +1,47 @@
 {
   "generic": {
     "1.0": {
-      "valid_parents": [
-        ""
-      ],
+      "action_groups": {},
+      "action_imports": {
+        "add_container_to": "action/equipment/add-container-to/1.0",
+        "download_inventory_tsv": "action/equipment/download-inventory-tsv/1.0",
+        "log_temperature": "action/equipment/log-temperature/1.0",
+        "remove_container_from": "action/equipment/remove-container-from/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "capacity": "",
+        "col_idx": "0",
+        "col_name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "Shelf",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "Shelf"
+      },
+      "singleton": "0",
       "valid_content": [
         ""
       ],
-      "description": "Shelf",
-      "properties": {
-        "name": "Shelf",
-        "comments": "",
-        "lab_code":""
-      },
-      "cont_address": {
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0",
-        "capacity": ""
-      },
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "expected_inputs": [],
-      "singleton": "0",
-      "expected_outputs": [],
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/set_object_status/1.0/": {}
-          }
-        },
-        "fridge": {
-          "group_order": "2",
-          "group_name": "Refrigerator Actions",
-          "actions": {
-            "action/equipment/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": []
+      "valid_parents": [
+        ""
+      ]
     }
   }
 }

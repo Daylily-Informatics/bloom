@@ -100,51 +100,51 @@ const DAGExplorer = (function() {
      * @param {Object} data - Graph data containing elements
      */
     function initializeFilterUI(data) {
-        // Get unique btypes
-        const btypes = new Set();
+        // Get unique types
+        const types = new Set();
         data.elements.nodes.forEach(function(ele) {
-            if (ele.data && ele.data.btype) {
-                btypes.add(ele.data.btype);
+            if (ele.data && ele.data.type) {
+                types.add(ele.data.type);
             }
         });
 
-        // Get unique b_sub_types
-        const bsubtypes = [...new Set(data.elements.nodes.map(function(ele) {
-            return ele.data && ele.data.b_sub_type ? ele.data.b_sub_type : null;
+        // Get unique subtypes
+        const subtypes = [...new Set(data.elements.nodes.map(function(ele) {
+            return ele.data && ele.data.subtype ? ele.data.subtype : null;
         }).filter(Boolean))].sort();
 
-        // Create b_sub_type buttons
-        bsubtypes.forEach(function(bsubtype) {
+        // Create subtype buttons
+        subtypes.forEach(function(subtype) {
             const button = $('<button />', {
-                id: 'btn_' + bsubtype,
-                text: bsubtype,
+                id: 'btn_' + subtype,
+                text: subtype,
                 class: 'subtype-button'
             });
-            $('#bsubtypeButtons').append(button);
+            $('#subtypeButtons').append(button);
 
             button.click(function() {
-                DAGFilters.toggleSubtypeFilter(bsubtype);
+                DAGFilters.toggleSubtypeFilter(subtype);
                 $(this).toggleClass('subtype-button-clicked');
             });
         });
 
-        // Create btype checkboxes
-        btypes.forEach(function(btype) {
+        // Create type checkboxes
+        types.forEach(function(type) {
             const br = $('<span/>');
             const checkbox = $('<input />', { 
                 type: 'checkbox', 
-                id: 'chk_' + btype, 
+                id: 'chk_' + type, 
                 checked: 'checked' 
             });
             const label = $('<label style="font-size: 10px;" />', { 
-                'for': 'chk_' + btype 
-            }).text(btype);
+                'for': 'chk_' + type 
+            }).text(type);
             
-            $('#btypeCheckboxes').append(checkbox).append(label).append(br);
+            $('#typeCheckboxes').append(checkbox).append(label).append(br);
 
             checkbox.change(function() {
                 const checked = $(this).is(':checked');
-                DAGFilters.filterByBtype(btype, checked);
+                DAGFilters.filterByType(type, checked);
             });
         });
     }
@@ -222,4 +222,3 @@ function changeLayout(layoutName) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DAGExplorer;
 }
-

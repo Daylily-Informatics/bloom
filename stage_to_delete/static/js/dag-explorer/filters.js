@@ -1,7 +1,7 @@
 /**
  * DAG Explorer Filters Module
  * 
- * Handles node filtering by edge count, btype, distance, and transparency.
+ * Handles node filtering by edge count, type, distance, and transparency.
  */
 
 const DAGFilters = (function() {
@@ -40,29 +40,29 @@ const DAGFilters = (function() {
     }
 
     /**
-     * Filter nodes by btype (show/hide)
-     * @param {string} btype - The btype to filter
+     * Filter nodes by type (show/hide)
+     * @param {string} type - The type to filter
      * @param {boolean} visible - Whether to show or hide
      */
-    function filterByBtype(btype, visible) {
+    function filterByType(type, visible) {
         const cy = DAGGraph.getInstance();
         if (!cy) return;
 
         const opacity = visible ? '1' : '0.1';
         cy.elements().filter(function(ele) {
-            return ele.data('btype') === btype;
+            return ele.data('type') === type;
         }).style('opacity', opacity);
     }
 
     /**
-     * Filter nodes by b_sub_type (toggle transparency)
-     * @param {string} subtype - The b_sub_type to filter
+     * Filter nodes by subtype (toggle transparency)
+     * @param {string} subtype - The subtype to filter
      */
     function toggleSubtypeFilter(subtype) {
         const cy = DAGGraph.getInstance();
         if (!cy) return;
 
-        const elements = cy.elements().filter('[b_sub_type = "' + subtype + '"]');
+        const elements = cy.elements().filter('[subtype = "' + subtype + '"]');
         const currentOpacity = elements.style('opacity');
         const newOpacity = currentOpacity === '0.1' ? '1' : '0.1';
         elements.style('opacity', newOpacity);
@@ -147,7 +147,7 @@ const DAGFilters = (function() {
     // Public API
     return {
         updateNodeTransparency: updateNodeTransparency,
-        filterByBtype: filterByBtype,
+        filterByType: filterByType,
         toggleSubtypeFilter: toggleSubtypeFilter,
         filterByDistance: filterByDistance,
         adjustGraphBasedOnDistance: adjustGraphBasedOnDistance,
@@ -159,4 +159,3 @@ const DAGFilters = (function() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DAGFilters;
 }
-

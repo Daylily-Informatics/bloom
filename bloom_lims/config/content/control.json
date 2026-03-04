@@ -1,128 +1,134 @@
 {
   "giab-HG001": {
     "1.0": {
-      "description": "giab NA12878",
-      "properties": {
-        "name": "giab NA12878",
-        "volume": "",
-        "volume_units": "",
-        "comments": "","lab_code":""
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "singleton": "0",
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "7.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "giab NA12878",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "7.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "giab NA12878",
+        "volume": "",
+        "volume_units": ""
+      },
+      "singleton": "0"
     }
   },
   "giab-HG002": {
     "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "5.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
       "description": "giab NA24385",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
       "properties": {
+        "comments": "",
+        "lab_code": "",
         "name": "giab NA24385",
         "volume": "",
-        "volume_units": "",
-        "comments": "","lab_code":""
+        "volume_units": ""
       },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "singleton": "0",
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "5.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
-    }
-  },
-  "water-ntc": {
-    "1.0": {
-      "description": "NTC - water",
-      "properties": {
-        "name": "NTC - water",
-        "volume": "",
-        "volume_units": "",
-        "comments": "","lab_code":""
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "singleton": "0",
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.10",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "singleton": "0"
     }
   },
   "synthetic-cfdna": {
     "1.0": {
-      "description": "synthetic-cfdna",
-      "properties": {
-        "name": "s ynthetic-cfdna",
-        "volume": "",
-        "volume_units": "",
-        "comments": "",
-        "lab_code":""
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "singleton": "0",
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "3.1",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "synthetic-cfdna",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "3.1",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "s ynthetic-cfdna",
+        "volume": "",
+        "volume_units": ""
+      },
+      "singleton": "0"
+    }
+  },
+  "water-ntc": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.10",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "NTC - water",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "NTC - water",
+        "volume": "",
+        "volume_units": ""
+      },
+      "singleton": "0"
     }
   }
 }
-

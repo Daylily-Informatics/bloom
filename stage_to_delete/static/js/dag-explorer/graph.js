@@ -158,28 +158,28 @@ const DAGGraph = (function() {
     }
 
     /**
-     * Get all unique btypes from nodes
-     * @returns {Set} Set of btype values
+     * Get all unique types from nodes
+     * @returns {Set} Set of type values
      */
-    function getBtypes() {
+    function getTypes() {
         if (!cy) return new Set();
-        const btypes = new Set();
+        const types = new Set();
         cy.nodes().forEach(function(node) {
-            const btype = node.data('btype');
-            if (btype) btypes.add(btype);
+            const type = node.data('type');
+            if (type) types.add(type);
         });
-        return btypes;
+        return types;
     }
 
     /**
-     * Get all unique b_sub_types from nodes
-     * @returns {Array} Sorted array of b_sub_type values
+     * Get all unique subtypes from nodes
+     * @returns {Array} Sorted array of subtype values
      */
-    function getBSubtypes() {
+    function getSubtypes() {
         if (!cy) return [];
         const subtypes = new Set();
         cy.nodes().forEach(function(node) {
-            const subtype = node.data('b_sub_type');
+            const subtype = node.data('subtype');
             if (subtype) subtypes.add(subtype);
         });
         return Array.from(subtypes).sort();
@@ -193,8 +193,8 @@ const DAGGraph = (function() {
         changeLayout: changeLayout,
         centerOnNode: centerOnNode,
         selectAndCenterNode: selectAndCenterNode,
-        getBtypes: getBtypes,
-        getBSubtypes: getBSubtypes,
+        getTypes: getTypes,
+        getSubtypes: getSubtypes,
         getCurrentLayout: function() { return currentLayoutName; }
     };
 })();
@@ -203,4 +203,3 @@ const DAGGraph = (function() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DAGGraph;
 }
-

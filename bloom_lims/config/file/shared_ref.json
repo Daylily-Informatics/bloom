@@ -1,54 +1,77 @@
 {
   "generic": {
     "1.0": {
-      "description": "Generic File Reference",
-      "properties": {
-        "name": "",
-        "status": "",
-        "comments": "",
-        "reference_type": "",
-        "visibility": "",
-        "valid_duration": "",
-        "start_datetime": "",
-        "end_datetime": "",
-        "who_pays": "",
-        "intended_users": [""],
-        "presigned_url": ""
-      },
-      "ui_form_properties" : [ 
-        {"property_key":"reference_type","form_label":"Reference Type"},
-        {"property_key":"visibility", "form_label":"Visibility"},
-        {"property_key": "status", "form_label":"Reference Status"},
-        {"property_key":"valid_duration","form_label":"Duration"},
-        {"property_key":"start_datetime","form_label":"Start Datetime"},
-        {"property_key":"end_datetime","form_label":"End Datetime"},
-        {"property_key":"who_pays","form_label":"Who Pays"}
-      ],  
-      "controlled_properties": { 
-    },
-      "arbitrary_association_strings": [], 
-      "valid_parents": [],
-      "file_type": "",
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "singleton": "0",
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
-      "instantiation_layouts": [],
+      "arbitrary_association_strings": [],
       "cogs": {
-        "state": "inactive",
+        "allocation_type": "",
         "cost": "0.00",
-        "cost_split_by_children": [{"*/*/*/*": {}}],
-        "allocation_type": ""
-      }
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "controlled_properties": {},
+      "description": "Generic File Reference",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "file_type": "",
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "end_datetime": "",
+        "intended_users": [
+          ""
+        ],
+        "name": "",
+        "presigned_url": "",
+        "reference_type": "",
+        "start_datetime": "",
+        "status": "",
+        "valid_duration": "",
+        "visibility": "",
+        "who_pays": ""
+      },
+      "singleton": "0",
+      "ui_form_properties": [
+        {
+          "form_label": "Reference Type",
+          "property_key": "reference_type"
+        },
+        {
+          "form_label": "Visibility",
+          "property_key": "visibility"
+        },
+        {
+          "form_label": "Reference Status",
+          "property_key": "status"
+        },
+        {
+          "form_label": "Duration",
+          "property_key": "valid_duration"
+        },
+        {
+          "form_label": "Start Datetime",
+          "property_key": "start_datetime"
+        },
+        {
+          "form_label": "End Datetime",
+          "property_key": "end_datetime"
+        },
+        {
+          "form_label": "Who Pays",
+          "property_key": "who_pays"
+        }
+      ],
+      "valid_parents": []
     }
   }
 }

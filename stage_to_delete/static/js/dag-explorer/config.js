@@ -20,7 +20,7 @@ const DAGConfig = (function() {
         DOUBLE_CLICK_THRESHOLD: 500     // Time window for double-click detection
     };
 
-    // Node colors by super_type
+    // Node colors by category
     const NODE_COLORS = {
         container: '#8B00FF',    // Purple
         content: '#00BFFF',      // Deep Sky Blue
@@ -32,8 +32,8 @@ const DAGConfig = (function() {
         default: 'pink'          // Fallback color
     };
 
-    // Sub-type specific color overrides
-    const SUB_TYPE_COLORS = {
+    // Subtype-specific color overrides
+    const SUBTYPE_COLORS = {
         well: '#70658c',
         file_set: '#228080',
         plate: '#9932CC',
@@ -125,7 +125,7 @@ const DAGConfig = (function() {
     return {
         TIMING: TIMING,
         NODE_COLORS: NODE_COLORS,
-        SUB_TYPE_COLORS: SUB_TYPE_COLORS,
+        SUBTYPE_COLORS: SUBTYPE_COLORS,
         EDGE_COLORS: EDGE_COLORS,
         DEFAULTS: DEFAULTS,
         STYLES: STYLES,
@@ -133,11 +133,11 @@ const DAGConfig = (function() {
         LAYOUTS: LAYOUTS,
         
         // Helper function to get node color
-        getNodeColor: function(superType, subType) {
-            if (subType && SUB_TYPE_COLORS[subType]) {
-                return SUB_TYPE_COLORS[subType];
+        getNodeColor: function(category, subtype) {
+            if (subtype && SUBTYPE_COLORS[subtype]) {
+                return SUBTYPE_COLORS[subtype];
             }
-            return NODE_COLORS[superType] || NODE_COLORS.default;
+            return NODE_COLORS[category] || NODE_COLORS.default;
         },
         
         // Helper function to get edge color
@@ -151,4 +151,3 @@ const DAGConfig = (function() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DAGConfig;
 }
-

@@ -1,38 +1,35 @@
 {
   "noamp-wgs": {
     "1.0": {
-      "valid_parents": [],
-      "layouts": [],
-      "description": "noamp-wgs 3x",
-      "properties": {
-        "name": "noamp-wgs 3x",
-        "comments": "",
-        "lab_code":"R&D"
-      },
       "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
+      "action_imports": {
+        "add_container_to_assay_q": "action/test_requisitions/add_container_to_assay_q/1.0",
+        "add_container_to_assay_q_pan_cancer_panel": "action/test_requisitions/add_container_to_assay_q__pan_cancer_panel/1.0",
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0",
+        "set_verification_state": "action/test_requisitions/set_verification_state/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "noamp-wgs 3x",
+      "layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "R&D",
+        "name": "noamp-wgs 3x"
       },
       "singleton": "0",
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        },
-        "test_requisitions": {
-          "group_order": "2",
-          "group_name": "Test Req Actions",
-          "actions": {
-            "action/test_requisitions/*/1.0/": {}
-          }
-        }
-      }
+      "valid_parents": []
     }
   }
 }

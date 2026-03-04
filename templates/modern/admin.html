@@ -21,6 +21,34 @@
 </div>
 {% endif %}
 
+{% if zebra_started %}
+<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-success);">
+  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+    <i class="fas fa-check-circle" style="color: var(--color-success);"></i>
+    <span>zebra_day start command launched successfully.</span>
+  </div>
+</div>
+{% endif %}
+
+{% if zebra_error %}
+<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-warning);">
+  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+    <i class="fas fa-exclamation-triangle" style="color: var(--color-warning);"></i>
+    <span>
+      {% if zebra_error == "command_not_found" %}
+      Could not find <code>zday_start</code> on this host.
+      {% elif zebra_error == "launch_failed" %}
+      Failed to launch zebra_day service.
+      {% elif zebra_error == "start_failed" %}
+      zebra_day service start command returned an error.
+      {% else %}
+      zebra_day service start failed.
+      {% endif %}
+    </span>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid grid-2">
   <!-- User Preferences -->
   <div class="card">
@@ -120,6 +148,11 @@
         <a href="{{ dependency_info.zebra_day.admin_url }}" target="_blank" class="btn btn-outline btn-sm">
           <i class="fas fa-external-link-alt"></i> Open Admin Interface
         </a>
+        <form action="/admin/zebra/start" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-play"></i> Start Zebra Service
+          </button>
+        </form>
         <span class="text-sm text-muted">Port 8118</span>
       </div>
       {% endif %}
@@ -407,6 +440,9 @@ function trackPackage(event) {
         html += '<div class="tracking-row"><strong>Status:</strong> ' + (data.status || 'Unknown') + '</div>';
         if (data.transit_time_hours) {
           html += '<div class="tracking-row"><strong>Transit Time:</strong> ' + data.transit_time_hours + ' hours</div>';
+        }
+        if (data.origin_city) {
+          html += '<div class="tracking-row"><strong>Origin City:</strong> ' + data.origin_city + '</div>';
         }
         if (data.origin_state) {
           html += '<div class="tracking-row"><strong>Origin State:</strong> ' + data.origin_state + '</div>';

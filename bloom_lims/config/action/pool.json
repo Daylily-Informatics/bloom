@@ -1,43 +1,26 @@
 {
-  
   "create-pool-from-containers": {
     "1.0": {
       "action_template": {
-        "action_name": "Create A Pool",
-        "method_name": "do_action_create_pool",
-        "action_executed": "0",
-        "max_executions": "-1",
         "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Create A Pool",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
         "capture_data": "yes",
         "captured_data": {
           "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
         },
-        "verify_data": "yes",
-        "verify" : {"instance_type" : "container/*/*/*"},
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "curr_user": "",
-        "description": "Create Pool",
-      "step_properties": {
-        "start_timestamp": "",
-        "end_timestamp": "",
-        "start_operator": "",
-        "end_operator": "",
-        "comments": "",
-        "step_number": ""
-      },
-      "child_container_obj": {
-        "container/tube/tube-eppi-1.5ml/1.0/": {
-          "json_addl": {
-            "properties": {
-              "comments": ""
+        "child_container_obj": {
+          "container/tube/tube-eppi-1.5ml/1.0/": {
+            "json_addl": {
+              "properties": {
+                "comments": ""
+              }
             }
           }
-        }
-      },
+        },
         "child_workflow_step_obj": {
           "workflow_step/pool/generic/*/": {
             "json_addl": {
@@ -47,9 +30,79 @@
               }
             }
           }
-        }
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "description": "Create Pool",
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_create_pool",
+        "step_properties": {
+          "comments": "",
+          "end_operator": "",
+          "end_timestamp": "",
+          "start_operator": "",
+          "start_timestamp": "",
+          "step_number": ""
+        },
+        "verify": {
+          "instance_type": "container/*/*/*"
+        },
+        "verify_data": "yes"
+      }
+    }
+  },
+  "create_pool_from_containers__extraction_plate_filled": {
+    "1.0": {
+      "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Create Pool From Containers",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
+        },
+        "child_container_obj": {
+          "container/tube/tube-eppi-1.5ml/1.0/": {
+            "json_addl": {
+              "properties": {
+                "comments": ""
+              }
+            }
+          }
+        },
+        "child_workflow_step_obj": {
+          "workflow_step/pool/generic/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": "",
+                "step_number": "0"
+              }
+            }
+          }
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "description": "Create Pool",
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_create_pool",
+        "step_properties": {
+          "comments": "",
+          "end_operator": "",
+          "end_timestamp": "",
+          "start_operator": "",
+          "start_timestamp": "",
+          "step_number": ""
+        },
+        "verify": {
+          "instance_type": "container/*/*/*"
+        },
+        "verify_data": "yes"
       }
     }
   }
-} 
-  
+}

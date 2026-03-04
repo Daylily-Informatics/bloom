@@ -2,14 +2,14 @@
   "create_child_container_and_link_child_workflow_step": {
     "1.0": {
       "action_template": {
-        "child_workflow_step_obj": {
-          "workflow_step/accessioning-steps/kit-generated/*/": {
-            "json_addl": {
-              "properties": {
-                "comments": ""
-              }
-            }
-          }
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Register Kit",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Comments": "",
+          "Kit Barcode": ""
         },
         "child_container_obj": {
           "container/kit/generic/*/": {
@@ -20,43 +20,96 @@
             }
           }
         },
-        "action_name": "Register Kit",
-        "method_name": "do_action_create_child_container_and_link_child_workflow_step",
-        "action_executed": "0",
-        "max_executions": "-1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "Kit Barcode": "",
-          "Comments": ""
-        },
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
-        "action_user": [],
-        "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
-        },
-        "simple_value": "",
-        "curr_user": ""
-      },
-      "properties": {
-        "name": "",
-        "comments": ""
-      }
-    }
-  },
-  "create_child_container_and_link_child_workflow_step_specimen": {
-    "1.0": {
-      "action_template": {
         "child_workflow_step_obj": {
-          "workflow_step/accessioning-steps/container-generated/*/": {
+          "workflow_step/accessioning-steps/kit-generated/*/": {
             "json_addl": {
               "properties": {
                 "comments": ""
               }
             }
           }
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_create_child_container_and_link_child_workflow_step",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        },
+        "simple_value": ""
+      },
+      "properties": {
+        "comments": "",
+        "name": ""
+      }
+    }
+  },
+  "create_child_container_and_link_child_workflow_step__package_generated": {
+    "1.0": {
+      "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Register Kit",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Comments": "",
+          "Kit Barcode": ""
+        },
+        "child_container_obj": {
+          "container/kit/generic/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": ""
+              }
+            }
+          }
+        },
+        "child_workflow_step_obj": {
+          "workflow_step/accessioning-steps/kit-generated/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": ""
+              }
+            }
+          }
+        },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "deactivate_when_executed": [
+          "action/core/print_barcode_label/1.0"
+        ],
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_create_child_container_and_link_child_workflow_step",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        },
+        "simple_value": ""
+      },
+      "properties": {
+        "comments": "",
+        "name": ""
+      }
+    }
+  },
+  "create_child_container_and_link_child_workflow_step_specimen": {
+    "1.0": {
+      "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Register Specimen Container",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Comment": "",
+          "MRN": "",
+          "_collection_date": "Collection Date: <input type=&quot;date&quot; name=&quot;collection_date&quot; required />",
+          "_dob": "DOB: <input type=&quot;date&quot; name=&quot;dob&quot; required />",
+          "_qc_pass": "QC Pass: <select name=&quot;qc_pass&quot; required><option value=&quot;Pass&quot;>Pass</option><option value=&quot;Fail&quot;>Fail</option><option value=&quot;Hold&quot;>Hold</option></select>"
         },
         "child_container_obj": {
           "container/tube/tube-strek-10ml/*/": {
@@ -80,38 +133,48 @@
             }
           }
         },
-        "action_name": "Register Specimen Container",
-        "method_name": "do_action_create_child_container_and_link_child_workflow_step",
-        "action_executed": "0",
-        "max_executions": "-1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "_collection_date": "Collection Date: <input type=&quot;date&quot; name=&quot;collection_date&quot; required />",
-          "MRN": "",
-          "_dob": "DOB: <input type=&quot;date&quot; name=&quot;dob&quot; required />",
-          "_qc_pass": "QC Pass: <select name=&quot;qc_pass&quot; required><option value=&quot;Pass&quot;>Pass</option><option value=&quot;Fail&quot;>Fail</option><option value=&quot;Hold&quot;>Hold</option></select>",
-          "Comment": ""
+        "child_workflow_step_obj": {
+          "workflow_step/accessioning-steps/container-generated/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": ""
+              }
+            }
+          }
         },
+        "curr_user": "",
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
-        "action_user": [],
+        "max_executions": "-1",
+        "method_name": "do_action_create_child_container_and_link_child_workflow_step",
         "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
+          "label_style": "",
+          "printer_name": ""
         },
-        "simple_value": "",
-        "curr_user": ""
+        "simple_value": ""
       },
       "properties": {
-        "name": "",
-        "comments": ""
+        "comments": "",
+        "name": ""
       }
     }
   },
   "create_test_req_and_link_child_workflow_step_dup": {
     "1.0": {
       "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Create New Test Req & Assoc To Specimen Tube",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Order Type": "",
+          "Patient Name": "",
+          "Physician": ""
+        },
+        "child_container_obj": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/test-requisition-generated2/*/": {
             "json_addl": {
@@ -121,7 +184,17 @@
             }
           }
         },
-        "child_container_obj": {},
+        "curr_user": "",
+        "deactivate_actions_when_executed": [
+          "action/workflow_step_accessioning/create_test_req_and_link_child_workflow_step_dup/1.0"
+        ],
+        "executed_datetime": [],
+        "max_executions": "1",
+        "method_name": "do_action_create_test_req_and_link_child_workflow_step",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        },
         "test_requisition_obj": {
           "test_requisition/clinical/pan-cancer-panel/1.0/": {
             "json_addl": {
@@ -130,36 +203,26 @@
               }
             }
           }
-        },
-        "action_name": "Create New Test Req & Assoc To Specimen Tube",
-        "method_name": "do_action_create_test_req_and_link_child_workflow_step",
-        "action_executed": "0",
-        "max_executions": "1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "deactivate_actions_when_executed": [
-          "action/workflow_step_accessioning/create_test_req_and_link_child_workflow_step_dup/1.0"
-        ],
-        "captured_data": {
-          "Patient Name": "",
-          "Physician": "",
-          "Order Type": ""
-        },
-        "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
-        },
-        "curr_user": ""
+        }
       }
     }
   },
   "ycreate_test_req_and_link_child_workflow_step": {
     "1.0": {
       "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Link Tube To Existing  Req.b",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Comment": "",
+          "Test Requisition EUID": "",
+          "Tube EUID": ""
+        },
+        "child_container_obj": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/test-requisition-generated2/*/": {
             "json_addl": {
@@ -169,7 +232,15 @@
             }
           }
         },
-        "child_container_obj": {},
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_ycreate_test_req_and_link_child_workflow_step",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        },
         "test_requisition_obj": {
           "test_requisition/clinical/pan-cancer-panel/1.0/": {
             "json_addl": {
@@ -178,38 +249,30 @@
               }
             }
           }
-        },
-        "action_name": "Link Tube To Existing  Req.b",
-        "method_name": "do_action_ycreate_test_req_and_link_child_workflow_step",
-        "action_executed": "0",
-        "max_executions": "-1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "Test Requisition EUID": "",
-          "Tube EUID": "",
-          "Comment": ""
-        },
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
-        },
-        "curr_user": ""
+        }
       },
       "properties": {
-        "name": "",
-        "comments": ""
+        "comments": "",
+        "name": ""
       }
     }
   },
   "ycreate_test_req_and_link_child_workflow_step2": {
     "1.0": {
       "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Link Tube To Existing  Req.b",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Comment": "",
+          "Test Requisition EUID": "",
+          "Tube EUID": ""
+        },
+        "child_container_obj": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/test-requisition-generated2/*/": {
             "json_addl": {
@@ -219,7 +282,15 @@
             }
           }
         },
-        "child_container_obj": {},
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "executed_datetime": [],
+        "max_executions": "-1",
+        "method_name": "do_action_ycreate_test_req_and_link_child_workflow_step",
+        "printer_opts": {
+          "label_style": "",
+          "printer_name": ""
+        },
         "test_requisition_obj": {
           "test_requisition/clinical/pan-cancer-panel/1.0/": {
             "json_addl": {
@@ -228,32 +299,11 @@
               }
             }
           }
-        },
-        "action_name": "Link Tube To Existing  Req.b",
-        "method_name": "do_action_ycreate_test_req_and_link_child_workflow_step",
-        "action_executed": "0",
-        "max_executions": "-1",
-        "action_enabled": "1",
-        "capture_data": "yes",
-        "captured_data": {
-          "Test Requisition EUID": "",
-          "Tube EUID": "",
-          "Comment": ""
-        },
-        "deactivate_actions_when_executed": [],
-        "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "printer_opts": {
-          "printer_name": "",
-          "label_style": ""
-        },
-        "curr_user": ""
+        }
       },
       "properties": {
-        "name": "",
-        "comments": ""
+        "comments": "",
+        "name": ""
       }
     }
   }

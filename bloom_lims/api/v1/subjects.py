@@ -129,6 +129,7 @@ async def create_subject(
         from sqlalchemy.orm.attributes import flag_modified
         
         bo = BloomObj(bdb)
+        bo.set_actor_context(user_id=user.user_id, email=user.email)
         result = bo.create_instances(data.template_euid)
         
         if not result or not result[0]:
@@ -149,6 +150,12 @@ async def create_subject(
             flag_modified(subject, "json_addl")
         
         bdb.session.commit()
+        bo.track_user_interaction(
+            subject.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
         
         return {
             "success": True,
@@ -172,7 +179,10 @@ async def update_subject(
     """Update a subject."""
     try:
         bdb = get_bdb(user.email)
+        from bloom_lims.bobjs import BloomObj
         from sqlalchemy.orm.attributes import flag_modified
+        bo = BloomObj(bdb)
+        bo.set_actor_context(user_id=user.user_id, email=user.email)
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
@@ -193,6 +203,12 @@ async def update_subject(
             flag_modified(subject, "json_addl")
 
         bdb.session.commit()
+        bo.track_user_interaction(
+            subject.euid,
+            relationship_type="user_updated",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         return {
             "success": True,
@@ -281,4 +297,3 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
     except Exception as e:
         logger.error(f"Error getting subject specimens {euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

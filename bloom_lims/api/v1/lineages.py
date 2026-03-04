@@ -145,11 +145,17 @@ async def delete_lineage(
     """Delete a lineage (soft delete by default)."""
     try:
         bdb = get_bdb(user.email)
-        import uuid as uuid_lib
-        
-        lineage = bdb.session.query(bdb.Base.classes.generic_instance_lineage).filter(
-            bdb.Base.classes.generic_instance_lineage.uuid == uuid_lib.UUID(uuid)
-        ).first()
+        # TapDB schema uses BIGINT identity keys (historical column name: uuid).
+        try:
+            lineage_id = int(uuid)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Invalid lineage id: {uuid}")
+
+        lineage = (
+            bdb.session.query(bdb.Base.classes.generic_instance_lineage)
+            .filter(bdb.Base.classes.generic_instance_lineage.uuid == lineage_id)
+            .first()
+        )
         
         if not lineage:
             raise HTTPException(status_code=404, detail=f"Lineage not found: {uuid}")
@@ -171,4 +177,3 @@ async def delete_lineage(
     except Exception as e:
         logger.error(f"Error deleting lineage {uuid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

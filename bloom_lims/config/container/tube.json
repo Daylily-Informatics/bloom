@@ -1,178 +1,183 @@
 {
-  "tube-strek-10ml": {
+  "tube-10ml-glass": {
     "1.0": {
-      "valid_parents": [],
-      "singleton": "0",
-      "valid_content": [
-        "content/.*"
-      ],
-      "description": "strek 10ml",
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "4.70",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "10ml glass tube",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
       "properties": {
-        "name": "strek 10ml",
-        "manufacturer": "",
-        "manufacturer_other": "",
-        "lot_number": "",
-        "lot_expiration_date": "",
         "comments": "",
-        "lab_code":""
+        "lab_code": "",
+        "lot_expiration_date": "",
+        "lot_number": "",
+        "manufacturer": "",
+        "manufacturer_other": "",
+        "name": "10ml glass tube"
       },
-      "cont_address": {
-        "name": "",
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "1.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
-    }
-  },
-  "tube-generic-10ml": {
-    "1.0": {
-      "valid_parents": [],
       "valid_content": [
         "content/.*"
       ],
-      "description": "Generic 10ml tube",
-      "properties": {
-        "name": "10ml tube generic",
-        "manufacturer": "",
-        "manufacturer_other": "",
-        "lot_number": "",
-        "lot_expiration_date": "",
-        "comments": "","lab_code":""
-      },
-      "cont_address": {
-        "name": "",
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "1.50",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "valid_parents": []
     }
   },
   "tube-eppi-1.5ml": {
     "1.0": {
-      "valid_parents": [],
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "1.70",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "1.5ml eppi tube",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "lot_expiration_date": "",
+        "lot_number": "",
+        "manufacturer": "",
+        "manufacturer_other": "",
+        "name": "1.5ml eppi tube"
+      },
       "valid_content": [
         "content/.*"
       ],
-      "description": "1.5ml eppi tube",
-      "properties": {
-        "name": "1.5ml eppi tube",
-        "manufacturer": "",
-        "manufacturer_other": "",
-        "lot_number": "",
-        "lot_expiration_date": "",
-        "comments": "","lab_code":""
-      },
-      "cont_address": {
-        "name": "",
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "1.70",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "valid_parents": []
     }
   },
-  "tube-10ml-glass": {
+  "tube-generic-10ml": {
     "1.0": {
-      "valid_parents": [],
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "1.50",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "Generic 10ml tube",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "lot_expiration_date": "",
+        "lot_number": "",
+        "manufacturer": "",
+        "manufacturer_other": "",
+        "name": "10ml tube generic"
+      },
       "valid_content": [
         "content/.*"
       ],
-      "description": "10ml glass tube",
-      "properties": {
-        "name": "10ml glass tube",
-        "manufacturer": "",
-        "manufacturer_other": "",
-        "lot_number": "",
-        "lot_expiration_date": "",
-        "comments": "","lab_code":""
-      },
-      "cont_address": {
-        "name": "",
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
+      "valid_parents": []
+    }
+  },
+  "tube-strek-10ml": {
+    "1.0": {
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "1.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "strek 10ml",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "4.70",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "lot_expiration_date": "",
+        "lot_number": "",
+        "manufacturer": "",
+        "manufacturer_other": "",
+        "name": "strek 10ml"
+      },
+      "singleton": "0",
+      "valid_content": [
+        "content/.*"
+      ],
+      "valid_parents": []
     }
   }
 }
-
-

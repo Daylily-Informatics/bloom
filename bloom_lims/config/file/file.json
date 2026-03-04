@@ -1,168 +1,324 @@
 {
   "generic": {
     "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "download_file": "action/file/download_file/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "arbitrary_association_strings": [],
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "controlled_properties": {
+        "category": {
+          "enum": {
+            "": [
+              ""
+            ],
+            "Clinical": [
+              "",
+              "Diagnosis",
+              "Staging",
+              "Procedure",
+              "Treatments",
+              "Testing",
+              "Imaging",
+              "Hospitalization",
+              "Biospecimen collection",
+              "Disease status",
+              "Other"
+            ],
+            "Other": [
+              ""
+            ],
+            "Research": [
+              "",
+              "Test results summary",
+              "Sequencing file",
+              "Other"
+            ]
+          },
+          "on": "purpose",
+          "type": "dependent string"
+        },
+        "import_or_remote": {
+          "enum": [
+            "Remote",
+            "Import"
+          ],
+          "type": "string"
+        },
+        "purpose": {
+          "enum": [
+            "",
+            "Clinical",
+            "Research",
+            "Other"
+          ],
+          "type": "string"
+        },
+        "purpose_subtype": {
+          "enum": [
+            "",
+            "Institution record",
+            "xCures record",
+            "Summary document",
+            "Data file",
+            "Literature",
+            "Other"
+          ],
+          "type": "string"
+        },
+        "sub_category": {
+          "enum": {
+            "": [
+              ""
+            ],
+            "Biospecimen collection": [
+              ""
+            ],
+            "Diagnosis": [
+              ""
+            ],
+            "Disease status": [
+              ""
+            ],
+            "Hospitalization": [
+              ""
+            ],
+            "Imaging": [
+              "",
+              "Abdomen",
+              "Abdomen, pelvis",
+              "Brain",
+              "Chest",
+              "Chest, abdomen",
+              "Chest, abdomen, pelvis",
+              "Other"
+            ],
+            "Other": [
+              ""
+            ],
+            "Procedure": [
+              ""
+            ],
+            "Sequencing file": [
+              ""
+            ],
+            "Staging": [
+              ""
+            ],
+            "Test results summary": [
+              ""
+            ],
+            "Testing": [
+              "",
+              "Blood",
+              "Cancer marker",
+              "ctDNA monitoring",
+              "Genetics",
+              "Pathology"
+            ],
+            "Treatments": [
+              ""
+            ]
+          },
+          "on": "category",
+          "type": "dependent string"
+        },
+        "sub_category_2": {
+          "enum": {
+            "": [
+              ""
+            ],
+            "Imaging": [
+              "",
+              "CT",
+              "PET CT",
+              "MRI",
+              "X-Ray",
+              "Ultrasound"
+            ]
+          },
+          "on": "category",
+          "type": "dependent string"
+        }
+      },
       "description": "Generic File",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "file_type": "",
+      "instantiation_layouts": [],
       "properties": {
-        "name": "",
+        "category": "",
+        "clinician_id": "",
         "comments": "",
-        "lab_code":"",
+        "creating_user": "",
+        "current_s3_bucket_name": "",
+        "current_s3_key": "",
+        "current_s3_uri": "",
+        "external_ids": [],
+        "file_tags": [],
+        "health_event_id": "",
+        "import_or_remote": "",
+        "lab_code": "",
+        "name": "",
+        "original_file_md5": "",
         "original_file_name": "",
         "original_file_path": "",
         "original_file_size_bytes": "",
-        "original_file_md5": "",
-        "original_server_ip": "",
-        "original_local_server_name": "",
         "original_file_suffix": "",
+        "original_local_server_name": "",
         "original_s3_uri": "",
-        "current_s3_key": "",
-        "current_s3_bucket_name": "",
-        "current_s3_uri": "",
-        "creating_user": "",
+        "original_server_ip": "",
+        "outcome_comment": "",
         "patient_id": "",
-        "clinician_id": "",
+        "purpose": "",
+        "purpose_subtype": "",
         "record_datetime": "",
         "record_datetime_end": "",
-        "health_event_id": "",
-        "external_ids": [],
         "study_id": "",
-        "outcome_comment": "",
+        "sub_category": "",
+        "sub_category_2": "",
+        "sub_variable": "",
         "upload_group_key": "",
-        "purpose":"",
-        "purpose_subtype":"",
-        "variable":"",
-        "sub_variable":"",
-        "category":"",
-        "sub_category":"",
-        "sub_category_2":"",
-        "file_tags": [],
-        "import_or_remote": ""       
+        "variable": ""
       },
-      "ui_form_properties" : [ 
-        {"property_key":"record_datetime","form_label":"Record Start (datetime)", "required": false, "value_type":"datetime"}, 
-        {"property_key":"record_datetime_end","form_label":"Record End (datetime)", "required": false, "value_type":"datetime"}, 
-
-        {"property_key":"1_break","form_label":"", "required": false, "value_type":"break"}, 
-
-
-        {"property_key":"patient_id","form_label":"Patient ID", "required": false, "value_type": "uid-interactive"}, 
-        {"property_key":"clinician_id","form_label":"Clinician ID", "required": false, "value_type":"uid-static"}, 
-        {"property_key":"lab_code","form_label":"Lab Code", "required": false, "value_type":"uid-static"}, 
-
-        {"property_key":"2_break","form_label":"", "required": false, "value_type":"break"}, 
-
-
-        {"property_key":"study_id","form_label":"Study ID", "required": false, "value_type":"uid-static"}, 
-
-        {"property_key":"3_break","form_label":"", "required": false, "value_type":"break"}, 
-
-        {"property_key":"purpose","form_label":"Purpose", "required": false, "value_type":"controlled"}, 
-        {"property_key": "purpose_subtype", "form_label": "Purpose Subtype", "required": false, "value_type":"controlled"},
-
-        {"property_key":"4_break","form_label":"", "required": false, "value_type":"break"}, 
-
-        {"property_key":"category","form_label":"Category", "required": false, "value_type":"controlled"}, 
-        {"property_key":"sub_category","form_label":"Sub Category", "required": false, "value_type":"controlled"}, 
-        {"property_key":"sub_category_2","form_label":"Sub Category 2", "required": false, "value_type":"controlled"}, 
-
-        {"property_key":"5_break","form_label":"", "required": false, "value_type":"break"}, 
-
-        {"property_key": "creating_user", "form_label":"Creating User", "required":false, "value_type":"uid-static"},
-        {"property_key": "file_tags", "form_label":"File Tags", "required":false, "value_type":"list"},
-        {"property_key":"comments","form_label":"Comments", "required": false, "value_type":"string"},
-        {"property_key":"import_or_remote","form_label":"Leave Remote / Import", "required": false, "value_type":"controlled"} 
-
-      ],  
-      "controlled_properties": { 
-        "purpose": {
-          "type": "string",
-          "enum": ["","Clinical", "Research", "Other"]
-        },
-        "import_or_remote": {
-          "type": "string",
-          "enum": ["Remote","Import"]
-        },
-        "purpose_subtype": {
-          "type": "string",
-          "enum": [ 
-            "",
-            "Institution record", 
-            "xCures record", 
-            "Summary document",
-            "Data file", 
-            "Literature", 
-            "Other"
-          ]
-        },
-        "category": {
-          "type": "dependent string", 
-          "on": "purpose",
-          "enum":
-          {
-            "":[""],
-            "Clinical": ["","Diagnosis","Staging","Procedure","Treatments","Testing","Imaging","Hospitalization","Biospecimen collection","Disease status","Other"],
-            "Research": ["","Test results summary","Sequencing file","Other"],
-            "Other": [""]
-          }
-        },
-        "sub_category": {
-          "type": "dependent string", 
-          "on": "category",
-          "enum": {
-            "":[""],
-            "Diagnosis" : [""],
-            "Staging" : [""],
-            "Procedure" : [""],
-            "Treatments" : [""],
-            "Testing" : ["","Blood", "Cancer marker", "ctDNA monitoring", "Genetics",  "Pathology"],
-            "Imaging" : ["","Abdomen", "Abdomen, pelvis", "Brain", "Chest",  "Chest, abdomen","Chest, abdomen, pelvis", "Other"],
-            "Hospitalization" : [""],
-            "Biospecimen collection" : [""],
-            "Disease status" : [""],
-            "Other" : [""],
-            "Test results summary" : [""],
-            "Sequencing file" : [""]
-          }
-        },
-        "sub_category_2": {
-          "type": "dependent string",
-          "on": "category",
-          "enum": {
-            "":[""],
-          "Imaging" : ["", "CT", "PET CT", "MRI", "X-Ray", "Ultrasound"]
-        }
-      }
-    },
-      "arbitrary_association_strings": [], 
-      "valid_parents": [],
-      "file_type": "",
-      "expected_inputs": [],
-      "expected_outputs": [],
       "singleton": "0",
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
+      "ui_form_properties": [
+        {
+          "form_label": "Record Start (datetime)",
+          "property_key": "record_datetime",
+          "required": false,
+          "value_type": "datetime"
         },
-        "files": {
-          "group_order": "2",
-          "group_name": "File Actions",
-          "actions": {
-            "action/file/*/1.0/": {}
-          }
+        {
+          "form_label": "Record End (datetime)",
+          "property_key": "record_datetime_end",
+          "required": false,
+          "value_type": "datetime"
+        },
+        {
+          "form_label": "",
+          "property_key": "1_break",
+          "required": false,
+          "value_type": "break"
+        },
+        {
+          "form_label": "Patient ID",
+          "property_key": "patient_id",
+          "required": false,
+          "value_type": "uid-interactive"
+        },
+        {
+          "form_label": "Clinician ID",
+          "property_key": "clinician_id",
+          "required": false,
+          "value_type": "uid-static"
+        },
+        {
+          "form_label": "Lab Code",
+          "property_key": "lab_code",
+          "required": false,
+          "value_type": "uid-static"
+        },
+        {
+          "form_label": "",
+          "property_key": "2_break",
+          "required": false,
+          "value_type": "break"
+        },
+        {
+          "form_label": "Study ID",
+          "property_key": "study_id",
+          "required": false,
+          "value_type": "uid-static"
+        },
+        {
+          "form_label": "",
+          "property_key": "3_break",
+          "required": false,
+          "value_type": "break"
+        },
+        {
+          "form_label": "Purpose",
+          "property_key": "purpose",
+          "required": false,
+          "value_type": "controlled"
+        },
+        {
+          "form_label": "Purpose Subtype",
+          "property_key": "purpose_subtype",
+          "required": false,
+          "value_type": "controlled"
+        },
+        {
+          "form_label": "",
+          "property_key": "4_break",
+          "required": false,
+          "value_type": "break"
+        },
+        {
+          "form_label": "Category",
+          "property_key": "category",
+          "required": false,
+          "value_type": "controlled"
+        },
+        {
+          "form_label": "Sub Category",
+          "property_key": "sub_category",
+          "required": false,
+          "value_type": "controlled"
+        },
+        {
+          "form_label": "Sub Category 2",
+          "property_key": "sub_category_2",
+          "required": false,
+          "value_type": "controlled"
+        },
+        {
+          "form_label": "",
+          "property_key": "5_break",
+          "required": false,
+          "value_type": "break"
+        },
+        {
+          "form_label": "Creating User",
+          "property_key": "creating_user",
+          "required": false,
+          "value_type": "uid-static"
+        },
+        {
+          "form_label": "File Tags",
+          "property_key": "file_tags",
+          "required": false,
+          "value_type": "list"
+        },
+        {
+          "form_label": "Comments",
+          "property_key": "comments",
+          "required": false,
+          "value_type": "string"
+        },
+        {
+          "form_label": "Leave Remote / Import",
+          "property_key": "import_or_remote",
+          "required": false,
+          "value_type": "controlled"
         }
-      },
-      "instantiation_layouts": [],
-      "cogs": {
-        "state": "inactive",
-        "cost": "0.00",
-        "cost_split_by_children": [{"*/*/*/*": {}}],
-        "allocation_type": ""
-      }
+      ],
+      "valid_parents": []
     }
   }
 }
- 

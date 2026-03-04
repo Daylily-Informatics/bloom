@@ -1,66 +1,86 @@
 {
-  "patient": {
+  "bloom-user": {
     "1.0": {
-      "description": "Patient",
-      "properties": {
-        "name": "A Patient",
-        "comments": "",
-        "phone": "",
-        "fax": "",
-        "address": "",
-        "lab_code":"",
-        "patient_id":"",
-        "other_uids":[]
-      },
-      "expected_inputs": [],
-      "singleton": "0",
-      "expected_outputs": [],
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
-      "instantiation_layouts": []
+      "description": "Bloom Authenticated User",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "cognito_sub": "",
+        "comments": "",
+        "email": "",
+        "name": "Bloom User"
+      },
+      "singleton": "0"
+    }
+  },
+  "patient": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Patient",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "address": "",
+        "comments": "",
+        "fax": "",
+        "lab_code": "",
+        "name": "A Patient",
+        "other_uids": [],
+        "patient_id": "",
+        "phone": ""
+      },
+      "singleton": "0"
     }
   },
   "physician": {
     "1.0": {
-      "description": "Clinician",
-      "properties": {
-        "name": "Clinician",
-        "comments": "",
-        "phone": "",
-        "fax": "",
-        "address": "",
-        "lab_code":"",
-        "clinician_id":"",
-        "other_uids":[]
-      },
-      "expected_inputs": [],
-      "singleton": "0",
-      "expected_outputs": [],
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "Clinician",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "address": "",
+        "clinician_id": "",
+        "comments": "",
+        "fax": "",
+        "lab_code": "",
+        "name": "Clinician",
+        "other_uids": [],
+        "phone": ""
+      },
+      "singleton": "0"
     }
   }
 }

@@ -80,6 +80,13 @@ class TemplateValidator:
     REFERENCE_PATTERN = re.compile(
         r"^([a-z_]+)/([a-z0-9_\-*]+)/([a-z0-9_\-*]+)/([0-9.*]+)/?$"
     )
+
+    # TapDB-canonical Bloom contract for action_imports:
+    #   {action_key: "action/{type}/{subtype}/{version}"}
+    ACTION_IMPORT_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+    ACTION_TEMPLATE_CODE_PATTERN = re.compile(
+        r"^action/[a-z0-9_-]+/[a-z0-9_-]+/[0-9]+(?:\.[0-9]+)*$"
+    )
     
     def __init__(self, config_path: Optional[Path] = None):
         """
@@ -233,23 +240,55 @@ class TemplateValidator:
             )
             return
 
-        for group_name, group_data in action_imports.items():
-            if not isinstance(group_data, dict):
+        for action_key, template_code in action_imports.items():
+            if not isinstance(action_key, str) or not self.ACTION_IMPORT_KEY_PATTERN.match(
+                action_key
+            ):
                 result.errors.append(
-                    f"{file_path}: {template_id} action group '{group_name}' must be a dict"
+                    f"{file_path}: {template_id} action_imports key '{action_key}' "
+                    "must be snake_case (^[a-z][a-z0-9_]*$)"
                 )
                 continue
 
-            # Validate required group fields
-            if "actions" not in group_data:
-                result.warnings.append(
-                    f"{file_path}: {template_id} group '{group_name}' missing 'actions'"
+            if not isinstance(template_code, str):
+                # Explicitly reject legacy grouped format like {"core": {"actions": {...}}}.
+                result.errors.append(
+                    f"{file_path}: {template_id} action_imports must be a flat dict "
+                    "{action_key: template_code}; legacy grouped format is not supported"
                 )
                 continue
 
-            # Track action references for later validation
-            for action_ref in group_data.get("actions", {}).keys():
-                self._action_references.add(action_ref.strip("/"))
+            normalized = template_code.strip()
+            if normalized != template_code:
+                result.errors.append(
+                    f"{file_path}: {template_id} action_imports value for '{action_key}' "
+                    "must not include leading/trailing whitespace"
+                )
+                continue
+
+            if normalized.endswith("/"):
+                result.errors.append(
+                    f"{file_path}: {template_id} action_imports value for '{action_key}' "
+                    "must be a canonical template code with no trailing slash"
+                )
+                continue
+
+            if "*" in normalized:
+                result.errors.append(
+                    f"{file_path}: {template_id} action_imports value for '{action_key}' "
+                    "must not contain wildcard '*'"
+                )
+                continue
+
+            if not self.ACTION_TEMPLATE_CODE_PATTERN.match(normalized):
+                result.errors.append(
+                    f"{file_path}: {template_id} action_imports value for '{action_key}' "
+                    f"must match 'action/{{type}}/{{subtype}}/{{version}}' (got '{normalized}')"
+                )
+                continue
+
+            # Track action template references for later pattern validation.
+            self._action_references.add(normalized)
 
     def _validate_instantiation_layouts(
         self,
@@ -321,4 +360,3 @@ class TemplateValidator:
                 result.errors.append(
                     f"Circular dependency detected involving {template_id}"
                 )
-

@@ -76,6 +76,7 @@ async def list_containers(
         from bloom_lims.bobjs import BloomContainer
 
         bc = BloomContainer(bdb)
+        bc.set_actor_context(user_id=user.user_id, email=user.email)
         query = bdb.session.query(bdb.Base.classes.generic_instance)
         query = query.filter(bdb.Base.classes.generic_instance.category == "container")
 
@@ -183,6 +184,12 @@ async def create_container(
             raise HTTPException(status_code=400, detail="template_euid is required")
 
         emit_bloom_event("container.created", _container_event_payload(container))
+        bc.track_user_interaction(
+            container.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         return {
             "success": True,
@@ -210,6 +217,7 @@ async def update_container(
         from sqlalchemy.orm.attributes import flag_modified
 
         bc = BloomContainer(bdb)
+        bc.set_actor_context(user_id=user.user_id, email=user.email)
         container = bc.get_by_euid(euid)
 
         if not container:
@@ -256,6 +264,12 @@ async def update_container(
             flag_modified(container, "json_addl")
 
         bdb.session.commit()
+        bc.track_user_interaction(
+            container.euid,
+            relationship_type="user_updated",
+            user_id=user.user_id,
+            email=user.email,
+        )
         payload = _container_event_payload(container)
         emit_bloom_event("container.updated", payload)
         if prev_status != container.bstatus:
@@ -345,7 +359,8 @@ async def add_content_to_container(
         from bloom_lims.bobjs import BloomContainer
 
         bc = BloomContainer(bdb)
-        bc.link_content(container_euid, data.content_euid)
+        # Schema field is `object_euid`; this endpoint is used for content placement.
+        bc.link_content(container_euid, data.object_euid)
 
         return {"success": True, "message": "Content added to container"}
     except Exception as e:
