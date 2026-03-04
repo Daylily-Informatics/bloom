@@ -40,7 +40,7 @@ tapdb:
   strict_namespace: true        # TAPDB_STRICT_NAMESPACE (requires TapDB v2 namespaced config)
   config_path: ""               # Optional TAPDB_CONFIG_PATH override
   local_pg_port: 5566           # Default local TapDB PostgreSQL port for dev/test
-  min_version: "0.1.25"         # Required minimum daylily-tapdb version
+  min_version: "0.1.27"         # Required minimum daylily-tapdb version
   max_version_exclusive: "0.2.0"
 
 # -----------------------------------------------------------------------------

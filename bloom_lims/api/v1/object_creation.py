@@ -7,11 +7,11 @@ Endpoints to support the multi-step object creation workflow.
 import json
 import logging
 import re
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from .dependencies import require_api_auth, APIUser
@@ -20,9 +20,6 @@ from .dependencies import require_api_auth, APIUser
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/object-creation", tags=["Object Creation"])
-
-# Path to config directory
-CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 
 # Regex pattern for valid path components: lowercase letters, numbers, underscores, hyphens
 VALID_PATH_COMPONENT_PATTERN = re.compile(r"^[a-z0-9_-]+$")
@@ -61,35 +58,6 @@ def validate_path_component(value: str, param_name: str) -> None:
         )
 
 
-def validate_path_within_config(resolved_path: Path) -> None:
-    """
-    Verify that a resolved path stays within CONFIG_DIR.
-
-    Args:
-        resolved_path: The resolved (normalized) path to check
-
-    Raises:
-        HTTPException: If path is outside CONFIG_DIR
-    """
-    config_dir_resolved = CONFIG_DIR.resolve()
-    try:
-        # Python 3.9+ method
-        if not resolved_path.is_relative_to(config_dir_resolved):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid path: access denied"
-            )
-    except AttributeError:
-        # Fallback for Python < 3.9
-        try:
-            resolved_path.relative_to(config_dir_resolved)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid path: access denied"
-            )
-
-
 class CreateObjectRequest(BaseModel):
     """Request body for creating a new object."""
     category: str
@@ -117,26 +85,48 @@ def get_bdb(username: str = "api-user"):
     return BLOOMdb3(app_username=username)
 
 
+def _template_payload(template_row) -> Dict[str, Any]:
+    """Return template json_addl as a dict."""
+    payload = template_row.json_addl or {}
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except Exception:
+            payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    return payload
+
+
 @router.get("/categories")
 async def list_categories(user: APIUser = Depends(require_api_auth)):
     """
-    List all available categories (directories in config/).
+    List all available categories from active TapDB templates.
 
     Step 1 of the object creation wizard.
     """
     try:
-        categories = []
-        for path in sorted(CONFIG_DIR.iterdir()):
-            if path.is_dir() and not path.name.startswith((".", "_")):
-                # Count JSON files in directory
-                json_files = list(path.glob("*.json"))
-                # Exclude metadata.json from count
-                type_count = len([f for f in json_files if f.name != "metadata.json"])
-                categories.append({
-                    "name": path.name,
-                    "display_name": path.name.replace("_", " ").title(),
-                    "type_count": type_count,
-                })
+        bdb = get_bdb(user.email)
+        template = bdb.Base.classes.generic_template
+        rows = (
+            bdb.session.query(
+                template.category,
+                func.count(func.distinct(template.type)).label("type_count"),
+            )
+            .filter(template.is_deleted == False)  # noqa: E712
+            .group_by(template.category)
+            .order_by(template.category)
+            .all()
+        )
+        categories = [
+            {
+                "name": row.category,
+                "display_name": row.category.replace("_", " ").title(),
+                "type_count": int(row.type_count or 0),
+            }
+            for row in rows
+            if row.category
+        ]
         return {"categories": categories}
     except Exception as e:
         logger.error(f"Error listing categories: {e}")
@@ -145,11 +135,11 @@ async def list_categories(user: APIUser = Depends(require_api_auth)):
 
 @router.get("/types")
 async def list_types(
-    category: str = Query(..., description="Category directory name"),
+    category: str = Query(..., description="Template category"),
     user: APIUser = Depends(require_api_auth),
 ):
     """
-    List all available types (JSON files) for a category.
+    List all available types for a category from active TapDB templates.
 
     Step 2 of the object creation wizard.
     """
@@ -157,33 +147,32 @@ async def list_types(
     validate_path_component(category, "category")
 
     try:
-        category_dir = CONFIG_DIR / category
-
-        # Verify resolved path stays within CONFIG_DIR
-        validate_path_within_config(category_dir.resolve())
-
-        if not category_dir.exists() or not category_dir.is_dir():
+        bdb = get_bdb(user.email)
+        template = bdb.Base.classes.generic_template
+        rows = (
+            bdb.session.query(
+                template.type,
+                func.count(func.distinct(template.subtype)).label("subtype_count"),
+            )
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.category == category,
+            )
+            .group_by(template.type)
+            .order_by(template.type)
+            .all()
+        )
+        if not rows:
             raise HTTPException(status_code=404, detail=f"Category not found: {category}")
-
-        types = []
-        for json_file in sorted(category_dir.glob("*.json")):
-            if json_file.name == "metadata.json":
-                continue  # Skip metadata files
-
-            type_name = json_file.stem
-            # Load file to count subtypes
-            try:
-                with open(json_file) as f:
-                    data = json.load(f)
-                    subtype_count = len(data)
-            except Exception:
-                subtype_count = 0
-
-            types.append({
-                "name": type_name,
-                "display_name": type_name.replace("_", " ").replace("-", " ").title(),
-                "subtype_count": subtype_count,
-            })
+        types = [
+            {
+                "name": row.type,
+                "display_name": row.type.replace("_", " ").replace("-", " ").title(),
+                "subtype_count": int(row.subtype_count or 0),
+            }
+            for row in rows
+            if row.type
+        ]
 
         return {"category": category, "types": types}
     except HTTPException:
@@ -195,12 +184,12 @@ async def list_types(
 
 @router.get("/subtypes")
 async def list_subtypes(
-    category: str = Query(..., description="Category directory name"),
-    type: str = Query(..., description="Type (JSON file name without extension)"),
+    category: str = Query(..., description="Template category"),
+    type: str = Query(..., description="Template type"),
     user: APIUser = Depends(require_api_auth),
 ):
     """
-    List all available subtypes and versions from a type's JSON file.
+    List all available subtypes and versions from active TapDB templates.
 
     Step 3 of the object creation wizard.
     """
@@ -209,31 +198,50 @@ async def list_subtypes(
     validate_path_component(type, "type")
 
     try:
-        json_file = CONFIG_DIR / category / f"{type}.json"
-
-        # Verify resolved path stays within CONFIG_DIR
-        validate_path_within_config(json_file.resolve())
-
-        if not json_file.exists():
+        bdb = get_bdb(user.email)
+        template = bdb.Base.classes.generic_template
+        rows = (
+            bdb.session.query(
+                template.subtype,
+                template.version,
+                template.json_addl,
+            )
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.category == category,
+                template.type == type,
+            )
+            .order_by(template.subtype, template.version)
+            .all()
+        )
+        if not rows:
             raise HTTPException(status_code=404, detail=f"Type not found: {category}/{type}")
 
-        with open(json_file) as f:
-            data = json.load(f)
+        subtype_map: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            subtype_name = row.subtype
+            if not subtype_name:
+                continue
+            payload = _template_payload(row)
+            entry = subtype_map.setdefault(
+                subtype_name,
+                {
+                    "name": subtype_name,
+                    "display_name": subtype_name.replace("-", " ").replace("_", " ").title(),
+                    "versions": [],
+                    "description": "",
+                },
+            )
+            if row.version:
+                entry["versions"].append(row.version)
+            if not entry["description"]:
+                entry["description"] = payload.get("description", "") or ""
 
         subtypes = []
-        for subtype_name, versions in data.items():
-            version_list = list(versions.keys()) if isinstance(versions, dict) else []
-            # Get description from first version if available
-            description = ""
-            if version_list and isinstance(versions.get(version_list[0]), dict):
-                description = versions[version_list[0]].get("description", "")
-
-            subtypes.append({
-                "name": subtype_name,
-                "display_name": subtype_name.replace("-", " ").replace("_", " ").title(),
-                "versions": version_list,
-                "description": description,
-            })
+        for subtype_name in sorted(subtype_map.keys()):
+            entry = subtype_map[subtype_name]
+            entry["versions"] = sorted(set(entry["versions"]))
+            subtypes.append(entry)
 
         return {"category": category, "type": type, "subtypes": subtypes}
     except HTTPException:
@@ -245,10 +253,10 @@ async def list_subtypes(
 
 @router.get("/template")
 async def get_template_details(
-    category: str = Query(..., description="Category directory name"),
-    type: str = Query(..., description="Type (JSON file name without extension)"),
-    subtype: str = Query(..., description="Subtype key in JSON"),
-    version: str = Query(..., description="Version key"),
+    category: str = Query(..., description="Template category"),
+    type: str = Query(..., description="Template type"),
+    subtype: str = Query(..., description="Template subtype"),
+    version: str = Query(..., description="Template version"),
     user: APIUser = Depends(require_api_auth),
 ):
     """
@@ -256,32 +264,53 @@ async def get_template_details(
 
     Step 4 of the object creation wizard - provides data for the creation form.
     """
-    # Validate path components to prevent path traversal
-    # Note: subtype and version are JSON keys, not filesystem paths,
-    # but we validate them anyway for defense in depth
+    # Validate category/type path components for defense in depth.
     validate_path_component(category, "category")
     validate_path_component(type, "type")
 
     try:
-        json_file = CONFIG_DIR / category / f"{type}.json"
-
-        # Verify resolved path stays within CONFIG_DIR
-        validate_path_within_config(json_file.resolve())
-
-        if not json_file.exists():
+        bdb = get_bdb(user.email)
+        template = bdb.Base.classes.generic_template
+        type_rows = (
+            bdb.session.query(template.euid)
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.category == category,
+                template.type == type,
+            )
+            .limit(1)
+            .all()
+        )
+        if not type_rows:
             raise HTTPException(status_code=404, detail=f"Type not found: {category}/{type}")
-
-        with open(json_file) as f:
-            data = json.load(f)
-
-        if subtype not in data:
+        subtype_rows = (
+            bdb.session.query(template.euid)
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.category == category,
+                template.type == type,
+                template.subtype == subtype,
+            )
+            .limit(1)
+            .all()
+        )
+        if not subtype_rows:
             raise HTTPException(status_code=404, detail=f"Subtype not found: {subtype}")
-
-        versions = data[subtype]
-        if version not in versions:
+        row = (
+            bdb.session.query(template)
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.category == category,
+                template.type == type,
+                template.subtype == subtype,
+                template.version == version,
+            )
+            .first()
+        )
+        if row is None:
             raise HTTPException(status_code=404, detail=f"Version not found: {version}")
 
-        template_data = versions[version]
+        template_data = _template_payload(row)
 
         return {
             "category": category,
