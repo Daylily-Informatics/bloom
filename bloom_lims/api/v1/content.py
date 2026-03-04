@@ -144,6 +144,7 @@ async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(requir
         from bloom_lims.bobjs import BloomContent
 
         bc = BloomContent(bdb)
+        bc.set_actor_context(user_id=user.user_id, email=user.email)
 
         if data.template_euid:
             result = bc.create_empty_content(data.template_euid)
@@ -151,6 +152,12 @@ async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(requir
         else:
             raise HTTPException(status_code=400, detail="template_euid is required")
 
+        bc.track_user_interaction(
+            sample.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
         return {
             "success": True,
             "euid": sample.euid,
@@ -172,6 +179,7 @@ async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(re
         from bloom_lims.bobjs import BloomContent
 
         bc = BloomContent(bdb)
+        bc.set_actor_context(user_id=user.user_id, email=user.email)
 
         if data.template_euid:
             result = bc.create_empty_content(data.template_euid)
@@ -179,6 +187,12 @@ async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(re
         else:
             raise HTTPException(status_code=400, detail="template_euid is required")
 
+        bc.track_user_interaction(
+            specimen.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
         return {
             "success": True,
             "euid": specimen.euid,
@@ -200,6 +214,7 @@ async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(requ
         from bloom_lims.bobjs import BloomContent
 
         bc = BloomContent(bdb)
+        bc.set_actor_context(user_id=user.user_id, email=user.email)
 
         if data.template_euid:
             result = bc.create_empty_content(data.template_euid)
@@ -207,6 +222,12 @@ async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(requ
         else:
             raise HTTPException(status_code=400, detail="template_euid is required")
 
+        bc.track_user_interaction(
+            reagent.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
         return {
             "success": True,
             "euid": reagent.euid,
@@ -233,6 +254,7 @@ async def update_content(
         from sqlalchemy.orm.attributes import flag_modified
 
         bc = BloomContent(bdb)
+        bc.set_actor_context(user_id=user.user_id, email=user.email)
         content = bc.get_by_euid(euid)
 
         if not content:
@@ -254,6 +276,12 @@ async def update_content(
             flag_modified(content, "json_addl")
 
         bdb.session.commit()
+        bc.track_user_interaction(
+            content.euid,
+            relationship_type="user_updated",
+            user_id=user.user_id,
+            email=user.email,
+        )
         if content.type == "specimen":
             emit_bloom_event("specimen.updated", _specimen_content_event_payload(content))
             if prev_status != content.bstatus:

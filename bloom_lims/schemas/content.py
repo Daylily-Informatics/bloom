@@ -39,6 +39,7 @@ class ContentBaseSchema(BloomBaseSchema):
 class SampleCreateSchema(ContentBaseSchema):
     """Schema for creating a sample."""
     
+    template_euid: Optional[str] = Field(None, description="Template EUID to create from")
     content_type: str = Field(default="sample", description="Content type")
     specimen_euid: Optional[str] = Field(None, description="Source specimen EUID")
     container_euid: Optional[str] = Field(None, description="Container to place sample")
@@ -49,7 +50,7 @@ class SampleCreateSchema(ContentBaseSchema):
     extraction_method: Optional[str] = Field(None, description="Extraction method used")
     quality_score: Optional[float] = Field(None, ge=0, le=100, description="Quality score (0-100)")
     
-    @field_validator("specimen_euid", "container_euid", mode="before")
+    @field_validator("template_euid", "specimen_euid", "container_euid", mode="before")
     @classmethod
     def validate_euids(cls, v):
         if v is not None and str(v).strip():
@@ -60,6 +61,7 @@ class SampleCreateSchema(ContentBaseSchema):
 class SpecimenCreateSchema(ContentBaseSchema):
     """Schema for creating a specimen."""
     
+    template_euid: Optional[str] = Field(None, description="Template EUID to create from")
     content_type: str = Field(default="specimen", description="Content type")
     
     # Specimen-specific fields
@@ -70,6 +72,13 @@ class SpecimenCreateSchema(ContentBaseSchema):
     
     # Subject info (anonymized)
     subject_id: Optional[str] = Field(None, max_length=100, description="Subject identifier")
+
+    @field_validator("template_euid", mode="before")
+    @classmethod
+    def validate_template_euid(cls, v):
+        if v is not None and str(v).strip():
+            return validate_euid(v)
+        return None
     
     @field_validator("specimen_type", mode="before")
     @classmethod
@@ -82,6 +91,7 @@ class SpecimenCreateSchema(ContentBaseSchema):
 class ReagentCreateSchema(ContentBaseSchema):
     """Schema for creating a reagent."""
     
+    template_euid: Optional[str] = Field(None, description="Template EUID to create from")
     content_type: str = Field(default="reagent", description="Content type")
     
     # Reagent-specific fields
@@ -91,6 +101,13 @@ class ReagentCreateSchema(ContentBaseSchema):
     manufacturer: Optional[str] = Field(None, max_length=200, description="Manufacturer")
     catalog_number: Optional[str] = Field(None, max_length=100, description="Catalog number")
     storage_conditions: Optional[str] = Field(None, description="Storage requirements")
+
+    @field_validator("template_euid", mode="before")
+    @classmethod
+    def validate_template_euid(cls, v):
+        if v is not None and str(v).strip():
+            return validate_euid(v)
+        return None
 
 
 class ControlCreateSchema(ContentBaseSchema):
@@ -153,4 +170,3 @@ class ContentResponseSchema(ContentBaseSchema, TimestampMixin):
     # Quality
     quality_score: Optional[float] = Field(None, description="Quality score")
     quality_status: Optional[str] = Field(None, description="Quality status (pass/fail/pending)")
-

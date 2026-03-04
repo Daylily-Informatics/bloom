@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, Optional
 
-from sqlalchemy import text
+from daylily_tapdb.sequences import ensure_instance_prefix_sequence
 
 from bloom_lims.db import BLOOMdb3
 
@@ -189,46 +189,7 @@ def _ensure_instance_prefix_sequence(session, prefix: str) -> None:
     if not normalized:
         return
 
-    seq_name = f"{normalized.lower()}_instance_seq"
-
-    session.execute(text(f'CREATE SEQUENCE IF NOT EXISTS "{seq_name}";'))
-    session.execute(
-        text(
-            f"""
-            WITH
-              desired AS (
-                SELECT
-                  COALESCE(
-                    (
-                      SELECT max(NULLIF(regexp_replace(euid, '[^0-9]', '', 'g'), '')::bigint)
-                      FROM generic_instance
-                      WHERE euid LIKE :prefix_pattern
-                    ),
-                    0
-                  ) + 1 AS next_val
-              ),
-              seq_state AS (
-                SELECT last_value, is_called FROM "{seq_name}"
-              ),
-              seq_next AS (
-                SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END AS next_val
-                FROM seq_state
-              ),
-              final_next AS (
-                SELECT GREATEST(
-                  (SELECT next_val FROM desired),
-                  (SELECT next_val FROM seq_next)
-                ) AS next_val
-              )
-            SELECT setval(
-              '"{seq_name}"',
-              (SELECT next_val FROM final_next),
-              false
-            );
-            """
-        ),
-        {"prefix_pattern": f"{normalized}%"},
-    )
+    ensure_instance_prefix_sequence(session, normalized)
 
 
 def seed_bloom_templates(config_dir: Optional[Path] = None) -> SeedSummary:

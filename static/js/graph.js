@@ -32,13 +32,13 @@ const DEFAULT_CONTROL_STATE = {
     edgeThreshold: 1,
     distance: 0,
     searchQuery: "",
-    hiddenBtypes: {},
+    hiddenTypes: {},
     mutedSubtypes: {},
 };
 
 let controlState = {
     ...DEFAULT_CONTROL_STATE,
-    hiddenBtypes: {},
+    hiddenTypes: {},
     mutedSubtypes: {},
 };
 
@@ -192,12 +192,12 @@ function setDetailsCogsOutput(message, isError = false) {
     el.style.color = isError ? "#ffd0d0" : "var(--color-gray-300)";
 }
 
-function getNodeBtype(node) {
-    return node.data("btype") || node.data("obj_type") || node.data("type") || "unknown";
+function getNodeType(node) {
+    return node.data("type") || node.data("obj_type") || "unknown";
 }
 
 function getNodeSubtype(node) {
-    return node.data("b_sub_type") || node.data("subtype") || "unknown";
+    return node.data("subtype") || "unknown";
 }
 
 function loadPersistedControls() {
@@ -210,13 +210,13 @@ function loadPersistedControls() {
         controlState = {
             ...DEFAULT_CONTROL_STATE,
             ...parsed,
-            hiddenBtypes: { ...(parsed.hiddenBtypes || {}) },
+            hiddenTypes: { ...(parsed.hiddenTypes || {}) },
             mutedSubtypes: { ...(parsed.mutedSubtypes || {}) },
         };
     } catch (_err) {
         controlState = {
             ...DEFAULT_CONTROL_STATE,
-            hiddenBtypes: {},
+            hiddenTypes: {},
             mutedSubtypes: {},
         };
     }
@@ -656,41 +656,41 @@ function refreshLegendFromCurrentGraph() {
 }
 
 function buildTypeAndSubtypeControls() {
-    const typeContainer = document.getElementById("btype-checkboxes");
+    const typeContainer = document.getElementById("type-checkboxes");
     const subtypeContainer = document.getElementById("subtype-buttons");
 
     if (!cy || !typeContainer || !subtypeContainer) {
         return;
     }
 
-    const btypes = Array.from(
-        new Set(cy.nodes().map((node) => getNodeBtype(node)).filter(Boolean))
+    const types = Array.from(
+        new Set(cy.nodes().map((node) => getNodeType(node)).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b));
 
     const subtypes = Array.from(
         new Set(cy.nodes().map((node) => getNodeSubtype(node)).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b));
 
-    if (btypes.length === 0) {
+    if (types.length === 0) {
         typeContainer.innerHTML = "<span style='color: var(--color-gray-400); font-size: 0.78rem;'>No types in graph.</span>";
     } else {
         typeContainer.innerHTML = "";
-        btypes.forEach((btype) => {
-            if (typeof controlState.hiddenBtypes[btype] === "undefined") {
-                controlState.hiddenBtypes[btype] = false;
+        types.forEach((type) => {
+            if (typeof controlState.hiddenTypes[type] === "undefined") {
+                controlState.hiddenTypes[type] = false;
             }
             const item = document.createElement("label");
             item.className = "type-filter-item";
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
-            checkbox.checked = !controlState.hiddenBtypes[btype];
+            checkbox.checked = !controlState.hiddenTypes[type];
             checkbox.addEventListener("change", () => {
-                controlState.hiddenBtypes[btype] = !checkbox.checked;
+                controlState.hiddenTypes[type] = !checkbox.checked;
                 persistControls();
                 applyFiltersAndStyles({ centerSearch: false });
             });
             item.appendChild(checkbox);
-            item.appendChild(document.createTextNode(btype));
+            item.appendChild(document.createTextNode(type));
             typeContainer.appendChild(item);
         });
     }
@@ -732,11 +732,9 @@ function nodeMatchesQuery(node, query) {
         node.id(),
         node.data("name"),
         node.data("euid"),
-        node.data("btype"),
-        node.data("obj_type"),
+        node.data("type"),
         node.data("category"),
         node.data("subtype"),
-        node.data("b_sub_type"),
     ];
     return values.some((value) => String(value || "").toLowerCase().includes(q));
 }
@@ -800,8 +798,8 @@ function applyFiltersAndStyles(options = {}) {
 
     cy.batch(() => {
         cy.nodes().forEach((node) => {
-            const btype = getNodeBtype(node);
-            const passType = !controlState.hiddenBtypes[btype];
+            const type = getNodeType(node);
+            const passType = !controlState.hiddenTypes[type];
             const passDistance = !distanceVisible || distanceVisible.has(node.id());
             const visible = passType && passDistance;
             node.style("display", visible ? "element" : "none");

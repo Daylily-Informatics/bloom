@@ -1,104 +1,107 @@
 {
-  "novaseq-6000": {
-    "1.0": {
-      "description": "Illumnina Novaseq 6000",
-      "properties": {
-        "name": "Illumnina Novaseq 6000",
-        "serial": "",
-        "manufacturer": "Illumina",
-        "model": "",
-        "operataional_status": "",
-        "comments": "","lab_code":""
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "singleton": "0",
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
-    }
-  },
   "miseq-y": {
     "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
       "description": "Illumnina MiSeq y",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
       "properties": {
-        "name": "Illumnina MiSeq y",
-        "serial": "",
+        "comments": "",
+        "lab_code": "",
         "manufacturer": "Illumina",
         "model": "",
+        "name": "Illumnina MiSeq y",
         "operataional_status": "",
-        "comments": "",
-        "lab_code":""
+        "serial": ""
       },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "singleton": "0",
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "singleton": "0"
     }
   },
-
-  "ont-minion": {
+  "novaseq-6000": {
     "1.0": {
-      "description": "ONT MinION",
-      "properties": {
-        "name": "ONT MinION",
-        "serial": "",
-        "manufacturer": "Oxford Nanopore Technologies",
-        "model": "",
-        "operataional_status": "",
-        "comments": "",
-        "lab_code":""
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "description": "Illumnina Novaseq 6000",
       "expected_inputs": [],
       "expected_outputs": [],
-      "action_groups": {},
-      "singleton": "0",
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "manufacturer": "Illumina",
+        "model": "",
+        "name": "Illumnina Novaseq 6000",
+        "operataional_status": "",
+        "serial": ""
+      },
+      "singleton": "0"
+    }
+  },
+  "ont-minion": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "description": "ONT MinION",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "manufacturer": "Oxford Nanopore Technologies",
+        "model": "",
+        "name": "ONT MinION",
+        "operataional_status": "",
+        "serial": ""
+      },
+      "singleton": "0"
     }
   }
 }

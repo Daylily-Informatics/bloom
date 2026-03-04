@@ -238,7 +238,7 @@ const DAGEvents = (function() {
                         const jsonAddl = DAGUtils.safeJSONParse(data.json_addl, {});
                         const name = jsonAddl?.properties?.name || 'N/A';
                         const content = 'EUID: ' + data.euid + ' // ' + name + ' // ' +
-                            data.uuid + ' ( ' + data.btype + ':::' + data.b_sub_type + ' ) <br>' +
+                            data.uuid + ' ( ' + data.type + ':::' + data.subtype + ' ) <br>' +
                             'Name: ' + name + ' ( ' + data.status + ' )<br>json_addl: ' + data.json_addl;
                         $('#node-info').html(content).show();
                     } else {
@@ -390,7 +390,7 @@ const DAGEvents = (function() {
                 .then(function(response) {
                     cy.add({
                         group: 'nodes',
-                        data: { id: response.euid, type: 'child', euid: response.euid, name: 'New Node', btype: '' },
+                        data: { id: response.euid, type: 'child', euid: response.euid, name: 'New Node', subtype: '' },
                         position: { x: 100, y: 100 }
                     });
                     DAGGraph.applyLayout({ name: DAGGraph.getCurrentLayout() });
@@ -489,4 +489,3 @@ const DAGEvents = (function() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DAGEvents;
 }
-

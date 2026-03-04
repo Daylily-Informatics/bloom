@@ -1,40 +1,41 @@
 {
   "specimen-containers-destroyed": {
     "1.0": {
-      "description": "Destroyed Containers Exceptions",
-      "step_properties": {
-        "start_timestamp": "",
-        "end_timestamp": "",
-        "start_operator": "",
-        "end_operator": "",
-        "comments": "",
-        "step_number": ""
-      },
-      "properties": {
-        "name": "Desctroyed Containers Exceptions", 
-        "comments": "",
-        "step_number": "",
-        "lab_code":""
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "singleton": "0",
-      "expected_inputs": [],
-      "expected_outputs": [],
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
           }
-        }
+        ],
+        "state": "active"
+      },
+      "description": "Destroyed Containers Exceptions",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "Desctroyed Containers Exceptions",
+        "step_number": ""
+      },
+      "singleton": "0",
+      "step_properties": {
+        "comments": "",
+        "end_operator": "",
+        "end_timestamp": "",
+        "start_operator": "",
+        "start_timestamp": "",
+        "step_number": ""
       }
     }
   }

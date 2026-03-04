@@ -149,19 +149,51 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)
+        bo.set_actor_context(user_id=user.user_id, email=user.email)
 
-        # For now, create via template if available
-        # This is a simplified implementation
-        obj_class = getattr(bdb.Base.classes, 'content_instance')
-        obj = obj_class(
-            name=data.name,
+        # TapDB requires instances be created from templates (template_uuid NOT NULL).
+        category = (data.category or "").strip().lower()
+        if not category or category == "instance":
+            category = "content"
+
+        version = "1.0"
+        templates = bo.query_template_by_component_v2(
+            category=category,
             type=data.type,
             subtype=data.subtype,
-            json_addl=data.json_addl or {},
+            version=version,
         )
+        if not templates and data.subtype:
+            # Fallback: if subtype doesn't exist, allow creating from the first
+            # matching category/type template.
+            templates = bo.query_template_by_component_v2(
+                category=category,
+                type=data.type,
+                subtype=None,
+                version=version,
+            )
+        if not templates:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No template found for {category}/{data.type}/{data.subtype or '*'}@{version}",
+            )
 
-        bdb.session.add(obj)
+        json_overrides = data.json_addl or {}
+        props = json_overrides.get("properties")
+        if not isinstance(props, dict):
+            props = {}
+        props.setdefault("name", data.name)
+        json_overrides["properties"] = props
+
+        obj = bo.create_instance(templates[0].euid, json_overrides)
+        obj.name = data.name
         bdb.session.commit()
+        bo.track_user_interaction(
+            obj.euid,
+            relationship_type="user_created",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         return {
             "success": True,
@@ -201,6 +233,7 @@ async def update_object(
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)
+        bo.set_actor_context(user_id=user.user_id, email=user.email)
 
         obj = bo.get_by_euid(euid)
         if not obj:
@@ -238,6 +271,12 @@ async def update_object(
             obj.is_deleted = data.is_deleted
 
         bdb.session.commit()
+        bo.track_user_interaction(
+            obj.euid,
+            relationship_type="user_updated",
+            user_id=user.user_id,
+            email=user.email,
+        )
 
         return {
             "success": True,

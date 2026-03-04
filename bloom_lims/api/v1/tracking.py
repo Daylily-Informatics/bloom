@@ -35,6 +35,7 @@ class TrackingResponse(BaseModel):
     carrier: str
     status: Optional[str] = None
     transit_time_hours: Optional[float] = None
+    origin_city: Optional[str] = None
     origin_state: Optional[str] = None
     ship_date: Optional[str] = None
     delivery_date: Optional[str] = None
@@ -153,6 +154,12 @@ async def _track_package(tracking_number: str, carrier: str) -> TrackingResponse
                     carrier=carrier,
                     status=data.get("status", data.get("Delivery_Status", "Unknown")),
                     transit_time_hours=round(transit_sec / 3600, 1) if transit_sec else None,
+                    origin_city=(
+                        data.get("origin_city")
+                        or data.get("Origin_City")
+                        or data.get("origin_city_name")
+                        or data.get("OriginCity")
+                    ),
                     origin_state=data.get("origin_state", data.get("Origin_State")),
                     ship_date=data.get("ship_date", data.get("Ship_Date")),
                     delivery_date=data.get("delivery_date", data.get("Delivery_Date")),

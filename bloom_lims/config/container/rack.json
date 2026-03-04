@@ -1,23 +1,86 @@
 {
-  "tube-rack-generic": {
+  "tube-rack-4-empty": {
     "1.0": {
-      "valid_parents": [],
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "4 position Rack",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "4 position Rack"
+      },
+      "singleton": "0",
       "valid_content": [
         "none"
       ],
+      "valid_parents": []
+    }
+  },
+  "tube-rack-generic": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
       "description": "4 position Rack",
-      "singleton": "0",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [
         [
           {
             "container/tube/tube-strek-10ml/*/": {
               "json_addl": {
                 "cont_address": {
+                  "col_idx": "0",
+                  "col_name": "1",
                   "name": "A1",
-                  "row_name": "A",
-                  "col_name": "1",
                   "row_idx": "0",
-                  "col_idx": "0"
+                  "row_name": "A"
                 }
               }
             }
@@ -26,11 +89,11 @@
             "container/tube/tube-strek-10ml/*/": {
               "json_addl": {
                 "cont_address": {
+                  "col_idx": "1",
+                  "col_name": "1",
                   "name": "B1",
-                  "row_name": "B",
-                  "col_name": "1",
                   "row_idx": "0",
-                  "col_idx": "1"
+                  "row_name": "B"
                 }
               }
             }
@@ -39,11 +102,11 @@
             "container/tube/tube-strek-10ml/*/": {
               "json_addl": {
                 "cont_address": {
-                  "name": "C1",
-                  "row_name": "C",
+                  "col_idx": "2",
                   "col_name": "1",
+                  "name": "C1",
                   "row_idx": "0",
-                  "col_idx": "2"
+                  "row_name": "C"
                 }
               }
             }
@@ -52,11 +115,11 @@
             "container/tube/tube-eppi-1.5ml/*/": {
               "json_addl": {
                 "cont_address": {
-                  "name": "D1",
-                  "row_name": "D",
+                  "col_idx": "3",
                   "col_name": "1",
+                  "name": "D1",
                   "row_idx": "0",
-                  "col_idx": "3"
+                  "row_name": "D"
                 }
               }
             }
@@ -64,77 +127,15 @@
         ]
       ],
       "properties": {
-        "name": "4 position Rack",
         "comments": "",
-        "lab_code":""
+        "lab_code": "",
+        "name": "4 position Rack"
       },
-      "cont_address": {
-        "name": "",
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      }
-    }
-  },
-  "tube-rack-4-empty": {
-    "1.0": {
-      "valid_parents": [],
+      "singleton": "0",
       "valid_content": [
         "none"
       ],
-      "description": "4 position Rack",
-      "singleton": "0",
-      "instantiation_layouts": [
-        ],
-      "properties": {
-        "name": "4 position Rack",
-        "comments": "",
-        "lab_code":""
-      },
-      "cont_address": {
-        "name": "",
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      }
+      "valid_parents": []
     }
   }
 }

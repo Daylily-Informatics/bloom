@@ -7,6 +7,8 @@ import logging
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.bobjs import BloomObj
 from bloom_lims.domain.external_specimens import ExternalSpecimenService
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas.external_specimens import (
@@ -53,6 +55,27 @@ def _specimen_event_payload(response: ExternalSpecimenResponse | dict, extra: di
     return payload
 
 
+def _track_specimen_interaction(
+    *,
+    user: APIUser,
+    specimen_euid: str | None,
+    relationship_type: str,
+) -> None:
+    if not specimen_euid:
+        return
+    bdb = BLOOMdb3(app_username=user.email)
+    try:
+        bo = BloomObj(bdb).set_actor_context(user_id=user.user_id, email=user.email)
+        bo.track_user_interaction(
+            specimen_euid,
+            relationship_type=relationship_type,
+            user_id=user.user_id,
+            email=user.email,
+        )
+    finally:
+        bdb.close()
+
+
 @router.post("", response_model=ExternalSpecimenResponse)
 async def create_external_specimen(
     payload: ExternalSpecimenCreateRequest,
@@ -63,6 +86,16 @@ async def create_external_specimen(
     try:
         result = service.create_specimen(payload=payload, idempotency_key=idempotency_key)
         created_flag = result.get("created", True) if isinstance(result, dict) else bool(result.created)
+        specimen_euid = (
+            result.get("specimen_euid")
+            if isinstance(result, dict)
+            else result.specimen_euid
+        )
+        _track_specimen_interaction(
+            user=user,
+            specimen_euid=specimen_euid,
+            relationship_type="user_created",
+        )
         if created_flag:
             emit_bloom_event("specimen.created", _specimen_event_payload(result))
         return result
@@ -142,6 +175,11 @@ async def update_external_specimen(
                 previous_status = None
 
         result = service.update_specimen(specimen_euid=specimen_euid, payload=payload)
+        _track_specimen_interaction(
+            user=user,
+            specimen_euid=specimen_euid,
+            relationship_type="user_updated",
+        )
         emit_bloom_event("specimen.updated", _specimen_event_payload(result))
         result_status = result.get("status") if isinstance(result, dict) else result.status
         if previous_status is not None and previous_status != result_status:

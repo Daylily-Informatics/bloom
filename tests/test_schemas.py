@@ -29,19 +29,22 @@ class TestBaseSchemas:
     def test_euid_validation(self):
         """Test EUID validation function.
 
-        BLOOM EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
-        - PREFIX: 2-3 uppercase letters (e.g., CX, WX, MRX)
-        - SEQUENCE_NUMBER: Integer with NO leading zeros
-
-        Valid examples: CX1, CX123, WX1000, MRX42
+        BLOOM uses TapDB/Meridian EUIDs:
+        - Production: PREFIX-BODYCHECK (e.g. CX-19, GT-13)
+        - BODY is Crockford Base32 (no leading zeros)
+        - CHECK is MOD32 checksum
         """
         from bloom_lims.schemas import validate_euid
+        from daylily_tapdb.euid import format_euid
 
-        # Valid EUIDs (format: PREFIX + sequence number)
-        assert validate_euid("CX1") == "CX1"
-        assert validate_euid("CX123") == "CX123"
-        assert validate_euid("  wx1000  ") == "WX1000"  # Should uppercase and strip
-        assert validate_euid("MRX42") == "MRX42"
+        cx1 = format_euid("CX", 1)
+        cx123 = format_euid("CX", 123)
+        wx1000 = format_euid("WX", 1000)
+
+        # Valid EUIDs (TapDB/Meridian)
+        assert validate_euid(cx1) == cx1
+        assert validate_euid(cx123) == cx123
+        assert validate_euid(f"  {wx1000.lower()}  ") == wx1000  # Should uppercase and strip
 
         # Invalid EUIDs
         with pytest.raises(ValueError):
@@ -49,9 +52,19 @@ class TestBaseSchemas:
         with pytest.raises(ValueError):
             validate_euid("   ")
         with pytest.raises(ValueError):
-            validate_euid("BLM-123456")  # Hyphens not allowed
+            validate_euid("CX1")  # Missing dash+checksum segment
         with pytest.raises(ValueError):
-            validate_euid("CX01")  # Leading zeros not allowed
+            validate_euid("CX-01")  # Leading zeros not allowed in BODY
+
+        # Bad checksum
+        bad_checksum = cx1[:-1] + ("0" if cx1[-1] != "0" else "1")
+        with pytest.raises(ValueError):
+            validate_euid(bad_checksum)
+
+        # Sandbox EUIDs are not accepted by Bloom's public schema validators
+        sandbox = format_euid("CX", 1, sandbox="X")
+        with pytest.raises(ValueError):
+            validate_euid(sandbox)
 
 
 class TestObjectSchemas:
@@ -88,12 +101,13 @@ class TestContainerSchemas:
     def test_container_create_schema(self):
         """Test ContainerCreateSchema validation."""
         from bloom_lims.schemas import ContainerCreateSchema
+        from daylily_tapdb.euid import format_euid
 
         data = ContainerCreateSchema(
             name="Test Plate",
             container_type="plate",
             subtype="96-well",
-            template_euid="CT123456",  # Valid EUID format: PREFIX + sequence number
+            template_euid=format_euid("GT", 1),
         )
         assert data.name == "Test Plate"
         assert data.container_type == "plate"
@@ -117,11 +131,12 @@ class TestContentSchemas:
     def test_sample_create_schema(self):
         """Test SampleCreateSchema validation."""
         from bloom_lims.schemas import SampleCreateSchema
+        from daylily_tapdb.euid import format_euid
         
         data = SampleCreateSchema(
             name="Test Sample",
             sample_type="blood",
-            template_euid="BLM123456",
+            template_euid=format_euid("GT", 2),
         )
         assert data.name == "Test Sample"
         assert data.sample_type == "blood"
@@ -129,11 +144,12 @@ class TestContentSchemas:
     def test_reagent_create_schema(self):
         """Test ReagentCreateSchema validation."""
         from bloom_lims.schemas import ReagentCreateSchema
+        from daylily_tapdb.euid import format_euid
         
         data = ReagentCreateSchema(
             name="Test Reagent",
             reagent_type="buffer",
-            template_euid="BLM123456",
+            template_euid=format_euid("GT", 3),
             lot_number="LOT001",
         )
         assert data.lot_number == "LOT001"
@@ -145,11 +161,12 @@ class TestWorkflowSchemas:
     def test_workflow_create_schema(self):
         """Test WorkflowCreateSchema validation."""
         from bloom_lims.schemas import WorkflowCreateSchema
+        from daylily_tapdb.euid import format_euid
 
         data = WorkflowCreateSchema(
             name="Test Workflow",
             workflow_type="sequencing",
-            template_euid="WF123456",  # Valid EUID format: PREFIX + sequence number
+            template_euid=format_euid("GT", 4),
         )
         assert data.name == "Test Workflow"
     

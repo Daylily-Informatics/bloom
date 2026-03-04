@@ -112,6 +112,16 @@ def gui(port, reload, background):
     protocol = "https"
     cert_file, key_file = _ensure_https_certs()
 
+    # Ensure TapDB namespace env vars are present even if the caller didn't
+    # source bloom_activate.sh (strict namespace is the default policy).
+    try:
+        from bloom_lims.config import apply_runtime_environment, get_settings
+
+        apply_runtime_environment(get_settings())
+    except Exception as exc:
+        console.print(f"[red]✗[/red]  Failed to apply runtime environment: {exc}")
+        raise SystemExit(1)
+
     pid = _get_pid()
     if pid:
         console.print(f"[yellow]⚠[/yellow]  Server already running (PID {pid})")

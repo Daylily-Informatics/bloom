@@ -1304,6 +1304,7 @@ class TestTrackingAPI:
                     {
                         "status": "IN_TRANSIT",
                         "transit_time_sec": 7200,
+                        "origin_city": "San Diego",
                         "origin_state": "CA",
                         "ship_date": "2026-03-01",
                         "delivery_date": "2026-03-03",
@@ -1318,6 +1319,8 @@ class TestTrackingAPI:
         assert data["carrier"] == "FedEx"
         assert data["status"] == "IN_TRANSIT"
         assert data["transit_time_hours"] == 2.0
+        assert data["origin_city"] == "San Diego"
+        assert data["origin_state"] == "CA"
 
     def test_track_fedex_supports_legacy_method(self, client):
         """FedEx tracking should remain compatible with legacy method names."""
@@ -1328,6 +1331,7 @@ class TestTrackingAPI:
                     {
                         "Delivery_Status": "DELIVERED",
                         "Transit_Time_sec": 3600,
+                        "Origin_City": "Seattle",
                         "Origin_State": "WA",
                         "Ship_Date": "2026-02-28",
                         "Delivery_Date": "2026-03-01",
@@ -1342,3 +1346,5 @@ class TestTrackingAPI:
         assert data["carrier"] == "FedEx"
         assert data["status"] == "DELIVERED"
         assert data["transit_time_hours"] == 1.0
+        assert data["origin_city"] == "Seattle"
+        assert data["origin_state"] == "WA"

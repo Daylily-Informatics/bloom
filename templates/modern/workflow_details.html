@@ -6,27 +6,40 @@
 <!-- Bootstrap 5 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
+    :root {
+        --wf-surface-0: var(--color-gray-900);
+        --wf-surface-1: var(--color-gray-800);
+        --wf-surface-2: var(--color-gray-700);
+        --wf-surface-3: var(--color-gray-600);
+        --wf-border: #4a5567;
+        --wf-text-primary: #eef2f7;
+        --wf-text-secondary: #c8d0dc;
+        --wf-text-muted: #a8b2c2;
+        --wf-chip-bg: #273142;
+        --wf-chip-border: #5a6b82;
+    }
+
     /* Bootstrap overrides to match BLOOM design system */
     .accordion {
-        --bs-accordion-bg: var(--color-gray-800);
-        --bs-accordion-border-color: var(--color-gray-600);
-        --bs-accordion-btn-bg: var(--color-gray-700);
-        --bs-accordion-btn-color: var(--color-gray-200);
-        --bs-accordion-active-bg: var(--color-highlight);
-        --bs-accordion-active-color: var(--color-white);
+        --bs-accordion-bg: var(--wf-surface-1);
+        --bs-accordion-border-color: var(--wf-border);
+        --bs-accordion-btn-bg: var(--wf-surface-2);
+        --bs-accordion-btn-color: var(--wf-text-primary);
+        --bs-accordion-active-bg: #3b4656;
+        --bs-accordion-active-color: var(--wf-text-primary);
         --bs-accordion-btn-focus-box-shadow: none;
     }
     .accordion-item {
-        background-color: var(--color-gray-800);
-        border-color: var(--color-gray-600);
+        background-color: var(--wf-surface-1);
+        border-color: var(--wf-border);
     }
     .accordion-body {
-        background-color: var(--color-gray-800);
-        color: var(--color-gray-200);
+        background-color: var(--wf-surface-1);
+        color: var(--wf-text-secondary);
     }
     .accordion-button {
-        background-color: var(--color-gray-700);
-        color: var(--color-gray-200);
+        background-color: var(--wf-surface-2);
+        color: var(--wf-text-primary);
     }
     .accordion-button::after {
         filter: invert(1);
@@ -35,17 +48,17 @@
         filter: invert(1);
     }
     .card {
-        background-color: var(--color-gray-800);
-        border-color: var(--color-gray-600);
-        color: var(--color-gray-200);
+        background-color: var(--wf-surface-1);
+        border-color: var(--wf-border);
+        color: var(--wf-text-secondary);
     }
     .card-header {
-        background-color: var(--color-gray-700);
-        border-color: var(--color-gray-600);
-        color: var(--color-white);
+        background-color: var(--wf-surface-2);
+        border-color: var(--wf-border);
+        color: var(--wf-text-primary);
     }
     .card-body {
-        background-color: var(--color-gray-800);
+        background-color: var(--wf-surface-1);
     }
     .badge.bg-success { background-color: var(--color-success) !important; }
     .badge.bg-warning { background-color: var(--color-warning) !important; }
@@ -73,26 +86,26 @@
         padding: 0.5rem 0.75rem;
     }
     .accordion-button:not(.collapsed) {
-        background-color: var(--color-highlight);
-        color: white;
+        background-color: #3b4656;
+        color: var(--wf-text-primary);
     }
     .accordion-button:focus {
         box-shadow: none;
-        border-color: var(--color-highlight);
+        border-color: var(--wf-border);
     }
     .accordion-button.step-type-workflow_step_instance,
     .accordion-button.step-type-workflow_instance {
-        background: var(--color-gray-700);
-        color: var(--color-gray-200);
+        background: var(--wf-surface-2);
+        color: var(--wf-text-primary);
     }
     .accordion-button.step-type-plate,
     .accordion-button.step-type-rack {
-        background: var(--color-secondary);
-        color: var(--color-gray-200);
+        background: #3f4b5f;
+        color: var(--wf-text-primary);
     }
     .accordion-button.step-type-package {
-        background: var(--color-accent);
-        color: var(--color-gray-200);
+        background: #45546b;
+        color: var(--wf-text-primary);
     }
     .step-info {
         display: flex;
@@ -103,35 +116,51 @@
     .step-type-badge {
         font-size: 0.75rem;
         padding: 0.25rem 0.5rem;
-        background: var(--color-gray-600);
+        background: #515f74;
         border-radius: var(--radius-sm);
+        color: var(--wf-text-primary);
     }
-    .child-type-chips {
+    .descendant-summary-chips {
         display: inline-flex;
         flex-wrap: wrap;
-        gap: 0.25rem;
+        gap: 0.35rem;
         align-items: center;
     }
-    .child-type-chip {
+    .descendant-chip {
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
-        padding: 0.125rem 0.375rem;
+        gap: 0.35rem;
+        padding: 0.18rem 0.5rem;
         border-radius: 999px;
-        background: var(--color-gray-600);
-        color: var(--color-gray-200);
-        font-size: 0.7rem;
+        border: 1px solid var(--wf-chip-border);
+        background: var(--wf-chip-bg);
+        color: var(--wf-text-primary);
+        font-size: 0.72rem;
         line-height: 1.1;
         white-space: nowrap;
+        font-weight: 600;
     }
-    .child-type-chip i {
-        font-size: 0.7rem;
+    .descendant-chip i {
+        font-size: 0.72rem;
+        opacity: 0.9;
     }
-    .child-type-chip .chip-count {
+    .descendant-chip .chip-count {
         font-weight: 700;
     }
-    .child-type-chip .chip-label {
-        opacity: 0.9;
+    .descendant-chip .chip-label {
+        opacity: 0.95;
+    }
+    .descendant-chip.total {
+        background: #2d3b4f;
+        border-color: #7186a4;
+    }
+    .descendant-chip.category-container { border-color: #6f8faf; }
+    .descendant-chip.category-content { border-color: #83a77a; }
+    .descendant-chip.category-workflow { border-color: #9f8bb9; }
+    .descendant-chip.category-workflow_step { border-color: #8ba3c5; }
+    .descendant-chip.category-other { border-color: #7f8799; }
+    .descendant-chip:hover {
+        background: #32445d;
     }
     .step-links {
         display: flex;
@@ -141,16 +170,17 @@
         z-index: 10;
     }
     .step-links a {
-        color: var(--color-highlight);
+        color: #b7d8ff;
         text-decoration: none;
         padding: 0.25rem 0.5rem;
-        background: var(--color-gray-800);
+        background: var(--wf-surface-0);
         border-radius: var(--radius-sm);
         font-size: 0.875rem;
+        border: 1px solid var(--wf-border);
     }
     .step-links a:hover {
-        color: var(--color-white);
-        background: var(--color-highlight);
+        color: var(--wf-text-primary);
+        background: #3d4b60;
     }
     .accordion-header {
         display: flex;
@@ -540,42 +570,39 @@
 {% endif %}
 
 <!-- Define recursive step rendering macro -->
-{% macro render_step(step, accordion_states, depth=0) %}
+{% macro render_step(step, accordion_states, step_descendant_summaries, depth=0) %}
 {% set is_workflow_step = step.polymorphic_discriminator in ['workflow_step_instance', 'workflow_instance'] %}
 {% set step_type = step.type %}
 {% set step_id = "step-" ~ step.euid %}
 {% set is_open = accordion_states.get(step.euid, 'closed') == 'open' %}
+{% set descendant_summary = step_descendant_summaries.get(step.euid, {"total_descendants": 0, "counts_by_category": {}, "counts_by_type": {}}) if step_descendant_summaries is defined else {"total_descendants": 0, "counts_by_category": {}, "counts_by_type": {}} %}
+{% set type_breakdown = [] %}
+{% for child_type, child_count in descendant_summary.counts_by_type|dictsort(false, 'value')|reverse %}
+{% set _ = type_breakdown.append(child_type ~ ': ' ~ child_count) %}
+{% endfor %}
+{% set type_breakdown_title = type_breakdown|join(' | ') %}
 
 {# Separate workflow step children from container and content children #}
 {# Query both container_instance AND content_instance lineages per Rule 6 (polymorphic identity naming) #}
 {% set workflow_children = [] %}
 {% set container_children = [] %}
 {% set content_children = [] %}
-{% set child_type_counts = {} %}
 {% if step.parent_of_lineages %}
     {% for child_lineage in step.get_sorted_parent_of_lineages(['container_instance', 'content_instance']) %}
         {% set child = child_lineage.child_instance %}
         {% if child.category == 'workflow_step' %}
             {% set _ = workflow_children.append(child) %}
-            {% set child_type_key = child.type or child.category or 'unknown' %}
-            {% set _ = child_type_counts.update({child_type_key: child_type_counts.get(child_type_key, 0) + 1}) %}
         {% elif child.category == 'content' %}
             {% set _ = content_children.append(child) %}
-            {% set child_type_key = child.type or child.category or 'unknown' %}
-            {% set _ = child_type_counts.update({child_type_key: child_type_counts.get(child_type_key, 0) + 1}) %}
         {% else %}
             {# container category #}
             {% set _ = container_children.append(child) %}
-            {% set child_type_key = child.type or child.category or 'unknown' %}
-            {% set _ = child_type_counts.update({child_type_key: child_type_counts.get(child_type_key, 0) + 1}) %}
             {# Also collect contents FROM this container #}
             {% if child.parent_of_lineages %}
                 {% for content_lineage in child.parent_of_lineages %}
                     {% set content = content_lineage.child_instance %}
                     {% if content.category == 'content' %}
                         {% set _ = content_children.append(content) %}
-                        {% set content_type_key = content.type or content.category or 'unknown' %}
-                        {% set _ = child_type_counts.update({content_type_key: child_type_counts.get(content_type_key, 0) + 1}) %}
                     {% endif %}
                 {% endfor %}
             {% endif %}
@@ -608,29 +635,30 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if child_type_counts|length > 0 %}
-                    <span class="child-type-chips ms-2" title="Child instance type counts">
-                        {% for child_type, child_count in child_type_counts|dictsort %}
-                        <span class="child-type-chip" data-child-type="{{ child_type }}" title="{{ child_type }}: {{ child_count }}">
-                            {% if child_type in ['package'] %}
+                    <span class="descendant-summary-chips ms-2" title="{{ type_breakdown_title if type_breakdown_title else 'No descendants' }}">
+                        <span class="descendant-chip total" title="{{ type_breakdown_title if type_breakdown_title else 'No descendants' }}">
+                            <i class="fas fa-sitemap"></i>
+                            <span class="chip-count">{{ descendant_summary.total_descendants }}</span>
+                            <span class="chip-label">total</span>
+                        </span>
+                        {% for category_name, category_count in descendant_summary.counts_by_category|dictsort(false, 'value')|reverse %}
+                        <span class="descendant-chip category-{{ category_name }}" data-child-category="{{ category_name }}" title="{{ category_name }}: {{ category_count }}">
+                            {% if category_name == 'container' %}
                             <i class="fas fa-box"></i>
-                            {% elif child_type in ['plate', 'rack'] %}
-                            <i class="fas fa-th"></i>
-                            {% elif child_type in ['tube', 'vial', 'well'] %}
+                            {% elif category_name == 'content' %}
                             <i class="fas fa-vial"></i>
-                            {% elif child_type in ['sample', 'reagent', 'control'] %}
-                            <i class="fas fa-flask"></i>
-                            {% elif child_type in ['queue', 'workflow_step', 'workflow', 'assay', 'accessioning-steps'] %}
+                            {% elif category_name == 'workflow' %}
+                            <i class="fas fa-project-diagram"></i>
+                            {% elif category_name == 'workflow_step' %}
                             <i class="fas fa-list-ol"></i>
                             {% else %}
                             <i class="fas fa-cube"></i>
                             {% endif %}
-                            <span class="chip-count">{{ child_count }}</span>
-                            <span class="chip-label">{{ child_type | replace('-', ' ') | replace('_', ' ') }}</span>
+                            <span class="chip-count">{{ category_count }}</span>
+                            <span class="chip-label">{{ category_name | replace('-', ' ') | replace('_', ' ') }}</span>
                         </span>
                         {% endfor %}
                     </span>
-                    {% endif %}
                 </div>
             </button>
             <!-- Links OUTSIDE the button so they work independently -->
@@ -803,7 +831,7 @@
                 {% if workflow_children|length > 0 %}
                 <div class="nested-steps">
                     {% for child_step in workflow_children %}
-                    {{ render_step(child_step, accordion_states, depth + 1) }}
+                    {{ render_step(child_step, accordion_states, step_descendant_summaries, depth + 1) }}
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -820,7 +848,7 @@
     </div>
     <div class="card-body">
         {% for step in workflow.get_sorted_parent_of_lineages(['workflow_instance']) %}
-        {{ render_step(step.child_instance, accordion_states) }}
+        {{ render_step(step.child_instance, accordion_states, step_descendant_summaries) }}
         {% else %}
         <p class="text-muted text-center py-4">No workflow steps found.</p>
         {% endfor %}

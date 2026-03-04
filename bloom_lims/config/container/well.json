@@ -1,48 +1,46 @@
 {
   "fixed-plate-well": {
     "1.0": {
-      "valid_parents": [
-        "container/plate/fixed-plate.*?/.*?"
-      ],
+      "action_groups": {},
+      "action_imports": {
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "cont_address": {
+        "col_idx": "0",
+        "col_name": "",
+        "row_idx": "0",
+        "row_name": ""
+      },
+      "description": "plate well - fixed",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "bottom_type": "",
+        "comments": "",
+        "diameter": "",
+        "height": "",
+        "lab_code": "",
+        "name": "",
+        "volume": ""
+      },
+      "singleton": "0",
       "valid_content": [
         "content/.*"
       ],
-      "description": "plate well - fixed",
-      "properties": {
-        "name": "",
-        "diameter": "",
-        "height": "",
-        "volume": "",
-        "comments": "",
-        "bottom_type": "",
-        "lab_code":""
-      },
-      "cont_address": {
-        "row_name": "",
-        "col_name": "",
-        "row_idx": "0",
-        "col_idx": "0"
-      },
-      "expected_inputs": [],
-      "singleton": "0",
-      "expected_outputs": [],
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/set_object_status/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "valid_parents": [
+        "container/plate/fixed-plate.*?/.*?"
+      ]
     }
   }
 }

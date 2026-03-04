@@ -142,16 +142,29 @@ class TestTemplatesMobileIntegration:
         assert "mobile.css" in content
         assert "mobile.js" in content
 
-    def test_admin_includes_mobile_assets(self):
-        """Test that admin.html includes mobile assets."""
-        template_path = PROJECT_ROOT / "templates" / "legacy" / "admin.html"
-        content = template_path.read_text()
-        assert "mobile.css" in content
-        assert "mobile.js" in content
+    def test_admin_template_remains_mobile_responsive(self):
+        """Test that admin UI keeps a mobile-responsive stylesheet contract."""
+        legacy_template_path = PROJECT_ROOT / "templates" / "legacy" / "admin.html"
+        modern_template_path = PROJECT_ROOT / "templates" / "modern" / "admin.html"
+
+        if legacy_template_path.exists():
+            content = legacy_template_path.read_text()
+            assert "mobile.css" in content
+            assert "mobile.js" in content
+            return
+
+        assert modern_template_path.exists()
+        content = modern_template_path.read_text()
+        assert '{% extends "modern/base.html" %}' in content
+
+        modern_base_path = PROJECT_ROOT / "templates" / "modern" / "base.html"
+        assert modern_base_path.exists()
+        base_content = modern_base_path.read_text()
+        assert "bloom_modern.css" in base_content
+        assert "viewport" in base_content
 
     def test_templates_have_apple_mobile_web_app_meta(self):
         """Test that templates have Apple mobile web app meta tags."""
         template_path = PROJECT_ROOT / "templates" / "legacy" / "index2.html"
         content = template_path.read_text()
         assert "apple-mobile-web-app-capable" in content
-

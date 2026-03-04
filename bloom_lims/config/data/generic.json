@@ -1,61 +1,60 @@
 {
   "gdna-quantification": {
     "1.0": {
-      "description": "DNA Quant Data",
-      "properties": {
-        "name": "DNA Quant Data",
-        "comments": "",
-        "lab_code":""
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "record_cfdna_quant_outcome": "action/data/record_cfdna_quant_outcome/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "description": "DNA Quant Data",
       "expected_inputs": [],
       "expected_outputs": [],
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "DNA Quant Data"
       },
-      "singleton": "0",
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        },
-        "data": {
-          "group_order": "2",
-          "group_name": "Data Actions",
-          "actions": {
-            "action/data/record_cfdna_quant_outcome/1.0/": {}
-          }
-        }
-      }
+      "singleton": "0"
     }
   },
   "temperature-log": {
     "1.0": {
+      "action_groups": {},
+      "action_imports": {},
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
       "description": "Temperature Log Data",
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "properties": {
-        "name": "Temperate Log Data",
-        "comments": "",
-        "lab_code":""
-      },
       "expected_inputs": [],
       "expected_outputs": [],
       "instantiation_layouts": [],
-      "singleton": "0",
-      "action_groups": {},
-      "action_imports": {}
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "Temperate Log Data"
+      },
+      "singleton": "0"
     }
   }
 }

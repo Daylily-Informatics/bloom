@@ -92,6 +92,218 @@ class BloomObj:
         self.is_deleted = is_deleted
         self.session = bdb.session
         self.Base = bdb.Base
+        app_username = str(getattr(bdb, "app_username", "") or "").strip()
+        self._actor_user_id = None
+        self._actor_email = app_username if "@" in app_username else None
+
+    def set_actor_context(self, *, user_id=None, email=None):
+        """Set optional actor identity context used for interaction lineage tracking."""
+        user_id_str = str(user_id or "").strip()
+        email_str = str(email or "").strip()
+        self._actor_user_id = user_id_str or None
+        self._actor_email = email_str or self._actor_email
+        return self
+
+    def _extract_actor_from_curr_user(self, curr_user):
+        actor_user_id = None
+        actor_email = None
+        if isinstance(curr_user, dict):
+            actor_user_id = (
+                curr_user.get("cognito_sub")
+                or curr_user.get("sub")
+                or curr_user.get("user_id")
+            )
+            actor_email = curr_user.get("email")
+        elif isinstance(curr_user, str):
+            curr = curr_user.strip()
+            if "@" in curr:
+                actor_email = curr
+            elif curr:
+                actor_user_id = curr
+        return (str(actor_user_id).strip() or None, str(actor_email).strip() or None)
+
+    def _instance_properties(self, instance):
+        payload = instance.json_addl or {}
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        props = payload.get("properties")
+        if not isinstance(props, dict):
+            props = {}
+            payload["properties"] = props
+            instance.json_addl = payload
+        return payload, props
+
+    def _ensure_user_actor_template(self):
+        templates = self.query_template_by_component_v2(
+            "actor", "user", "bloom-user", "1.0"
+        )
+        if templates:
+            return templates[0]
+
+        template = self.Base.classes.generic_template(
+            name="Bloom User",
+            polymorphic_discriminator="generic_template",
+            category="actor",
+            type="user",
+            subtype="bloom-user",
+            version="1.0",
+            instance_prefix="AX",
+            instance_polymorphic_identity="generic_instance",
+            json_addl={
+                "description": "Bloom authenticated user projection",
+                "properties": {
+                    "name": "Bloom User",
+                    "email": "",
+                    "cognito_sub": "",
+                    "comments": "",
+                },
+                "expected_inputs": [],
+                "singleton": "0",
+                "expected_outputs": [],
+                "action_groups": {},
+                "action_imports": {
+                    "core": {
+                        "group_order": "1",
+                        "group_name": "Core Actions",
+                        "actions": {"action/core/*/1.0/": {}},
+                    }
+                },
+                "instantiation_layouts": [],
+            },
+            bstatus="active",
+            is_singleton=False,
+            is_deleted=False,
+        )
+        self.session.add(template)
+        self.session.flush()
+        return template
+
+    def _upsert_user_actor(self, *, user_id=None, email=None):
+        resolved_user_id = str(user_id or "").strip() or None
+        resolved_email = str(email or "").strip() or None
+        if not resolved_user_id and not resolved_email:
+            return None
+
+        actors = (
+            self.session.query(self.Base.classes.generic_instance)
+            .filter(
+                self.Base.classes.generic_instance.category == "actor",
+                self.Base.classes.generic_instance.type == "user",
+                self.Base.classes.generic_instance.subtype == "bloom-user",
+                self.Base.classes.generic_instance.version == "1.0",
+                self.Base.classes.generic_instance.is_deleted == False,  # noqa: E712
+            )
+            .all()
+        )
+
+        actor = None
+        for candidate in actors:
+            _, props = self._instance_properties(candidate)
+            candidate_sub = str(props.get("cognito_sub") or "").strip()
+            candidate_email = str(props.get("email") or "").strip().lower()
+            if resolved_user_id and candidate_sub == resolved_user_id:
+                actor = candidate
+                break
+            if resolved_email and candidate_email == resolved_email.lower():
+                actor = candidate
+                break
+
+        if actor is None:
+            template = self._ensure_user_actor_template()
+            actor_name = resolved_email or resolved_user_id or "Bloom User"
+            actor = self.create_instance(
+                template.euid,
+                json_addl_overrides={
+                    "properties": {
+                        "name": actor_name,
+                        "email": resolved_email or "",
+                        "cognito_sub": resolved_user_id or "",
+                        "comments": "",
+                    }
+                },
+            )
+            return actor
+
+        payload, props = self._instance_properties(actor)
+        changed = False
+        if resolved_email and props.get("email") != resolved_email:
+            props["email"] = resolved_email
+            changed = True
+        if resolved_user_id and props.get("cognito_sub") != resolved_user_id:
+            props["cognito_sub"] = resolved_user_id
+            changed = True
+        if resolved_email and actor.name != resolved_email:
+            actor.name = resolved_email
+            changed = True
+        if changed:
+            payload["properties"] = props
+            actor.json_addl = payload
+            flag_modified(actor, "json_addl")
+            self.session.commit()
+
+        return actor
+
+    def track_user_interaction(
+        self,
+        target_euid,
+        *,
+        relationship_type="user_interacted",
+        action_ds=None,
+        user_id=None,
+        email=None,
+    ):
+        """Create lineage from a user actor node to a target object."""
+        try:
+            target_euid = str(target_euid or "").strip()
+            if not target_euid:
+                return None
+
+            action_user_id = None
+            action_email = None
+            if isinstance(action_ds, dict):
+                action_user_id, action_email = self._extract_actor_from_curr_user(
+                    action_ds.get("curr_user")
+                )
+                if not action_user_id:
+                    action_user_id = (
+                        str(action_ds.get("curr_user_id") or "").strip() or None
+                    )
+
+            actor = self._upsert_user_actor(
+                user_id=user_id or action_user_id or self._actor_user_id,
+                email=email or action_email or self._actor_email,
+            )
+            if actor is None or actor.euid == target_euid:
+                return None
+
+            target_obj = self.get_by_euid(target_euid)
+            if not target_obj or getattr(target_obj, "is_deleted", False):
+                return None
+
+            self.create_generic_instance_lineage_by_euids(
+                actor.euid,
+                target_euid,
+                relationship_type=str(relationship_type or "user_interacted"),
+            )
+            self.session.commit()
+            return actor.euid
+        except Exception as exc:
+            self.logger.warning(
+                "Failed to track user interaction (%s -> %s): %s",
+                relationship_type,
+                target_euid,
+                exc,
+            )
+            try:
+                self.session.rollback()
+            except Exception:
+                pass
+            return None
 
     def _fetch_fedex_tracking_ops_meta(self, tracking_number):
         """Fetch FedEx metadata across carrier-tracking API versions."""
@@ -221,6 +433,27 @@ class BloomObj:
             False if template.json_addl.get("singleton", "0") in [0, "0"] else True
         )
 
+        # TapDB ships a built-in system user actor template that must be singleton in practice.
+        # The underlying DB enforces a uniqueness constraint on `json_addl.login_identifier`
+        # for these instances; attempting to create multiple will raise an IntegrityError.
+        is_system_user_actor = (
+            template.type == "actor"
+            and template.subtype == "system_user"
+            and str(template.version or "") == "1.0"
+        )
+
+        if is_singleton or is_system_user_actor:
+            existing = (
+                self.session.query(self.Base.classes.generic_instance)
+                .filter(
+                    self.Base.classes.generic_instance.template_uuid == template.uuid,
+                    self.Base.classes.generic_instance.is_deleted == False,  # noqa: E712
+                )
+                .first()
+            )
+            if existing is not None:
+                return existing
+
         cname = template.polymorphic_discriminator.replace("_template", "_instance")
         parent_instance = getattr(self.Base.classes, f"{cname}")(
             name=template.name,
@@ -236,6 +469,24 @@ class BloomObj:
                 "_template", "_instance"
             ),
         )
+
+        # Normalize TapDB system-user actor instances to satisfy DB uniqueness constraint.
+        if is_system_user_actor:
+            # Promote properties.login_identifier to top-level json_addl.login_identifier.
+            try:
+                payload = parent_instance.json_addl or {}
+                props = payload.get("properties") or {}
+                login_identifier = str(payload.get("login_identifier") or "").strip()
+                if not login_identifier:
+                    login_identifier = str(props.get("login_identifier") or "").strip()
+                if not login_identifier:
+                    login_identifier = "system"
+                payload["login_identifier"] = login_identifier
+                parent_instance.json_addl = payload
+            except Exception:
+                # Best-effort: if anything goes wrong, let the DB enforce constraints.
+                pass
+
         # Lots of fun stuff happening when instantiating action_imports!
         ai = (
             self._create_action_ds(parent_instance.json_addl["action_imports"])
@@ -444,6 +695,23 @@ class BloomObj:
         # self.session.commit()
 
         return lineage_record
+
+    def create_lineage(self, parent_instance, child_instance, relationship_type: str = "generic"):
+        """
+        Backwards-compatible lineage creator.
+
+        Many API routes and legacy code paths refer to `create_lineage(parent, child)`.
+        TapDB/Bloom core implementation is `create_generic_instance_lineage_by_euids`.
+        """
+        parent_euid = getattr(parent_instance, "euid", parent_instance)
+        child_euid = getattr(child_instance, "euid", child_instance)
+        if not parent_euid or not child_euid:
+            raise Exception("parent_instance and child_instance must be provided")
+        return self.create_generic_instance_lineage_by_euids(
+            parent_instance_euid=parent_euid,
+            child_instance_euid=child_euid,
+            relationship_type=relationship_type,
+        )
 
     def create_instance_by_code(self, layout_str, layout_ds):
         ret_obj = self._create_child_instance(layout_str, layout_ds)
@@ -1644,6 +1912,11 @@ class BloomObj:
         flag_modified(bobj, "json_addl")
         ##self.session.flush()
         self.session.commit()
+        self.track_user_interaction(
+            euid,
+            relationship_type=f"user_action:{action}",
+            action_ds=action_ds,
+        )
 
         return bobj
 

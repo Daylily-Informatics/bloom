@@ -136,29 +136,36 @@ async def create_file_set(
     try:
         bdb = get_bdb(user.email)
         from bloom_lims.bobjs import BloomObj
-        from sqlalchemy.orm.attributes import flag_modified
-        import uuid as uuid_lib
-        
-        # Create file set instance directly
-        GenericInstance = bdb.Base.classes.generic_instance
-        file_set = GenericInstance(
-            uuid=uuid_lib.uuid4(),
-            name=data.name,
-            category="data",
-            type="file_set",
-            subtype=data.file_type or "generic",
-            bstatus="created",
-            json_addl=data.json_addl or {},
-        )
-        bdb.session.add(file_set)
-        bdb.session.flush()
-        
+
+        bo = BloomObj(bdb)
+
+        # Instances must be created from templates in TapDB (template_uuid is NOT NULL).
+        subtype = (data.file_type or "generic").strip().lower() or "generic"
+        templates = bo.query_template_by_component_v2("file", "file_set", subtype, "1.0")
+        if not templates and subtype != "generic":
+            templates = bo.query_template_by_component_v2("file", "file_set", "generic", "1.0")
+        if not templates:
+            raise HTTPException(status_code=500, detail="Missing file_set template (file/file_set/*/1.0)")
+        template = templates[0]
+
+        json_overrides = data.json_addl or {}
+        # Ensure name is reflected in json_addl properties for UI consistency.
+        props = json_overrides.get("properties")
+        if not isinstance(props, dict):
+            props = {}
+        props.setdefault("name", data.name)
+        json_overrides["properties"] = props
+
+        file_set = bo.create_instance(template.euid, json_overrides)
+
+        # Override the top-level name for the instance.
+        file_set.name = data.name
+
         # Link to parent if provided
         if data.parent_euid:
-            bo = BloomObj(bdb)
             parent = bo.get_by_euid(data.parent_euid)
             if parent:
-                bo.create_lineage(parent, file_set)
+                bo.create_lineage(parent, file_set, relationship_type="file_set_of")
         
         bdb.session.commit()
         
@@ -173,4 +180,3 @@ async def create_file_set(
     except Exception as e:
         logger.error(f"Error creating file set: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

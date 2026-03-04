@@ -8,13 +8,22 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.13.3/css/selectize.bootstrap5.css" />
 <style>
+    :root {
+        --dewey-surface-0: var(--color-gray-900);
+        --dewey-surface-1: var(--color-gray-800);
+        --dewey-surface-2: var(--color-gray-700);
+        --dewey-border: #4b5666;
+        --dewey-text-primary: #eef2f7;
+        --dewey-text-secondary: #c8d0dc;
+        --dewey-focus: #3d4d63;
+    }
     .accordion-button:not(.collapsed) {
-        background-color: var(--color-highlight);
-        color: white;
+        background-color: var(--dewey-focus);
+        color: var(--dewey-text-primary);
     }
     .accordion-button:focus {
         box-shadow: none;
-        border-color: var(--color-highlight);
+        border-color: var(--dewey-border);
     }
     .option-buttons {
         display: flex;
@@ -24,34 +33,38 @@
     }
     .option-button {
         padding: 0.25rem 0.5rem;
-        border: 1px solid var(--color-gray-600);
+        border: 1px solid var(--dewey-border);
         border-radius: var(--radius-sm);
         cursor: pointer;
         font-size: 0.875rem;
-        background: var(--color-gray-700);
+        background: var(--dewey-surface-2);
         transition: all 0.2s ease;
+        color: var(--dewey-text-secondary);
     }
     .option-button:hover {
-        background: var(--color-gray-600);
+        background: #3a4453;
+        color: var(--dewey-text-primary);
     }
     .option-button.selected {
-        background-color: var(--color-highlight);
-        color: white;
-        border-color: var(--color-highlight);
+        background-color: var(--dewey-focus);
+        color: var(--dewey-text-primary);
+        border-color: #6f839d;
     }
     .selectize-input {
-        background-color: var(--color-gray-700) !important;
-        border-color: var(--color-gray-600) !important;
+        background-color: var(--dewey-surface-2) !important;
+        border-color: var(--dewey-border) !important;
     }
     .selectize-dropdown {
-        background-color: var(--color-gray-800) !important;
-        border-color: var(--color-gray-600) !important;
+        background-color: var(--dewey-surface-1) !important;
+        border-color: var(--dewey-border) !important;
     }
     .form-section {
-        background: var(--color-gray-800);
+        background: var(--dewey-surface-1);
+        border: 1px solid var(--dewey-border);
         border-radius: var(--radius-md);
         padding: 1.5rem;
         margin-bottom: 1rem;
+        color: var(--dewey-text-secondary);
     }
     .form-row {
         display: grid;
@@ -261,4 +274,3 @@ function resetForms() {
 window.onload = resetForms;
 </script>
 {% endblock %}
-

@@ -9,6 +9,7 @@ With BLOOM_OAUTH=no, authentication is bypassed for testing.
 
 import os
 import sys
+import subprocess
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -96,6 +97,21 @@ class TestMainGUIEndpoints:
         response = client.get("/admin?saved=1")
         assert response.status_code == 200
         assert "Preferences saved." in response.text
+
+    def test_admin_start_zebra_service_redirects_on_success(self, client):
+        """Test zebra start action launches command and redirects with success flag."""
+        with patch("main.shutil.which", return_value="/usr/local/bin/zday_start"):
+            with patch(
+                "main.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    args=["zday_start"], returncode=0, stdout="ok", stderr=""
+                ),
+            ) as mocked_run:
+                response = client.post("/admin/zebra/start", follow_redirects=False)
+
+        assert response.status_code == 303
+        assert response.headers.get("location") == "/admin?zebra_started=1"
+        mocked_run.assert_called_once()
 
 
 class TestAssaysEndpoint:

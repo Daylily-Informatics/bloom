@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 os.environ["BLOOM_OAUTH"] = "no"
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
-from main import app, require_auth
+from main import _build_graph_elements_for_start, app, require_auth
 
 
 @pytest.fixture
@@ -156,6 +156,7 @@ class TestGraphViewerRoutes:
         assert "id=\"search-query\"" in response.text
         assert "id=\"transparency-slider\"" in response.text
         assert "id=\"distance-slider\"" in response.text
+        assert "id=\"type-checkboxes\"" in response.text
         assert "I + left click node" in response.text
         assert "initGraphPage()" in response.text
 
@@ -169,6 +170,34 @@ class TestGraphViewerRoutes:
 
 
 class TestGraphViewerApis:
+    def test_build_graph_elements_emits_canonical_node_keys(self):
+        fake_bobj = MagicMock()
+        fake_bobj.fetch_graph_data_by_node_depth.return_value = [
+            (
+                "CX-1",  # euid
+                None,
+                "Sample Tube",
+                "tube",  # type
+                "container",  # category
+                "tube-generic",  # subtype
+                "1.0",  # version
+                None,
+                "LN-1",  # lineage_euid
+                "WX-1",  # parent
+                "CX-1",  # child
+                "generic",  # relationship_type
+            )
+        ]
+
+        nodes, _edges = _build_graph_elements_for_start(fake_bobj, "CX-1", 3)
+        assert nodes
+        node_data = nodes[0]["data"]
+        assert node_data["type"] == "tube"
+        assert node_data["category"] == "container"
+        assert node_data["subtype"] == "tube-generic"
+        assert "btype" not in node_data
+        assert "b_sub_type" not in node_data
+
     def test_api_graph_data_returns_elements(self, client):
         fake_nodes = [{"data": {"id": "N1", "category": "container", "color": "#8B00FF"}}]
         fake_edges = [{"data": {"id": "E1", "source": "N1", "target": "N2"}}]
@@ -208,6 +237,8 @@ class TestGraphViewerApis:
         assert payload["euid"] == "CX-TEST"
         assert payload["category"] == "container"
         assert payload["type"] == "instance"
+        assert "btype" not in payload
+        assert "b_sub_type" not in payload
 
     def test_api_lineage_rejects_non_admin(self, client):
         def _non_admin_auth():

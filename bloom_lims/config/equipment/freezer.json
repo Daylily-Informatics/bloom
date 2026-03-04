@@ -1,114 +1,28 @@
 {
-  "freezer-m80c": {
-    "1.0": {
-      "description": "-80C Freezer.",
-      "properties": {
-        "name": "-80C Freezer",
-        "serial": "",
-        "manufacturer": "",
-        "model": "",
-        "operataional_status": "",
-        "comments": "","lab_code":""
-      },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "instantiation_layouts": [
-        [
-          {
-            "container/shelf/generic/1.0": {
-              "json_addl": {
-                "cont_address": {
-                  "name": "Shelf-1",
-                  "row_name": "Shelf-1",
-                  "col_name": "",
-                  "row_idx": "0",
-                  "col_idx": "0",
-                  "capacity": "10"
-                }
-              }
-            }
-          },
-          {
-            "container/shelf/generic/1.0": {
-              "json_addl": {
-                "cont_address": {
-                  "name": "Shelf-2",
-                  "row_name": "Shelf-2",
-                  "col_name": "",
-                  "row_idx": "0",
-                  "col_idx": "1",
-                  "capacity": "10"
-                }
-              }
-            }
-          },
-          {
-            "container/shelf/generic/1.0": {
-              "json_addl": {
-                "cont_address": {
-                  "name": "Shelf-3",
-                  "row_name": "Shelf-3",
-                  "col_name": "",
-                  "row_idx": "0",
-                  "col_idx": "2",
-                  "capacity": "10"
-                }
-              }
-            }
-          },
-          {
-            "container/shelf/generic/1.0": {
-              "json_addl": {
-                "cont_address": {
-                  "name": "Shelf-4",
-                  "row_name": "Shelf-4",
-                  "col_name": "",
-                  "row_idx": "0",
-                  "col_idx": "3",
-                  "capacity": "10"
-                }
-              }
-            }
-          }
-        ]
-      ],
-      "singleton": "0",
-      "action_groups": {},
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        },
-        "fridge": {
-          "group_order": "2",
-          "group_name": "Refrigerator Actions",
-          "actions": {
-            "action/equipment/*/1.0/": {}
-          }
-        }
-      }
-    }
-  },
   "freezer-m20c": {
     "1.0": {
-      "description": "-20C Freezer",
-      "properties": {
-        "name": "-20C Freezer",
-        "serial": "",
-        "manufacturer": "",
-        "model": "",
-        "operataional_status": "",
-        "comments": "","lab_code":""
+      "action_groups": {},
+      "action_imports": {
+        "add_container_to": "action/equipment/add-container-to/1.0",
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "download_inventory_tsv": "action/equipment/download-inventory-tsv/1.0",
+        "log_temperature": "action/equipment/log-temperature/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "remove_container_from": "action/equipment/remove-container-from/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "inactive"
+      },
+      "description": "-20C Freezer",
       "expected_inputs": [],
       "expected_outputs": [],
       "instantiation_layouts": [
@@ -117,12 +31,12 @@
             "container/shelf/generic/1.0": {
               "json_addl": {
                 "cont_address": {
-                  "name": "Shelf-1",
-                  "row_name": "Shelf-1",
-                  "col_name": "",
-                  "row_idx": "0",
+                  "capacity": "10",
                   "col_idx": "0",
-                  "capacity": "10"
+                  "col_name": "",
+                  "name": "Shelf-1",
+                  "row_idx": "0",
+                  "row_name": "Shelf-1"
                 }
               }
             }
@@ -131,42 +45,126 @@
             "container/shelf/generic/1.0": {
               "json_addl": {
                 "cont_address": {
-                  "name": "Shelf-2",
-                  "row_name": "Shelf-2",
-                  "col_name": "",
-                  "row_idx": "0",
+                  "capacity": "10",
                   "col_idx": "1",
-                  "capacity": "10"
+                  "col_name": "",
+                  "name": "Shelf-2",
+                  "row_idx": "0",
+                  "row_name": "Shelf-2"
                 }
               }
             }
           }
         ]
       ],
-      "singleton": "0",
-      "cogs" : {
-        "state" : "inactive",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "manufacturer": "",
+        "model": "",
+        "name": "-20C Freezer",
+        "operataional_status": "",
+        "serial": ""
       },
+      "singleton": "0"
+    }
+  },
+  "freezer-m80c": {
+    "1.0": {
       "action_groups": {},
       "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
+        "add_container_to": "action/equipment/add-container-to/1.0",
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "download_inventory_tsv": "action/equipment/download-inventory-tsv/1.0",
+        "log_temperature": "action/equipment/log-temperature/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "remove_container_from": "action/equipment/remove-container-from/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
           }
-        },
-        "fridge": {
-          "group_order": "2",
-          "group_name": "Refrigerator Actions",
-          "actions": {
-            "action/equipment/*/1.0/": {}
+        ],
+        "state": "inactive"
+      },
+      "description": "-80C Freezer.",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [
+        [
+          {
+            "container/shelf/generic/1.0": {
+              "json_addl": {
+                "cont_address": {
+                  "capacity": "10",
+                  "col_idx": "0",
+                  "col_name": "",
+                  "name": "Shelf-1",
+                  "row_idx": "0",
+                  "row_name": "Shelf-1"
+                }
+              }
+            }
+          },
+          {
+            "container/shelf/generic/1.0": {
+              "json_addl": {
+                "cont_address": {
+                  "capacity": "10",
+                  "col_idx": "1",
+                  "col_name": "",
+                  "name": "Shelf-2",
+                  "row_idx": "0",
+                  "row_name": "Shelf-2"
+                }
+              }
+            }
+          },
+          {
+            "container/shelf/generic/1.0": {
+              "json_addl": {
+                "cont_address": {
+                  "capacity": "10",
+                  "col_idx": "2",
+                  "col_name": "",
+                  "name": "Shelf-3",
+                  "row_idx": "0",
+                  "row_name": "Shelf-3"
+                }
+              }
+            }
+          },
+          {
+            "container/shelf/generic/1.0": {
+              "json_addl": {
+                "cont_address": {
+                  "capacity": "10",
+                  "col_idx": "3",
+                  "col_name": "",
+                  "name": "Shelf-4",
+                  "row_idx": "0",
+                  "row_name": "Shelf-4"
+                }
+              }
+            }
           }
-        }
-      }
+        ]
+      ],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "manufacturer": "",
+        "model": "",
+        "name": "-80C Freezer",
+        "operataional_status": "",
+        "serial": ""
+      },
+      "singleton": "0"
     }
   }
 }

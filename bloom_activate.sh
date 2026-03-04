@@ -70,7 +70,9 @@ fi
 
 # TapDB/AWS runtime defaults for BLOOM
 export TAPDB_ENV="${TAPDB_ENV:-dev}"
+export TAPDB_CLIENT_ID="${TAPDB_CLIENT_ID:-bloom}"
 export TAPDB_DATABASE_NAME="${TAPDB_DATABASE_NAME:-bloom}"
+export TAPDB_STRICT_NAMESPACE="${TAPDB_STRICT_NAMESPACE:-1}"
 export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-5566}"
 export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
@@ -80,7 +82,9 @@ export AWS_REGION="${AWS_REGION:-us-west-2}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-$AWS_REGION}"
 
 echo -e "  ${_GREEN}✓${_NC} TAPDB_ENV=${TAPDB_ENV}"
+echo -e "  ${_GREEN}✓${_NC} TAPDB_CLIENT_ID=${TAPDB_CLIENT_ID}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DATABASE_NAME=${TAPDB_DATABASE_NAME}"
+echo -e "  ${_GREEN}✓${_NC} TAPDB_STRICT_NAMESPACE=${TAPDB_STRICT_NAMESPACE}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DEV_PORT=${TAPDB_DEV_PORT}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_TEST_PORT=${TAPDB_TEST_PORT}"
 echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
@@ -98,8 +102,8 @@ except Exception:
     print("  \033[1;33m⚠\033[0m daylily-tapdb not installed")
     raise SystemExit(0)
 
-if not (Version("0.1.21") <= v < Version("0.2.0")):
-    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.1.21, 0.2.0)")
+if not (Version("0.1.25") <= v < Version("0.2.0")):
+    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.1.25, 0.2.0)")
 else:
     print(f"  \033[0;32m✓\033[0m daylily-tapdb version {v}")
 PY
@@ -109,7 +113,9 @@ export BLOOM_ROOT
 deactivate_bloom() {
     unset BLOOM_ROOT
     unset TAPDB_ENV
+    unset TAPDB_CLIENT_ID
     unset TAPDB_DATABASE_NAME
+    unset TAPDB_STRICT_NAMESPACE
     unset BLOOM_TAPDB_LOCAL_PG_PORT
     unset TAPDB_DEV_PORT
     unset TAPDB_TEST_PORT

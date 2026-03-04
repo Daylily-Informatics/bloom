@@ -2,6 +2,17 @@
   "create_package_and_first_workflow_step": {
     "1.0": {
       "action_template": {
+        "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Register Package",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
+        "capture_data": "yes",
+        "captured_data": {
+          "Carrier Name": "",
+          "Tracking Number": ""
+        },
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/package-generated/1.0": {
             "json_addl": {
@@ -11,6 +22,11 @@
             }
           }
         },
+        "curr_user": "",
+        "deactivate_actions_when_executed": [],
+        "description": "Create Package and First Workflow Step",
+        "executed_datetime": [],
+        "max_executions": "1",
         "method_name": "do_action_create_package_and_first_workflow_step",
         "new_container_obj": {
           "container/package/generic/*/": {
@@ -20,27 +36,56 @@
               }
             }
           }
-        },
-        "description": "Create Package and First Workflow Step",
-        "action_name": "Register Package",
-        "action_executed": "0",
-        "max_executions": "1",
+        }
+      },
+      "properties": {
+        "comments": "",
+        "name": ""
+      }
+    }
+  },
+  "create_package_and_first_workflow_step__generic": {
+    "1.0": {
+      "action_template": {
         "action_enabled": "1",
+        "action_executed": "0",
+        "action_name": "Override Action Name",
+        "action_order": "0",
+        "action_simple_value": "",
+        "action_user": [],
         "capture_data": "yes",
         "captured_data": {
           "Carrier Name": "",
           "Tracking Number": ""
         },
+        "child_workflow_step_obj": {
+          "workflow_step/accessioning-steps/package-generated/1.0": {
+            "json_addl": {
+              "properties": {
+                "step_number": "1"
+              }
+            }
+          }
+        },
+        "curr_user": "",
         "deactivate_actions_when_executed": [],
+        "description": "Override Default Description",
         "executed_datetime": [],
-        "action_order": "0",
-        "action_simple_value": "",
-        "action_user": [],
-        "curr_user": ""
+        "max_executions": "1",
+        "method_name": "do_action_create_package_and_first_workflow_step",
+        "new_container_obj": {
+          "container/package/generic/*/": {
+            "json_addl": {
+              "properties": {
+                "comments": "x"
+              }
+            }
+          }
+        }
       },
       "properties": {
-        "name": "",
-        "comments": ""
+        "comments": "",
+        "name": ""
       }
     }
   }

@@ -1,32 +1,33 @@
 {
   "generic": {
     "1.0": {
-      "description": "Collection Kit",
-      "properties": {
-        "name": "Collection Kit",
-        "comments": "",
-        "lab_code":""
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "10.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "Collection Kit",
       "expected_inputs": [],
       "expected_outputs": [],
-      "action_groups": {},
-      "singleton": "0",
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
       "instantiation_layouts": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "10.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      }
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "name": "Collection Kit"
+      },
+      "singleton": "0"
     }
   }
 }

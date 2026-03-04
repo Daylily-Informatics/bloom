@@ -42,7 +42,7 @@ class ObjectBaseSchema(BloomBaseSchema):
     name: str = Field(..., min_length=1, max_length=500, description="Object name")
     type: str = Field(..., min_length=1, max_length=100, description="Object type (e.g., sample, plate)")
     subtype: Optional[str] = Field(None, max_length=100, description="Object subtype")
-    category: str = Field(default="instance", max_length=50, description="Category (formerly super_type)")
+    category: str = Field(default="instance", max_length=50, description="Object category")
     json_addl: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional JSON data")
 
     @field_validator("type", mode="before")
@@ -141,4 +141,3 @@ class ObjectQueryParams(BloomBaseSchema):
         if v:
             return str(v).strip().lower()
         return v
-

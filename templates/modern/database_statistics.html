@@ -123,11 +123,11 @@
         <tbody>
           {% set stats_7d_dict = dict(stats_7d) if stats_7d else {} %}
           {% set stats_30d_dict = dict(stats_30d) if stats_30d else {} %}
-          {% for sub_type, count_1d in stats_1d %}
-          {% set count_7d = stats_7d_dict.get(sub_type, 0) %}
-          {% set count_30d = stats_30d_dict.get(sub_type, 0) %}
+          {% for subtype, count_1d in stats_1d %}
+          {% set count_7d = stats_7d_dict.get(subtype, 0) %}
+          {% set count_30d = stats_30d_dict.get(subtype, 0) %}
           <tr>
-            <td><a href="/search?query={{ sub_type }}&type=subtype">{{ sub_type }}</a></td>
+            <td><a href="/search?query={{ subtype }}&type=subtype">{{ subtype }}</a></td>
             <td class="{{ 'stat-positive' if count_1d > 0 else 'stat-zero' }}">{{ count_1d }}</td>
             <td class="{{ 'stat-positive' if count_7d > 0 else 'stat-zero' }}">{{ count_7d }}</td>
             <td class="{{ 'stat-positive' if count_30d > 0 else 'stat-zero' }}">{{ count_30d }}</td>
@@ -152,4 +152,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-

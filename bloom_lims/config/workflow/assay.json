@@ -1,433 +1,413 @@
 {
-  "hla-typing": {
-    "1.2": {
-      "description": "HLA Typing v1.2",
-      "properties": {
-        "name": "HLA Typing v1.2",
-        "comments": "",
-        "lab_code":"",
-        "library_prep_queue_subtypes": [
-          "illumina-novaseq-libprep-eligible",
-          "ont-libprep-eligible"
-        ]
+  "accessioning-RnD": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_package_and_first_workflow_step_assay_root": "action/accessioning-ay/create_package_and_first_workflow_step_assay_root/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
-      "singleton": "1",
+      "assay_type": "accessioning",
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "Accessioning For R&D",
       "expected_inputs": [],
       "expected_outputs": [],
-      "assay_type": "assay",
-      "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
       "instantiation_layouts": [
         [
           {
-            "workflow_step/queue/extraction-batch-eligible/1.0/": {
-              "description" : "Extraction Batch Eligible",
+            "workflow_step/queue/all-purpose/1.0/": {
+              "action_imports": {
+                "add_relationships": "action/core/add-relationships/1.0",
+                "create_package_and_first_workflow_step": "action/assay-queue-accessioning/create_package_and_first_workflow_step/1.0",
+                "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+                "print_barcode_label": "action/core/print_barcode_label/1.0",
+                "set_object_status": "action/core/set_object_status/1.0"
+              },
+              "description": "In Progress RnD Accessioning WorkSets",
               "json_addl": {
-                "description": "Extraction Batch Eligible",
+                "description": "In Progress RnD Accessioning  WorkSets",
                 "properties": {
-                  "name": "Extraction Batch Eligible",
                   "comments": "",
-                  "step_number": "1",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "In Progress RnD Accessioning WorkSets",
+                  "step_number": "1"
                 }
               }
             }
           },
           {
-            "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/": {
-              "description" : "Blood To gDNA Extraction Eligible",
+            "workflow_step/queue/plasma-isolation-queue-removed/1.0/": {
+              "description": "Completed RnD Accessioning Worksets",
               "json_addl": {
-                "description": "Blood To gDNA Extraction Eligible",
+                "description": "Completed RnD Accessioning Worksets",
                 "properties": {
-                  "name":"Blood To gDNA Extraction Eligible",
                   "comments": "",
-                  "step_number": "2",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "Completed RnD Accessioning Worksets",
+                  "step_number": "2"
                 }
               }
             }
           },
           {
-            "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/": {
-              "description" : "Buccal To gDNA Extraction Eligible",
+            "workflow_step/queue/plasma-isolation-queue-exception/1.0/": {
+              "description": "Exception RnD Accessioning Queue",
               "json_addl": {
-                "description": "Buccal To gDNA Extraction Eligible",
+                "description": "Exception RnD Accessioning Queue",
                 "properties": {
-                  "name":"Buccal To gDNA Extraction Eligible",
                   "comments": "",
-                  "step_number": "3",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/input-gdna-normalization-eligible/1.0/": {
-              "description" : "Input gDNA Normalization Eligible",
-              "json_addl": {
-                "description": "Input gDNA Normalization Eligible",
-                "properties": {
-                 "name": "Input gDNA Normalization Eligible",
-                  "comments": "",
-                  "step_number": "4",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/": {
-              "description" : "Illumina Novaseq LibPrep Eligible",
-              "json_addl": {
-                "description": "Illumina Novaseq LibPrep Eligible",
-                "properties": {
-                  "name": "Illumina Novaseq LibPrep Eligible",
-                  "comments": "",
-                  "step_number": "5",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/ont-libprep-eligible/1.0/": {
-              "description" : "ONT LibPrep Eligible",
-              "json_addl": {
-                "description": "ONT LibPrep Eligible",
-                "properties": {
-                  "name": "ONT LibPrep Eligible",
-                  "comments": "",
-                  "step_number": "6",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "Exception RnD Accessioning Queue",
+                  "step_number": "3"
                 }
               }
             }
           }
         ]
-      ]
-    }
-  },
-  "carrier-screen": {
-    "3.9": {
-  
-      "description": "Carrier Screen 3.9",
+      ],
       "properties": {
-        "name": "Carrier Screen 3.9",
+        "ay_addl": "fedex",
         "comments": "",
-        "lab_code":"",
-        "library_prep_queue_subtypes": [
-          "illumina-novaseq-libprep-eligible",
-          "ont-libprep-eligible"
-        ]
+        "lab_code": "",
+        "name": "Accessioning For R&D"
       },
-      "singleton": "1",
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "assay_type": "assay",
-      "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
-      "instantiation_layouts": [
-        [
-          {
-            "workflow_step/queue/extraction-batch-eligible/1.0/": {
-              "description" : "Extraction Batch Eligible",
-              "json_addl": {
-                "description": "Extraction Batch Eligible",
-                "properties": {
-                  "name": "Extraction Batch Eligible",
-                  "comments": "",
-                  "step_number": "1",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/": {
-              "description" : "Blood To gDNA Extraction Eligible",
-              "json_addl": {
-                "description": "Blood To gDNA Extraction Eligible",
-                "properties": {
-                  "name":"Blood To gDNA Extraction Eligible",
-                  "comments": "",
-                  "step_number": "2",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/": {
-              "description" : "Buccal To gDNA Extraction Eligible",
-              "json_addl": {
-                "description": "Buccal To gDNA Extraction Eligible",
-                "properties": {
-                  "name":"Buccal To gDNA Extraction Eligible",
-                  "comments": "",
-                  "step_number": "3",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/input-gdna-normalization-eligible/1.0/": {
-              "description" : "Input gDNA Normalization Eligible",
-              "json_addl": {
-                "description": "Input gDNA Normalization Eligible",
-                "properties": {
-                 "name": "Input gDNA Normalization Eligible",
-                  "comments": "",
-                  "step_number": "4",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/": {
-              "description" : "Illumina Novaseq LibPrep Eligible",
-              "json_addl": {
-                "description": "Illumina Novaseq LibPrep Eligible",
-                "properties": {
-                  "name": "Illumina Novaseq LibPrep Eligible",
-                  "comments": "",
-                  "step_number": "5",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-          {
-            "workflow_step/queue/ont-libprep-eligible/1.0/": {
-              "description" : "ONT LibPrep Eligible",
-              "json_addl": {
-                "description": "ONT LibPrep Eligible",
-                "properties": {
-                 "name": "ONT LibPrep Eligible",
-                  "comments": "",
-                  "step_number": "6",
-                  "lab_code":""
-                }
-              }
-            }
-          }
-        ]
-      ]
+      "singleton": "1"
     }
   },
   "accessioning-clinical": {
     "1.0": {
-      "description": "Accessioning - Clinical",
-      "properties": {
-        "name": "Accessioning - Clinical",
-        "comments": "",
-        "lab_code":"",
-        "ay_addl":"fedex"
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_package_and_first_workflow_step_assay_root": "action/accessioning-ay/create_package_and_first_workflow_step_assay_root/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
-      "singleton": "1",
       "assay_type": "accessioning",
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "Accessioning - Clinical",
       "expected_inputs": [],
       "expected_outputs": [],
-      "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "accessioning": {
-          "group_order": "2",
-          "group_name": "Package Receipt",
-          "actions": {
-            "action/accessioning-ay/*/1.0/": {}
-          }
-        },"core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      },
       "instantiation_layouts": [
         [
-        
           {
             "workflow_step/queue/all-purpose/1.0/": {
-              "description" : "In Progress Prod Accessioning WorkSets",
+              "description": "In Progress Prod Accessioning WorkSets",
               "json_addl": {
                 "description": "In Progress Prod Accessioning  WorkSets",
                 "properties": {
-                  "name":"In Progress Prod Accessioning WorkSets",
                   "comments": "",
-                  "step_number": "1",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "In Progress Prod Accessioning WorkSets",
+                  "step_number": "1"
                 }
               }
             }
           },
-
           {
             "workflow_step/queue/plasma-isolation-queue-removed/1.0/": {
-              "description" : "Completed Prod Accessioning Worksets",
+              "description": "Completed Prod Accessioning Worksets",
               "json_addl": {
                 "description": "Completed Prod Accessioning Worksets",
                 "properties": {
-                  "name":"Completed Prod Accessioning Worksets",
                   "comments": "",
-                  "step_number": "2",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "Completed Prod Accessioning Worksets",
+                  "step_number": "2"
                 }
               }
             }
           },
           {
             "workflow_step/queue/plasma-isolation-queue-exception/1.0/": {
-              "description" : "Exception Prod Accessioning Queue",
+              "description": "Exception Prod Accessioning Queue",
               "json_addl": {
-                "description": "Exception Prod Accessioning Queue", 
+                "description": "Exception Prod Accessioning Queue",
                 "properties": {
-                 "name": "Exception Prod Accessioning Queue", 
                   "comments": "",
-                  "step_number": "3",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "Exception Prod Accessioning Queue",
+                  "step_number": "3"
                 }
               }
             }
           }
         ]
-      ]
+      ],
+      "properties": {
+        "ay_addl": "fedex",
+        "comments": "",
+        "lab_code": "",
+        "name": "Accessioning - Clinical"
+      },
+      "singleton": "1"
     }
   },
-  "accessioning-RnD": {
-    "1.0": {
-      "description": "Accessioning For R&D",
-      "properties": {
-        "name": "Accessioning For R&D",
-        "comments": "",
-        "lab_code":"",
-        "ay_addl":"fedex"
+  "carrier-screen": {
+    "3.9": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
       },
-      "assay_type": "accessioning",
-      "singleton": "1",
+      "assay_type": "assay",
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "Carrier Screen 3.9",
       "expected_inputs": [],
       "expected_outputs": [],
-      "action_groups": {},
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        },
-        "accessioning": {
-          "group_order": "2",
-          "group_name": "Package Receipt",
-          "actions": {
-            "action/accessioning-ay/*/1.0/": {}
-          }
-        }
-      },
       "instantiation_layouts": [
         [
-    
           {
-            "workflow_step/queue/all-purpose/1.0/": {
-              "description" : "In Progress RnD Accessioning WorkSets",
-              "action_imports": {
-                "corei": {
-                  "group_order": "1",
-                  "group_name": "Core ActionsIMP",
-                  "actions": {
-                    "action/core/*/1.0/": {}
-                  }
-                }},
-                "assay-queue-accessioning": {
-                  "group_order": "2",
-                  "group_name": "Assay Queue Actions",
-                  "actions": {
-                    "action/assay-queue-accessioning/*/1.0/": {}
-                  }
-                },
+            "workflow_step/queue/extraction-batch-eligible/1.0/": {
+              "description": "Extraction Batch Eligible",
               "json_addl": {
-                "description": "In Progress RnD Accessioning  WorkSets",
+                "description": "Extraction Batch Eligible",
                 "properties": {
-                  "name":"In Progress RnD Accessioning WorkSets",
                   "comments": "",
-                  "step_number": "1",
-                  "lab_code":""
-                }
-              }
-            }
-          },
-
-          {
-            "workflow_step/queue/plasma-isolation-queue-removed/1.0/": {
-              "description" : "Completed RnD Accessioning Worksets",
-              "json_addl": {
-                "description": "Completed RnD Accessioning Worksets",
-                "properties": {
-                  "name":"Completed RnD Accessioning Worksets",
-                  "comments": "",
-                  "step_number": "2",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "Extraction Batch Eligible",
+                  "step_number": "1"
                 }
               }
             }
           },
           {
-            "workflow_step/queue/plasma-isolation-queue-exception/1.0/": {
-              "description" : "Exception RnD Accessioning Queue",
+            "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/": {
+              "description": "Blood To gDNA Extraction Eligible",
               "json_addl": {
-                "description": "Exception RnD Accessioning Queue", 
+                "description": "Blood To gDNA Extraction Eligible",
                 "properties": {
-                 "name": "Exception RnD Accessioning Queue", 
                   "comments": "",
-                  "step_number": "3",
-                  "lab_code":""
+                  "lab_code": "",
+                  "name": "Blood To gDNA Extraction Eligible",
+                  "step_number": "2"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/": {
+              "description": "Buccal To gDNA Extraction Eligible",
+              "json_addl": {
+                "description": "Buccal To gDNA Extraction Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Buccal To gDNA Extraction Eligible",
+                  "step_number": "3"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/input-gdna-normalization-eligible/1.0/": {
+              "description": "Input gDNA Normalization Eligible",
+              "json_addl": {
+                "description": "Input gDNA Normalization Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Input gDNA Normalization Eligible",
+                  "step_number": "4"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/": {
+              "description": "Illumina Novaseq LibPrep Eligible",
+              "json_addl": {
+                "description": "Illumina Novaseq LibPrep Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Illumina Novaseq LibPrep Eligible",
+                  "step_number": "5"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/ont-libprep-eligible/1.0/": {
+              "description": "ONT LibPrep Eligible",
+              "json_addl": {
+                "description": "ONT LibPrep Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "ONT LibPrep Eligible",
+                  "step_number": "6"
                 }
               }
             }
           }
         ]
-      ]
+      ],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "library_prep_queue_subtypes": [
+          "illumina-novaseq-libprep-eligible",
+          "ont-libprep-eligible"
+        ],
+        "name": "Carrier Screen 3.9"
+      },
+      "singleton": "1"
+    }
+  },
+  "hla-typing": {
+    "1.2": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "assay_type": "assay",
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
+      "description": "HLA Typing v1.2",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [
+        [
+          {
+            "workflow_step/queue/extraction-batch-eligible/1.0/": {
+              "description": "Extraction Batch Eligible",
+              "json_addl": {
+                "description": "Extraction Batch Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Extraction Batch Eligible",
+                  "step_number": "1"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/": {
+              "description": "Blood To gDNA Extraction Eligible",
+              "json_addl": {
+                "description": "Blood To gDNA Extraction Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Blood To gDNA Extraction Eligible",
+                  "step_number": "2"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/": {
+              "description": "Buccal To gDNA Extraction Eligible",
+              "json_addl": {
+                "description": "Buccal To gDNA Extraction Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Buccal To gDNA Extraction Eligible",
+                  "step_number": "3"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/input-gdna-normalization-eligible/1.0/": {
+              "description": "Input gDNA Normalization Eligible",
+              "json_addl": {
+                "description": "Input gDNA Normalization Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Input gDNA Normalization Eligible",
+                  "step_number": "4"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/": {
+              "description": "Illumina Novaseq LibPrep Eligible",
+              "json_addl": {
+                "description": "Illumina Novaseq LibPrep Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "Illumina Novaseq LibPrep Eligible",
+                  "step_number": "5"
+                }
+              }
+            }
+          },
+          {
+            "workflow_step/queue/ont-libprep-eligible/1.0/": {
+              "description": "ONT LibPrep Eligible",
+              "json_addl": {
+                "description": "ONT LibPrep Eligible",
+                "properties": {
+                  "comments": "",
+                  "lab_code": "",
+                  "name": "ONT LibPrep Eligible",
+                  "step_number": "6"
+                }
+              }
+            }
+          }
+        ]
+      ],
+      "properties": {
+        "comments": "",
+        "lab_code": "",
+        "library_prep_queue_subtypes": [
+          "illumina-novaseq-libprep-eligible",
+          "ont-libprep-eligible"
+        ],
+        "name": "HLA Typing v1.2"
+      },
+      "singleton": "1"
     }
   }
 }

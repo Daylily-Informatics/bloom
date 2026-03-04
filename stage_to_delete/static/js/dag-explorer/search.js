@@ -2,7 +2,7 @@
  * DAG Explorer Search Module
  * 
  * Implements search functionality including fuzzy search across
- * node ID, name, and btype fields.
+ * node ID, name, type, and subtype fields.
  */
 
 const DAGSearch = (function() {
@@ -55,15 +55,15 @@ const DAGSearch = (function() {
         return cy.nodes().filter(function(node) {
             const id = (node.id() || '').toLowerCase();
             const name = (node.data('name') || '').toLowerCase();
-            const btype = (node.data('btype') || '').toLowerCase();
+            const type = (node.data('type') || '').toLowerCase();
             const euid = (node.data('euid') || '').toLowerCase();
-            const bSubType = (node.data('b_sub_type') || '').toLowerCase();
+            const subtype = (node.data('subtype') || '').toLowerCase();
             
             return id.includes(query) || 
                    name.includes(query) || 
-                   btype.includes(query) ||
+                   type.includes(query) ||
                    euid.includes(query) ||
-                   bSubType.includes(query);
+                   subtype.includes(query);
         });
     }
 
@@ -120,7 +120,7 @@ const DAGSearch = (function() {
                 id: node.id(),
                 euid: node.data('euid'),
                 name: node.data('name') || 'Unnamed',
-                btype: node.data('btype')
+                type: node.data('type')
             });
         });
 
@@ -169,4 +169,3 @@ const DAGSearch = (function() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DAGSearch;
 }
-

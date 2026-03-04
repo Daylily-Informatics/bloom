@@ -74,12 +74,11 @@ The sqlalchemy ORM allows for dynamic generation of classes as defined by the po
 
 #### Common Fields To All Three Tables
 
-> **Note:** Field naming was updated to align with TapDB conventions:
-> - `super_type` → `category`
-> - `btype` → `type`
-> - `b_sub_type` → `subtype`
->
-> Backward compatibility is maintained via SQLAlchemy hybrid_property synonyms in `tapdb_adapter.py`.
+> **Note:** BLOOM uses TapDB canonical field names:
+> - `category`
+> - `type`
+> - `subtype`
+> - `version`
 
 ```python
 
@@ -93,9 +92,9 @@ The sqlalchemy ORM allows for dynamic generation of classes as defined by the po
 
     polymorphic_discriminator = Column(Text, nullable=True)
 
-    category = Column(Text, nullable=True)       # formerly super_type
-    type = Column(Text, nullable=True)           # formerly btype
-    subtype = Column(Text, nullable=True)        # formerly b_sub_type
+    category = Column(Text, nullable=True)
+    type = Column(Text, nullable=True)
+    subtype = Column(Text, nullable=True)
     version = Column(Text, nullable=True)
 
     bstate = Column(Text, nullable=True)
@@ -114,9 +113,9 @@ The sqlalchemy ORM allows for dynamic generation of classes as defined by the po
 * modified_dt : when the object was last modified, w/TZ (for bookkeeping and to prevent dag UI generation when not necessary)
 * polymorphic_discriminator : sqlalchemy magic field to allow for polymorphic inheritance.  This is the field that allows the ORM to know which class to instantiate when querying the DB.  It is `{type}_[template|instance|instance_lineage]` and controls what class sqlalcehmy instantiates.
 
-* category : This names a top level class, which can have various child subtypes, etc.  This corresponds to the directories found in `bloom_lims/config/`. (Formerly `super_type`)
-* type : This is the name of the first removed child sub-class.  This corresponds to the json file name in the `bloom_lims/config/{category}/` dir. (Formerly `btype`)
-* subtype : This is the name of the second removed child sub-class.  This corresponds to the *KEYS* in the json files in the `bloom_lims/config/{category}/{type}.json` dir. (Formerly `b_sub_type`)
+* category : This names a top level class, which can have various child subtypes, etc.  This corresponds to the directories found in `bloom_lims/config/`.
+* type : This is the name of the first removed child sub-class.  This corresponds to the json file name in the `bloom_lims/config/{category}/` dir.
+* subtype : This is the name of the second removed child sub-class.  This corresponds to the *KEYS* in the json files in the `bloom_lims/config/{category}/{type}.json` dir.
 * version : This is the version of the subtype instance. Meant to capture finer differences in the same subtype. VERSION are all keys below the 'subtype' json file top level keys.  This is not really in use.  I had tinkered with allowing specifying a `*` for all versions, and largely just assume this means 1.0. TLDR: this is not well considered yet.
 
 * bstate : Not really in use. Intended to capture the instance state && I wanted to distinguish between state and status. 
@@ -196,7 +195,7 @@ In addition to the shared fields, also include:
 ### Sub-ORM Instance Classes
 This really only applies to intances.
 
-Definitions for templates are in the json files as described above and located in `bloom_lims/config/{super_type}/{btype}.json`.
+Definitions for templates are in the json files as described above and located in `bloom_lims/config/{category}/{type}.json`.
 
 #### Top level types
 ```bash

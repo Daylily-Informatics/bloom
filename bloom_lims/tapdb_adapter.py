@@ -1,8 +1,8 @@
 """
 BLOOM ↔ TapDB Adapter Module.
 
-This adapter preserves BLOOM's legacy API surface while delegating connection
-resolution and runtime behavior to daylily-tapdb.
+This adapter delegates connection resolution and runtime behavior to
+daylily-tapdb while exposing BLOOM-compatible ORM class wiring.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from typing import Optional
 
 from sqlalchemy import text
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Session
 
 from daylily_tapdb import TAPDBConnection
@@ -67,66 +66,13 @@ from daylily_tapdb.models.template import (
 from bloom_lims.config import get_tapdb_db_config
 
 
-def _add_bloom_field_aliases(cls):
-    """Add BLOOM field aliases (super_type/btype/b_sub_type)."""
-
-    @hybrid_property
-    def super_type(self):
-        return self.category
-
-    @super_type.setter
-    def super_type(self, value):
-        self.category = value
-
-    @super_type.expression
-    def super_type(cls):
-        return cls.category
-
-    @hybrid_property
-    def btype(self):
-        return self.type
-
-    @btype.setter
-    def btype(self, value):
-        self.type = value
-
-    @btype.expression
-    def btype(cls):
-        return cls.type
-
-    @hybrid_property
-    def b_sub_type(self):
-        return self.subtype
-
-    @b_sub_type.setter
-    def b_sub_type(self, value):
-        self.subtype = value
-
-    @b_sub_type.expression
-    def b_sub_type(cls):
-        return cls.subtype
-
-    cls.super_type = super_type
-    cls.btype = btype
-    cls.b_sub_type = b_sub_type
-    return cls
-
-
-_add_bloom_field_aliases(tapdb_core)
-
-
 def _translate_bloom_kwargs(kwargs: dict) -> dict:
-    """Translate BLOOM constructor field names to TapDB names."""
-    translations = {
-        "super_type": "category",
-        "btype": "type",
-        "b_sub_type": "subtype",
-    }
-    return {translations.get(key, key): value for key, value in kwargs.items()}
+    """Preserve kwargs as-is using canonical TapDB field names."""
+    return dict(kwargs)
 
 
 def _patch_init_for_bloom_compat(cls) -> None:
-    """Patch a class __init__ once so BLOOM field names remain accepted."""
+    """Patch class __init__ once to preserve constructor passthrough."""
     if getattr(cls, "__bloom_init_patched__", False):
         return
 

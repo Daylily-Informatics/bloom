@@ -18,7 +18,7 @@ gunicorn
 # =============================================================================
 SQLAlchemy>=2.0.19
 psycopg2-binary
-daylily-tapdb==0.1.21
+daylily-tapdb==0.1.25
 # Local editable override for development:
 # -e ../../daylily/daylily-tapdb
 

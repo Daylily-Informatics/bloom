@@ -1407,6 +1407,8 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "cognito_info": cognito_info,
         "db_info": db_info,
         "saved": request.query_params.get("saved") == "1",
+        "zebra_started": request.query_params.get("zebra_started") == "1",
+        "zebra_error": request.query_params.get("zebra_error", ""),
     }
     return HTMLResponse(content=template.render(context))
 
@@ -1435,6 +1437,59 @@ async def admin_update_preferences(request: Request, _auth=Depends(require_auth)
         return {"status": "success", "updated_keys": updated_keys}
 
     return RedirectResponse(url="/admin?saved=1", status_code=303)
+
+
+@app.post("/admin/zebra/start")
+async def admin_start_zebra_service(request: Request, _auth=Depends(require_auth)):
+    """Launch zebra_day service using zday_start."""
+    accepts = request.headers.get("accept", "").lower()
+
+    if shutil.which("zday_start") is None:
+        if "application/json" in accepts:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "detail": "zday_start command not found"},
+            )
+        return RedirectResponse(url="/admin?zebra_error=command_not_found", status_code=303)
+
+    try:
+        result = subprocess.run(
+            ["zday_start"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except Exception as exc:
+        logging.error("Failed to launch zday_start: %s", exc)
+        if "application/json" in accepts:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "detail": f"Failed to launch zday_start: {exc}",
+                },
+            )
+        return RedirectResponse(url="/admin?zebra_error=launch_failed", status_code=303)
+
+    if result.returncode != 0:
+        stderr_trimmed = (result.stderr or "").strip()
+        logging.error("zday_start returned non-zero (%s): %s", result.returncode, stderr_trimmed)
+        if "application/json" in accepts:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "detail": "zday_start returned non-zero exit code",
+                    "stderr": stderr_trimmed,
+                },
+            )
+        return RedirectResponse(url="/admin?zebra_error=start_failed", status_code=303)
+
+    if "application/json" in accepts:
+        return {"status": "success", "message": "zday_start executed successfully"}
+
+    return RedirectResponse(url="/admin?zebra_started=1", status_code=303)
 
 
 @app.post("/update_preference")
@@ -1811,8 +1866,10 @@ async def plate_carosel(
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
 
     # Fetch the main plate and its wells
-    main_plate = bobdb.get_by_euid(plate_euid)
-    oplt = bobdb.get_by_euid("CX42")
+    try:
+        main_plate = bobdb.get_by_euid(plate_euid)
+    except Exception:
+        main_plate = None
     if not main_plate:
         return "Main plate not found."
 
@@ -2306,6 +2363,80 @@ async def workflow_details(
     workflow = bwfdb.get_sorted_euid(workflow_euid)
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
+    max_recursive_depth = 12
+
+    def _iter_active_children(parent_obj):
+        for lineage in getattr(parent_obj, "parent_of_lineages", []) or []:
+            if getattr(lineage, "is_deleted", False):
+                continue
+            child = getattr(lineage, "child_instance", None)
+            if child is None or getattr(child, "is_deleted", False):
+                continue
+            yield child
+
+    def _collect_workflow_steps(root_workflow):
+        workflow_steps = {}
+        stack = list(getattr(root_workflow, "workflow_steps_sorted", []) or [])
+        while stack:
+            step_obj = stack.pop()
+            step_euid = getattr(step_obj, "euid", None)
+            if not step_euid or step_euid in workflow_steps:
+                continue
+
+            workflow_steps[step_euid] = step_obj
+            for child in _iter_active_children(step_obj):
+                if getattr(child, "category", None) == "workflow_step":
+                    stack.append(child)
+
+        return workflow_steps
+
+    def _descendant_summary(root_obj, depth_limit):
+        counts_by_category = {}
+        counts_by_type = {}
+        visited = set()
+        stack = [(root_obj, 0)]
+
+        while stack:
+            current, depth = stack.pop()
+            if depth >= depth_limit:
+                continue
+
+            for child in _iter_active_children(current):
+                child_key = (
+                    getattr(child, "euid", None)
+                    or getattr(child, "uuid", None)
+                    or id(child)
+                )
+                if child_key in visited:
+                    continue
+
+                visited.add(child_key)
+                child_category = (
+                    getattr(child, "category", None)
+                    or "other"
+                )
+                child_type = (
+                    getattr(child, "type", None)
+                    or child_category
+                    or "other"
+                )
+                counts_by_category[child_category] = (
+                    counts_by_category.get(child_category, 0) + 1
+                )
+                counts_by_type[child_type] = counts_by_type.get(child_type, 0) + 1
+                stack.append((child, depth + 1))
+
+        return {
+            "total_descendants": sum(counts_by_category.values()),
+            "counts_by_category": counts_by_category,
+            "counts_by_type": counts_by_type,
+        }
+
+    step_descendant_summaries = {}
+    for step_euid, step_obj in _collect_workflow_steps(workflow).items():
+        step_descendant_summaries[step_euid] = _descendant_summary(
+            step_obj, max_recursive_depth
+        )
 
     # Use modern template
     template = templates.get_template("modern/workflow_details.html")
@@ -2313,6 +2444,7 @@ async def workflow_details(
         "request": request,
         "workflow": workflow,
         "accordion_states": accordion_states,
+        "step_descendant_summaries": step_descendant_summaries,
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(**context))
@@ -2339,7 +2471,9 @@ async def workflow_step_action(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomWorkflow(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     bo = bobdb.get_by_euid(euid)
 
-    ds["curr_user"] = request.session.get("user_data", "bloomui-user")
+    user_data = request.session.get("user_data", {})
+    ds["curr_user"] = user_data.get("email", "bloomui-user")
+    ds["curr_user_id"] = user_data.get("cognito_sub") or user_data.get("sub")
     udat = request.session.get("user_data", {})
     ds["lab"] = udat.get("print_lab", "BLOOM")
     ds["printer_name"] = udat.get("printer_name", "")
@@ -2356,12 +2490,20 @@ async def workflow_step_action(request: Request, _auth=Depends(require_auth)):
         bwfdb = BloomWorkflow(
             BLOOMdb3(app_username=request.session["user_data"]["email"])
         )
+        bwfdb.set_actor_context(
+            user_id=user_data.get("cognito_sub") or user_data.get("sub"),
+            email=user_data.get("email"),
+        )
         act = bwfdb.do_action(
             euid, action_ds=ds, action=action, action_group=action_group
         )
     else:
         bwfsdb = BloomWorkflowStep(
             BLOOMdb3(app_username=request.session["user_data"]["email"])
+        )
+        bwfsdb.set_actor_context(
+            user_id=user_data.get("cognito_sub") or user_data.get("sub"),
+            email=user_data.get("email"),
         )
         act = bwfsdb.do_action(
             euid, action_ds=ds, action=action, action_group=action_group
@@ -2524,10 +2666,8 @@ def _build_graph_elements_for_start(bobj: BloomObj, start_euid: str, depth: int)
                     "name": node["name"] or str(node["euid"]),
                     "type": node["type"],
                     "obj_type": node["type"],
-                    "btype": node["type"],  # Legacy compatibility
                     "category": node["category"],
                     "subtype": node["subtype"],
-                    "b_sub_type": node["subtype"],  # Legacy compatibility
                     "version": node["version"],
                     "color": color,
                 }
@@ -2655,10 +2795,8 @@ async def api_graph_object_detail(
         "name": obj.name,
         "type": object_kind,
         "obj_type": getattr(obj, "type", ""),
-        "btype": getattr(obj, "type", ""),
         "category": getattr(obj, "category", ""),
         "subtype": getattr(obj, "subtype", ""),
-        "b_sub_type": getattr(obj, "subtype", ""),
         "version": getattr(obj, "version", ""),
         "bstatus": getattr(obj, "bstatus", ""),
         "json_addl": getattr(obj, "json_addl", {}) or {},

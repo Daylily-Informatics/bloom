@@ -1,62 +1,66 @@
 {
   "blood-whole-to-gdna": {
     "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
       "description": "DNA extraction from blood-whole in tube-strek-10ml tubes to a fixed-plate-96 with gdna in each well.",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [
         []
       ],
       "properties": {
-        "comments": "","lab_code":""
+        "comments": "",
+        "lab_code": ""
       },
-      "expected_inputs": [],
-      "expected_outputs": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "action_groups": {},
-      "singleton": "0",
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      }
+      "singleton": "0"
     }
   },
   "blood-whole-to-plasma-to-cfdna": {
     "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "cogs": {
+        "allocation_type": "",
+        "cost": "0.00",
+        "cost_split_by_children": [
+          {
+            "*/*/*/*": {}
+          }
+        ],
+        "state": "active"
+      },
       "description": "DNA extraction from blood-whole in tube-strek-10ml tubes to a fixed-plate-96 with gdna in each well.",
+      "expected_inputs": [],
+      "expected_outputs": [],
       "instantiation_layouts": [
         []
       ],
       "properties": {
-        "comments": "","lab_code":""
+        "comments": "",
+        "lab_code": ""
       },
-      "expected_inputs": [],
-      "cogs" : {
-        "state" : "active",
-        "cost" : "0.00",
-        "cost_split_by_children" : [{"*/*/*/*":{}}],
-        "allocation_type" : ""
-      },
-      "singleton": "0",
-      "expected_outputs": [],
-      "action_groups": {},
-      "action_imports": {
-        "core": {
-          "group_order": "1",
-          "group_name": "Core Actions",
-          "actions": {
-            "action/core/*/1.0/": {}
-          }
-        }
-      }
+      "singleton": "0"
     }
   }
 }
