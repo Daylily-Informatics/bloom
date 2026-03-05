@@ -180,6 +180,25 @@ def test_containers_content_link_layout_and_delete(client: TestClient, bdb) -> N
     assert del_resp.status_code == 200, del_resp.text
 
 
+def test_external_container_bulk_status_route(client: TestClient) -> None:
+    created = _create_instance_via_object_creation(
+        client,
+        category="container",
+        type_name="tube",
+        subtype="tube-generic-10ml",
+        version="1.0",
+        name="coverage-external-bulk-status",
+    )
+    resp = client.post(
+        "/api/v1/external/containers/status/bulk",
+        json={"container_euids": [created["euid"], "CNT-MISSING-FOR-COVERAGE"]},
+    )
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["statuses"][created["euid"]]
+    assert payload["statuses"]["CNT-MISSING-FOR-COVERAGE"] == "unknown"
+
+
 def test_content_create_update_and_delete_endpoints(client: TestClient, bdb) -> None:
     sample_template = _get_template_euid(bdb, category="content", type_name="sample", subtype="gdna", version="1.0")
     specimen_template = _get_template_euid(bdb, category="content", type_name="specimen", subtype="blood-whole", version="1.0")

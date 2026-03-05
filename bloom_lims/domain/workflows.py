@@ -81,8 +81,6 @@ class BloomWorkflow(BloomObj):
         now_dt = get_datetime_string()
         if action_method == "do_action_create_and_link_child":
             self.do_action_create_and_link_child(wf_euid, action_ds, None)
-        elif action_method == "do_action_create_package_and_first_workflow_step":
-            self.do_action_create_package_and_first_workflow_step(wf_euid, action_ds)
         elif action_method == "do_action_destroy_specimen_containers":
             self.do_action_destroy_specimen_containers(wf_euid, action_ds)
         else:
@@ -126,12 +124,6 @@ class BloomWorkflow(BloomObj):
                 self.logger.exception(f"ERROR: {e}")
                 # self.session.rollback()
 
-    def do_action_create_package_and_first_workflow_step(self, wf_euid, action_ds={}):
-        raise Exception("This is GARBAGE?")
-        # DELETED A BUNCH OF STUFF... if needed, revert to previous commit
-
-
-
 class BloomWorkflowStep(BloomObj):
     def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
         super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
@@ -150,27 +142,6 @@ class BloomWorkflowStep(BloomObj):
             self.do_action_create_and_link_child(wfs_euid, action_ds)
         elif action_method == "do_action_create_input":
             self.do_action_create_input(wfs_euid, action_ds)
-        elif (
-            action_method
-            == "do_action_create_child_container_and_link_child_workflow_step"
-        ):
-            self.do_action_create_child_container_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_create_test_req_and_link_child_workflow_step":
-            self.do_action_create_test_req_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_xcreate_test_req_and_link_child_workflow_step":
-            self.do_action_xcreate_test_req_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_ycreate_test_req_and_link_child_workflow_step":
-            self.do_action_ycreate_test_req_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_add_container_to_assay_q":
-            self.do_action_add_container_to_assay_q(wfs_euid, action_ds)
         elif action_method == "do_action_move_instances_to_queue":
             self.do_action_move_instances_to_queue(wfs_euid, action_ds)
         elif action_method == "do_action_plate_create_fill_auto":
@@ -619,31 +590,6 @@ class BloomWorkflowStep(BloomObj):
             self.create_generic_instance_lineage_by_euids(wfs_euid, child_data.euid)
             self.session.commit()
 
-    def do_action_ycreate_test_req_and_link_child_workflow_step(
-        self, wfs_euid, action_ds
-    ):
-        tri_euid = action_ds["captured_data"]["Test Requisition EUID"]
-        container_euid = action_ds["captured_data"]["Tube EUID"]
-
-        # In this case, deactivate any active actions to create or link this container available in other workflow steps
-        deactivate_arr = [
-            "create_test_req_and_link_child_workflow_step",
-            "ycreate_test_req_and_link_child_workflow_step",
-        ]
-        ciobj = self.get_by_euid(container_euid)
-
-        for i in ciobj.child_of_lineages:
-            if i.polymorphic_discriminator == "generic_instance_lineage":
-                for da in deactivate_arr:
-                    if da in i.parent_instance.json_addl["actions"]:
-                        i.parent_instance.json_addl["actions"][da][
-                            "action_enabled"
-                        ] = "0"
-        flag_modified(i.parent_instance, "json_addl")
-        ##self.session.flush()
-        self.create_generic_instance_lineage_by_euids(tri_euid, container_euid)
-        self.session.commit()
-
     def do_action_stamp_copy_plate(self, wfs_euid, action_ds):
 
         wfs = self.get_by_euid(wfs_euid)
@@ -1071,235 +1017,6 @@ class BloomWorkflowStep(BloomObj):
         )
         self.session.commit()
         return list(updated_wells.values())
-
-    def do_action_add_container_to_assay_q(self, obj_euid, action_ds):
-        # This action should be coming to us from a TRI ... kind of breaking my model... how to deal with this?
-        assay_selection = str(
-            action_ds.get("captured_data", {}).get("assay_selection", "")
-        ).strip()
-        if not assay_selection:
-            raise Exception("Missing assay selection")
-
-        cont_euid = action_ds["captured_data"]["Container EUID"]
-
-        try:
-            cx = self.get_by_euid(cont_euid)
-            if not self.check_lineages_for_type(
-                cx.child_of_lineages, "clinical", parent_or_child="parent"
-            ):
-                raise Exception(
-                    f"Container {cont_euid} does not have a test request as a parent"
-                )
-
-        except Exception as e:
-            self.logger.exception(f"ERROR: {e}")
-            self.session.rollback()
-            raise e
-
-        wf = None
-        selection_parts = assay_selection.lstrip("/").rstrip("/").split("/")
-        # Backward-compatible support for legacy layout-coded selection values.
-        if len(selection_parts) == 4 and selection_parts[0] == "workflow":
-            category, type_name, subtype, version = selection_parts
-            results = self.query_instance_by_component_v2(
-                category, type_name, subtype, version
-            )
-            if len(results) == 0:
-                raise Exception(
-                    f"Could not find assay instance for {category}/{type_name}/{subtype}/{version}"
-                )
-            if len(results) > 1:
-                # Prefer active instance if multiple are present.
-                active_results = [res for res in results if str(res.bstatus) == "active"]
-                wf = active_results[0] if active_results else results[0]
-                self.logger.warning(
-                    "Multiple assay instances for %s/%s/%s/%s; using %s",
-                    category,
-                    type_name,
-                    subtype,
-                    version,
-                    wf.euid,
-                )
-            else:
-                wf = results[0]
-        else:
-            # New preferred behavior: assay_selection is selected workflow EUID.
-            wf = self.get_by_euid(assay_selection)
-            if (
-                wf is None
-                or wf.category != "workflow"
-                or wf.type != "assay"
-                or wf.is_deleted
-            ):
-                raise Exception(
-                    f"Selected assay '{assay_selection}' is not a valid active workflow/assay instance"
-                )
-
-        wfs = ""
-
-        try:
-            extraction_batch_steps = self._get_workflow_steps(
-                wf, subtype="extraction-batch-eligible"
-            )
-            if extraction_batch_steps:
-                wfs = extraction_batch_steps[0]
-            else:
-                # Create the expected ingress queue topology on demand when missing.
-                try:
-                    wfs = self._get_or_create_queue_step(wf, "extraction-batch-eligible")
-                    self.logger.info(
-                        "Created extraction ingress queue step %s for assay workflow %s",
-                        wfs.euid,
-                        wf.euid,
-                    )
-                except Exception:
-                    candidate_steps = self._get_workflow_steps(wf)
-                    if candidate_steps:
-                        wfs = candidate_steps[0]
-                        self.logger.warning(
-                            "Fell back to first available queue %s for assay workflow %s",
-                            wfs.euid,
-                            wf.euid,
-                        )
-                    else:
-                        wfs = self._get_or_create_queue_step(wf, "all-purpose")
-                        self.logger.info(
-                            "Created fallback queue step %s for assay workflow %s",
-                            wfs.euid,
-                            wf.euid,
-                        )
-        except Exception as e:
-            self.logger.exception(f"ERROR: {e}")
-            self.session.rollback()
-            raise e
-
-        # Prevent adding duplicate to queue
-        for cur_ci in wfs.parent_of_lineages:
-            if cur_ci.is_deleted or getattr(cur_ci.child_instance, "is_deleted", False):
-                continue
-            if cont_euid == cur_ci.child_instance.euid:
-                self.logger.exception(
-                    f"Container {cont_euid} already in assay queue {wf.euid}"
-                )
-                raise Exception(
-                    f"Container {cont_euid} already in assay queue {wf.euid}"
-                )
-
-        # if here, add to the queue!
-        self.create_generic_instance_lineage_by_euids(wfs.euid, cont_euid)
-        self.session.commit()
-        return wfs
-
-    def do_action_create_child_container_and_link_child_workflow_step(
-        self, wfs_euid, action_ds={}
-    ):
-        wfs = self.get_by_euid(wfs_euid)
-        ## TODO: pull out common lineage and child creation more cleanly
-
-        child_wfs = ""
-        for layout_str in action_ds["child_workflow_step_obj"]:
-            child_wfs = self.create_instance_by_code(
-                layout_str, action_ds["child_workflow_step_obj"][layout_str]
-            )
-            self.session.commit()
-
-        # AND THIS LOGIC NEEDS TIGHTENING UP too
-        parent_cont = ""
-        parent_conts_n = 0
-        for i in wfs.parent_of_lineages:
-            if i.child_instance.category == "container":
-                parent_cont = i.child_instance
-                parent_conts_n += 1
-        if parent_conts_n != 1:
-            self.logger.exception(
-                f"Parent container count is {parent_conts_n} for {wfs.euid}, and should be ==1... this logic needs tightening up"
-            )
-            raise Exception(
-                f"Parent container count is {parent_conts_n} for {wfs.euid}, and should be ==1... this logic needs tightening up"
-            )
-
-        child_cont = ""
-        for layout_str in action_ds["child_container_obj"]:
-            child_cont = self.create_instance_by_code(
-                layout_str, action_ds["child_container_obj"][layout_str]
-            )
-            self.session.commit()
-
-            for content_layouts in (
-                []
-                if "instantiation_layouts"
-                not in action_ds["child_container_obj"][layout_str]
-                else action_ds["child_container_obj"][layout_str][
-                    "instantiation_layouts"
-                ]
-            ):
-                for cli in content_layouts:
-                    new_ctnt = ""
-                    for cli_k in cli:
-                        new_ctnt = self.create_instance_by_code(cli_k, cli[cli_k])
-                        ##self.session.flush()
-                        self.session.commit()
-                        self.create_generic_instance_lineage_by_euids(
-                            child_cont.euid, new_ctnt.euid
-                        )
-
-        try:
-            self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
-            self.create_generic_instance_lineage_by_euids(
-                parent_cont.euid, child_cont.euid
-            )
-
-        except Exception as e:
-            self.logger.exception(f"ERROR: {e}")
-            self.session.rollback()
-            raise e
-
-        self.create_generic_instance_lineage_by_euids(child_wfs.euid, child_cont.euid)
-        self.session.commit()
-        return child_wfs
-
-    def do_action_create_test_req_and_link_child_workflow_step(
-        self, wfs_euid, action_ds
-    ):
-        wfs = self.get_by_euid(wfs_euid)
-        child_wfs = ""
-
-        for layout_str in action_ds["child_workflow_step_obj"]:
-            child_wfs = self.create_instance_by_code(
-                layout_str, action_ds["child_workflow_step_obj"][layout_str]
-            )
-            self.session.commit()
-
-        self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
-
-        new_test_req = ""
-        for layout_str in action_ds["test_requisition_obj"]:
-            new_test_req = self.create_instance_by_code(
-                layout_str, action_ds["test_requisition_obj"][layout_str]
-            )
-            self.session.commit()
-
-        prior_cont_euid = ""
-        prior_cont_euid_n = 0
-        for i in wfs.parent_of_lineages:
-            if i.child_instance.type == "tube":
-                prior_cont_euid = i.child_instance.euid
-                prior_cont_euid_n += 1
-        if prior_cont_euid_n != 1:
-            self.logger.exception(
-                f"Prior container count is {prior_cont_euid_n} for {wfs.euid}, and should be ==1... this logic needs tightening up w/r/t finding the desired plate"
-            )
-            raise Exception(
-                f"Prior container count is {prior_cont_euid_n} for {wfs.euid}, and should be ==1... this logic needs tightening up"
-            )
-
-        self.create_generic_instance_lineage_by_euids(
-            new_test_req.euid, prior_cont_euid
-        )
-        self.create_generic_instance_lineage_by_euids(child_wfs.euid, new_test_req.euid)
-        self.session.commit()
-        return (child_wfs, new_test_req, prior_cont_euid)
-
 
 
 

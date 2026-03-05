@@ -1373,10 +1373,6 @@ class BloomObj:
 
         elif action_method == "do_action_destroy_specimen_containers":
             r = self.do_action_destroy_specimen_containers(euid, action_ds)
-        elif action_method == "do_action_create_package_and_first_workflow_step_assay":
-            r = self.do_action_create_package_and_first_workflow_step_assay(
-                euid, action_ds
-            )
         elif action_method == "do_action_move_workset_to_another_queue":
             r = self.do_action_move_workset_to_another_queue(euid, action_ds)
         elif action_method == "do_stamp_plates_into_plate":
@@ -1630,114 +1626,6 @@ class BloomObj:
         self.delete_obj(lineage_link)
         ##self.session.flush()
         self.session.commit()
-
-    # Doing this globally for now
-    def do_action_create_package_and_first_workflow_step_assay(
-        self, euid, action_ds={}
-    ):
-        wf = self.get_by_euid(euid)
-
-        #'workflow_step_to_attach_as_child': {'workflow_step/queue/all-purpose/1.0/': {'json_addl': {'properties': {'name': 'hey user, SET THIS NAME ',
-
-        queue_definitions = action_ds.get("workflow_step_to_attach_as_child", {})
-        if not queue_definitions:
-            raise Exception(
-                "Missing workflow_step_to_attach_as_child definition for package registration action"
-            )
-
-        queue_layout = list(queue_definitions.keys())[0]
-        (category, type_name, subtype, version) = (
-            queue_layout.lstrip("/").rstrip("/").split("/")
-        )
-
-        active_workset_q_wfs = ""
-        for pwf_child_lin in wf.parent_of_lineages:
-            if pwf_child_lin.is_deleted:
-                continue
-            if (
-                pwf_child_lin.child_instance.type == type_name
-                and pwf_child_lin.child_instance.subtype == subtype
-            ):
-                active_workset_q_wfs = pwf_child_lin.child_instance
-                break
-
-        # TapDB-seeded workflows may not materialize queue children at creation time.
-        # Create and attach the queue step on-demand so Register Package still works.
-        if active_workset_q_wfs == "":
-            queue_defaults = queue_definitions.get(queue_layout, {})
-            active_workset_q_wfs = self.create_instance_by_code(
-                queue_layout, queue_defaults
-            )
-            self.create_generic_instance_lineage_by_euids(
-                wf.euid, active_workset_q_wfs.euid
-            )
-            self.session.commit()
-
-        # 1001897582860000245100773464327825
-        fx_opsmd = {}
-
-        if self.track_fedex:
-            try:
-                fx_opsmd = self._fetch_fedex_tracking_ops_meta(
-                    action_ds["captured_data"]["Tracking Number"]
-                )
-                # Check the transit time is calculated
-                tt = fx_opsmd[0]["Transit_Time_sec"]
-            except Exception as e:
-                self.logger.warning(
-                    "Failed to fetch FedEx tracking data for %s: %s",
-                    action_ds["captured_data"].get("Tracking Number", ""),
-                    e,
-                )
-
-        action_ds["captured_data"]["Fedex Tracking Data"] = fx_opsmd
-
-        wfs = ""
-        for layout_str in action_ds["child_workflow_step_obj"]:
-            wfs = self.create_instance_by_code(
-                layout_str, action_ds["child_workflow_step_obj"][layout_str]
-            )
-            self.create_generic_instance_lineage_by_euids(
-                active_workset_q_wfs.euid, wfs.euid
-            )
-            ##self.session.flush()
-            self.session.commit()
-
-        package = ""
-        for layout_str in action_ds["new_container_obj"]:
-            for cv_k in action_ds["captured_data"]:
-                action_ds["new_container_obj"][layout_str]["json_addl"]["properties"][
-                    "fedex_tracking_data"
-                ] = fx_opsmd
-                action_ds["new_container_obj"][layout_str]["json_addl"]["properties"][
-                    cv_k
-                ] = action_ds["captured_data"][cv_k]
-
-            package = self.create_instance_by_code(
-                layout_str, action_ds["new_container_obj"][layout_str]
-            )
-            ##elf.session.flush()
-            self.session.commit()
-
-        ##self.session.flush()
-        self.session.commit()
-
-        self.create_generic_instance_lineage_by_euids(wfs.euid, package.euid)
-        self.session.commit()
-        return wfs
-
-        # There are A LOT of common patterns with these actions, and only a small number of them too. ABSCRACT MOAR
-
-        # Get the euid obj, which is the AY
-
-        # Get the AY child workflow queue object defined by the action
-
-        # Create the new workset object
-
-        # Create the new package object, wiuth the captured data from the action
-
-        # link package to workset
-        # link workset to workflow queue object
 
     def do_action_print_barcode_label(self, euid, action_ds={}):
         """_summary_

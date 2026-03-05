@@ -10,3 +10,4 @@ Bloom only manages physical materials and state.
 
 Execution orchestration is performed through
 protocol eligibility and queue consumption.
+

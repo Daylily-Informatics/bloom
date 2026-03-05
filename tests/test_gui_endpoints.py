@@ -142,9 +142,9 @@ class TestAssaysEndpoint:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_assays_show_type_accessioning(self, client):
-        """Test assays with show_type=accessioning (was failing before TapDB fix)."""
-        response = client.get("/assays?show_type=accessioning")
+    def test_assays_show_type_unknown(self, client):
+        """Test assays with unknown show_type falls back to generic rendering."""
+        response = client.get("/assays?show_type=unknown")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
