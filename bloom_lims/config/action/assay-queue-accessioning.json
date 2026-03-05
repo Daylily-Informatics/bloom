@@ -27,16 +27,17 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "Carrier Name": "",
-          "Tracking Number": ""
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Register Packagexx",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",

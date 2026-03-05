@@ -9,9 +9,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "child_container_obj": {
           "container/tube/tube-eppi-1.5ml/1.0/": {
             "json_addl": {
@@ -48,7 +46,11 @@
         "verify": {
           "instance_type": "container/*/*/*"
         },
-        "verify_data": "yes"
+        "verify_data": "yes",
+        "ui_schema": {
+          "title": "Create A Pool",
+          "fields": []
+        }
       }
     }
   },
@@ -62,9 +64,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "child_container_obj": {
           "container/tube/tube-eppi-1.5ml/1.0/": {
             "json_addl": {
@@ -101,7 +101,11 @@
         "verify": {
           "instance_type": "container/*/*/*"
         },
-        "verify_data": "yes"
+        "verify_data": "yes",
+        "ui_schema": {
+          "title": "Create Pool From Containers",
+          "fields": []
+        }
       }
     }
   }

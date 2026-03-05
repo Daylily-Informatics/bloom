@@ -9,10 +9,8 @@
         "action_executed": "0",
         "max_executions": "1",
         "action_enabled": "0",
-        "capture_data": "no",
-        "captured_data": {
-          "Comments": ""
-        },
+        "capture_data": "yes",
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -21,7 +19,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Reverse Destroy",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",

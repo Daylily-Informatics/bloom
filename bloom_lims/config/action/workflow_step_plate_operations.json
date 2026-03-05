@@ -19,9 +19,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "Plate EUID:<textarea name=&quot;plate_euid&quot; rows=&quot;1&quot; cols=&quot;16&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -30,7 +28,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Stamp Plate (no well address changes)",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -66,9 +68,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_uploaded_file": "<input type=file name=gdna_quant ></input>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -78,6 +78,10 @@
         "printer_opts": {
           "printer_name": "",
           "label_style": ""
+        },
+        "ui_schema": {
+          "title": "Upload cfDNA Quant Data",
+          "fields": []
         }
       },
       "properties": {

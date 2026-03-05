@@ -203,8 +203,11 @@ class TestGraphViewerApis:
         fake_edges = [{"data": {"id": "E1", "source": "N1", "target": "N2"}}]
         fake_bobj = MagicMock()
 
-        with patch("main.BLOOMdb3", _DummyDB), patch("main.BloomObj", return_value=fake_bobj), patch(
-            "main._build_graph_elements_for_start", return_value=(fake_nodes, fake_edges)
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ), patch(
+            "bloom_lims.gui.routes.graph._build_graph_elements_for_start",
+            return_value=(fake_nodes, fake_edges),
         ):
             response = client.get("/api/graph/data?start_euid=AY1&depth=3")
 
@@ -217,8 +220,10 @@ class TestGraphViewerApis:
 
     def test_api_graph_data_unknown_start_is_safe(self, client):
         fake_bobj = MagicMock()
-        with patch("main.BLOOMdb3", _DummyDB), patch("main.BloomObj", return_value=fake_bobj), patch(
-            "main._build_graph_elements_for_start", return_value=([], [])
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ), patch(
+            "bloom_lims.gui.routes.graph._build_graph_elements_for_start", return_value=([], [])
         ):
             response = client.get("/api/graph/data?start_euid=ZZZ-NONEXISTENT&depth=3")
 
@@ -229,7 +234,9 @@ class TestGraphViewerApis:
 
     def test_api_object_detail_returns_payload(self, client):
         fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
-        with patch("main.BLOOMdb3", _DummyDB), patch("main.BloomObj", return_value=fake_bobj):
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ):
             response = client.get("/api/object/CX-TEST")
 
         assert response.status_code == 200
@@ -256,7 +263,9 @@ class TestGraphViewerApis:
 
     def test_api_lineage_admin_create_success(self, client):
         fake_bobj = _fake_bobj_for_lineage_create(existing_lineage=False)
-        with patch("main.BLOOMdb3", _DummyDB), patch("main.BloomObj", return_value=fake_bobj):
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ):
             response = client.post(
                 "/api/lineage",
                 json={"parent_euid": "PARENT-1", "child_euid": "CHILD-1", "relationship_type": "generic"},
@@ -269,7 +278,9 @@ class TestGraphViewerApis:
 
     def test_api_lineage_duplicate_returns_409(self, client):
         fake_bobj = _fake_bobj_for_lineage_create(existing_lineage=True)
-        with patch("main.BLOOMdb3", _DummyDB), patch("main.BloomObj", return_value=fake_bobj):
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ):
             response = client.post(
                 "/api/lineage",
                 json={"parent_euid": "PARENT-1", "child_euid": "CHILD-1", "relationship_type": "generic"},
@@ -289,7 +300,9 @@ class TestGraphViewerApis:
 
     def test_api_object_delete_admin_soft_delete(self, client):
         fake_bobj = _fake_bobj_for_delete()
-        with patch("main.BLOOMdb3", _DummyDB), patch("main.BloomObj", return_value=fake_bobj):
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ):
             response = client.delete("/api/object/DEL-1")
 
         assert response.status_code == 200

@@ -92,7 +92,7 @@ class TapDBSettings(BaseModel):
         default=5566,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
-    min_version: str = Field(default="0.1.27", description="Minimum supported daylily-tapdb")
+    min_version: str = Field(default="0.1.30", description="Minimum supported daylily-tapdb")
     max_version_exclusive: str = Field(
         default="0.2.0",
         description="Exclusive upper bound for daylily-tapdb",
@@ -430,6 +430,10 @@ class BloomSettings(BaseSettings):
         atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
         if atlas_token is not None:
             self.atlas.token = atlas_token
+
+        atlas_org_id = os.environ.get("BLOOM_ATLAS__ORGANIZATION_ID")
+        if atlas_org_id is not None:
+            self.atlas.organization_id = atlas_org_id
 
         atlas_timeout = os.environ.get("BLOOM_ATLAS__TIMEOUT_SECONDS")
         if atlas_timeout is not None:

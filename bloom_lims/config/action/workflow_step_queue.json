@@ -22,7 +22,7 @@
           "workflow/assay-workset/hla-typing/1.2/": {
             "json_addl": {
               "properties": {
-                "name" : "",
+                "name": "",
                 "comments": "",
                 "step_number": "0"
               }
@@ -37,9 +37,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -48,7 +46,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Plasma Isolation Tube to Tube",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -87,11 +89,7 @@
         "deactivate_actions_when_executed": [
           "ycreate_test_req_and_link_child_workflow_step"
         ],
-        "captured_data": {
-          "Patient Name": "",
-          "Physician": "",
-          "Order Type": ""
-        },
+        "captured_data": {},
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
@@ -100,7 +98,11 @@
           "printer_name": "",
           "label_style": ""
         },
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Create New Test Req & Assoc To Specimen Tube",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -136,11 +138,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "Test Requisition EUID": "",
-          "Tube EUID": "",
-          "Comment": ""
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -150,7 +148,11 @@
           "printer_name": "",
           "label_style": ""
         },
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Link Tube To Existing  Req.b",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -178,9 +180,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -189,7 +189,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Map Tubes To Extraction Plate Wells",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -217,9 +221,7 @@
         "max_executions": "-1",
         "action_enabled": "0",
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -228,7 +230,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Fill Plate & Specify Map",
+          "fields": []
+        }
       }
     }
   },
@@ -242,10 +248,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_instance_refs": "Instance Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -254,7 +257,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Add to Blood to gDNA Extraction Queue",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -272,10 +279,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_instance_refs": "Instance Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -284,7 +288,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Add to Buccal to gDNA Extraction Queue",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -302,10 +310,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_instance_refs": "Instance Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -314,7 +319,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Add gDNA to gDNA Normalization Queue",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -331,10 +340,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -343,7 +349,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Plate Create & Fill Auto",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -360,12 +370,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />",
-          "_mapping_csv_text": "Directed Mapping CSV (source_ref,destination_well):<textarea required name=&quot;mapping_csv_text&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_mapping_csv_file": "Or Upload Mapping CSV: <input type=&quot;file&quot; name=&quot;mapping_csv_file&quot; accept=&quot;.csv,.txt&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -374,7 +379,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Plate Create & Fill Directed",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -391,11 +400,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_destination_plate_euid": "Destination Plate EUID: <input required type=&quot;text&quot; name=&quot;destination_plate_euid&quot; />",
-          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -404,7 +409,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Existing Plate Fill Auto",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -421,13 +430,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_destination_plate_euid": "Destination Plate EUID: <input required type=&quot;text&quot; name=&quot;destination_plate_euid&quot; />",
-          "_instance_refs": "Source Refs (EUID or PLATEEUID.WELL):<textarea required name=&quot;instance_refs&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_instance_refs_file": "Or Upload Source Refs File: <input type=&quot;file&quot; name=&quot;instance_refs_file&quot; accept=&quot;.txt,.csv&quot; />",
-          "_mapping_csv_text": "Directed Mapping CSV (source_ref,destination_well):<textarea required name=&quot;mapping_csv_text&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_mapping_csv_file": "Or Upload Mapping CSV: <input type=&quot;file&quot; name=&quot;mapping_csv_file&quot; accept=&quot;.csv,.txt&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -436,7 +439,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Existing Plate Fill Directed",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -453,10 +460,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_quant_csv_text": "Quant CSV (plate_euid,well_address,quant_value):<textarea required name=&quot;quant_csv_text&quot; rows=&quot;8&quot; cols=&quot;50&quot;></textarea>",
-          "_quant_csv_file": "Or Upload Quant CSV: <input type=&quot;file&quot; name=&quot;quant_csv_file&quot; accept=&quot;.csv,.txt&quot; />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -465,7 +469,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Save Quant Data",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",

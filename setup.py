@@ -28,7 +28,7 @@ setup(
     version=get_version(),
     packages=find_packages(),
     install_requires=[
-        "daylily-tapdb==0.1.27",
+        "daylily-tapdb==0.1.30",
         "daylily-cognito==0.1.24",
         "psutil>=5.9.0",
     ],

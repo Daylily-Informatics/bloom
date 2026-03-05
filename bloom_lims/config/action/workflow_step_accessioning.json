@@ -7,10 +7,7 @@
         "action_name": "Register Kit",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Comments": "",
-          "Kit Barcode": ""
-        },
+        "captured_data": {},
         "child_container_obj": {
           "container/kit/generic/*/": {
             "json_addl": {
@@ -38,7 +35,11 @@
           "label_style": "",
           "printer_name": ""
         },
-        "simple_value": ""
+        "simple_value": "",
+        "ui_schema": {
+          "title": "Register Kit",
+          "fields": []
+        }
       },
       "properties": {
         "comments": "",
@@ -54,10 +55,7 @@
         "action_name": "Register Kit",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Comments": "",
-          "Kit Barcode": ""
-        },
+        "captured_data": {},
         "child_container_obj": {
           "container/kit/generic/*/": {
             "json_addl": {
@@ -88,7 +86,11 @@
           "label_style": "",
           "printer_name": ""
         },
-        "simple_value": ""
+        "simple_value": "",
+        "ui_schema": {
+          "title": "Register Kit",
+          "fields": []
+        }
       },
       "properties": {
         "comments": "",
@@ -104,13 +106,7 @@
         "action_name": "Register Specimen Container",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Comment": "",
-          "MRN": "",
-          "_collection_date": "Collection Date: <input type=&quot;date&quot; name=&quot;collection_date&quot; required />",
-          "_dob": "DOB: <input type=&quot;date&quot; name=&quot;dob&quot; required />",
-          "_qc_pass": "QC Pass: <select name=&quot;qc_pass&quot; required><option value=&quot;Pass&quot;>Pass</option><option value=&quot;Fail&quot;>Fail</option><option value=&quot;Hold&quot;>Hold</option></select>"
-        },
+        "captured_data": {},
         "child_container_obj": {
           "container/tube/tube-strek-10ml/*/": {
             "instantiation_layouts": [
@@ -151,7 +147,11 @@
           "label_style": "",
           "printer_name": ""
         },
-        "simple_value": ""
+        "simple_value": "",
+        "ui_schema": {
+          "title": "Register Specimen Container",
+          "fields": []
+        }
       },
       "properties": {
         "comments": "",
@@ -169,11 +169,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Order Type": "",
-          "Patient Name": "",
-          "Physician": ""
-        },
+        "captured_data": {},
         "child_container_obj": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/test-requisition-generated2/*/": {
@@ -203,6 +199,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Create New Test Req & Assoc To Specimen Tube",
+          "fields": []
         }
       }
     }
@@ -217,11 +217,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Comment": "",
-          "Test Requisition EUID": "",
-          "Tube EUID": ""
-        },
+        "captured_data": {},
         "child_container_obj": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/test-requisition-generated2/*/": {
@@ -249,6 +245,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Link Tube To Existing  Req.b",
+          "fields": []
         }
       },
       "properties": {
@@ -267,11 +267,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Comment": "",
-          "Test Requisition EUID": "",
-          "Tube EUID": ""
-        },
+        "captured_data": {},
         "child_container_obj": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/test-requisition-generated2/*/": {
@@ -299,6 +295,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Link Tube To Existing  Req.b",
+          "fields": []
         }
       },
       "properties": {

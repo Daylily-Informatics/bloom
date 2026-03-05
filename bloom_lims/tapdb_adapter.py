@@ -8,6 +8,7 @@ daylily-tapdb while exposing BLOOM-compatible ORM class wiring.
 from __future__ import annotations
 
 import logging
+import os
 from types import SimpleNamespace
 from typing import Optional
 
@@ -64,6 +65,7 @@ from daylily_tapdb.models.template import (
 )
 
 from bloom_lims.config import get_tapdb_db_config
+from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
 
 
 def _translate_bloom_kwargs(kwargs: dict) -> dict:
@@ -150,6 +152,13 @@ class BLOOMdb3:
         self.logger = logging.getLogger(__name__ + ".BLOOMdb3")
         self.app_username = app_username
 
+        # Best-effort attribution for TapDB-style DB metrics.
+        # (The request middleware sets path/method; the DB adapter tags username.)
+        try:
+            db_username_var.set(app_username)
+        except Exception:
+            pass
+
         # Legacy arguments remain accepted; TapDB config is authoritative.
         if any([db_url_prefix != "postgresql://", db_hostname, db_pass, db_user, db_name]):
             self.logger.warning(
@@ -181,6 +190,14 @@ class BLOOMdb3:
         )
 
         self.engine = self._conn.engine
+        # Install TapDB-style per-query metrics once per engine.
+        try:
+            maybe_install_engine_metrics(
+                self.engine, env_name=os.environ.get("TAPDB_ENV", "dev")
+            )
+        except Exception:
+            # Metrics are best-effort; never block DB init.
+            pass
         self._Session = self._conn._Session
         self.session = self._Session()
 

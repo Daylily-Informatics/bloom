@@ -8,9 +8,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_object_status": "<select name=&quot;object_status&quot;><option value=&quot;in_progress&quot;>In Progress</option><option value=&quot;complete&quot;>Complete</option><option value=&quot;failed&quot;>Fail</option><option value=&quot;abandoned&quot;>Abandon</option></select>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -21,7 +19,11 @@
           "label_style": ""
         },
         "curr_user": "",
-        "description": "Set Status"
+        "description": "Set Status",
+        "ui_schema": {
+          "title": "Set Status",
+          "fields": []
+        }
       }
     }
   },
@@ -34,8 +36,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "no",
-        "captured_data": {
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -46,7 +47,11 @@
           "label_style": ""
         },
         "curr_user": "",
-        "description": "Print Label2"
+        "description": "Print Label2",
+        "ui_schema": {
+          "title": "Print Label",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -63,18 +68,18 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_lineage_type_to_create": "Create Relationship(s): <select required name=&quot;lineage_type_to_create&quot;><option value=&quot;parent&quot;>Parents of this record</option><option value=&quot;child&quot;>Children of this record</option></select>",
-          "_relationship_type": "Relationship Type (not yet controlled): <input required type=&quot;text&quot; name=&quot;relationship_type&quot; value=&quot;generic&quot;/>",
-          "_parent_euids": "EUIDS (one per line):<textarea required name=&quot;euids&quot;/></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
         "curr_user": "",
-        "description": "Add Parent or Child Relationships (aka lineages)."
+        "description": "Add Parent or Child Relationships (aka lineages).",
+        "ui_schema": {
+          "title": "Add Parent or Child Relationship(s)",
+          "fields": []
+        }
       }
     }
   },
@@ -87,18 +92,18 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_subject_kind": "Subject Kind: <select required name=&quot;subject_kind&quot;><option value=&quot;accession&quot;>Accession</option><option value=&quot;analysis_bundle&quot;>Analysis Bundle</option><option value=&quot;report&quot;>Report</option><option value=&quot;generic&quot;>Generic</option></select>",
-          "_subject_name": "Subject Name (optional): <input type=&quot;text&quot; name=&quot;subject_name&quot; value=&quot;&quot;/>",
-          "_comments": "Comments: <textarea name=&quot;comments&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
         "curr_user": "",
-        "description": "Create a Subject (decision scope) with this object as the anchor."
+        "description": "Create a Subject (decision scope) with this object as the anchor.",
+        "ui_schema": {
+          "title": "Create Subject (Decision Scope)",
+          "fields": []
+        }
       }
     }
   }

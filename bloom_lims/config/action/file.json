@@ -1,4 +1,4 @@
-{ 
+{
   "download_file": {
     "1.0": {
       "action_template": {
@@ -8,17 +8,18 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_dowload_type": "File Creation Mode: <select name=&quot;download_type&quot;><option value=&quot;dewey&quot; selected >dewey</option><option value=&quot;hybrid&quot;>hybrid</option><option value=&quot;orig&quot;>orig</option></select>",
-          "_create_metadata_file": "Generate Metadata yaml:<select name=&quot;create_metadata_file&quot;><option selected value=&quot;yes&quot;>yes</option><option value=&quot;no&quot;>no</option></select>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
         "curr_user": "",
-        "description": "Download File From S3"
+        "description": "Download File From S3",
+        "ui_schema": {
+          "title": "Download A File",
+          "fields": []
+        }
       }
     }
   }

@@ -8,11 +8,8 @@
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
-        "capture_data": "no",
-        "captured_data": {
-          "Carrier Name": "",
-          "Tracking Number": ""
-        },
+        "capture_data": "yes",
+        "captured_data": {},
         "child_workflow_step_obj": {},
         "curr_user": "",
         "deactivate_actions_when_executed": [],
@@ -23,6 +20,10 @@
         "printer_opts": {
           "label_style": "",
           "printer_name": ""
+        },
+        "ui_schema": {
+          "title": "Download Plate Map TSV",
+          "fields": []
         }
       },
       "properties": {
@@ -41,10 +42,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Destination Plate EUID": "",
-          "_capture_barcodes": "Source Plate EUIDs:<textarea name=&quot;source_barcodes&quot; rows=&quot;6&quot; cols=&quot;30&quot;></textarea><br>"
-        },
+        "captured_data": {},
         "child_workflow_step_obj": {
           "workflow_step/plate-operations/plate-added-to/*/": {
             "json_addl": {
@@ -72,7 +70,11 @@
         "verify": {
           "instance_type": "container/*/*/*"
         },
-        "verify_data": "yes"
+        "verify_data": "yes",
+        "ui_schema": {
+          "title": "Stamp plates into plate",
+          "fields": []
+        }
       }
     }
   },
@@ -86,10 +88,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Destination Plate EUID": "",
-          "_capture_barcodes": "Source Plate EUIDs:<textarea name=&quot;source_barcodes&quot; rows=&quot;6&quot; cols=&quot;30&quot;></textarea><br>"
-        },
+        "captured_data": {},
         "child_workflow_step_obj": {
           "workflow_step/plate-operations/plate-added-to/*/": {
             "json_addl": {
@@ -117,7 +116,11 @@
         "verify": {
           "instance_type": "container/*/*/*"
         },
-        "verify_data": "yes"
+        "verify_data": "yes",
+        "ui_schema": {
+          "title": "Add Plates to Plate",
+          "fields": []
+        }
       }
     }
   }

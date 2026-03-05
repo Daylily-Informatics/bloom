@@ -9,69 +9,376 @@ function decodeHtmlEntities(value) {
     return decoder.value;
 }
 
-function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, actionGroup) {
-    try {
-        var uniqueFormId = stepEuid + '-' + actionName + actionGroup + '-form';
-        var existingForm = document.getElementById(uniqueFormId);
+function sanitizeIdSegment(value) {
+    return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
-        // Check if the form already exists
-        if (existingForm) {
-            // If it exists, toggle its display
-            existingForm.style.display = existingForm.style.display === 'none' ? 'block' : 'none';
-        } else {
-            // If it does not exist, create the form
-            var actionData = actionDataJson;
-            if (actionData['capture_data'] === 'no') {
-                // Directly submit the form without capturing user input
-                performWorkflowStepAction(stepEuid, actionDataJson, actionName, actionGroup);
-            } else {
-                // Create the form for user input
-                var formContainer = document.createElement('div');
-                formContainer.id = uniqueFormId;
-                formContainer.style.display = 'block'; // Ensure the form is visible when first created
-                formContainer.style.flexBasis = '100%';
-                formContainer.style.width = '100%';
-                formContainer.style.marginTop = '0.75rem';
-                formContainer.style.padding = '0.75rem';
-                formContainer.style.border = '1px solid rgba(148, 163, 184, 0.35)';
-                formContainer.style.borderRadius = '0.5rem';
-                formContainer.style.background = 'rgba(15, 23, 42, 0.45)';
+function getActionFormId(stepEuid, actionName, actionGroup) {
+    return 'action-form-' + sanitizeIdSegment(stepEuid) + '-' + sanitizeIdSegment(actionGroup) + '-' + sanitizeIdSegment(actionName);
+}
 
-                var formHTML = '<form>';
-                for (var key in actionData['captured_data']) {
-                    var value = actionData['captured_data'][key];
+function getActionSchema(actionData) {
+    if (!actionData || typeof actionData !== 'object') {
+        return null;
+    }
+    if (actionData.ui_schema && Array.isArray(actionData.ui_schema.fields)) {
+        return actionData.ui_schema;
+    }
+    return null;
+}
 
-                    if (key.startsWith('_')) {
-                        // Key-prefixed values are authored as HTML snippets and may be entity-encoded.
-                        formHTML += decodeHtmlEntities(value);
-                    } else {
-                        // Check if value is an array or a string
-                        if (Array.isArray(value)) {
-                            // Handle array values
-                            value.forEach(function(item) {
-                                formHTML += key + '<input type="text" name="' + key + '[]" value="' + item + '"><br>';
-                            });
-                        } else {
-                            // Handle string values
-                            formHTML += key + '<input type="text" name="' + key + '" value="' + decodeHtmlEntities(value) + '"><br>';
-                        }
-                    }
-                }
-                formHTML += '</form>';
-                formHTML += '<ul><button class="actionSubmit" onclick="submitCapturedDataForm(\'' + uniqueFormId + '\', \'' + actionName + '\', \'' + stepEuid + '\', \'' + escape(JSON.stringify(actionData)) + '\', \'' + actionGroup + '\')">Submit</button><hr></ul>';
+function createFormContainer(uniqueFormId) {
+    var formContainer = document.createElement('div');
+    formContainer.id = uniqueFormId;
+    formContainer.style.display = 'block';
+    formContainer.style.flexBasis = '100%';
+    formContainer.style.width = '100%';
+    formContainer.style.marginTop = '0.75rem';
+    formContainer.style.padding = '0.75rem';
+    formContainer.style.border = '1px solid rgba(148, 163, 184, 0.35)';
+    formContainer.style.borderRadius = '0.5rem';
+    formContainer.style.background = 'rgba(15, 23, 42, 0.45)';
+    return formContainer;
+}
 
-                formContainer.innerHTML = formHTML;
+function createErrorPanel() {
+    var errorPanel = document.createElement('div');
+    errorPanel.className = 'action-form-error-panel';
+    errorPanel.style.display = 'none';
+    errorPanel.style.marginBottom = '0.75rem';
+    errorPanel.style.padding = '0.5rem 0.75rem';
+    errorPanel.style.border = '1px solid rgba(239, 68, 68, 0.85)';
+    errorPanel.style.borderRadius = '0.375rem';
+    errorPanel.style.background = 'rgba(127, 29, 29, 0.35)';
+    errorPanel.style.color = '#fecaca';
+    errorPanel.style.fontWeight = '600';
+    return errorPanel;
+}
 
-                var parent = button.parentElement;
-                if (parent && window.getComputedStyle(parent).display.indexOf('flex') !== -1) {
-                    parent.insertAdjacentElement('afterend', formContainer);
-                } else {
-                    button.insertAdjacentElement('afterend', formContainer);
-                }
-            }
+function setFormError(formContainer, message) {
+    if (!formContainer) {
+        return;
+    }
+    var panel = formContainer.querySelector('.action-form-error-panel');
+    if (!panel) {
+        return;
+    }
+    panel.textContent = message || 'Action failed';
+    panel.style.display = 'block';
+}
+
+function clearFormError(formContainer) {
+    if (!formContainer) {
+        return;
+    }
+    var panel = formContainer.querySelector('.action-form-error-panel');
+    if (!panel) {
+        return;
+    }
+    panel.textContent = '';
+    panel.style.display = 'none';
+}
+
+function clearFieldErrors(form) {
+    if (!form) {
+        return;
+    }
+    var errored = form.querySelectorAll('[data-action-field-error="1"]');
+    errored.forEach(function(el) {
+        el.removeAttribute('data-action-field-error');
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+    });
+}
+
+function findFieldInput(form, fieldName) {
+    if (!form || !fieldName) {
+        return null;
+    }
+    var elems = form.elements;
+    for (var i = 0; i < elems.length; i++) {
+        if (elems[i].name === fieldName) {
+            return elems[i];
         }
+    }
+    return null;
+}
+
+function applyFieldErrors(form, errorFields) {
+    if (!form || !Array.isArray(errorFields)) {
+        return;
+    }
+    var first = null;
+    errorFields.forEach(function(fieldName) {
+        var input = findFieldInput(form, fieldName);
+        if (!input) {
+            return;
+        }
+        if (!first) {
+            first = input;
+        }
+        input.setAttribute('data-action-field-error', '1');
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.2)';
+    });
+    if (first && typeof first.focus === 'function') {
+        first.focus();
+    }
+}
+
+function setSubmitRunning(formContainer, running) {
+    var button = formContainer ? formContainer.querySelector('.action-submit-btn') : null;
+    if (!button) {
+        return;
+    }
+    if (running) {
+        button.setAttribute('disabled', 'disabled');
+        button.textContent = 'Running...';
+    } else {
+        button.removeAttribute('disabled');
+        button.textContent = 'Submit';
+    }
+}
+
+function normalizeOptions(options) {
+    if (!Array.isArray(options)) {
+        return [];
+    }
+    return options
+        .map(function(opt) {
+            if (!opt || typeof opt !== 'object') {
+                return null;
+            }
+            var value = String(opt.value || '').trim();
+            var label = String(opt.label || value).trim();
+            if (!value) {
+                return null;
+            }
+            return { value: value, label: label };
+        })
+        .filter(function(opt) { return opt !== null; });
+}
+
+async function fetchWorkflowAssayOptions() {
+    var response = await fetch('/api/v1/workflows/?workflow_type=assay&page_size=1000');
+    var payload = await response.json().catch(function() { return {}; });
+    if (!response.ok) {
+        throw new Error((payload && payload.detail) || 'Failed to fetch assay options');
+    }
+
+    var items = Array.isArray(payload.items) ? payload.items : [];
+    return items
+        .filter(function(item) { return item && item.euid; })
+        .map(function(item) {
+            var label = String(item.name || item.euid) + ' [' + String(item.euid) + ']';
+            return {
+                value: String(item.euid),
+                label: label,
+            };
+        });
+}
+
+async function resolveFieldOptions(field) {
+    var options = normalizeOptions(field.options);
+    if (options.length > 0) {
+        return options;
+    }
+    if (field.options_source === 'workflow_assays') {
+        return fetchWorkflowAssayOptions();
+    }
+    return [];
+}
+
+function createFieldInput(field, options) {
+    var type = String(field.type || 'text').toLowerCase();
+    var input = null;
+
+    if (type === 'textarea') {
+        input = document.createElement('textarea');
+        input.rows = Number(field.rows || 4);
+    } else if (type === 'select') {
+        input = document.createElement('select');
+        var selectOptions = normalizeOptions(options || []);
+        if (selectOptions.length === 0) {
+            var emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = field.placeholder || 'No options available';
+            emptyOption.selected = true;
+            input.appendChild(emptyOption);
+        } else {
+            selectOptions.forEach(function(opt) {
+                var option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                input.appendChild(option);
+            });
+        }
+    } else {
+        input = document.createElement('input');
+        if (type === 'number') {
+            input.type = 'number';
+            if (field.min !== undefined) {
+                input.min = String(field.min);
+            }
+            if (field.max !== undefined) {
+                input.max = String(field.max);
+            }
+            if (field.step !== undefined) {
+                input.step = String(field.step);
+            }
+        } else if (type === 'file') {
+            input.type = 'file';
+            if (field.accept) {
+                input.accept = String(field.accept);
+            }
+            if (field.multiple === true) {
+                input.multiple = true;
+            }
+        } else {
+            input.type = 'text';
+        }
+    }
+
+    input.name = String(field.name || '').trim();
+    input.required = !!field.required;
+    input.className = 'action-field-input';
+    input.style.display = 'block';
+    input.style.width = '100%';
+    input.style.maxWidth = '480px';
+    input.style.marginTop = '0.25rem';
+    input.style.marginBottom = '0.75rem';
+    input.style.padding = '0.45rem 0.6rem';
+    input.style.border = '1px solid rgba(148, 163, 184, 0.45)';
+    input.style.borderRadius = '0.375rem';
+    input.style.background = 'rgba(15, 23, 42, 0.85)';
+    input.style.color = '#e2e8f0';
+
+    if (type !== 'file' && field.default !== undefined && field.default !== null) {
+        input.value = String(field.default);
+    }
+
+    return input;
+}
+
+async function buildSchemaFields(form, schema) {
+    var fields = Array.isArray(schema.fields) ? schema.fields : [];
+    for (var i = 0; i < fields.length; i++) {
+        var field = fields[i];
+        if (!field || typeof field !== 'object') {
+            continue;
+        }
+        var name = String(field.name || '').trim();
+        if (!name) {
+            continue;
+        }
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'action-field-wrapper';
+
+        var label = document.createElement('label');
+        label.textContent = String(field.label || name);
+        label.style.display = 'block';
+        label.style.fontSize = '0.85rem';
+        label.style.fontWeight = '600';
+        label.style.color = '#cbd5e1';
+
+        var options = await resolveFieldOptions(field);
+        var input = createFieldInput(field, options);
+        label.appendChild(input);
+
+        if (field.help_text) {
+            var hint = document.createElement('div');
+            hint.textContent = String(field.help_text);
+            hint.style.fontSize = '0.75rem';
+            hint.style.color = '#94a3b8';
+            hint.style.marginTop = '-0.35rem';
+            hint.style.marginBottom = '0.5rem';
+            wrapper.appendChild(label);
+            wrapper.appendChild(hint);
+        } else {
+            wrapper.appendChild(label);
+        }
+
+        form.appendChild(wrapper);
+    }
+}
+
+function appendFormToDom(button, formContainer) {
+    var parent = button.parentElement;
+    if (parent && window.getComputedStyle(parent).display.indexOf('flex') !== -1) {
+        parent.insertAdjacentElement('afterend', formContainer);
+    } else {
+        button.insertAdjacentElement('afterend', formContainer);
+    }
+}
+
+async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName, actionGroup) {
+    try {
+        var uniqueFormId = getActionFormId(stepEuid, actionName, actionGroup);
+        var existingForm = document.getElementById(uniqueFormId);
+        if (existingForm) {
+            existingForm.style.display = existingForm.style.display === 'none' ? 'block' : 'none';
+            return;
+        }
+
+        var actionData = actionDataJson || {};
+        var schema = getActionSchema(actionData);
+        var captureMode = String(actionData.capture_data || '').toLowerCase();
+        var fields = schema && Array.isArray(schema.fields) ? schema.fields : [];
+
+        if (captureMode === 'no' || fields.length === 0) {
+            if (captureMode !== 'no') {
+                var schemaMessage = 'Action template is missing ui_schema.fields: ' + actionName;
+                if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+                    window.BloomToast.error('Action Error', schemaMessage);
+                }
+                return;
+            }
+            await performWorkflowStepAction({
+                euid: stepEuid,
+                action_group: actionGroup,
+                action_key: actionName,
+                captured_data: {},
+            });
+            return;
+        }
+
+        var formContainer = createFormContainer(uniqueFormId);
+        var errorPanel = createErrorPanel();
+        var form = document.createElement('form');
+        form.className = 'action-dynamic-form';
+        form.noValidate = true;
+
+        formContainer.appendChild(errorPanel);
+        formContainer.appendChild(form);
+
+        await buildSchemaFields(form, schema);
+
+        var submitButton = document.createElement('button');
+        submitButton.type = 'submit';
+        submitButton.className = 'action-submit-btn';
+        submitButton.textContent = 'Submit';
+        submitButton.style.marginTop = '0.25rem';
+        submitButton.style.padding = '0.45rem 0.9rem';
+        submitButton.style.border = 'none';
+        submitButton.style.borderRadius = '0.375rem';
+        submitButton.style.background = '#6366f1';
+        submitButton.style.color = '#ffffff';
+        submitButton.style.fontWeight = '600';
+        submitButton.style.cursor = 'pointer';
+        form.appendChild(submitButton);
+
+        form.addEventListener('submit', function(evt) {
+            evt.preventDefault();
+            submitCapturedDataForm(formContainer, form, stepEuid, actionName, actionGroup);
+        });
+
+        appendFormToDom(button, formContainer);
     } catch (e) {
-        console.error('Error parsing action data JSON:', e);
+        console.error('Error building action form:', e);
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+            window.BloomToast.error('Action Error', e.message || 'Unable to open action form');
+        }
     }
 }
 
@@ -123,121 +430,136 @@ function readFileAsText(file) {
     });
 }
 
-async function submitCapturedDataForm(formId, actionName, stepEuid, actionDataJson, actionGroup) {
-    var formContainer = document.getElementById(formId);
-    if (!formContainer) {
-        return;
-    }
-    var form = formContainer.querySelector('form');
+async function buildCapturedDataFromForm(form) {
     var formData = new FormData(form);
-    var actionData = JSON.parse(unescape(actionDataJson));
+    var capturedData = {};
 
-    try {
-        var entries = [];
-        formData.forEach(function(value, key) {
-            entries.push([key, value]);
-        });
+    var entries = [];
+    formData.forEach(function(value, key) {
+        entries.push([key, value]);
+    });
 
-        for (var i = 0; i < entries.length; i++) {
-            var key = entries[i][0];
-            var value = entries[i][1];
+    for (var i = 0; i < entries.length; i++) {
+        var key = entries[i][0];
+        var value = entries[i][1];
 
-            if (value instanceof File) {
-                if (!value.name || value.size === 0) {
-                    continue;
-                }
-                var fileText = await readFileAsText(value);
-                actionData['captured_data'][key + '_name'] = value.name;
-                actionData['captured_data'][key + '_text'] = fileText;
-
-                // For fields ending in _file, also append contents to the
-                // corresponding text key so server handlers can read one key.
-                if (key.endsWith('_file')) {
-                    var textKey = key.slice(0, -5);
-                    var prior = actionData['captured_data'][textKey] || '';
-                    actionData['captured_data'][textKey] = prior
-                        ? (String(prior) + '\n' + fileText)
-                        : fileText;
-                }
+        if (value instanceof File) {
+            if (!value.name || value.size === 0) {
                 continue;
             }
-
-            if (Object.prototype.hasOwnProperty.call(actionData['captured_data'], key)) {
-                if (Array.isArray(actionData['captured_data'][key])) {
-                    actionData['captured_data'][key].push(value);
-                } else {
-                    actionData['captured_data'][key] = [actionData['captured_data'][key], value];
-                }
-            } else {
-                actionData['captured_data'][key] = value;
+            var fileText = await readFileAsText(value);
+            capturedData[key + '_name'] = value.name;
+            capturedData[key + '_text'] = fileText;
+            capturedData[key] = fileText;
+            if (key.endsWith('_file')) {
+                var textKey = key.slice(0, -5);
+                var prior = capturedData[textKey] || '';
+                capturedData[textKey] = prior
+                    ? (String(prior) + '\n' + fileText)
+                    : fileText;
             }
+            continue;
         }
 
-        // Now call the original function with updated data
-        performWorkflowStepAction(stepEuid, actionData, actionName, actionGroup);
+        if (Object.prototype.hasOwnProperty.call(capturedData, key)) {
+            if (Array.isArray(capturedData[key])) {
+                capturedData[key].push(value);
+            } else {
+                capturedData[key] = [capturedData[key], value];
+            }
+        } else {
+            capturedData[key] = value;
+        }
+    }
 
-        // Remove the form from the DOM
+    return capturedData;
+}
+
+async function submitCapturedDataForm(formContainer, form, stepEuid, actionName, actionGroup) {
+    if (!formContainer || !form) {
+        return;
+    }
+
+    clearFormError(formContainer);
+    clearFieldErrors(form);
+    setSubmitRunning(formContainer, true);
+
+    try {
+        var capturedData = await buildCapturedDataFromForm(form);
+        var responsePayload = await performWorkflowStepAction({
+            euid: stepEuid,
+            action_group: actionGroup,
+            action_key: actionName,
+            captured_data: capturedData,
+        });
+
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.success === 'function') {
+            var okMessage = (responsePayload && responsePayload.message) ? responsePayload.message : 'Action completed';
+            window.BloomToast.success('Action Complete', okMessage, 2000);
+        }
         formContainer.remove();
+        setTimeout(function() {
+            window.location.reload();
+        }, 300);
     } catch (error) {
-        console.error('Error submitting action form:', error);
+        console.error('Action submission failed:', error);
+        var message = error && error.message ? error.message : 'Action failed';
+        var fields = Array.isArray(error && error.error_fields) ? error.error_fields : [];
+        setFormError(formContainer, message);
+        applyFieldErrors(form, fields);
+
         if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
-            window.BloomToast.error('Action Error', error.message || 'Unable to submit form data');
+            window.BloomToast.error('Action Failed', message);
         }
+    } finally {
+        setSubmitRunning(formContainer, false);
     }
 }
 
-function performWorkflowStepAction(stepEuid, ds, action, actionGroup) {
-    console.log('Performing workflow step action:', stepEuid, ds, action, actionGroup); // Debugging log
-
-    fetch('/workflow_step_action', {
+async function performWorkflowStepAction(payload) {
+    var response = await fetch('/workflow_step_action', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ action_group: actionGroup, euid: stepEuid, action: action, ds: ds })
-    })
-    .then(async response => {
-        var contentType = response.headers.get('content-type') || '';
-        var payload = null;
-        if (contentType.indexOf('application/json') !== -1) {
-            payload = await response.json();
-        } else {
-            payload = await response.text();
-        }
-
-        if (response.ok) {
-            console.log('Response OK', payload);
-            return payload;
-        }
-
-        var message = 'Action failed';
-        if (payload && typeof payload === 'object') {
-            message = payload.detail || payload.message || message;
-        } else if (typeof payload === 'string' && payload.trim() !== '') {
-            message = payload;
-        }
-        throw new Error(message);
-    })
-    .then(data => {
-        console.log('Success:', data);
-        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.success === 'function') {
-            var msg = (data && data.message) ? data.message : 'Action completed';
-            window.BloomToast.success('Action Complete', msg, 2000);
-        }
-        // Add a slight delay before reloading
-        setTimeout(function() {
-            window.location.reload();
-        }, 500); // Waits for 500 milliseconds
-    })
-    .catch((error) => {
-        console.error('Error:', error);
-        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
-            window.BloomToast.error('Action Error', error.message || 'Request failed');
-        }
+        body: JSON.stringify(payload),
     });
-}
 
-// Additional shared functions can be added here as needed.
+    var contentType = response.headers.get('content-type') || '';
+    var parsed = null;
+    if (contentType.indexOf('application/json') !== -1) {
+        parsed = await response.json().catch(function() { return {}; });
+    } else {
+        parsed = await response.text().catch(function() { return ''; });
+    }
+
+    if (response.ok) {
+        return parsed;
+    }
+
+    var message = 'Action failed';
+    var fields = [];
+    if (parsed && typeof parsed === 'object') {
+        if (typeof parsed.detail === 'string' && parsed.detail.trim() !== '') {
+            message = parsed.detail;
+        } else if (parsed.detail && typeof parsed.detail === 'object' && typeof parsed.detail.message === 'string') {
+            message = parsed.detail.message;
+            fields = Array.isArray(parsed.detail.error_fields) ? parsed.detail.error_fields : [];
+        } else if (typeof parsed.message === 'string' && parsed.message.trim() !== '') {
+            message = parsed.message;
+        }
+        if (Array.isArray(parsed.error_fields)) {
+            fields = parsed.error_fields;
+        }
+    } else if (typeof parsed === 'string' && parsed.trim() !== '') {
+        message = parsed.trim();
+    }
+
+    var err = new Error(message);
+    err.error_fields = fields;
+    err.status = response.status;
+    throw err;
+}
 
 
 

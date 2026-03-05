@@ -12,19 +12,19 @@
           }
         },
         "child_workflow_object": {
-          "workflow/accessioning/accession-package-kit-tubes-testreq/1.0" : { 
+          "workflow/accessioning/accession-package-kit-tubes-testreq/1.0": {
             "json_addl": {
               "properties": {
                 "step_number": "1"
               }
             }
-          }	
+          }
         },
         "workflow_step_to_attach_as_child": {
           "workflow_step/queue/all-purpose/1.0/": {
             "json_addl": {
               "properties": {
-                "name" : "",
+                "name": "",
                 "comments": "",
                 "step_number": "0"
               }
@@ -47,16 +47,17 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "Carrier Name": "",
-          "Tracking Number": ""
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Register Package",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",

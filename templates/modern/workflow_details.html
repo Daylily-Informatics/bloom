@@ -494,13 +494,14 @@
 </div>
 
 <!-- Workflow Action Groups -->
-{% if workflow.json_addl and 'action_groups' in workflow.json_addl %}
+{% set workflow_action_groups = action_groups_by_euid.get(workflow.euid, {}) if action_groups_by_euid is defined else {} %}
+{% if workflow_action_groups %}
 <div class="card mb-4">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-play-circle"></i> Workflow Actions</h3>
     </div>
     <div class="card-body">
-        {% for group_key, group_value in workflow.json_addl['action_groups'].items() %}
+        {% for group_key, group_value in workflow_action_groups.items() %}
         <div class="action-group">
             <div class="action-group-name">{{ group_value.group_name }}</div>
             {% for action_key, action_value in group_value.actions.items() %}
@@ -542,9 +543,10 @@
                 <span class="badge bg-{{ 'success' if trx.bstatus == 'active' else 'secondary' }}">{{ trx.bstatus }}</span>
                 <a href="/dindex2?globalStartNodeEUID={{ trx.euid }}" target="bloom_dag" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
             </div>
-            {% if trx.json_addl and trx.json_addl.action_groups %}
+            {% set trx_action_groups = action_groups_by_euid.get(trx.euid, {}) if action_groups_by_euid is defined else {} %}
+            {% if trx_action_groups %}
             <div class="requisition-actions" style="display: flex; flex-wrap: wrap; gap: var(--spacing-xs);">
-                {% for group_key, group_value in trx.json_addl.action_groups.items() %}
+                {% for group_key, group_value in trx_action_groups.items() %}
                 <div class="action-group" style="display: flex; align-items: center; gap: var(--spacing-xs);">
                     <span class="action-group-name" style="font-size: 0.75rem; color: var(--color-gray-400);">{{ group_value.group_name }}:</span>
                     {% for action_key, action_value in group_value.actions.items() %}
@@ -674,9 +676,10 @@
              data-bs-parent="#accordion-{{ step.euid }}">
             <div class="accordion-body">
                 <!-- Action Groups for this step -->
-                {% if step.json_addl and 'action_groups' in step.json_addl %}
+                {% set step_action_groups = action_groups_by_euid.get(step.euid, {}) if action_groups_by_euid is defined else {} %}
+                {% if step_action_groups %}
                 <div class="mb-3">
-                    {% for group_key, group_value in step.json_addl['action_groups'].items() %}
+                    {% for group_key, group_value in step_action_groups.items() %}
                     <div class="action-group">
                         <div class="action-group-name">{{ group_value.group_name }}</div>
                         {% for action_key, action_value in group_value.actions.items() %}

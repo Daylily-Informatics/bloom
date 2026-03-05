@@ -22,6 +22,7 @@ from .batch import router as batch_router
 from .async_tasks import router as async_tasks_router
 from .templates import router as templates_router
 from .actions import router as actions_router
+from .actions_execute import router as actions_execute_router
 from .subjects import router as subjects_router
 from .lineages import router as lineages_router
 from .file_sets import router as file_sets_router
@@ -52,6 +53,7 @@ router.include_router(batch_router)
 router.include_router(async_tasks_router)
 router.include_router(templates_router)
 router.include_router(actions_router)
+router.include_router(actions_execute_router)
 router.include_router(subjects_router)
 router.include_router(lineages_router)
 router.include_router(file_sets_router)
@@ -86,6 +88,7 @@ async def api_v1_info():
             "tasks": "/api/v1/tasks",
             "templates": "/api/v1/templates",
             "actions": "/api/v1/actions",
+            "actions_execute": "/api/v1/actions/execute",
             "subjects": "/api/v1/subjects",
             "lineages": "/api/v1/lineages",
             "file_sets": "/api/v1/file-sets",

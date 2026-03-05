@@ -13,9 +13,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;container_euids&quot; rows=&quot;12&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_user": [],
@@ -24,7 +22,11 @@
           "label_style": ""
         },
         "simple_value": "",
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Add Container To",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -45,9 +47,7 @@
         "action_enabled": "1",
         "capture_data": "yes",
         "deactivate_actions_when_executed": [],
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;container_euids&quot; rows=&quot;12&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
@@ -56,7 +56,11 @@
           "printer_name": "",
           "label_style": ""
         },
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Remove Container",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -86,7 +90,11 @@
           "printer_name": "",
           "label_style": ""
         },
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Download Inventory TSV",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -113,9 +121,7 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "Temperature (celcius)": ""
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -125,6 +131,10 @@
         "printer_opts": {
           "printer_name": "",
           "label_style": ""
+        },
+        "ui_schema": {
+          "title": "Log Temperature",
+          "fields": []
         }
       },
       "properties": {

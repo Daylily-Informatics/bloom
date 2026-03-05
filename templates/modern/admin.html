@@ -105,7 +105,7 @@
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-link"></i> Quick Links</h3>
     </div>
-    <div class="card-body">
+  <div class="card-body">
       <div class="list-group">
         <a href="/object_templates_summary" class="list-item">
           <span><i class="fas fa-cubes"></i> Object Templates</span>
@@ -121,6 +121,10 @@
         </a>
         <a href="/user_home" class="list-item">
           <span><i class="fas fa-user"></i> User Home</span>
+          <i class="fas fa-chevron-right text-muted"></i>
+        </a>
+        <a href="/admin/metrics" class="list-item">
+          <span><i class="fas fa-chart-line"></i> TapDB Metrics</span>
           <i class="fas fa-chevron-right text-muted"></i>
         </a>
       </div>
@@ -201,7 +205,7 @@
         </span>
       </h3>
     </div>
-    <div class="card-body">
+  <div class="card-body">
       <p class="text-muted">{{ dependency_info.tapdb.description }}</p>
       <div class="info-grid">
         <div class="info-row">
@@ -217,7 +221,19 @@
           <span class="info-val font-mono">{{ db_info.user }}</span>
         </div>
       </div>
-    </div>
+
+      <div class="integration-actions" style="margin-top: var(--spacing-md);">
+        <a href="/admin/metrics" class="btn btn-outline btn-sm">
+          <i class="fas fa-chart-line"></i> DB Metrics
+        </a>
+        {% if tapdb_metrics_summary %}
+          <span class="text-sm text-muted">
+            p95 {{ "%.1f"|format(tapdb_metrics_summary.summary.p95_ms) }}ms
+            ({{ tapdb_metrics_summary.summary.count }} rows)
+          </span>
+        {% endif %}
+      </div>
+  </div>
   </div>
 
   <!-- Cognito Auth -->

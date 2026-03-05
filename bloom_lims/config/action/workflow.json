@@ -26,10 +26,7 @@
         "max_executions": "1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "Carrier Name": "",
-          "Tracking Number": ""
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -39,6 +36,10 @@
         "printer_opts": {
           "printer_name": "",
           "label_style": ""
+        },
+        "ui_schema": {
+          "title": "Register Package",
+          "fields": []
         }
       },
       "properties": {
@@ -67,9 +68,7 @@
         "max_executions": "1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "_capture_barcodes": "<textarea name=&quot;discard_barcodes&quot; rows=&quot;24&quot; cols=&quot;50&quot;></textarea>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -79,6 +78,10 @@
         "printer_opts": {
           "printer_name": "",
           "label_style": ""
+        },
+        "ui_schema": {
+          "title": "Scan Conatiner Barcodes",
+          "fields": []
         }
       },
       "properties": {

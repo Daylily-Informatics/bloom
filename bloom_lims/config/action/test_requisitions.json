@@ -9,10 +9,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Container EUID": "",
-          "___workflow/assay/": "<select name=&quot;assay_selection&quot;><option value=&quot;/add/an/assay/wf&quot;>AddAnAssayInTheObjectActionDef</option></select>"
-        },
+        "captured_data": {},
         "curr_user": "",
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
@@ -30,6 +27,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Add Specimen to Assay Queue",
+          "fields": []
         }
       },
       "properties": {
@@ -48,10 +49,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Container EUID": "",
-          "___workflow/assay/": "<select name=&quot;assay_selection&quot;><option value=&quot;workflow/assay/hla-typing/1.2&quot;>HLA Typing v1.2</option><option value=&quot;workflow/assay/carrier-screen/3.9&quot;>Carrier Screen v3.9</option></select>"
-        },
+        "captured_data": {},
         "curr_user": "",
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
@@ -69,6 +67,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Add Specimen to Assay Queue",
+          "fields": []
         }
       },
       "properties": {
@@ -87,10 +89,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Verification Status": "",
-          "comment": ""
-        },
+        "captured_data": {},
         "curr_user": "",
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
@@ -99,6 +98,10 @@
         "printer_opts": {
           "label_style": "",
           "printer_name": ""
+        },
+        "ui_schema": {
+          "title": "Verify Test Req",
+          "fields": []
         }
       },
       "properties": {

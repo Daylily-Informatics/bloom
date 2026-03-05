@@ -131,6 +131,30 @@ def _seed_bloom_templates() -> None:
     )
 
 
+def _seed_tapdb_templates(
+    env_name: str,
+    *,
+    include_workflow: bool = True,
+    overwrite: bool = False,
+) -> None:
+    """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
+    tapdb_config_dir = os.environ.get("TAPDB_SEED_CONFIG_PATH", "").strip()
+    args = ["db", "data", "seed", env_name]
+    if tapdb_config_dir:
+        args.extend(["--config", tapdb_config_dir])
+        console.print(
+            f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}"
+        )
+    else:
+        console.print(
+            "[cyan]TapDB template seed:[/cyan] using built-in TapDB core config"
+        )
+    if include_workflow:
+        args.append("--include-workflow")
+    args.append("--overwrite" if overwrite else "--skip-existing")
+    _run_tapdb(args)
+
+
 @click.group()
 def db():
     """Database management commands routed through daylily-tapdb."""
@@ -156,6 +180,7 @@ def db_init(force: bool):
         if force:
             setup_args.append("--force")
         _run_tapdb(setup_args)
+        _seed_tapdb_templates(env_name, include_workflow=True, overwrite=force)
         _seed_bloom_templates()
         return
 
@@ -169,6 +194,7 @@ def db_init(force: bool):
     if force:
         setup_args.append("--force")
     _run_tapdb(setup_args)
+    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=force)
     _seed_bloom_templates()
 
 
@@ -254,7 +280,7 @@ def db_migrate(revision: str):
 def db_seed():
     """Seed template data via tapdb."""
     env_name = _current_env()
-    _run_tapdb(["db", "data", "seed", env_name, "--include-workflow"])
+    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=False)
     _seed_bloom_templates()
 
 
@@ -289,4 +315,5 @@ def db_reset(yes: bool):
     _run_tapdb(args)
     setup_args = ["db", "setup", env_name, "--include-workflow", "--force"]
     _run_tapdb(setup_args)
+    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=True)
     _seed_bloom_templates()

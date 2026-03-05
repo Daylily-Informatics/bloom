@@ -126,6 +126,7 @@ def _get_assay_instance(bobj: BloomObj, subtype: str, version: str):
 
 
 def _get_active_queue_step_by_subtype(workflow_obj, subtype: str):
+    candidates = []
     for lin in workflow_obj.parent_of_lineages:
         child = lin.child_instance
         if lin.is_deleted:
@@ -133,8 +134,22 @@ def _get_active_queue_step_by_subtype(workflow_obj, subtype: str):
         if child is None or child.is_deleted:
             continue
         if child.category == "workflow_step" and child.type == "queue" and child.subtype == subtype:
-            return child
-    return None
+            candidates.append(child)
+
+    if not candidates:
+        return None
+
+    def _sort_key(step_obj):
+        props = step_obj.json_addl.get("properties", {}) if isinstance(step_obj.json_addl, dict) else {}
+        step_number = props.get("step_number")
+        try:
+            order = int(step_number)
+        except (TypeError, ValueError):
+            order = 10**9
+        return (order, str(step_obj.euid))
+
+    candidates.sort(key=_sort_key)
+    return candidates[0]
 
 
 def _require_queue_template_or_skip(bobj: BloomObj, subtype: str):
@@ -516,4 +531,3 @@ def test_add_specimen_routes_to_extraction_batch_queue(bdb_function):
         not lin.is_deleted and lin.child_instance.euid == container.euid
         for lin in queued_step.parent_of_lineages
     )
-

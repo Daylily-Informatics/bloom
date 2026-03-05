@@ -8,11 +8,11 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "EUID": ""
-        },
+        "captured_data": {},
         "verify_data": "yes",
-        "verify" : {"instance_type" : "*/*/*/*"},
+        "verify": {
+          "instance_type": "*/*/*/*"
+        },
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -27,6 +27,10 @@
           "end_operator": "",
           "comments": "",
           "step_number": ""
+        },
+        "ui_schema": {
+          "title": "Set Object As Child",
+          "fields": []
         }
       }
     }

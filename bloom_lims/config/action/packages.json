@@ -9,10 +9,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Carrier Name": "",
-          "Tracking Number": ""
-        },
+        "captured_data": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/package-generated/1.0": {
             "json_addl": {
@@ -36,6 +33,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Register Package",
+          "fields": []
         }
       },
       "properties": {
@@ -54,10 +55,7 @@
         "action_simple_value": "",
         "action_user": [],
         "capture_data": "yes",
-        "captured_data": {
-          "Carrier Name": "",
-          "Tracking Number": ""
-        },
+        "captured_data": {},
         "child_workflow_step_obj": {
           "workflow_step/accessioning-steps/package-generated/1.0": {
             "json_addl": {
@@ -81,6 +79,10 @@
               }
             }
           }
+        },
+        "ui_schema": {
+          "title": "Override Action Name",
+          "fields": []
         }
       },
       "properties": {

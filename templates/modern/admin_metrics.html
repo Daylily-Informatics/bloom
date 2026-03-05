@@ -1,0 +1,199 @@
+{% extends "modern/base.html" %}
+
+{% block title %}TapDB Metrics - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>TapDB Metrics</h1>
+    <p class="text-muted">DB query latency metrics (TSV, two-week rotation)</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin" class="btn btn-outline btn-sm">
+      <i class="fas fa-arrow-left"></i> Admin
+    </a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-chart-line"></i> DB Metrics (TSV)</h3>
+  </div>
+  <div class="card-body">
+    <div class="info-grid" style="gap: var(--spacing-xs);">
+      <div class="info-row"><span class="info-key">Enabled:</span> <span class="info-val font-mono">{{ "yes" if metrics_enabled else "no" }}</span></div>
+      <div class="info-row"><span class="info-key">Period start (UTC):</span> <span class="info-val font-mono">{{ period_start_utc }}</span></div>
+      <div class="info-row"><span class="info-key">File:</span> <span class="info-val font-mono">{{ metrics_file }}</span></div>
+      <div class="info-row"><span class="info-key">Dropped (process):</span> <span class="info-val font-mono">{{ dropped_count }}</span></div>
+    </div>
+    {% if metrics_message %}
+      <div class="text-muted" style="margin-top: var(--spacing-md);">
+        {{ metrics_message }}
+      </div>
+    {% endif %}
+
+    <form method="get" action="/admin/metrics" style="margin-top: var(--spacing-md); display: flex; gap: var(--spacing-md); align-items: flex-end; flex-wrap: wrap;">
+      <div class="form-group" style="margin: 0;">
+        <label class="form-label">Tail lines</label>
+        <input class="form-input" type="number" name="limit" min="1" max="20000" value="{{ limit }}" style="width: 140px;" />
+      </div>
+      <button class="btn btn-primary btn-sm" type="submit">
+        <i class="fas fa-rotate"></i> Refresh
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card stat-card">
+    <div class="stat-value">{{ summary.count }}</div>
+    <div class="stat-label">Rows Parsed</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ "%.1f"|format(summary.p50_ms) }}</div>
+    <div class="stat-label">p50 ms</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ "%.1f"|format(summary.p95_ms) }}</div>
+    <div class="stat-label">p95 ms</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ "%.1f"|format(summary.p99_ms) }}</div>
+    <div class="stat-label">p99 ms</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ "%.1f"|format(summary.max_ms) }}</div>
+    <div class="stat-label">max ms</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-hourglass-half"></i> Slowest Queries (Top 25)</h3>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ms</th>
+            <th>ok</th>
+            <th>op</th>
+            <th>table</th>
+            <th>route</th>
+            <th>user</th>
+            <th>error</th>
+            <th>ts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.slowest %}
+          <tr>
+            <td class="font-mono">{{ "%.3f"|format(row.duration_ms) }}</td>
+            <td class="font-mono">{{ "1" if row.ok else "0" }}</td>
+            <td>{{ row.op }}</td>
+            <td class="font-mono">{{ row.table_hint }}</td>
+            <td class="font-mono">{{ row.method }} {{ row.path }}</td>
+            <td class="font-mono">{{ row.username }}</td>
+            <td class="font-mono">{{ row.error_type }}</td>
+            <td class="font-mono">{{ row.ts_utc }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: var(--spacing-lg);">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-route"></i> By Route (p95)</h3>
+    </div>
+    <div class="card-body">
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>route</th>
+              <th>count</th>
+              <th>p95 ms</th>
+              <th>max ms</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in summary.by_path[:25] %}
+            <tr>
+              <td class="font-mono">{{ row.path }}</td>
+              <td class="font-mono">{{ row.count }}</td>
+              <td class="font-mono">{{ "%.3f"|format(row.p95_ms) }}</td>
+              <td class="font-mono">{{ "%.3f"|format(row.max_ms) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-table"></i> By Table Hint (p95)</h3>
+    </div>
+    <div class="card-body">
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>table</th>
+              <th>count</th>
+              <th>p95 ms</th>
+              <th>max ms</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in summary.by_table[:25] %}
+            <tr>
+              <td class="font-mono">{{ row.table_hint }}</td>
+              <td class="font-mono">{{ row.count }}</td>
+              <td class="font-mono">{{ "%.3f"|format(row.p95_ms) }}</td>
+              <td class="font-mono">{{ "%.3f"|format(row.max_ms) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.stat-card {
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-white);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--color-gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: var(--spacing-xs);
+}
+</style>
+{% endblock %}
+

@@ -1,0 +1,64 @@
+"""FastAPI application factory for BLOOM.
+
+This keeps `main.py` as a thin entrypoint while preserving `uvicorn main:app`.
+"""
+
+from __future__ import annotations
+
+import os
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+
+from bloom_lims.api import RateLimitMiddleware, api_v1_router
+from bloom_lims.gui.errors import register_exception_handlers
+from bloom_lims.gui.router import router as gui_router
+from bloom_lims.tapdb_metrics import request_method_var, request_path_var, stop_all_writers
+
+
+def create_app() -> FastAPI:
+    app = FastAPI()
+
+    @app.on_event("shutdown")
+    def _shutdown_cleanup() -> None:
+        # Best-effort shutdown to flush/stop metrics writer.
+        stop_all_writers()
+
+    # Request attribution context for TapDB-style DB metrics.
+    @app.middleware("http")
+    async def _metrics_request_context(request, call_next):
+        token_path = request_path_var.set(request.url.path)
+        token_method = request_method_var.set(request.method)
+        try:
+            return await call_next(request)
+        finally:
+            request_path_var.reset(token_path)
+            request_method_var.reset(token_method)
+
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/templates", StaticFiles(directory="templates"), name="templates")
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+    app.mount("/tmp", StaticFiles(directory="tmp"), name="tmp")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
+
+    # Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
+    if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":
+        app.add_middleware(RateLimitMiddleware)
+
+    # Include routers
+    app.include_router(api_v1_router)
+    app.include_router(gui_router)
+
+    register_exception_handlers(app)
+    return app

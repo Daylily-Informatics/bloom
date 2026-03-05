@@ -8,10 +8,7 @@
         "max_executions": "-1",
         "action_enabled": "0",
         "capture_data": "yes",
-        "captured_data": {
-          "Interpretation Comments": "",
-          "_object_status": "<select name=&quot;object_status&quot;><option value=&quot;pass&quot;>PASS</option><option value=&quot;fail&quot;>FAIL</option><option value=&quot;repeat&quot;>REPEAT</option></select>"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -21,7 +18,11 @@
           "printer_name": "",
           "label_style": ""
         },
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Record Quantification Outcome",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",
@@ -38,10 +39,7 @@
         "max_executions": "-1",
         "action_enabled": "0",
         "capture_data": "yes",
-        "captured_data": {
-          "Log Comment": "",
-          "Temperature (celcuius)": ""
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
@@ -51,7 +49,11 @@
           "printer_name": "",
           "label_style": ""
         },
-        "curr_user": ""
+        "curr_user": "",
+        "ui_schema": {
+          "title": "Log Temperature",
+          "fields": []
+        }
       },
       "properties": {
         "name": "",

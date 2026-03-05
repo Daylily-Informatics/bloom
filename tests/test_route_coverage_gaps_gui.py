@@ -21,6 +21,7 @@ import pytest
 os.environ["BLOOM_OAUTH"] = "no"
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
+from fastapi.responses import RedirectResponse
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -80,7 +81,10 @@ def test_auth_callback_aliases(client: TestClient) -> None:
     assert resp.status_code == 200
     assert "Processing" in resp.text or "login" in resp.text.lower()
 
-    with patch.object(main, "_complete_cognito_login", new=AsyncMock(return_value=main.RedirectResponse(url="/", status_code=303))):
+    with patch(
+        "bloom_lims.gui.routes.auth._complete_cognito_login",
+        new=AsyncMock(return_value=RedirectResponse(url="/", status_code=303)),
+    ):
         resp = client.post("/auth/callback", json={"access_token": "x", "id_token": "y"}, follow_redirects=False)
         assert resp.status_code == 303
 
@@ -221,7 +225,7 @@ def test_query_by_euids_create_and_download_file_flows(client: TestClient, tmp_p
         bstatus="created",
         json_addl={"properties": {"name": "file-1", "lab_code": "X"}},
     )
-    with patch("main.BloomFile.get_by_euid", return_value=fake_file):
+    with patch("bloom_lims.gui.routes.legacy.BloomFile.get_by_euid", return_value=fake_file):
         resp = client.post("/query_by_euids", data={"file_euids": "FX-1"})
         assert resp.status_code == 200
         assert "text/html" in resp.headers.get("content-type", "")
@@ -231,8 +235,8 @@ def test_query_by_euids_create_and_download_file_flows(client: TestClient, tmp_p
         euid="FX-TEST",
         json_addl={"properties": {"current_s3_uri": "s3://bucket/key"}},
     )
-    with patch("main.BloomFile.create_file", return_value=fake_created), patch(
-        "main.BloomFileSet.add_files_to_file_set", return_value=None
+    with patch("bloom_lims.gui.routes.files.BloomFile.create_file", return_value=fake_created), patch(
+        "bloom_lims.gui.routes.files.BloomFileSet.add_files_to_file_set", return_value=None
     ):
         resp = client.post(
             "/create_file",
@@ -250,7 +254,7 @@ def test_query_by_euids_create_and_download_file_flows(client: TestClient, tmp_p
     downloaded = tmp_dir / "downloaded.txt"
     downloaded.write_text("ok", encoding="utf-8")
 
-    with patch("main.BloomFile.download_file", return_value=str(downloaded)):
+    with patch("bloom_lims.gui.routes.files.BloomFile.download_file", return_value=str(downloaded)):
         resp = client.post(
             "/download_file",
             data={

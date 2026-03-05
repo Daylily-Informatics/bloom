@@ -77,6 +77,19 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
+    def test_admin_includes_tapdb_metrics_link(self, client):
+        """Admin page includes link to TapDB metrics."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "/admin/metrics" in response.text
+
+    def test_admin_metrics_returns_html(self, client):
+        """TapDB metrics page returns HTML."""
+        response = client.get("/admin/metrics")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "TapDB Metrics" in response.text
+
     def test_admin_preferences_post_redirects(self, client):
         """Test admin preferences form POST succeeds and redirects."""
         response = client.post(
@@ -100,9 +113,9 @@ class TestMainGUIEndpoints:
 
     def test_admin_start_zebra_service_redirects_on_success(self, client):
         """Test zebra start action launches command and redirects with success flag."""
-        with patch("main.shutil.which", return_value="/usr/local/bin/zday_start"):
+        with patch("bloom_lims.gui.routes.legacy.shutil.which", return_value="/usr/local/bin/zday_start"):
             with patch(
-                "main.subprocess.run",
+                "bloom_lims.gui.routes.legacy.subprocess.run",
                 return_value=subprocess.CompletedProcess(
                     args=["zday_start"], returncode=0, stdout="ok", stderr=""
                 ),

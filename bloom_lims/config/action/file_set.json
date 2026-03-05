@@ -1,4 +1,4 @@
-{ 
+{
   "add-file": {
     "1.0": {
       "action_template": {
@@ -8,16 +8,18 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "file_euid": "File EUID: <input name=file_euid />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
         "curr_user": "",
-        "description": "Add a file to a file set."
+        "description": "Add a file to a file set.",
+        "ui_schema": {
+          "title": "Add File To Set",
+          "fields": []
+        }
       }
     }
   },
@@ -30,16 +32,18 @@
         "max_executions": "-1",
         "action_enabled": "1",
         "capture_data": "yes",
-        "captured_data": {
-          "file_euid": "File EUID: <input name=file_euid />"
-        },
+        "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
         "curr_user": "",
-        "description": "Remove a file from a file set."
+        "description": "Remove a file from a file set.",
+        "ui_schema": {
+          "title": "Remove File From File Set",
+          "fields": []
+        }
       }
     }
   }
