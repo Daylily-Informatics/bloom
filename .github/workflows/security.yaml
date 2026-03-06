@@ -1,0 +1,49 @@
+name: Security Checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install security tools
+        run: |
+          pip install bandit[toml] safety ruff
+
+      - name: Ruff lint check (advisory)
+        continue-on-error: true
+        run: ruff check bloom_lims/ main.py --output-format=github
+
+      - name: Ruff format check (advisory)
+        continue-on-error: true
+        run: ruff format --check bloom_lims/ main.py
+
+      - name: Bandit security scan (JSON report)
+        run: bandit -c pyproject.toml -r bloom_lims/ main.py -f json -o bandit-report.json || true
+
+      - name: Bandit security scan (human-readable)
+        continue-on-error: true
+        run: bandit -c pyproject.toml -r bloom_lims/ main.py
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          if-no-files-found: ignore
+
