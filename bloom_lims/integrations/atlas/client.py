@@ -7,6 +7,8 @@ from typing import Any
 
 import requests
 
+from bloom_lims.security.transport import InsecureTransportError, require_https_url
+from bloom_lims.integrations.atlas.tls import resolve_requests_verify
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,16 @@ class AtlasClient:
         timeout_seconds: int = 10,
         verify_ssl: bool = True,
     ):
-        self.base_url = base_url.rstrip("/")
+        clean_base_url = str(base_url or "").strip()
+        if clean_base_url:
+            try:
+                clean_base_url = require_https_url(clean_base_url, context_label="atlas.base_url")
+            except InsecureTransportError as exc:
+                raise AtlasClientError(str(exc), path="atlas.base_url") from exc
+        self.base_url = clean_base_url.rstrip("/")
         self.token = token
         self.timeout_seconds = timeout_seconds
-        self.verify_ssl = verify_ssl
+        self.verify_ssl = resolve_requests_verify(base_url=self.base_url, verify_ssl=bool(verify_ssl))
 
     @property
     def is_configured(self) -> bool:

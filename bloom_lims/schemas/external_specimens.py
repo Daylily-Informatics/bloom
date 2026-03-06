@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class AtlasReferences(BaseModel):
+    tenant_id: str | None = None
     order_number: str | None = None
     patient_id: str | None = None
     shipment_number: str | None = None
@@ -68,4 +69,3 @@ class ExternalSpecimenResponse(BaseModel):
 class ExternalSpecimenLookupResponse(BaseModel):
     items: list[ExternalSpecimenResponse]
     total: int
-

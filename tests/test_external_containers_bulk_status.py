@@ -16,7 +16,7 @@ from main import app  # noqa: E402
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 def _create_tube(client: TestClient, name: str) -> str:

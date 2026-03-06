@@ -72,5 +72,13 @@ def test_create_file_with_url(bloom_file_instance):
         assert new_file.json_addl['properties']['description'] == "URL test"
         assert new_file.json_addl['properties']['original_file_size_bytes'] == len(b"test content")
 
+
+def test_create_file_with_http_url_rejected(bloom_file_instance):
+    with pytest.raises(Exception, match="Only https:// URLs are permitted"):
+        bloom_file_instance.create_file(
+            file_metadata={"description": "URL test", "import_or_remote": "import"},
+            url="http://example.org/test.png",
+        )
+
 if __name__ == "__main__":
     pytest.main()

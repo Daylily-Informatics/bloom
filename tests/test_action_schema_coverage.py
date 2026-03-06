@@ -31,6 +31,11 @@ def test_every_action_template_has_ui_schema_fields():
             missing.append(f"{path}:{action_name}:{version}: missing ui_schema.fields")
             continue
 
+        capture_mode = str(action_template.get("capture_data") or "").strip().lower()
+        if capture_mode == "yes" and len(fields) == 0:
+            missing.append(f"{path}:{action_name}:{version}: capture_data=yes requires non-empty ui_schema.fields")
+            continue
+
         for idx, field in enumerate(fields):
             if not isinstance(field, dict):
                 missing.append(f"{path}:{action_name}:{version}: field[{idx}] is not an object")

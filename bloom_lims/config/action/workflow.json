@@ -32,7 +32,15 @@
         },
         "ui_schema": {
           "title": "Scan Conatiner Barcodes",
-          "fields": []
+          "fields": [
+            {
+              "name": "discard_barcodes",
+              "label": "Container EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One container EUID per line"
+            }
+          ]
         }
       },
       "properties": {

@@ -29,6 +29,8 @@ from bloom_lims.domain.utils import get_datetime_string, generate_random_string,
 
 import re
 
+from bloom_lims.security.transport import InsecureTransportError, require_https_url
+
 logger = logging.getLogger(__name__)
 
 
@@ -417,6 +419,11 @@ class BloomFile(BloomObj):
                 raise ValueError(
                     "file_name must be provided if file_data or url is passed without a filename."
                 )
+        if url:
+            try:
+                url = require_https_url(url, context_label="File source URL")
+            except InsecureTransportError as exc:
+                raise ValueError("Only https:// URLs are permitted for file ingestion") from exc
 
         file_suffix = file_name.split(".")[-1]
         s3_key = self._determine_s3_key(euid, file_name)

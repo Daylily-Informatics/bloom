@@ -18,7 +18,14 @@
         "description": "Add a file to a file set.",
         "ui_schema": {
           "title": "Add File To Set",
-          "fields": []
+          "fields": [
+            {
+              "name": "file_euid",
+              "label": "File EUID",
+              "type": "text",
+              "required": true
+            }
+          ]
         }
       }
     }
@@ -42,7 +49,14 @@
         "description": "Remove a file from a file set.",
         "ui_schema": {
           "title": "Remove File From File Set",
-          "fields": []
+          "fields": [
+            {
+              "name": "file_euid",
+              "label": "File EUID",
+              "type": "text",
+              "required": true
+            }
+          ]
         }
       }
     }

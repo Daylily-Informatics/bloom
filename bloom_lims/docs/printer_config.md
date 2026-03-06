@@ -7,7 +7,7 @@ Bloom relies on [zebra_day](github.com/DaylilyInformatics/zebra_day) to administ
 
 ### Detect Printers On Your Local Network
 _this MUST be done at least once when setting up a new bloom install_ && _done again when adding new printers_
-* `zebra_day` can scan the local network (barring firewal rules blocking this) and update the venv printer config file with detected printers. Open the `Scan Network For Zebra Printers` page @ `http://localhost:8118/build_new_printers_config_json`. You IP prefix should be auto detected, else enter the first three sections (ie `192.168.1`). Enter a few character 'Lab Code' (only alphanumeric, no whitespace, etc.), this will be the code under which detected printers are added to the json config. The scan might take a few minutes to complete.
+* `zebra_day` can scan the local network (barring firewal rules blocking this) and update the venv printer config file with detected printers. Open the `Scan Network For Zebra Printers` page @ `https://localhost:8118/build_new_printers_config_json`. You IP prefix should be auto detected, else enter the first three sections (ie `192.168.1`). Enter a few character 'Lab Code' (only alphanumeric, no whitespace, etc.), this will be the code under which detected printers are added to the json config. The scan might take a few minutes to complete.
 
 ![Printer Scan](../imgs/bc_scan.png)
 

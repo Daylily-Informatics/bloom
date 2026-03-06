@@ -89,7 +89,7 @@ def test_push_test_order_status_event_happy_path(monkeypatch):
     app.dependency_overrides[require_external_token_auth] = _external_rw_user
     monkeypatch.setattr(atlas_bridge_mod, "AtlasService", _FakeAtlasService)
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
             "/api/v1/external/atlas/test-orders/8f4ad36e-5f41-4a00-83dd-a2f3afb8f431/status-events",
             headers={"Idempotency-Key": "idem-123"},
@@ -109,7 +109,7 @@ def test_push_test_order_status_event_requires_token_auth(monkeypatch):
 
     monkeypatch.setattr(atlas_bridge_mod, "AtlasService", _FakeAtlasService)
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
             "/api/v1/external/atlas/test-orders/8f4ad36e-5f41-4a00-83dd-a2f3afb8f431/status-events",
             json=_payload(),
@@ -126,7 +126,7 @@ def test_push_test_order_status_event_requires_write_permission(monkeypatch):
     app.dependency_overrides[require_external_token_auth] = _external_ro_user
     monkeypatch.setattr(atlas_bridge_mod, "AtlasService", _FakeAtlasService)
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
             "/api/v1/external/atlas/test-orders/8f4ad36e-5f41-4a00-83dd-a2f3afb8f431/status-events",
             json=_payload(),
@@ -143,7 +143,7 @@ def test_push_test_order_status_event_missing_tenant_config_maps_to_424(monkeypa
     app.dependency_overrides[require_external_token_auth] = _external_rw_user
     monkeypatch.setattr(atlas_bridge_mod, "AtlasService", _FakeAtlasService)
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.post(
             "/api/v1/external/atlas/test-orders/8f4ad36e-5f41-4a00-83dd-a2f3afb8f431/status-events",
             json=_payload(),

@@ -8,7 +8,7 @@
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
-        "capture_data": "yes",
+        "capture_data": "no",
         "captured_data": {},
         "child_workflow_step_obj": {},
         "curr_user": "",
@@ -73,7 +73,21 @@
         "verify_data": "yes",
         "ui_schema": {
           "title": "Stamp plates into plate",
-          "fields": []
+          "fields": [
+            {
+              "name": "Destination Plate EUID",
+              "label": "Destination Plate EUID",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "source_barcodes",
+              "label": "Source Plate EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One plate EUID per line"
+            }
+          ]
         }
       }
     }
@@ -119,7 +133,21 @@
         "verify_data": "yes",
         "ui_schema": {
           "title": "Add Plates to Plate",
-          "fields": []
+          "fields": [
+            {
+              "name": "Destination Plate EUID",
+              "label": "Destination Plate EUID",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "source_barcodes",
+              "label": "Source Plate EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One plate EUID per line"
+            }
+          ]
         }
       }
     }

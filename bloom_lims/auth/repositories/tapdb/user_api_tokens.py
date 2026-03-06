@@ -64,6 +64,8 @@ class UserTokenRecord:
     token_name: str
     token_prefix: str
     scope: str
+    atlas_callback_uri: str | None
+    atlas_tenant_uuid: str | None
     created_at: datetime | None
     euid: str | None = None
 
@@ -117,6 +119,8 @@ class TapdbUserAPITokenRepository:
         token_name: str,
         token_prefix: str,
         scope: str,
+        atlas_callback_uri: str | None,
+        atlas_tenant_uuid: str | None,
         token_hash: str,
         expires_at: datetime,
         created_by: uuid.UUID | None,
@@ -129,6 +133,8 @@ class TapdbUserAPITokenRepository:
             "token_name": token_name,
             "token_prefix": token_prefix,
             "scope": scope,
+            "atlas_callback_uri": atlas_callback_uri,
+            "atlas_tenant_uuid": atlas_tenant_uuid,
             "created_by": str(created_by) if created_by else None,
             "created_at": datetime.now(UTC).isoformat(),
         }
@@ -369,6 +375,8 @@ class TapdbUserAPITokenRepository:
             token_name=str(props.get("token_name") or token_instance.name or token_instance.euid),
             token_prefix=str(props.get("token_prefix") or ""),
             scope=str(props.get("scope") or ""),
+            atlas_callback_uri=str(props.get("atlas_callback_uri") or "").strip() or None,
+            atlas_tenant_uuid=str(props.get("atlas_tenant_uuid") or "").strip() or None,
             created_at=_to_dt(props.get("created_at")) or token_instance.created_dt,
             euid=token_instance.euid,
         )

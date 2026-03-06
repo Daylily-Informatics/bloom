@@ -192,7 +192,7 @@ def _ensure_instance_prefix_sequence(session, prefix: str) -> None:
     ensure_instance_prefix_sequence(session, normalized)
 
 
-def seed_bloom_templates(config_dir: Optional[Path] = None) -> SeedSummary:
+def seed_bloom_templates(config_dir: Optional[Path] = None, *, overwrite: bool = False) -> SeedSummary:
     """
     Upsert Bloom legacy templates into TAPDB generic_template.
 
@@ -251,12 +251,40 @@ def seed_bloom_templates(config_dir: Optional[Path] = None) -> SeedSummary:
                 inserted += 1
                 continue
 
-            # Existing templates are intentionally left unchanged here. Some
-            # local dev databases still carry legacy column typing, and
-            # update-flushes through ORM mappings can fail in mixed-schema
-            # environments. The supplemental seed path is used to ensure
-            # required templates exist, not to mutate existing definitions.
-            continue
+            if not overwrite:
+                # Existing templates are intentionally left unchanged by
+                # default. Some legacy local dev databases carried mixed
+                # typing; mutating rows could fail in those environments.
+                # Use overwrite=True (CLI: `bloom db seed --overwrite`) when
+                # you explicitly want config-driven updates.
+                continue
+
+            # Minimal overwrite: config-driven json_addl is the main contract
+            # for templates. Keep other fields aligned too.
+            changed = False
+            if existing.name != record.name:
+                existing.name = record.name
+                changed = True
+            if getattr(existing, "instance_prefix", None) != record.instance_prefix:
+                existing.instance_prefix = record.instance_prefix
+                changed = True
+            if getattr(existing, "instance_polymorphic_identity", None) != record.instance_polymorphic_identity:
+                existing.instance_polymorphic_identity = record.instance_polymorphic_identity
+                changed = True
+            if getattr(existing, "bstatus", None) != record.bstatus:
+                existing.bstatus = record.bstatus
+                changed = True
+            if getattr(existing, "is_singleton", None) != record.is_singleton:
+                existing.is_singleton = record.is_singleton
+                changed = True
+            if getattr(existing, "is_deleted", None):
+                existing.is_deleted = False
+                changed = True
+            if getattr(existing, "json_addl", None) != record.json_addl:
+                existing.json_addl = record.json_addl
+                changed = True
+            if changed:
+                updated += 1
 
         for prefix in sorted(prefixes):
             _ensure_instance_prefix_sequence(session, prefix)

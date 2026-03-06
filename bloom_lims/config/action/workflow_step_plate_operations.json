@@ -31,7 +31,14 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Stamp Plate (no well address changes)",
-          "fields": []
+          "fields": [
+            {
+              "name": "plate_euid",
+              "label": "Plate EUID",
+              "type": "text",
+              "required": true
+            }
+          ]
         }
       },
       "properties": {
@@ -67,7 +74,7 @@
         "action_executed": "0",
         "max_executions": "-1",
         "action_enabled": "1",
-        "capture_data": "yes",
+        "capture_data": "no",
         "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],

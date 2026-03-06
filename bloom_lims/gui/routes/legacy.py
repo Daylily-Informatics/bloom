@@ -34,6 +34,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from auth.cognito.client import CognitoConfigurationError
 from bloom_lims.bobjs import BloomFile, BloomFileReference, BloomFileSet, BloomObj
 from bloom_lims.bvars import BloomVars
+from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.actions import hydrate_dynamic_action_groups as _hydrate_dynamic_action_groups
 from bloom_lims.gui.deps import (
@@ -44,6 +45,7 @@ from bloom_lims.gui.deps import (
 )
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
 from bloom_lims.gui.jinja import templates
+from bloom_lims.security.transport import is_https_url
 
 
 router = APIRouter()
@@ -329,6 +331,14 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     dest_section = {"section": dest}
 
     user_data = request.session.get("user_data", {})
+    settings = get_settings()
+    configured_zebra_admin_url = (
+        os.environ.get("BLOOM_ZEBRA_ADMIN_URL")
+        or os.environ.get("BLOOM_UI__ZEBRA_ADMIN_URL")
+        or str(getattr(settings.ui, "zebra_admin_url", "") or "")
+    ).strip()
+    zebra_admin_url = configured_zebra_admin_url if is_https_url(configured_zebra_admin_url) else None
+    zebra_admin_url_warning = bool(configured_zebra_admin_url and not zebra_admin_url)
 
     bobdb = BloomObj(
         BLOOMdb3(app_username=request.session["user_data"]["email"]),
@@ -364,14 +374,16 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         zebra_version = importlib.metadata.version("zebra_day")
         dependency_info["zebra_day"] = {
             "version": zebra_version,
-            "admin_url": "http://localhost:8118",
+            "admin_url": zebra_admin_url,
+            "admin_url_warning": zebra_admin_url_warning,
             "description": "Zebra printer fleet management and ZPL label printing",
             "status": "available",
         }
     except importlib.metadata.PackageNotFoundError:
         dependency_info["zebra_day"] = {
             "version": "Not installed",
-            "admin_url": None,
+            "admin_url": zebra_admin_url,
+            "admin_url_warning": zebra_admin_url_warning,
             "description": "Zebra printer fleet management and ZPL label printing",
             "status": "missing",
         }
@@ -448,6 +460,8 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "saved": request.query_params.get("saved") == "1",
         "zebra_started": request.query_params.get("zebra_started") == "1",
         "zebra_error": request.query_params.get("zebra_error", ""),
+        "tool_api_default_token_days": settings.auth.tool_api_default_token_days,
+        "tool_api_max_token_days": settings.auth.tool_api_max_token_days,
     }
     return HTMLResponse(content=template.render(context))
 

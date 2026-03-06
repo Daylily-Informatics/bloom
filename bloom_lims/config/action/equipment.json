@@ -25,7 +25,15 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Add Container To",
-          "fields": []
+          "fields": [
+            {
+              "name": "container_euids",
+              "label": "Container EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One container EUID per line"
+            }
+          ]
         }
       },
       "properties": {
@@ -59,7 +67,15 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Remove Container",
-          "fields": []
+          "fields": [
+            {
+              "name": "container_euids",
+              "label": "Container EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One container EUID per line"
+            }
+          ]
         }
       },
       "properties": {
@@ -134,7 +150,15 @@
         },
         "ui_schema": {
           "title": "Log Temperature",
-          "fields": []
+          "fields": [
+            {
+              "name": "Temperature (celcius)",
+              "label": "Temperature (celcius)",
+              "type": "number",
+              "required": true,
+              "step": "0.1"
+            }
+          ]
         }
       },
       "properties": {

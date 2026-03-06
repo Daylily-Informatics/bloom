@@ -22,7 +22,33 @@
         "description": "Set Status",
         "ui_schema": {
           "title": "Set Status",
-          "fields": []
+          "fields": [
+            {
+              "name": "object_status",
+              "label": "Status",
+              "type": "select",
+              "required": true,
+              "default": "in_progress",
+              "options": [
+                {
+                  "label": "In Progress",
+                  "value": "in_progress"
+                },
+                {
+                  "label": "Complete",
+                  "value": "complete"
+                },
+                {
+                  "label": "Fail",
+                  "value": "failed"
+                },
+                {
+                  "label": "Abandon",
+                  "value": "abandoned"
+                }
+              ]
+            }
+          ]
         }
       }
     }
@@ -78,7 +104,39 @@
         "description": "Add Parent or Child Relationships (aka lineages).",
         "ui_schema": {
           "title": "Add Parent or Child Relationship(s)",
-          "fields": []
+          "fields": [
+            {
+              "name": "lineage_type_to_create",
+              "label": "Create Relationship(s)",
+              "type": "select",
+              "required": true,
+              "default": "parent",
+              "options": [
+                {
+                  "label": "Parents of this record",
+                  "value": "parent"
+                },
+                {
+                  "label": "Children of this record",
+                  "value": "child"
+                }
+              ]
+            },
+            {
+              "name": "relationship_type",
+              "label": "Relationship Type",
+              "type": "text",
+              "required": true,
+              "default": "generic"
+            },
+            {
+              "name": "euids",
+              "label": "EUIDS",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One EUID per line"
+            }
+          ]
         }
       }
     }
@@ -102,7 +160,45 @@
         "description": "Create a Subject (decision scope) with this object as the anchor.",
         "ui_schema": {
           "title": "Create Subject (Decision Scope)",
-          "fields": []
+          "fields": [
+            {
+              "name": "subject_kind",
+              "label": "Subject Kind",
+              "type": "select",
+              "required": true,
+              "default": "accession",
+              "options": [
+                {
+                  "label": "Accession",
+                  "value": "accession"
+                },
+                {
+                  "label": "Analysis Bundle",
+                  "value": "analysis_bundle"
+                },
+                {
+                  "label": "Report",
+                  "value": "report"
+                },
+                {
+                  "label": "Generic",
+                  "value": "generic"
+                }
+              ]
+            },
+            {
+              "name": "subject_name",
+              "label": "Subject Name (optional)",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "comments",
+              "label": "Comments",
+              "type": "textarea",
+              "required": false
+            }
+          ]
         }
       }
     }

@@ -157,8 +157,12 @@
             <i class="fas fa-play"></i> Start Zebra Service
           </button>
         </form>
-        <span class="text-sm text-muted">Port 8118</span>
       </div>
+      {% elif dependency_info.zebra_day.admin_url_warning %}
+      <p class="text-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        Zebra admin URL is not HTTPS. Configure <code>BLOOM_ZEBRA_ADMIN_URL</code> with an <code>https://</code> URL.
+      </p>
       {% endif %}
     </div>
   </div>
@@ -266,6 +270,204 @@
       {% else %}
       <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> {{ cognito_info.message }}</p>
       {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Tool API Users -->
+<h2 class="section-title" style="margin-top: var(--spacing-xl);">
+  <i class="fas fa-key"></i> Tool API Users
+</h2>
+<div class="card" id="tool-api-users-card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-robot"></i> Admin-Managed API Principals</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-muted">
+      Create API-only tool users, issue initial <code>blm_</code> tokens, and grant additional tokens.
+    </p>
+
+    <div id="tool-users-banner" class="tool-users-banner" style="display: none;"></div>
+
+    <div class="grid grid-2" style="margin-top: var(--spacing-md);">
+      <div class="info-item">
+        <div class="info-label">Create Tool API User</div>
+        <form id="tool-user-create-form" class="tool-user-form">
+          <div class="form-group">
+            <label class="form-label" for="tool-display-name">Display Name</label>
+            <input id="tool-display-name" class="form-input" type="text" required maxlength="200">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tool-external-key">External System Key</label>
+            <input id="tool-external-key" class="form-input" type="text" required maxlength="128" placeholder="atlas-prod">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tool-role">Role</label>
+            <select id="tool-role" class="form-select">
+              <option value="INTERNAL_READ_WRITE" selected>INTERNAL_READ_WRITE</option>
+              <option value="INTERNAL_READ_ONLY">INTERNAL_READ_ONLY</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tool-description">Description (optional)</label>
+            <textarea id="tool-description" class="form-input" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="display: flex; gap: var(--spacing-xs); align-items: center;">
+              <input id="tool-issue-initial-token" type="checkbox" checked>
+              Issue initial token
+            </label>
+          </div>
+          <div id="tool-initial-token-fields" class="tool-inline-fields">
+            <div class="form-group">
+              <label class="form-label" for="tool-initial-token-name">Initial Token Name (optional)</label>
+              <input id="tool-initial-token-name" class="form-input" type="text" maxlength="120" placeholder="atlas-initial">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tool-initial-token-scope">Initial Token Scope</label>
+              <select id="tool-initial-token-scope" class="form-select">
+                <option value="internal_rw" selected>internal_rw</option>
+                <option value="internal_ro">internal_ro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tool-initial-token-ttl">TTL (days)</label>
+              <input
+                id="tool-initial-token-ttl"
+                class="form-input"
+                type="number"
+                min="1"
+                max="{{ tool_api_max_token_days }}"
+                value="{{ tool_api_default_token_days }}"
+              >
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tool-initial-token-note">Initial Token Note (optional)</label>
+              <input id="tool-initial-token-note" class="form-input" type="text">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tool-initial-token-atlas-callback-uri">Atlas Callback URI (optional)</label>
+              <input
+                id="tool-initial-token-atlas-callback-uri"
+                class="form-input"
+                type="url"
+                placeholder="https://atlas.example/api/integrations/bloom/v1/events"
+              >
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tool-initial-token-atlas-tenant-uuid">Atlas Tenant UUID (optional)</label>
+              <input
+                id="tool-initial-token-atlas-tenant-uuid"
+                class="form-input font-mono"
+                type="text"
+                placeholder="00000000-0000-0000-0000-000000000000"
+              >
+            </div>
+          </div>
+          <button id="tool-create-submit" type="submit" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Create Tool User
+          </button>
+        </form>
+      </div>
+
+      <div class="info-item">
+        <div class="info-label">Grant Additional Token</div>
+        <form id="tool-grant-token-form" class="tool-user-form" style="display: none;">
+          <input type="hidden" id="grant-user-id">
+          <div class="form-group">
+            <label class="form-label" for="grant-user-name">Tool User</label>
+            <input id="grant-user-name" class="form-input" type="text" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="grant-token-name">Token Name</label>
+            <input id="grant-token-name" class="form-input" type="text" required maxlength="120">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="grant-token-scope">Scope</label>
+            <select id="grant-token-scope" class="form-select">
+              <option value="internal_rw">internal_rw</option>
+              <option value="internal_ro">internal_ro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="grant-token-ttl">TTL (days)</label>
+            <input
+              id="grant-token-ttl"
+              class="form-input"
+              type="number"
+              min="1"
+              max="{{ tool_api_max_token_days }}"
+              value="{{ tool_api_default_token_days }}"
+            >
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="grant-token-note">Note (optional)</label>
+            <input id="grant-token-note" class="form-input" type="text">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="grant-token-atlas-callback-uri">Atlas Callback URI (optional)</label>
+            <input
+              id="grant-token-atlas-callback-uri"
+              class="form-input"
+              type="url"
+              placeholder="https://atlas.example/api/integrations/bloom/v1/events"
+            >
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="grant-token-atlas-tenant-uuid">Atlas Tenant UUID (optional)</label>
+            <input
+              id="grant-token-atlas-tenant-uuid"
+              class="form-input font-mono"
+              type="text"
+              placeholder="00000000-0000-0000-0000-000000000000"
+            >
+          </div>
+          <div style="display: flex; gap: var(--spacing-sm);">
+            <button id="grant-token-submit" type="submit" class="btn btn-primary">
+              <i class="fas fa-key"></i> Grant Token
+            </button>
+            <button id="grant-token-cancel" type="button" class="btn btn-outline">Cancel</button>
+          </div>
+        </form>
+        <div id="tool-grant-placeholder" class="text-muted text-sm">
+          Select a tool user in the table below to grant an additional token.
+        </div>
+      </div>
+    </div>
+
+    <div id="tool-token-once-panel" class="tool-token-panel" style="display: none;">
+      <div class="info-label">Plaintext Token (Shown Once)</div>
+      <div class="tool-token-value-row">
+        <input id="tool-token-value" class="form-input font-mono" type="text" readonly>
+        <button id="tool-token-copy" type="button" class="btn btn-outline btn-sm">
+          <i class="fas fa-copy"></i> Copy
+        </button>
+      </div>
+      <div class="text-warning text-sm">Store this token now. Bloom will not show it again.</div>
+    </div>
+
+    <div class="table-container" style="margin-top: var(--spacing-md);">
+      <table class="table" id="tool-users-table">
+        <thead>
+          <tr>
+            <th>Display Name</th>
+            <th>External Key</th>
+            <th>Role</th>
+            <th>User UUID</th>
+            <th>Token Count</th>
+            <th>Last Token Issued</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tool-users-table-body">
+          <tr>
+            <td colspan="7" class="text-muted">Loading tool API users...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="tool-users-admin-warning" class="text-warning text-sm" style="display: none;">
+      Admin privileges required.
     </div>
   </div>
 </div>
@@ -396,11 +598,65 @@
 .text-warning {
   color: var(--color-warning);
 }
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.tool-users-banner {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  margin-top: var(--spacing-md);
+}
+
+.tool-users-banner.is-success {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.tool-users-banner.is-error {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.tool-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.tool-inline-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.tool-token-panel {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-gray-600);
+  border-radius: var(--radius-sm);
+  background: var(--color-gray-700);
+}
+
+.tool-token-value-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin: var(--spacing-sm) 0;
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+const TOOL_USERS_ENDPOINT = '/api/v1/admin/tool-api-users';
+const TOOL_DEFAULT_TOKEN_DAYS = Number('{{ tool_api_default_token_days | int }}');
+const TOOL_MAX_TOKEN_DAYS = Number('{{ tool_api_max_token_days | int }}');
+
 // Theme selector with localStorage persistence
 document.addEventListener('DOMContentLoaded', function() {
   const themeSelector = document.getElementById('theme-selector');
@@ -415,6 +671,8 @@ document.addEventListener('DOMContentLoaded', function() {
     localStorage.setItem('bloom_theme', theme);
     applyTheme(theme);
   });
+
+  setupToolApiUsers();
 });
 
 function applyTheme(theme) {
@@ -477,6 +735,301 @@ function trackPackage(event) {
     .catch(error => {
       resultDiv.innerHTML = '<span class="text-muted">Tracking lookup failed. ' + error.message + '</span>';
     });
+}
+
+function setupToolApiUsers() {
+  const createForm = document.getElementById('tool-user-create-form');
+  const grantForm = document.getElementById('tool-grant-token-form');
+  const issueInitialTokenCheckbox = document.getElementById('tool-issue-initial-token');
+  const initialTokenFields = document.getElementById('tool-initial-token-fields');
+  const roleSelect = document.getElementById('tool-role');
+  const grantCancelButton = document.getElementById('grant-token-cancel');
+  const grantPlaceholder = document.getElementById('tool-grant-placeholder');
+  const tokenCopyButton = document.getElementById('tool-token-copy');
+  const tableBody = document.getElementById('tool-users-table-body');
+
+  if (!createForm || !grantForm || !tableBody) {
+    return;
+  }
+
+  issueInitialTokenCheckbox.addEventListener('change', function() {
+    initialTokenFields.style.display = issueInitialTokenCheckbox.checked ? 'grid' : 'none';
+  });
+
+  roleSelect.addEventListener('change', syncCreateScopeOptionsToRole);
+  syncCreateScopeOptionsToRole();
+  initialTokenFields.style.display = issueInitialTokenCheckbox.checked ? 'grid' : 'none';
+
+  createForm.addEventListener('submit', async function(event) {
+    event.preventDefault();
+    await submitCreateToolUser();
+  });
+
+  grantForm.addEventListener('submit', async function(event) {
+    event.preventDefault();
+    await submitGrantToolToken();
+  });
+
+  grantCancelButton.addEventListener('click', function() {
+    grantForm.reset();
+    grantForm.style.display = 'none';
+    grantPlaceholder.style.display = 'block';
+  });
+
+  tableBody.addEventListener('click', function(event) {
+    const button = event.target.closest('button[data-tool-user-id]');
+    if (!button) return;
+    openGrantForm(button.dataset.toolUserId, button.dataset.displayName, button.dataset.role);
+  });
+
+  tokenCopyButton.addEventListener('click', async function() {
+    const tokenField = document.getElementById('tool-token-value');
+    try {
+      await navigator.clipboard.writeText(tokenField.value);
+      showToolUsersBanner('Plaintext token copied to clipboard.', 'success');
+    } catch (error) {
+      showToolUsersBanner('Unable to copy token. Copy it manually from the field.', 'error');
+    }
+  });
+
+  loadToolApiUsers();
+}
+
+function setToolFormsDisabled(disabled) {
+  document.querySelectorAll('#tool-api-users-card input, #tool-api-users-card select, #tool-api-users-card textarea, #tool-api-users-card button')
+    .forEach(function(element) {
+      if (element.id === 'tool-token-value') {
+        return;
+      }
+      element.disabled = disabled;
+    });
+}
+
+function showToolUsersBanner(message, type) {
+  const banner = document.getElementById('tool-users-banner');
+  if (!banner) return;
+  banner.classList.remove('is-success', 'is-error');
+  banner.classList.add(type === 'success' ? 'is-success' : 'is-error');
+  banner.textContent = message;
+  banner.style.display = 'block';
+}
+
+function clearToolUsersBanner() {
+  const banner = document.getElementById('tool-users-banner');
+  if (!banner) return;
+  banner.style.display = 'none';
+  banner.textContent = '';
+  banner.classList.remove('is-success', 'is-error');
+}
+
+function syncCreateScopeOptionsToRole() {
+  const role = document.getElementById('tool-role').value;
+  const scopeSelect = document.getElementById('tool-initial-token-scope');
+  if (role === 'INTERNAL_READ_ONLY') {
+    scopeSelect.innerHTML = '<option value=\"internal_ro\">internal_ro</option>';
+  } else {
+    scopeSelect.innerHTML = '<option value=\"internal_rw\">internal_rw</option><option value=\"internal_ro\">internal_ro</option>';
+    scopeSelect.value = 'internal_rw';
+  }
+}
+
+function openGrantForm(toolUserId, displayName, role) {
+  const grantForm = document.getElementById('tool-grant-token-form');
+  const grantPlaceholder = document.getElementById('tool-grant-placeholder');
+  const scopeSelect = document.getElementById('grant-token-scope');
+
+  document.getElementById('grant-user-id').value = toolUserId;
+  document.getElementById('grant-user-name').value = displayName;
+  document.getElementById('grant-token-name').value = '';
+  document.getElementById('grant-token-note').value = '';
+  document.getElementById('grant-token-atlas-callback-uri').value = '';
+  document.getElementById('grant-token-atlas-tenant-uuid').value = '';
+  document.getElementById('grant-token-ttl').value = TOOL_DEFAULT_TOKEN_DAYS;
+
+  if (role === 'INTERNAL_READ_ONLY') {
+    scopeSelect.innerHTML = '<option value=\"internal_ro\">internal_ro</option>';
+  } else {
+    scopeSelect.innerHTML = '<option value=\"internal_rw\">internal_rw</option><option value=\"internal_ro\">internal_ro</option>';
+    scopeSelect.value = 'internal_rw';
+  }
+
+  grantPlaceholder.style.display = 'none';
+  grantForm.style.display = 'flex';
+}
+
+function showPlaintextToken(plaintextToken) {
+  if (!plaintextToken) return;
+  document.getElementById('tool-token-value').value = plaintextToken;
+  document.getElementById('tool-token-once-panel').style.display = 'block';
+}
+
+async function readErrorDetail(response) {
+  try {
+    const payload = await response.json();
+    if (payload && payload.detail) return String(payload.detail);
+    if (payload && payload.message) return String(payload.message);
+    return JSON.stringify(payload);
+  } catch (error) {
+    return response.status + ' ' + response.statusText;
+  }
+}
+
+async function loadToolApiUsers() {
+  clearToolUsersBanner();
+  const tableBody = document.getElementById('tool-users-table-body');
+  const adminWarning = document.getElementById('tool-users-admin-warning');
+
+  try {
+    const response = await fetch(TOOL_USERS_ENDPOINT);
+    if (response.status === 403) {
+      tableBody.innerHTML = '<tr><td colspan=\"7\" class=\"text-warning\">Admin privileges required.</td></tr>';
+      adminWarning.style.display = 'block';
+      setToolFormsDisabled(true);
+      return;
+    }
+    if (!response.ok) {
+      const detail = await readErrorDetail(response);
+      throw new Error(detail);
+    }
+
+    adminWarning.style.display = 'none';
+    setToolFormsDisabled(false);
+
+    const payload = await response.json();
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    if (items.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan=\"7\" class=\"text-muted\">No tool API users found.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = items.map(function(item) {
+      return '' +
+        '<tr>' +
+        '<td>' + escapeHtml(item.display_name || '') + '</td>' +
+        '<td class=\"font-mono\">' + escapeHtml(item.external_system_key || '') + '</td>' +
+        '<td>' + escapeHtml(item.role || '') + '</td>' +
+        '<td class=\"font-mono text-sm\">' + escapeHtml(item.user_id || '') + '</td>' +
+        '<td>' + Number(item.active_token_count || 0) + ' / ' + Number(item.token_count || 0) + '</td>' +
+        '<td>' + escapeHtml(item.last_token_issued_at || '-') + '</td>' +
+        '<td>' +
+        '<button class=\"btn btn-outline btn-sm\" data-tool-user-id=\"' + escapeHtml(item.user_id || '') + '\" data-display-name=\"' + escapeHtml(item.display_name || '') + '\" data-role=\"' + escapeHtml(item.role || '') + '\">' +
+        '<i class=\"fas fa-key\"></i> Grant Token' +
+        '</button>' +
+        '</td>' +
+        '</tr>';
+    }).join('');
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan=\"7\" class=\"text-warning\">Failed to load tool API users.</td></tr>';
+    showToolUsersBanner(error.message || 'Failed to load tool API users.', 'error');
+  }
+}
+
+async function submitCreateToolUser() {
+  clearToolUsersBanner();
+  const submitButton = document.getElementById('tool-create-submit');
+  submitButton.disabled = true;
+  submitButton.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i> Creating...';
+
+  try {
+    const issueInitialToken = document.getElementById('tool-issue-initial-token').checked;
+    const payload = {
+      display_name: document.getElementById('tool-display-name').value.trim(),
+      external_system_key: document.getElementById('tool-external-key').value.trim(),
+      role: document.getElementById('tool-role').value,
+      description: document.getElementById('tool-description').value.trim() || null,
+      issue_initial_token: issueInitialToken
+    };
+
+    if (issueInitialToken) {
+      payload.initial_token = {
+        token_name: document.getElementById('tool-initial-token-name').value.trim() || null,
+        scope: document.getElementById('tool-initial-token-scope').value,
+        expires_in_days: Number(document.getElementById('tool-initial-token-ttl').value || TOOL_DEFAULT_TOKEN_DAYS),
+        note: document.getElementById('tool-initial-token-note').value.trim() || null,
+        atlas_callback_uri: document.getElementById('tool-initial-token-atlas-callback-uri').value.trim() || null,
+        atlas_tenant_uuid: document.getElementById('tool-initial-token-atlas-tenant-uuid').value.trim() || null
+      };
+    }
+
+    const response = await fetch(TOOL_USERS_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error(await readErrorDetail(response));
+    }
+
+    const body = await response.json();
+    document.getElementById('tool-user-create-form').reset();
+    document.getElementById('tool-issue-initial-token').checked = true;
+    document.getElementById('tool-initial-token-ttl').value = TOOL_DEFAULT_TOKEN_DAYS;
+    document.getElementById('tool-initial-token-atlas-callback-uri').value = '';
+    document.getElementById('tool-initial-token-atlas-tenant-uuid').value = '';
+    document.getElementById('tool-initial-token-fields').style.display = 'grid';
+    syncCreateScopeOptionsToRole();
+    showToolUsersBanner('Tool API user created successfully.', 'success');
+    showPlaintextToken(body.plaintext_token);
+    await loadToolApiUsers();
+  } catch (error) {
+    showToolUsersBanner(error.message || 'Tool API user creation failed.', 'error');
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerHTML = '<i class=\"fas fa-user-plus\"></i> Create Tool User';
+  }
+}
+
+async function submitGrantToolToken() {
+  clearToolUsersBanner();
+  const submitButton = document.getElementById('grant-token-submit');
+  submitButton.disabled = true;
+  submitButton.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i> Granting...';
+
+  try {
+    const toolUserId = document.getElementById('grant-user-id').value;
+    if (!toolUserId) {
+      throw new Error('Select a tool user before granting a token.');
+    }
+
+    const payload = {
+      token_name: document.getElementById('grant-token-name').value.trim(),
+      scope: document.getElementById('grant-token-scope').value,
+      expires_in_days: Number(document.getElementById('grant-token-ttl').value || TOOL_DEFAULT_TOKEN_DAYS),
+      note: document.getElementById('grant-token-note').value.trim() || null,
+      atlas_callback_uri: document.getElementById('grant-token-atlas-callback-uri').value.trim() || null,
+      atlas_tenant_uuid: document.getElementById('grant-token-atlas-tenant-uuid').value.trim() || null
+    };
+    const response = await fetch(TOOL_USERS_ENDPOINT + '/' + encodeURIComponent(toolUserId) + '/tokens', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      throw new Error(await readErrorDetail(response));
+    }
+
+    const body = await response.json();
+    showToolUsersBanner('Token granted successfully.', 'success');
+    showPlaintextToken(body.plaintext_token);
+    document.getElementById('tool-grant-token-form').reset();
+    document.getElementById('tool-grant-token-form').style.display = 'none';
+    document.getElementById('tool-grant-placeholder').style.display = 'block';
+    await loadToolApiUsers();
+  } catch (error) {
+    showToolUsersBanner(error.message || 'Token grant failed.', 'error');
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerHTML = '<i class=\"fas fa-key\"></i> Grant Token';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 </script>
 {% endblock %}

@@ -37,6 +37,7 @@ from .admin_auth import router as admin_auth_router
 from .external_specimens import router as external_specimens_router
 from .external_containers import router as external_containers_router
 from .atlas_bridge import router as atlas_bridge_router
+from .downloads import router as downloads_router
 
 
 # Main v1 router
@@ -69,6 +70,7 @@ router.include_router(admin_auth_router)
 router.include_router(external_specimens_router)
 router.include_router(external_containers_router)
 router.include_router(atlas_bridge_router)
+router.include_router(downloads_router)
 
 
 @router.get("/")
@@ -101,8 +103,10 @@ async def api_v1_info():
             "worksets": "/api/v1/worksets",
             "user_tokens": "/api/v1/user-tokens",
             "admin_auth": "/api/v1/admin/groups",
+            "admin_tool_api_users": "/api/v1/admin/tool-api-users",
             "external_specimens": "/api/v1/external/specimens",
             "external_containers": "/api/v1/external/containers",
             "external_atlas": "/api/v1/external/atlas",
+            "downloads": "/api/v1/downloads/{token}",
         },
     }

@@ -38,6 +38,14 @@ def test_atlas_client_prefers_integration_lookup_path(monkeypatch):
     assert calls[0].endswith("/api/integrations/bloom/v1/lookups/orders/ORD-100")
 
 
+def test_atlas_client_rejects_http_base_url():
+    try:
+        AtlasClient(base_url="http://atlas.example.org", token="tok")
+        assert False, "Expected AtlasClientError"
+    except AtlasClientError as exc:
+        assert "https://" in str(exc)
+
+
 def test_atlas_client_falls_back_to_legacy_lookup_path(monkeypatch):
     calls = []
 

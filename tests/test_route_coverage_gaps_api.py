@@ -26,7 +26,7 @@ from main import app
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 def _get_template_euid(

@@ -21,6 +21,8 @@ class TokenCreateRequest(BaseModel):
     scope: str = Field(default="internal_ro")
     expires_in_days: int = Field(default=2, ge=1, le=3650)
     note: str | None = None
+    atlas_callback_uri: str | None = None
+    atlas_tenant_uuid: str | None = None
 
 
 def _parse_user_uuid(user: APIUser) -> uuid.UUID:
@@ -44,6 +46,8 @@ def _token_row_to_dict(
         "token_name": token.token_name,
         "token_prefix": token.token_prefix,
         "scope": token.scope,
+        "atlas_callback_uri": token.atlas_callback_uri,
+        "atlas_tenant_uuid": token.atlas_tenant_uuid,
         "status": revision.status,
         "expires_at": revision.expires_at.isoformat(),
         "last_used_at": revision.last_used_at.isoformat() if revision.last_used_at else None,
@@ -95,6 +99,8 @@ async def create_user_token(
                 scope=payload.scope,
                 expires_in_days=payload.expires_in_days,
                 note=payload.note,
+                atlas_callback_uri=payload.atlas_callback_uri,
+                atlas_tenant_uuid=payload.atlas_tenant_uuid,
             ),
         )
         return {
@@ -108,6 +114,8 @@ async def create_user_token(
         }
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         bdb.close()
 

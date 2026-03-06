@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Dosis&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap');
 
 
 /* CSS Variables for Easy Theme Management */
@@ -18,7 +18,7 @@
     --container-bg-color: #0b131a;
     --panel-bg-color: #011220;
     --text-color: #ffffff;
-    --font-family: 'Dosis', sans-serif; /* Replace 'Your Font Family' with your desired font */
+    --font-family: 'Kanit', sans-serif; /* GUI primary font */
     --font-size: 16px; /* Example size */
     --font-weight: inherit; 
     --border-radius: 4px;

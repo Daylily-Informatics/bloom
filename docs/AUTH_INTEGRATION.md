@@ -2,6 +2,13 @@
 
 This document describes Bloom's token-first external API model and Atlas integration contract.
 
+## HTTPS-Only Transport Policy
+
+- Bloom rejects all inbound `http://` requests with `426 Upgrade Required`.
+- Bloom enforces HTTPS for outbound integration URLs and file-ingest URLs.
+- `atlas.base_url` must be HTTPS, for local Atlas use:
+  - `BLOOM_ATLAS__BASE_URL=https://localhost:8915`
+
 ## RBAC Model
 
 Bloom roles:
@@ -59,9 +66,35 @@ Admin:
 - `GET /api/v1/admin/user-tokens`
 - `DELETE /api/v1/admin/user-tokens/{token_id}`
 - `GET /api/v1/admin/user-tokens/{token_id}/usage`
+- `GET /api/v1/admin/tool-api-users`
+- `POST /api/v1/admin/tool-api-users`
+- `POST /api/v1/admin/tool-api-users/{tool_user_id}/tokens`
 
 Auth context:
 - `GET /api/v1/auth/me` now includes `roles`, `groups`, `permissions`, and `auth_source`.
+
+## Tool API Users (Admin-Managed)
+
+Tool API users are API-only principals intended for external systems.
+
+Create tool API user:
+- required: `display_name`, `external_system_key`
+- role: `INTERNAL_READ_ONLY` or `INTERNAL_READ_WRITE` (no `ADMIN`)
+- `API_ACCESS` and role group are auto-assigned at create-time
+- optional `issue_initial_token` (default `true`)
+
+Default tool-token policy:
+- default TTL: `auth.tool_api_default_token_days` (default `30`)
+- max TTL: `auth.tool_api_max_token_days` (default `3650`)
+
+Role/scope caps:
+- read-only tool user: `internal_ro` only
+- read/write tool user: `internal_ro`, `internal_rw`
+
+Token response behavior:
+- plaintext token is returned once at creation/grant time
+- token plaintext is never persisted in Bloom storage/logs
+- revocation uses existing endpoint: `DELETE /api/v1/admin/user-tokens/{token_id}`
 
 ## Legacy API Key Behavior
 

@@ -21,7 +21,34 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Record Quantification Outcome",
-          "fields": []
+          "fields": [
+            {
+              "name": "quant_outcome",
+              "label": "Outcome",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "label": "Pass",
+                  "value": "pass"
+                },
+                {
+                  "label": "Fail",
+                  "value": "fail"
+                },
+                {
+                  "label": "Repeat",
+                  "value": "repeat"
+                }
+              ]
+            },
+            {
+              "name": "comments",
+              "label": "Comments (optional)",
+              "type": "textarea",
+              "required": false
+            }
+          ]
         }
       },
       "properties": {
@@ -52,7 +79,15 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Log Temperature",
-          "fields": []
+          "fields": [
+            {
+              "name": "Temperature (celcius)",
+              "label": "Temperature (celcius)",
+              "type": "number",
+              "required": true,
+              "step": "0.1"
+            }
+          ]
         }
       },
       "properties": {

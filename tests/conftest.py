@@ -241,7 +241,7 @@ def api_client():
     from fastapi.testclient import TestClient
     from bloom_lims.main import app
 
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 @pytest.fixture(scope="function")

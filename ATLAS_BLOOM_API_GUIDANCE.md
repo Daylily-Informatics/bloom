@@ -19,6 +19,11 @@ Current defaults and constraints:
 - `saliva` is not currently available as a specimen template in Bloom.
 - No order-alert subscription/webhook endpoint exists yet. Use polling (documented below).
 
+Transport policy:
+- Bloom is HTTPS-only for all inbound requests. `http://` calls are rejected with `426 Upgrade Required`.
+- Bloom outbound Atlas integration is HTTPS-only. Configure local Atlas as:
+  - `https://localhost:8915`
+
 ## 2. Authentication Prerequisites
 
 Atlas should use a Bloom-issued bearer token:
@@ -36,6 +41,15 @@ Token management endpoints:
 1. `GET /api/v1/admin/user-tokens`
 2. `DELETE /api/v1/admin/user-tokens/{token_id}`
 3. Group membership management under `/api/v1/admin/groups/...`
+4. Tool API user lifecycle:
+5. `GET /api/v1/admin/tool-api-users`
+6. `POST /api/v1/admin/tool-api-users` (optionally issues initial token)
+7. `POST /api/v1/admin/tool-api-users/{tool_user_id}/tokens` (grant additional token)
+
+Admin tool-user defaults:
+- role defaults to `INTERNAL_READ_WRITE` + `API_ACCESS`
+- default token TTL is 30 days (configurable in Bloom)
+- tool users are restricted to `INTERNAL_READ_ONLY` or `INTERNAL_READ_WRITE`
 
 Recommended token scope for Atlas write flows:
 - `internal_rw` (or `admin`)

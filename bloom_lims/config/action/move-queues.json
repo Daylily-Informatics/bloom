@@ -22,7 +22,15 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Move Workset To Another Queue",
-          "fields": []
+          "fields": [
+            {
+              "name": "q_selection",
+              "label": "Destination Queue Template Code",
+              "type": "text",
+              "required": true,
+              "help_text": "Example: workflow_step/queue/extraction-batch-eligible/1.0/"
+            }
+          ]
         }
       },
       "properties": {

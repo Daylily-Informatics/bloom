@@ -18,7 +18,46 @@
         "description": "Download File From S3",
         "ui_schema": {
           "title": "Download A File",
-          "fields": []
+          "fields": [
+            {
+              "name": "download_type",
+              "label": "Download Type",
+              "type": "select",
+              "required": true,
+              "default": "dewey",
+              "options": [
+                {
+                  "label": "Dewey",
+                  "value": "dewey"
+                },
+                {
+                  "label": "Original",
+                  "value": "orig"
+                },
+                {
+                  "label": "Hybrid",
+                  "value": "hybrid"
+                }
+              ]
+            },
+            {
+              "name": "create_metadata_file",
+              "label": "Create Metadata File",
+              "type": "select",
+              "required": true,
+              "default": "no",
+              "options": [
+                {
+                  "label": "No",
+                  "value": "no"
+                },
+                {
+                  "label": "Yes",
+                  "value": "yes"
+                }
+              ]
+            }
+          ]
         }
       }
     }

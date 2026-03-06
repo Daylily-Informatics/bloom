@@ -328,18 +328,38 @@ async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName
 
         if (captureMode === 'no' || fields.length === 0) {
             if (captureMode !== 'no') {
-                var schemaMessage = 'Action template is missing ui_schema.fields: ' + actionName;
+                var schemaMessage = 'Action template is missing ui_schema.fields: ' + actionName + '. This usually means templates are stale. Run `bloom db seed --overwrite` and hard-refresh the page.';
                 if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
                     window.BloomToast.error('Action Error', schemaMessage);
                 }
                 return;
             }
-            await performWorkflowStepAction({
-                euid: stepEuid,
-                action_group: actionGroup,
-                action_key: actionName,
-                captured_data: {},
-            });
+
+            try {
+                var oneClickPayload = await performWorkflowStepAction({
+                    euid: stepEuid,
+                    action_group: actionGroup,
+                    action_key: actionName,
+                    captured_data: {},
+                });
+
+                if (oneClickPayload && oneClickPayload.download_url) {
+                    window.open(oneClickPayload.download_url, '_blank');
+                }
+                if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.success === 'function') {
+                    var okMessage = (oneClickPayload && oneClickPayload.message) ? oneClickPayload.message : 'Action completed';
+                    window.BloomToast.success('Action Complete', okMessage, 2000);
+                }
+                setTimeout(function() {
+                    window.location.reload();
+                }, 250);
+            } catch (err) {
+                console.error('One-click action failed:', err);
+                var message = err && err.message ? err.message : 'Action failed';
+                if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+                    window.BloomToast.error('Action Failed', message);
+                }
+            }
             return;
         }
 
@@ -492,6 +512,10 @@ async function submitCapturedDataForm(formContainer, form, stepEuid, actionName,
             action_key: actionName,
             captured_data: capturedData,
         });
+
+        if (responsePayload && responsePayload.download_url) {
+            window.open(responsePayload.download_url, '_blank');
+        }
 
         if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.success === 'function') {
             var okMessage = (responsePayload && responsePayload.message) ? responsePayload.message : 'Action completed';

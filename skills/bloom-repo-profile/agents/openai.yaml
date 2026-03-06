@@ -1,0 +1,4 @@
+interface:
+  display_name: "BLOOM Repo Profile"
+  short_description: "Guidance for work in BLOOM LIMS"
+  default_prompt: "Use $bloom-repo-profile to complete this task in the BLOOM LIMS repository."

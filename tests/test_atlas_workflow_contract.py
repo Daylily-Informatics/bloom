@@ -20,6 +20,7 @@ import bloom_lims.integrations.atlas.events as events_mod
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
 from bloom_lims.config import AtlasSettings
 from bloom_lims.integrations.atlas.events import AtlasEventClient
+from bloom_lims.integrations.atlas.service import AtlasDependencyError
 
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
@@ -156,7 +157,7 @@ def _create_specimen(client: TestClient, *, payload: dict, idempotency_key: str)
 def _build_client(monkeypatch) -> TestClient:
     monkeypatch.setattr(external_domain, "AtlasService", lambda: _FakeAtlasLookupService())
     app.dependency_overrides[require_external_token_auth] = _token_user
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 def test_create_empty_container_via_object_creation_contract(monkeypatch):
@@ -224,7 +225,7 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
     monkeypatch.setattr(external_domain, "AtlasService", lambda: _ContextMismatchAtlasService())
     app.dependency_overrides[require_external_token_auth] = _token_user
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         container = _create_container(client, name=f"atlas-context-mismatch-{uuid.uuid4().hex[:8]}")
         response = client.post(
             "/api/v1/external/specimens",
@@ -268,7 +269,7 @@ def test_container_context_summary_persisted_in_validation_metadata(monkeypatch)
     monkeypatch.setattr(external_domain, "AtlasService", lambda: _ContextMatchingAtlasService())
     app.dependency_overrides[require_external_token_auth] = _token_user
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         container = _create_container(client, name=f"atlas-context-match-{uuid.uuid4().hex[:8]}")
         created = _create_specimen(
             client,
@@ -294,6 +295,87 @@ def test_container_context_summary_persisted_in_validation_metadata(monkeypatch)
     assert summary["order_number"] == "ORD-MATCH"
     assert summary["patient_id"] == "PAT-MATCH"
     assert summary["test_order_count"] == 2
+
+
+def test_container_context_uses_tenant_from_atlas_refs_when_default_not_configured(monkeypatch):
+    class _TenantFromRefsAtlasService(_FakeAtlasLookupService):
+        def get_required_tenant_id(self):
+            raise AtlasDependencyError("Atlas tenant UUID not configured (atlas.organization_id)")
+
+        def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+            _ = container_euid
+            if tenant_id != "11111111-2222-3333-4444-555555555555":
+                raise AssertionError(f"unexpected tenant_id: {tenant_id}")
+            return SimpleNamespace(
+                payload={
+                    "tenant_id": tenant_id,
+                    "order": {"order_number": "ORD-REF"},
+                    "patient": {"patient_id": "PAT-REF"},
+                    "test_orders": [],
+                    "links": {"testkit_barcode": "KIT-REF"},
+                },
+                from_cache=False,
+                stale=False,
+                fetched_at=datetime.now(UTC),
+            )
+
+    monkeypatch.setattr(external_domain, "AtlasService", lambda: _TenantFromRefsAtlasService())
+    app.dependency_overrides[require_external_token_auth] = _token_user
+
+    with TestClient(app, base_url="https://testserver") as client:
+        container = _create_container(client, name=f"atlas-tenant-override-{uuid.uuid4().hex[:8]}")
+        created = _create_specimen(
+            client,
+            payload={
+                "specimen_template_code": "content/specimen/blood-whole/1.0",
+                "specimen_name": "tenant-override",
+                "container_euid": container["euid"],
+                "status": "active",
+                "properties": {"source": "atlas-contract-test"},
+                "atlas_refs": {
+                    "tenant_id": "11111111-2222-3333-4444-555555555555",
+                    "order_number": "ORD-REF",
+                    "patient_id": "PAT-REF",
+                    "kit_barcode": "KIT-REF",
+                },
+            },
+            idempotency_key=f"idem-{uuid.uuid4()}",
+        )
+
+    assert created["atlas_refs"]["tenant_id"] == "11111111-2222-3333-4444-555555555555"
+
+
+def test_container_context_lookup_skipped_for_patient_only_refs(monkeypatch):
+    class _NoContextRequiredAtlasService(_FakeAtlasLookupService):
+        def get_required_tenant_id(self):
+            raise AtlasDependencyError("Atlas tenant UUID not configured (atlas.organization_id)")
+
+        def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+            _ = container_euid
+            _ = tenant_id
+            raise AssertionError("container context lookup should not be called for patient-only refs")
+
+    monkeypatch.setattr(external_domain, "AtlasService", lambda: _NoContextRequiredAtlasService())
+    app.dependency_overrides[require_external_token_auth] = _token_user
+
+    with TestClient(app, base_url="https://testserver") as client:
+        container = _create_container(client, name=f"atlas-patient-only-{uuid.uuid4().hex[:8]}")
+        created = _create_specimen(
+            client,
+            payload={
+                "specimen_template_code": "content/specimen/blood-whole/1.0",
+                "specimen_name": "patient-only",
+                "container_euid": container["euid"],
+                "status": "active",
+                "properties": {"source": "atlas-contract-test"},
+                "atlas_refs": {
+                    "patient_id": "PAT-ONLY",
+                },
+            },
+            idempotency_key=f"idem-{uuid.uuid4()}",
+        )
+
+    assert created["atlas_refs"]["patient_id"] == "PAT-ONLY"
 
 
 def test_create_specimen_auto_container_contract(monkeypatch):
@@ -446,7 +528,7 @@ def test_event_delivery_failure_is_fail_open(monkeypatch):
 
     monkeypatch.setattr(events_mod.requests, "post", fake_post)
 
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         created = _create_container(client, name=f"atlas-fail-open-{uuid.uuid4().hex[:8]}")
         assert created["euid"]
         fetched = client.get(f"/api/v1/containers/{created['euid']}")

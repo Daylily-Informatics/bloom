@@ -23,7 +23,7 @@ from main import app
 @pytest.fixture
 def client():
     """Create test client with auth disabled."""
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 class TestAPIRoot:

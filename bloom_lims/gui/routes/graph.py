@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -16,6 +17,13 @@ from bloom_lims.gui.jinja import templates
 
 
 router = APIRouter()
+
+
+DAG_OUTPUT_DIR = Path("./dags").resolve()
+LEGACY_DAG_OUTPUT_DIR = Path(".").resolve()
+DAG_FILE_GLOB = "dag_*.json"
+DAG_MAX_FILES = 200
+DAG_MAX_AGE_DAYS = 14
 
 
 GRAPH_CATEGORY_COLORS = {
@@ -64,6 +72,54 @@ def _normalize_graph_request_params(
 
     resolved_depth = max(1, min(resolved_depth, 10))
     return resolved_start, resolved_depth
+
+
+def _resolve_dag_path(path_str: str) -> Path:
+    candidate = Path(path_str)
+    if not candidate.is_absolute():
+        candidate = (Path.cwd() / candidate).resolve()
+    if candidate.exists():
+        return candidate
+
+    # Backward compatibility: older sessions may still point at ./dag_*.json.
+    if candidate.name.startswith("dag_") and candidate.suffix == ".json":
+        dags_candidate = DAG_OUTPUT_DIR / candidate.name
+        if dags_candidate.exists():
+            return dags_candidate
+    return candidate
+
+
+def _cleanup_dag_files(base_dir: Path) -> int:
+    try:
+        if not base_dir.exists():
+            return 0
+
+        dag_files = sorted(
+            base_dir.glob(DAG_FILE_GLOB),
+            key=lambda file_path: file_path.stat().st_mtime,
+            reverse=True,
+        )
+
+        now = datetime.now()
+        cutoff = now - timedelta(days=DAG_MAX_AGE_DAYS)
+        deleted = 0
+        for index, dag_file in enumerate(dag_files):
+            try:
+                mtime = datetime.fromtimestamp(dag_file.stat().st_mtime)
+            except OSError:
+                continue
+
+            should_delete = index >= DAG_MAX_FILES or mtime < cutoff
+            if should_delete:
+                try:
+                    dag_file.unlink(missing_ok=True)
+                    deleted += 1
+                except OSError:
+                    logging.warning("Failed to delete stale DAG file: %s", dag_file)
+        return deleted
+    except OSError:
+        logging.warning("Failed to scan DAG cleanup directory: %s", base_dir)
+        return 0
 
 
 def _build_graph_elements_for_start(bobj: BloomObj, start_euid: str, depth: int) -> tuple[list, list]:
@@ -269,19 +325,41 @@ async def get_dagv2(
     logging.warning("Deprecated endpoint /get_dagv2 used; prefer GET /api/graph/data")
     dag_fn = request.session.get("user_data", {}).get("dag_fnv2", "")
     dag_data = {"elements": {"nodes": [], "edges": []}}
-    if dag_fn and os.path.exists(dag_fn):
-        with open(dag_fn, "r") as f:
-            dag_data = json.load(f)
+    if dag_fn:
+        dag_path = _resolve_dag_path(dag_fn)
+        if dag_path.exists():
+            request.session.setdefault("user_data", {})["dag_fnv2"] = str(dag_path)
+            with dag_path.open("r", encoding="utf-8") as f:
+                dag_data = json.load(f)
+        elif os.path.exists(dag_fn):
+            with open(dag_fn, "r") as f:
+                dag_data = json.load(f)
     return dag_data
 
 
 @router.post("/update_dag")
 async def update_dag(request: Request, _auth=Depends(require_auth)):
     input_json = await request.json()
-    filename = f"dag_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
-    with open(filename, "w") as f:
+
+    DAG_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"dag_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.json"
+    dag_path = DAG_OUTPUT_DIR / filename
+    with dag_path.open("w", encoding="utf-8") as f:
         json.dump(input_json, f)
-    return {"status": "success", "filename": filename}
+
+    request.session.setdefault("user_data", {})["dag_fnv2"] = str(dag_path)
+
+    deleted_dags = _cleanup_dag_files(DAG_OUTPUT_DIR)
+    deleted_legacy = 0
+    if LEGACY_DAG_OUTPUT_DIR != DAG_OUTPUT_DIR:
+        deleted_legacy = _cleanup_dag_files(LEGACY_DAG_OUTPUT_DIR)
+
+    return {
+        "status": "success",
+        "filename": filename,
+        "path": str(dag_path),
+        "deleted_dag_files": deleted_dags + deleted_legacy,
+    }
 
 
 @router.post("/add_new_edge")

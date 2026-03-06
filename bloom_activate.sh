@@ -11,6 +11,20 @@ fi
 
 BLOOM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Load local environment overrides from gitignored files.
+if [[ -f "$BLOOM_ROOT/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$BLOOM_ROOT/.env"
+    set +a
+fi
+if [[ -f "$BLOOM_ROOT/.env.local" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$BLOOM_ROOT/.env.local"
+    set +a
+fi
+
 _GREEN='\033[0;32m'
 _YELLOW='\033[1;33m'
 _BLUE='\033[0;34m'
@@ -77,6 +91,8 @@ export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-5566}"
 export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
+unset TAPDB_ADMIN_DISABLE_AUTH
+export TAPDB_ADMIN_SHARED_AUTH="${TAPDB_ADMIN_SHARED_AUTH:-1}"
 export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
 export AWS_REGION="${AWS_REGION:-us-west-2}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-$AWS_REGION}"
@@ -88,6 +104,7 @@ echo -e "  ${_GREEN}✓${_NC} TAPDB_STRICT_NAMESPACE=${TAPDB_STRICT_NAMESPACE}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DEV_PORT=${TAPDB_DEV_PORT}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_TEST_PORT=${TAPDB_TEST_PORT}"
 echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
+echo -e "  ${_GREEN}✓${_NC} TAPDB_ADMIN_SHARED_AUTH=${TAPDB_ADMIN_SHARED_AUTH}"
 echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
 echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
 
@@ -120,6 +137,7 @@ deactivate_bloom() {
     unset TAPDB_DEV_PORT
     unset TAPDB_TEST_PORT
     unset BLOOM_COGNITO_APP_NAME
+    unset TAPDB_ADMIN_SHARED_AUTH
     if [[ "$CONDA_DEFAULT_ENV" == "BLOOM" ]]; then
         conda deactivate 2>/dev/null
     fi

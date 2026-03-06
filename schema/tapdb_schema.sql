@@ -1,1 +1,0 @@
-/Users/jmajor/projects/daylily/daylily-tapdb/schema/tapdb_schema.sql

@@ -51,7 +51,7 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
   
   /* Fonts */
-  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-primary: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   
   /* Transitions */
@@ -575,6 +575,54 @@ pre {
 .table th.sortable::after { content: ' ↕'; opacity: 0.4; }
 .table th.sortable.asc::after { content: ' ↑'; opacity: 1; }
 .table th.sortable.desc::after { content: ' ↓'; opacity: 1; }
+
+.table-enhancement-wrap {
+  width: 100%;
+}
+
+.table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.table-filter-input {
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.table-filter-count {
+  font-size: 0.8rem;
+}
+
+.table-sortable-col {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 1.25rem;
+}
+
+.table-sortable-col::after {
+  content: ' ↕';
+  opacity: 0.45;
+  position: absolute;
+  right: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+}
+
+.table-sortable-col.sort-asc::after {
+  content: ' ↑';
+  opacity: 1;
+}
+
+.table-sortable-col.sort-desc::after {
+  content: ' ↓';
+  opacity: 1;
+}
 
 /* ==================== Forms ==================== */
 .form-group {

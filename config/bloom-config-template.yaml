@@ -29,6 +29,7 @@ debug: false
 ui:
   support_email: "support@dyly.bio"
   github_repo_url: "https://github.com/Daylily-Informatics/bloom"
+  zebra_admin_url: ""           # Optional HTTPS URL for zebra_day admin UI
 
 # -----------------------------------------------------------------------------
 # TapDB Runtime Configuration
@@ -120,11 +121,15 @@ auth:
   session_timeout_minutes: 30
   max_sessions_per_user: 5
 
+  # Admin-managed tool API user token defaults
+  tool_api_default_token_days: 30
+  tool_api_max_token_days: 3650
+
 # -----------------------------------------------------------------------------
 # Atlas Integration
 # -----------------------------------------------------------------------------
 atlas:
-  base_url: ""                  # e.g., https://atlas.example.org
+  base_url: ""                  # REQUIRED HTTPS URL, e.g., https://atlas.example.org
   token: ""                     # Bearer token used for Atlas lookup APIs
   timeout_seconds: 10
   cache_ttl_seconds: 300

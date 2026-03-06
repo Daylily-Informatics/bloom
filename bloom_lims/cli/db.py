@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import importlib
 import os
-import shutil
 import subprocess
 import sys
-from pathlib import Path
 from typing import List
 
 import click
@@ -21,58 +18,6 @@ from bloom_lims.config import (
 )
 
 console = Console()
-
-
-def _bloom_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _resolve_tapdb_schema_source() -> Path | None:
-    """Locate tapdb_schema.sql from installed package or local dev checkouts."""
-    candidates: List[Path] = []
-
-    try:
-        tapdb_pkg = importlib.import_module("daylily_tapdb")
-        pkg_file = Path(tapdb_pkg.__file__).resolve()
-        # Handle editable/dev installs and wheel installs.
-        candidates.extend(
-            [
-                pkg_file.parents[1] / "schema" / "tapdb_schema.sql",
-                pkg_file.parents[2] / "schema" / "tapdb_schema.sql",
-            ]
-        )
-    except Exception:
-        pass
-
-    root = _bloom_root()
-    candidates.extend(
-        [
-            root.parent / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-            root.parent / "daylily" / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-        ]
-    )
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def _ensure_schema_available_for_bloom_root() -> None:
-    """Ensure tapdb schema is visible when running tapdb from bloom repo root."""
-    target = _bloom_root() / "schema" / "tapdb_schema.sql"
-    if target.exists():
-        return
-
-    source = _resolve_tapdb_schema_source()
-    if source is None:
-        return
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        target.symlink_to(source)
-    except Exception:
-        shutil.copy2(source, target)
 
 
 def _tapdb_base_cmd() -> List[str]:
@@ -119,9 +64,9 @@ def _run_tapdb(args: List[str], check: bool = True) -> int:
     return result.returncode
 
 
-def _seed_bloom_templates() -> None:
+def _seed_bloom_templates(*, overwrite: bool = False) -> None:
     """Seed Bloom legacy template configs into TAPDB generic_template."""
-    summary = seed_bloom_templates()
+    summary = seed_bloom_templates(overwrite=overwrite)
     console.print(
         "[cyan]Bloom template seed:[/cyan] "
         f"loaded={summary.templates_loaded}, "
@@ -169,7 +114,6 @@ def db_init(force: bool):
     console.print(f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]")
 
     if env_name in {"dev", "test"}:
-        _ensure_schema_available_for_bloom_root()
         local_port = _local_pg_port(env_name)
         console.print(
             f"[cyan]Using local TapDB PostgreSQL port {local_port} for env={env_name}[/cyan]"
@@ -181,7 +125,7 @@ def db_init(force: bool):
             setup_args.append("--force")
         _run_tapdb(setup_args)
         _seed_tapdb_templates(env_name, include_workflow=True, overwrite=force)
-        _seed_bloom_templates()
+        _seed_bloom_templates(overwrite=force)
         return
 
     create_args = ["db", "create", env_name]
@@ -190,12 +134,11 @@ def db_init(force: bool):
     _run_tapdb(create_args, check=False)
 
     setup_args = ["db", "setup", env_name, "--include-workflow"]
-    _ensure_schema_available_for_bloom_root()
     if force:
         setup_args.append("--force")
     _run_tapdb(setup_args)
     _seed_tapdb_templates(env_name, include_workflow=True, overwrite=force)
-    _seed_bloom_templates()
+    _seed_bloom_templates(overwrite=force)
 
 
 @db.command("auth-setup")
@@ -272,16 +215,16 @@ def db_migrate(revision: str):
     env_name = _current_env()
     if revision != "head":
         console.print("[yellow]Revision argument is ignored; using tapdb managed migrations.[/yellow]")
-    _ensure_schema_available_for_bloom_root()
     _run_tapdb(["db", "schema", "migrate", env_name])
 
 
 @db.command("seed")
-def db_seed():
+@click.option("--overwrite", is_flag=True, help="Overwrite/update existing templates")
+def db_seed(overwrite: bool):
     """Seed template data via tapdb."""
     env_name = _current_env()
-    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=False)
-    _seed_bloom_templates()
+    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=overwrite)
+    _seed_bloom_templates(overwrite=overwrite)
 
 
 @db.command("shell")
@@ -311,9 +254,8 @@ def db_reset(yes: bool):
             return
 
     args = ["db", "schema", "reset", env_name, "--force"]
-    _ensure_schema_available_for_bloom_root()
     _run_tapdb(args)
     setup_args = ["db", "setup", env_name, "--include-workflow", "--force"]
     _run_tapdb(setup_args)
     _seed_tapdb_templates(env_name, include_workflow=True, overwrite=True)
-    _seed_bloom_templates()
+    _seed_bloom_templates(overwrite=True)

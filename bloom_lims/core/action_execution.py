@@ -273,6 +273,24 @@ def _map_exception(exc: Exception) -> ActionExecutionError:
     msg = str(exc).strip() or "Action execution failed"
     if "No instance refs were provided" in msg:
         return ActionExecutionError(status_code=400, detail=msg, error_fields=["instance_refs"])
+    if msg.startswith("Missing directed mapping CSV"):
+        return ActionExecutionError(
+            status_code=400,
+            detail=msg,
+            error_fields=["mapping_csv_text", "mapping_csv_file"],
+        )
+    if msg.startswith("Missing quant CSV data"):
+        return ActionExecutionError(
+            status_code=400,
+            detail=msg,
+            error_fields=["quant_csv_text", "quant_csv_file"],
+        )
+    if "quant value must be float" in msg.lower():
+        return ActionExecutionError(
+            status_code=400,
+            detail=msg,
+            error_fields=["quant_csv_text", "quant_csv_file"],
+        )
     if msg.startswith("Missing required field"):
         suffix = msg.split(":", 1)[1].strip() if ":" in msg else ""
         return ActionExecutionError(
@@ -280,6 +298,8 @@ def _map_exception(exc: Exception) -> ActionExecutionError:
             detail=msg,
             error_fields=[suffix] if suffix else [],
         )
+    if msg.lower().startswith("missing "):
+        return ActionExecutionError(status_code=400, detail=msg)
     if "validation" in msg.lower() or "invalid" in msg.lower():
         return ActionExecutionError(status_code=400, detail=msg)
 
@@ -348,17 +368,31 @@ def execute_action_for_instance(
             action_ds=action_ds,
         )
 
+        download_url = None
         message = f"{request_data.action_key} performed for EUID {request_data.euid}"
-        if isinstance(result, str) and result.strip():
-            message = result.strip()
 
-        return {
+        if isinstance(result, str) and result.strip():
+            # If action returned a tmp file path, return a signed URL instead of leaking the path.
+            try:
+                from bloom_lims.core.downloads import create_download_token, DownloadTokenError
+
+                token = create_download_token(result.strip())
+                download_url = f"/api/v1/downloads/{token}"
+                message = "Download ready"
+            except DownloadTokenError:
+                message = result.strip()
+
+        payload = {
             "status": "success",
             "message": message,
             "euid": request_data.euid,
             "action_group": request_data.action_group,
             "action_key": request_data.action_key,
         }
+        if download_url:
+            payload["download_url"] = download_url
+
+        return payload
 
     except Exception as exc:  # mapped below to preserve consistent error schema
         raise _map_exception(exc) from exc

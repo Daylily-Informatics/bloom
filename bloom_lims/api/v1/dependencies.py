@@ -292,9 +292,14 @@ async def get_api_user(
 
     if hasattr(request, "session") and "user_data" in request.session:
         user_data = request.session.get("user_data", {})
+        session_user_id = (
+            user_data.get("sub")
+            or user_data.get("cognito_sub")
+            or user_data.get("user_id")
+        )
         return _make_user(
             email=user_data.get("email", "session-user"),
-            user_id=user_data.get("sub"),
+            user_id=session_user_id,
             role_hint=user_data.get("role") or user_data.get("custom:role"),
             auth_source="session",
             groups_hint=user_data.get("groups") if isinstance(user_data.get("groups"), list) else [],

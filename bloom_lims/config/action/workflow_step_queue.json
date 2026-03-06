@@ -49,7 +49,15 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Plasma Isolation Tube to Tube",
-          "fields": []
+          "fields": [
+            {
+              "name": "discard_barcodes",
+              "label": "Container EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One container EUID per line"
+            }
+          ]
         }
       },
       "properties": {
@@ -90,7 +98,15 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Map Tubes To Extraction Plate Wells",
-          "fields": []
+          "fields": [
+            {
+              "name": "discard_barcodes",
+              "label": "Container EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One container EUID per line"
+            }
+          ]
         }
       },
       "properties": {
@@ -131,7 +147,36 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Fill Plate & Specify Map",
-          "fields": []
+          "fields": [
+            {
+              "name": "instance_refs",
+              "label": "Source Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One source per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Source Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            },
+            {
+              "name": "mapping_csv_text",
+              "label": "Directed Mapping CSV",
+              "type": "textarea",
+              "required": false,
+              "help_text": "CSV rows: source_ref,destination_well (e.g. CX-1,A1)"
+            },
+            {
+              "name": "mapping_csv_file",
+              "label": "Directed Mapping CSV File",
+              "type": "file",
+              "required": false,
+              "accept": ".csv,.txt"
+            }
+          ]
         }
       }
     }
@@ -158,7 +203,22 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Add to Blood to gDNA Extraction Queue",
-          "fields": []
+          "fields": [
+            {
+              "name": "instance_refs",
+              "label": "Instance Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One ref per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Instance Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            }
+          ]
         }
       },
       "properties": {
@@ -189,7 +249,22 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Add to Buccal to gDNA Extraction Queue",
-          "fields": []
+          "fields": [
+            {
+              "name": "instance_refs",
+              "label": "Instance Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One ref per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Instance Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            }
+          ]
         }
       },
       "properties": {
@@ -220,7 +295,22 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Add gDNA to gDNA Normalization Queue",
-          "fields": []
+          "fields": [
+            {
+              "name": "instance_refs",
+              "label": "Instance Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One ref per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Instance Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            }
+          ]
         }
       },
       "properties": {
@@ -250,7 +340,22 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Plate Create & Fill Auto",
-          "fields": []
+          "fields": [
+            {
+              "name": "instance_refs",
+              "label": "Instance Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One ref per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Instance Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            }
+          ]
         }
       },
       "properties": {
@@ -280,7 +385,36 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Plate Create & Fill Directed",
-          "fields": []
+          "fields": [
+            {
+              "name": "instance_refs",
+              "label": "Source Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One source per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Source Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            },
+            {
+              "name": "mapping_csv_text",
+              "label": "Directed Mapping CSV",
+              "type": "textarea",
+              "required": false,
+              "help_text": "CSV rows: source_ref,destination_well (e.g. CX-1,A1)"
+            },
+            {
+              "name": "mapping_csv_file",
+              "label": "Directed Mapping CSV File",
+              "type": "file",
+              "required": false,
+              "accept": ".csv,.txt"
+            }
+          ]
         }
       },
       "properties": {
@@ -310,7 +444,28 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Existing Plate Fill Auto",
-          "fields": []
+          "fields": [
+            {
+              "name": "destination_plate_euid",
+              "label": "Destination Plate EUID",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "instance_refs",
+              "label": "Instance Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One ref per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Instance Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            }
+          ]
         }
       },
       "properties": {
@@ -340,7 +495,42 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Existing Plate Fill Directed",
-          "fields": []
+          "fields": [
+            {
+              "name": "destination_plate_euid",
+              "label": "Destination Plate EUID",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "instance_refs",
+              "label": "Source Refs",
+              "type": "textarea",
+              "required": false,
+              "help_text": "One source per line: EUID or PLATEEUID.WELL"
+            },
+            {
+              "name": "instance_refs_file",
+              "label": "Source Refs File",
+              "type": "file",
+              "required": false,
+              "accept": ".txt,.csv"
+            },
+            {
+              "name": "mapping_csv_text",
+              "label": "Directed Mapping CSV",
+              "type": "textarea",
+              "required": false,
+              "help_text": "CSV rows: source_ref,destination_well (e.g. CX-1,A1)"
+            },
+            {
+              "name": "mapping_csv_file",
+              "label": "Directed Mapping CSV File",
+              "type": "file",
+              "required": false,
+              "accept": ".csv,.txt"
+            }
+          ]
         }
       },
       "properties": {
@@ -370,7 +560,22 @@
         "curr_user": "",
         "ui_schema": {
           "title": "Save Quant Data",
-          "fields": []
+          "fields": [
+            {
+              "name": "quant_csv_text",
+              "label": "Quant CSV",
+              "type": "textarea",
+              "required": false,
+              "help_text": "CSV rows: plate_euid,well_address,quant_value"
+            },
+            {
+              "name": "quant_csv_file",
+              "label": "Quant CSV File",
+              "type": "file",
+              "required": false,
+              "accept": ".csv,.txt"
+            }
+          ]
         }
       },
       "properties": {

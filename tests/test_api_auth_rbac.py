@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+import bloom_lims.api.v1.dependencies as api_deps
 import bloom_lims.api.v1.external_specimens as external_specimens_api
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth, require_write
 
@@ -20,7 +21,7 @@ from main import app  # noqa: E402
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 @pytest.fixture
@@ -102,6 +103,7 @@ def test_api_root_lists_new_auth_endpoints(client):
     endpoints = response.json()["endpoints"]
     assert "user_tokens" in endpoints
     assert "admin_auth" in endpoints
+    assert "admin_tool_api_users" in endpoints
     assert "external_specimens" in endpoints
 
 
@@ -145,6 +147,22 @@ def test_user_tokens_default_expiry_is_48_hours(client):
     expires_at = datetime.fromisoformat(payload["token"]["expires_at"])
     lifetime = expires_at - created_at
     assert timedelta(hours=47, minutes=55) <= lifetime <= timedelta(hours=48, minutes=5)
+
+
+def test_user_tokens_accept_atlas_callback_and_tenant_context(client):
+    response = client.post(
+        "/api/v1/user-tokens",
+        json={
+            "token_name": f"pytest-atlas-context-{uuid.uuid4()}",
+            "scope": "internal_ro",
+            "atlas_callback_uri": "https://localhost:8915/api/integrations/bloom/v1/events",
+            "atlas_tenant_uuid": "99999999-8888-7777-6666-555555555555",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["token"]["atlas_callback_uri"] == "https://localhost:8915/api/integrations/bloom/v1/events"
+    assert payload["token"]["atlas_tenant_uuid"] == "99999999-8888-7777-6666-555555555555"
 
 
 def test_admin_group_membership_endpoints_list_add_get_delete(client):
@@ -340,3 +358,35 @@ def test_external_specimens_patch_update(client, monkeypatch, external_token_aut
     payload = response.json()
     assert payload["specimen_euid"] == "SP-TEST4"
     assert payload["status"] == "inactive"
+
+
+@pytest.mark.asyncio
+async def test_get_api_user_session_uses_cognito_sub_when_sub_missing(monkeypatch):
+    captured = {}
+
+    class FakeRequest:
+        session = {
+            "user_data": {
+                "email": "johnm@lsmc.com",
+                "cognito_sub": "68412340-e0f1-702d-6388-9aee4f321753",
+                "role": "user",
+            }
+        }
+
+    def _fake_make_user(**kwargs):
+        captured.update(kwargs)
+        return APIUser(
+            email=kwargs["email"],
+            user_id=kwargs["user_id"],
+            roles=["ADMIN"],
+            groups=["ADMIN"],
+            auth_source=kwargs.get("auth_source", "session"),
+        )
+
+    monkeypatch.setattr(api_deps, "_is_dev_bypass_active", lambda: False)
+    monkeypatch.setattr(api_deps, "_make_user", _fake_make_user)
+
+    user = await api_deps.get_api_user(FakeRequest(), credentials=None, x_api_key=None)
+    assert user.user_id == "68412340-e0f1-702d-6388-9aee4f321753"
+    assert captured["user_id"] == "68412340-e0f1-702d-6388-9aee4f321753"
+    assert captured["auth_source"] == "session"

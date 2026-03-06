@@ -17,6 +17,8 @@ from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from bloom_lims.security.transport import InsecureTransportError, require_https_url
+
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
@@ -211,6 +213,10 @@ class UISettings(BaseModel):
         default="https://github.com/Daylily-Informatics/bloom",
         description="Repository URL shown in the GUI footer/help page",
     )
+    zebra_admin_url: str = Field(
+        default="",
+        description="Optional HTTPS URL for zebra_day admin UI",
+    )
 
 
 class AuthSettings(BaseModel):
@@ -235,6 +241,14 @@ class AuthSettings(BaseModel):
 
     session_timeout_minutes: int = Field(default=30, description="Session timeout")
     max_sessions_per_user: int = Field(default=5, description="Max concurrent sessions")
+    tool_api_default_token_days: int = Field(
+        default=30,
+        description="Default expiration in days for admin-issued tool API tokens",
+    )
+    tool_api_max_token_days: int = Field(
+        default=3650,
+        description="Maximum allowed expiration in days for admin-issued tool API tokens",
+    )
 
 
 class AtlasSettings(BaseModel):
@@ -281,6 +295,17 @@ class AtlasSettings(BaseModel):
         default=0.5,
         description="Base backoff delay in seconds for Bloom -> Atlas status event retries",
     )
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            return ""
+        try:
+            return require_https_url(cleaned, context_label="atlas.base_url").rstrip("/")
+        except InsecureTransportError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class LoggingSettings(BaseModel):
@@ -425,7 +450,11 @@ class BloomSettings(BaseSettings):
         """
         atlas_base_url = os.environ.get("BLOOM_ATLAS__BASE_URL")
         if atlas_base_url is not None:
-            self.atlas.base_url = atlas_base_url
+            cleaned = str(atlas_base_url).strip()
+            if cleaned:
+                self.atlas.base_url = require_https_url(cleaned, context_label="atlas.base_url").rstrip("/")
+            else:
+                self.atlas.base_url = ""
 
         atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
         if atlas_token is not None:

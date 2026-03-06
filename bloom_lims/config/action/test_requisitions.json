@@ -8,7 +8,7 @@
         "action_order": "0",
         "action_simple_value": "",
         "action_user": [],
-        "capture_data": "yes",
+        "capture_data": "no",
         "captured_data": {},
         "curr_user": "",
         "deactivate_actions_when_executed": [],

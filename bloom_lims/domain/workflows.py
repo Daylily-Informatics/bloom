@@ -160,8 +160,12 @@ class BloomWorkflowStep(BloomObj):
             self.do_action_fill_plate_directed(wfs_euid, action_ds)
         elif action_method == "do_action_link_tubes_auto":
             self.do_action_link_tubes_auto(wfs_euid, action_ds)
+        elif action_method == "do_action_create_pool":
+            self.do_action_create_pool(wfs_euid, action_ds)
         elif action_method == "do_action_cfdna_quant":
             self.do_action_cfdna_quant(wfs_euid, action_ds)
+        elif action_method == "do_action_cfdna_post_extraction_quant":
+            self.do_action_cfdna_post_extraction_quant(wfs_euid, action_ds)
         elif action_method == "do_action_stamp_copy_plate":
             self.do_action_stamp_copy_plate(wfs_euid, action_ds)
         elif action_method == "do_action_log_temperature":
@@ -674,6 +678,53 @@ class BloomWorkflowStep(BloomObj):
         self.session.commit()
 
         return child_wfs
+
+    def do_action_cfdna_post_extraction_quant(self, wfs_euid, action_ds):
+        """Compatibility alias for extraction step quant actions."""
+        return self.do_action_cfdna_quant(wfs_euid, action_ds)
+
+    def do_action_create_pool(self, wfs_euid, action_ds):
+        """Create a pool tube and link source containers as parents."""
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        source_barcodes = str(captured.get("source_barcodes") or "").splitlines()
+        pool_name = str(captured.get("pool_name") or "").strip()
+
+        wfs = self.get_by_euid(wfs_euid)
+
+        child_wfs = ""
+        for layout_str in action_ds.get("child_workflow_step_obj", {}) or {}:
+            child_wfs = self.create_instance_by_code(
+                layout_str, action_ds["child_workflow_step_obj"][layout_str]
+            )
+            self.session.commit()
+        if child_wfs:
+            self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
+
+        pool_tube = ""
+        for dlayout_str in action_ds.get("child_container_obj", {}) or {}:
+            pool_tube = self.create_instance_by_code(
+                dlayout_str, action_ds["child_container_obj"][dlayout_str]
+            )
+            if pool_tube and pool_name:
+                props = pool_tube.json_addl.setdefault("properties", {})
+                props["name"] = pool_name
+                flag_modified(pool_tube, "json_addl")
+            self.session.commit()
+
+        if pool_tube:
+            if child_wfs:
+                self.create_generic_instance_lineage_by_euids(child_wfs.euid, pool_tube.euid)
+            else:
+                self.create_generic_instance_lineage_by_euids(wfs.euid, pool_tube.euid)
+
+        for src in source_barcodes:
+            src = str(src).strip()
+            if not src or not pool_tube:
+                continue
+            self.create_generic_instance_lineage_by_euids(src, pool_tube.euid)
+
+        self.session.commit()
+        return child_wfs or pool_tube
 
     def do_action_link_tubes_auto(self, wfs_euid, action_ds):
         containers = action_ds["captured_data"]["discard_barcodes"].rstrip().split("\n")

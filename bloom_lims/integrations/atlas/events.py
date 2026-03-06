@@ -12,6 +12,8 @@ from typing import Any
 import requests
 
 from bloom_lims.config import AtlasSettings, get_settings
+from bloom_lims.security.transport import InsecureTransportError, is_https_url, require_https_url
+from bloom_lims.integrations.atlas.tls import resolve_requests_verify
 
 
 logger = logging.getLogger(__name__)
@@ -25,18 +27,22 @@ class AtlasEventClient:
 
     def _endpoint(self) -> str:
         base = str(self.settings.base_url or "").strip().rstrip("/")
+        base = require_https_url(base, context_label="atlas.base_url").rstrip("/")
         path = str(self.settings.events_path or "").strip()
         if not path:
             path = "/api/integrations/bloom/v1/events"
         if not path.startswith("/"):
             path = f"/{path}"
-        return f"{base}{path}"
+        endpoint = f"{base}{path}"
+        return require_https_url(endpoint, context_label="Atlas events endpoint")
 
     def _is_configured(self) -> tuple[bool, str]:
         if not self.settings.events_enabled:
             return False, "events disabled"
         if not self.settings.base_url:
             return False, "atlas.base_url not configured"
+        if not is_https_url(self.settings.base_url):
+            return False, "atlas.base_url must use https://"
         if not self.settings.organization_id:
             return False, "atlas.organization_id not configured"
         if not self.settings.webhook_secret:
@@ -72,7 +78,11 @@ class AtlasEventClient:
             "X-Bloom-Event-Id": event_uuid,
         }
 
-        endpoint = self._endpoint()
+        try:
+            endpoint = self._endpoint()
+        except InsecureTransportError as exc:
+            logger.warning("Atlas event skipped (%s)", exc)
+            return None
         timeout_seconds = max(1, int(self.settings.events_timeout_seconds))
         max_retries = max(0, int(self.settings.events_max_retries))
         last_error = ""
@@ -84,7 +94,10 @@ class AtlasEventClient:
                     data=body_bytes,
                     headers=headers,
                     timeout=timeout_seconds,
-                    verify=self.settings.verify_ssl,
+                    verify=resolve_requests_verify(
+                        base_url=str(self.settings.base_url or ""),
+                        verify_ssl=bool(self.settings.verify_ssl),
+                    ),
                 )
             except requests.RequestException as exc:
                 last_error = str(exc)

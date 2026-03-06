@@ -236,6 +236,7 @@ class ExternalSpecimenService:
         container_euid: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         payload = {
+            "tenant_id": refs.tenant_id,
             "order_number": refs.order_number,
             "patient_id": refs.patient_id,
             "shipment_number": refs.shipment_number or refs.package_number,
@@ -247,13 +248,31 @@ class ExternalSpecimenService:
             for key, value in payload.items()
             if value is not None and str(value).strip()
         }
-        if not normalized:
+        if not any(
+            key in normalized
+            for key in (
+                "order_number",
+                "patient_id",
+                "shipment_number",
+                "package_number",
+                "kit_barcode",
+            )
+        ):
             raise ValueError("At least one Atlas reference is required")
 
         validation_meta: dict[str, Any] = {}
+        has_container_context_refs = any(
+            key in normalized
+            for key in (
+                "order_number",
+                "shipment_number",
+                "package_number",
+                "kit_barcode",
+            )
+        )
         try:
-            if container_euid:
-                tenant_id = self.atlas.get_required_tenant_id()
+            if container_euid and has_container_context_refs:
+                tenant_id = str(normalized.get("tenant_id") or "").strip() or self.atlas.get_required_tenant_id()
                 ctx_result = self.atlas.get_container_trf_context(
                     container_euid,
                     tenant_id=tenant_id,

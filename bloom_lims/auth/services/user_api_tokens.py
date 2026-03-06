@@ -26,6 +26,7 @@ from bloom_lims.auth.repositories.tapdb.user_api_tokens import (
     UserTokenUsageRecord,
 )
 from bloom_lims.auth.services.groups import GroupService
+from bloom_lims.security.transport import require_https_url
 
 
 TOKEN_PREFIX = "blm_"
@@ -40,6 +41,8 @@ class TokenCreateInput:
     scope: str
     expires_in_days: int = 2
     note: str | None = None
+    atlas_callback_uri: str | None = None
+    atlas_tenant_uuid: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +67,23 @@ class UserAPITokenService:
         self.db = db
         self.repo = TapdbUserAPITokenRepository(db)
         self.groups = GroupService(db)
+
+    @staticmethod
+    def _normalize_atlas_tenant_uuid(value: str | None) -> str | None:
+        candidate = str(value or "").strip()
+        if not candidate:
+            return None
+        try:
+            return str(uuid.UUID(candidate))
+        except ValueError as exc:
+            raise ValueError("atlas_tenant_uuid must be a valid UUID") from exc
+
+    @staticmethod
+    def _normalize_atlas_callback_uri(value: str | None) -> str | None:
+        candidate = str(value or "").strip()
+        if not candidate:
+            return None
+        return require_https_url(candidate, context_label="atlas_callback_uri")
 
     @staticmethod
     def generate_plaintext_token() -> str:
@@ -114,12 +134,16 @@ class UserAPITokenService:
         token_hash = self.hash_token(plaintext)
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=expires_in_days)
+        atlas_callback_uri = self._normalize_atlas_callback_uri(payload.atlas_callback_uri)
+        atlas_tenant_uuid = self._normalize_atlas_tenant_uuid(payload.atlas_tenant_uuid)
 
         token, revision = self.repo.create_token(
             user_id=owner_user_id,
             token_name=payload.token_name.strip(),
             token_prefix=self.display_prefix(plaintext),
             scope=scope,
+            atlas_callback_uri=atlas_callback_uri,
+            atlas_tenant_uuid=atlas_tenant_uuid,
             token_hash=token_hash,
             expires_at=expires_at,
             created_by=actor_user_id,

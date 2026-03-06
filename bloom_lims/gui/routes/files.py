@@ -1067,7 +1067,7 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
     # This is intentionally not performance-optimized, because it is a legacy path.
     from bloom_lims.app import create_app
 
-    client = TestClient(create_app())
+    client = TestClient(create_app(), base_url="https://testserver")
 
     for i, row in enumerate(rows):
         num_files = 0

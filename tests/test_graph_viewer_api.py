@@ -4,6 +4,7 @@ Graph viewer route/API contract tests (mocked, no live DB dependency).
 
 import os
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +19,7 @@ from main import _build_graph_elements_for_start, app, require_auth
 
 @pytest.fixture
 def client():
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, base_url="https://testserver",  raise_server_exceptions=False)
 
 
 class _DummyDB:
@@ -260,6 +261,50 @@ class TestGraphViewerApis:
             assert response.status_code == 403
         finally:
             app.dependency_overrides.pop(require_auth, None)
+
+    def test_update_dag_writes_file_under_dags_dir(self, client, tmp_path, monkeypatch):
+        dags_dir = tmp_path / "dags"
+        legacy_dir = tmp_path / "legacy"
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+
+        monkeypatch.setattr("bloom_lims.gui.routes.graph.DAG_OUTPUT_DIR", dags_dir)
+        monkeypatch.setattr("bloom_lims.gui.routes.graph.LEGACY_DAG_OUTPUT_DIR", legacy_dir)
+
+        payload = {"elements": {"nodes": [], "edges": []}}
+        response = client.post("/update_dag", json=payload)
+        assert response.status_code == 200
+        body = response.json()
+
+        written_path = Path(body["path"])
+        assert written_path.parent == dags_dir
+        assert written_path.name.startswith("dag_")
+        assert written_path.exists()
+
+        read_back = client.get("/get_dagv2")
+        assert read_back.status_code == 200
+        assert read_back.json() == payload
+
+    def test_update_dag_cleanup_keeps_latest_files(self, client, tmp_path, monkeypatch):
+        dags_dir = tmp_path / "dags"
+        legacy_dir = tmp_path / "legacy"
+        dags_dir.mkdir(parents=True, exist_ok=True)
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+
+        stale_a = dags_dir / "dag_20000101000000000000.json"
+        stale_b = dags_dir / "dag_20000101000000000001.json"
+        stale_a.write_text("{}", encoding="utf-8")
+        stale_b.write_text("{}", encoding="utf-8")
+
+        monkeypatch.setattr("bloom_lims.gui.routes.graph.DAG_OUTPUT_DIR", dags_dir)
+        monkeypatch.setattr("bloom_lims.gui.routes.graph.LEGACY_DAG_OUTPUT_DIR", legacy_dir)
+        monkeypatch.setattr("bloom_lims.gui.routes.graph.DAG_MAX_FILES", 1)
+        monkeypatch.setattr("bloom_lims.gui.routes.graph.DAG_MAX_AGE_DAYS", 3650)
+
+        response = client.post("/update_dag", json={"elements": {"nodes": [], "edges": []}})
+        assert response.status_code == 200
+
+        dag_files = list(dags_dir.glob("dag_*.json"))
+        assert len(dag_files) == 1
 
     def test_api_lineage_admin_create_success(self, client):
         fake_bobj = _fake_bobj_for_lineage_create(existing_lineage=False)

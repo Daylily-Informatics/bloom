@@ -9,7 +9,7 @@
         "action_executed": "0",
         "max_executions": "1",
         "action_enabled": "0",
-        "capture_data": "yes",
+        "capture_data": "no",
         "captured_data": {},
         "deactivate_actions_when_executed": [],
         "executed_datetime": [],

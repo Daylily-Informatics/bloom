@@ -27,7 +27,7 @@ from main import app
 @pytest.fixture
 def client():
     """Create test client with auth disabled."""
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, base_url="https://testserver",  raise_server_exceptions=False)
 
 
 class TestPublicEndpoints:
@@ -77,11 +77,29 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
+    def test_admin_loads_table_enhancements_script(self, client):
+        """Modern base should load global table enhancement JS."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert '/static/modern/js/table_enhancements.js' in response.text
+
+    def test_table_enhancements_static_asset_served(self, client):
+        """Table enhancement script should be available as static asset."""
+        response = client.get("/static/modern/js/table_enhancements.js")
+        assert response.status_code == 200
+        assert "downloadVisibleRowsCsv" in response.text
+
     def test_admin_includes_tapdb_metrics_link(self, client):
         """Admin page includes link to TapDB metrics."""
         response = client.get("/admin")
         assert response.status_code == 200
         assert "/admin/metrics" in response.text
+
+    def test_admin_does_not_render_insecure_zebra_link(self, client):
+        """Admin page should never include insecure HTTP zebra admin links."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "http://localhost:8118" not in response.text
 
     def test_admin_metrics_returns_html(self, client):
         """TapDB metrics page returns HTML."""
@@ -89,6 +107,20 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "TapDB Metrics" in response.text
+
+    def test_admin_renders_tool_api_users_section(self, client):
+        """Admin page includes Tool API Users management UI."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "Tool API Users" in response.text
+        assert "id=\"tool-user-create-form\"" in response.text
+        assert "/api/v1/admin/tool-api-users" in response.text
+
+    def test_admin_tool_api_users_non_admin_message_present(self, client):
+        """Admin page includes the non-admin warning text for tool-user API actions."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "Admin privileges required." in response.text
 
     def test_admin_preferences_post_redirects(self, client):
         """Test admin preferences form POST succeeds and redirects."""

@@ -848,7 +848,7 @@ class BloomObj:
 
         if len(combined_result) > 1:
             raise Exception(
-                f"Multiple {len(combined_results)} templates found for {uuid}"
+                f"Multiple {len(combined_result)} rows found for uuid {uuid}"
             )
         elif len(combined_result) == 0:
             self.logger.debug(f"No template found with uuid:", uuid)
@@ -1356,7 +1356,9 @@ class BloomObj:
         return self.delete(uuid=uuid)
 
     def delete_obj(self, obj):
-        return self.delete(uuid=obj.uuid)
+        # Prefer deleting by passing the ORM object directly to avoid uuid collisions
+        # between instance/template/lineage tables.
+        return self.delete(uuid=obj)
 
     #
     # Global Object Actions
@@ -1370,6 +1372,26 @@ class BloomObj:
             r = self.do_action_set_object_status(euid, action_ds, action_group, action)
         elif action_method == "do_action_print_barcode_label":
             r = self.do_action_print_barcode_label(euid, action_ds)
+        elif action_method == "do_action_set_verification_state":
+            r = self.do_action_set_verification_state(euid, action_ds)
+        elif action_method == "do_action_set_child_object":
+            r = self.do_action_set_child_object(euid, action_ds)
+        elif action_method == "do_action_add_container_to":
+            r = self.do_action_add_container_to(euid, action_ds)
+        elif action_method == "do_action_remove_container_from":
+            r = self.do_action_remove_container_from(euid, action_ds)
+        elif action_method == "do_action_log_temperature":
+            r = self.do_action_log_temperature(euid, action_ds)
+        elif action_method == "do_action_generate_inventory_tsv":
+            r = self.do_action_generate_inventory_tsv(euid, action_ds)
+        elif action_method == "do_action_download_plate_map":
+            r = self.do_action_download_plate_map(euid, action_ds)
+        elif action_method == "do_action_download_quant_data":
+            r = self.do_action_download_quant_data(euid, action_ds)
+        elif action_method == "do_action_record_cfdna_quant_outcome":
+            r = self.do_action_record_cfdna_quant_outcome(euid, action_ds)
+        elif action_method == "do_action_complete_specimen_destroy":
+            r = self.do_action_complete_specimen_destroy(euid, action_ds)
 
         elif action_method == "do_action_destroy_specimen_containers":
             r = self.do_action_destroy_specimen_containers(euid, action_ds)
@@ -1473,6 +1495,286 @@ class BloomObj:
             self.logger.error(f"Failed to create subject for anchor {euid}")
 
         return subject_euid
+
+    def do_action_set_verification_state(self, euid, action_ds):
+        """Mark a test requisition as verified (one-click action)."""
+        bobj = self.get_by_euid(euid)
+        now_dt = get_datetime_string()
+        un = action_ds.get("curr_user", "bloomdborm")
+
+        props = bobj.json_addl.setdefault("properties", {})
+        props["verification_status"] = "verified"
+        props["verification_timestamp"] = now_dt
+        props["verification_user"] = un
+        flag_modified(bobj, "json_addl")
+        self.session.commit()
+        return bobj
+
+    def do_action_set_child_object(self, euid, action_ds):
+        """Create lineage edges from this object to provided child EUIDs."""
+        parent_obj = self.get_by_euid(euid)
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        raw = str(captured.get("child_euids") or "")
+        relationship_type = str(captured.get("relationship_type") or "generic").strip() or "generic"
+        for child_euid in unique_non_empty_strings(raw.splitlines()):
+            self.create_generic_instance_lineage_by_euids(parent_obj.euid, child_euid, relationship_type)
+        self.session.commit()
+        return parent_obj
+
+    def do_action_add_container_to(self, euid, action_ds):
+        """Move one or more containers into this equipment's active location."""
+        equipment_obj = self.get_by_euid(euid)
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        raw = str(captured.get("container_euids") or "")
+        relationship_type = "location"
+
+        for container_euid in unique_non_empty_strings(raw.splitlines()):
+            container_obj = self.get_by_euid(container_euid)
+            found_current = False
+            for lineage in list(getattr(container_obj, "child_of_lineages", []) or []):
+                if getattr(lineage, "is_deleted", False):
+                    continue
+                if getattr(lineage, "relationship_type", None) != relationship_type:
+                    continue
+                parent = getattr(lineage, "parent_instance", None)
+                if parent is not None and getattr(parent, "euid", None) == equipment_obj.euid:
+                    found_current = True
+                    continue
+                self.delete_obj(lineage)
+
+            if not found_current:
+                self.create_generic_instance_lineage_by_euids(
+                    equipment_obj.euid, container_obj.euid, relationship_type
+                )
+
+        self.session.commit()
+        return equipment_obj
+
+    def do_action_remove_container_from(self, euid, action_ds):
+        """Remove one or more containers from this equipment's active location."""
+        equipment_obj = self.get_by_euid(euid)
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+        raw = str(captured.get("container_euids") or "")
+        relationship_type = "location"
+
+        for container_euid in unique_non_empty_strings(raw.splitlines()):
+            container_obj = self.get_by_euid(container_euid)
+            for lineage in list(getattr(container_obj, "child_of_lineages", []) or []):
+                if getattr(lineage, "is_deleted", False):
+                    continue
+                if getattr(lineage, "relationship_type", None) != relationship_type:
+                    continue
+                parent = getattr(lineage, "parent_instance", None)
+                if parent is not None and getattr(parent, "euid", None) == equipment_obj.euid:
+                    self.delete_obj(lineage)
+        self.session.commit()
+        return equipment_obj
+
+    def do_action_log_temperature(self, euid, action_ds):
+        """Log a temperature reading as a child data record linked to this object."""
+        now_dt = get_datetime_string()
+        un = action_ds.get("curr_user", "bloomdborm")
+        temp_c = action_ds["captured_data"]["Temperature (celcius)"]
+
+        child_data = None
+        for dlayout_str in action_ds.get("child_container_obj", {}):
+            child_data = self.create_instance_by_code(
+                dlayout_str, action_ds["child_container_obj"][dlayout_str]
+            )
+            props = child_data.json_addl.setdefault("properties", {})
+            props["temperature_c"] = temp_c
+            props["temperature_timestamp"] = now_dt
+            props["temperature_log_user"] = un
+            flag_modified(child_data, "json_addl")
+            self.create_generic_instance_lineage_by_euids(euid, child_data.euid)
+            self.session.commit()
+        return child_data
+
+    def do_action_generate_inventory_tsv(self, euid, action_ds):
+        """Generate a TSV inventory for descendant container instances."""
+        from uuid import uuid4
+        import csv
+
+        root_obj = self.get_by_euid(euid)
+        tmp_dir = Path("./tmp")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        out_path = tmp_dir / f"inventory_{root_obj.euid}_{uuid4().hex}.tsv"
+
+        visited = set()
+        queue = [root_obj]
+        rows = []
+        while queue:
+            current = queue.pop(0)
+            if current is None:
+                continue
+            uuid_val = getattr(current, "uuid", None)
+            if uuid_val in visited:
+                continue
+            visited.add(uuid_val)
+
+            for lineage in getattr(current, "parent_of_lineages", []) or []:
+                if getattr(lineage, "is_deleted", False):
+                    continue
+                child = getattr(lineage, "child_instance", None)
+                if child is None or getattr(child, "is_deleted", False):
+                    continue
+                queue.append(child)
+                if getattr(child, "category", None) == "container":
+                    props = child.json_addl.get("properties", {}) if isinstance(child.json_addl, dict) else {}
+                    rows.append(
+                        {
+                            "euid": child.euid,
+                            "type": child.type,
+                            "subtype": child.subtype,
+                            "version": child.version,
+                            "status": getattr(child, "bstatus", ""),
+                            "name": props.get("name", "") if isinstance(props, dict) else "",
+                        }
+                    )
+
+        with out_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["euid", "type", "subtype", "version", "status", "name"],
+                delimiter="\t",
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+
+        return str(out_path)
+
+    def do_action_download_plate_map(self, euid, action_ds):
+        """Generate a TSV plate map (well -> content) for a plate container."""
+        from uuid import uuid4
+        import csv
+
+        plate_obj = self.get_by_euid(euid)
+        tmp_dir = Path("./tmp")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        out_path = tmp_dir / f"plate_map_{plate_obj.euid}_{uuid4().hex}.tsv"
+
+        rows = []
+        for lineage in getattr(plate_obj, "parent_of_lineages", []) or []:
+            if getattr(lineage, "is_deleted", False):
+                continue
+            well = getattr(lineage, "child_instance", None)
+            if well is None or getattr(well, "is_deleted", False):
+                continue
+            if getattr(well, "type", None) != "well":
+                continue
+            cont_address = well.json_addl.get("cont_address", {}) if isinstance(well.json_addl, dict) else {}
+            address = cont_address.get("name", "")
+            content_euids = []
+            for wlin in getattr(well, "parent_of_lineages", []) or []:
+                if getattr(wlin, "is_deleted", False):
+                    continue
+                child = getattr(wlin, "child_instance", None)
+                if child is None or getattr(child, "is_deleted", False):
+                    continue
+                if getattr(child, "category", None) in {"content", "sample", "control"}:
+                    content_euids.append(child.euid)
+            rows.append(
+                {
+                    "plate_euid": plate_obj.euid,
+                    "well_address": address,
+                    "well_euid": well.euid,
+                    "content_euids": ";".join(content_euids),
+                }
+            )
+
+        with out_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["plate_euid", "well_address", "well_euid", "content_euids"],
+                delimiter="\t",
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+
+        return str(out_path)
+
+    def do_action_download_quant_data(self, euid, action_ds):
+        """Generate a TSV of quant values for all plate wells under an object (step or plate)."""
+        from uuid import uuid4
+        import csv
+
+        obj = self.get_by_euid(euid)
+        plates = []
+        if getattr(obj, "type", None) == "plate":
+            plates = [obj]
+        else:
+            for lineage in getattr(obj, "parent_of_lineages", []) or []:
+                if getattr(lineage, "is_deleted", False):
+                    continue
+                child = getattr(lineage, "child_instance", None)
+                if child is None or getattr(child, "is_deleted", False):
+                    continue
+                if getattr(child, "type", None) == "plate":
+                    plates.append(child)
+
+        if not plates:
+            raise Exception(f"No plates found under {euid}")
+
+        tmp_dir = Path("./tmp")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        out_path = tmp_dir / f"quant_{obj.euid}_{uuid4().hex}.tsv"
+
+        rows = []
+        for plate in plates:
+            for lineage in getattr(plate, "parent_of_lineages", []) or []:
+                if getattr(lineage, "is_deleted", False):
+                    continue
+                well = getattr(lineage, "child_instance", None)
+                if well is None or getattr(well, "is_deleted", False):
+                    continue
+                if getattr(well, "type", None) != "well":
+                    continue
+                props = well.json_addl.get("properties", {}) if isinstance(well.json_addl, dict) else {}
+                cont_address = well.json_addl.get("cont_address", {}) if isinstance(well.json_addl, dict) else {}
+                address = cont_address.get("name", "")
+                quant_value = props.get("quant_value", "") if isinstance(props, dict) else ""
+                rows.append(
+                    {
+                        "plate_euid": plate.euid,
+                        "well_address": address,
+                        "quant_value": quant_value,
+                    }
+                )
+
+        with out_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["plate_euid", "well_address", "quant_value"],
+                delimiter="\t",
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+
+        return str(out_path)
+
+    def do_action_record_cfdna_quant_outcome(self, euid, action_ds):
+        """Record a manual quantification outcome on a data record (legacy)."""
+        bobj = self.get_by_euid(euid)
+        now_dt = get_datetime_string()
+        un = action_ds.get("curr_user", "bloomdborm")
+        captured = action_ds.get("captured_data", {}) if isinstance(action_ds, dict) else {}
+
+        props = bobj.json_addl.setdefault("properties", {})
+        props["quant_outcome"] = str(captured.get("quant_outcome") or "").strip()
+        props["quant_outcome_comments"] = str(captured.get("comments") or "").strip()
+        props["quant_outcome_timestamp"] = now_dt
+        props["quant_outcome_user"] = un
+        flag_modified(bobj, "json_addl")
+        self.session.commit()
+        return bobj
+
+    def do_action_complete_specimen_destroy(self, euid, action_ds):
+        """Legacy action to complete a destroy step; keeps behavior minimal."""
+        wfs = self.get_by_euid(euid)
+        wfs.bstatus = "complete"
+        flag_modified(wfs, "bstatus")
+        self.session.commit()
+        return wfs
 
     def ret_plate_wells_dict(self, plate):
         plate_wells = {}

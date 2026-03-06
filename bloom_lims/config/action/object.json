@@ -30,7 +30,22 @@
         },
         "ui_schema": {
           "title": "Set Object As Child",
-          "fields": []
+          "fields": [
+            {
+              "name": "child_euids",
+              "label": "Child EUIDs",
+              "type": "textarea",
+              "required": true,
+              "help_text": "One EUID per line"
+            },
+            {
+              "name": "relationship_type",
+              "label": "Relationship Type",
+              "type": "text",
+              "required": false,
+              "default": "generic"
+            }
+          ]
         }
       }
     }
