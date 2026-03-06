@@ -153,6 +153,17 @@ profile = "black"
 line_length = 88
 skip_gitignore = true
 
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "bloom_lims/database", "stage_to_delete"]
+skips = ["B101"]  # allow assert in non-test code (used extensively)
+
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true
