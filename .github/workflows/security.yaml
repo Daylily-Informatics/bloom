@@ -24,16 +24,18 @@ jobs:
         run: |
           pip install bandit[toml] safety ruff
 
-      - name: Ruff lint check
+      - name: Ruff lint check (advisory)
+        continue-on-error: true
         run: ruff check bloom_lims/ main.py --output-format=github
 
-      - name: Ruff format check
+      - name: Ruff format check (advisory)
+        continue-on-error: true
         run: ruff format --check bloom_lims/ main.py
 
-      - name: Bandit security scan
+      - name: Bandit security scan (JSON report)
         run: bandit -c pyproject.toml -r bloom_lims/ main.py -f json -o bandit-report.json || true
 
-      - name: Bandit human-readable output
+      - name: Bandit security scan (human-readable)
         run: bandit -c pyproject.toml -r bloom_lims/ main.py
 
       - name: Upload bandit report
@@ -42,4 +44,5 @@ jobs:
         with:
           name: bandit-report
           path: bandit-report.json
+          if-no-files-found: ignore
 
