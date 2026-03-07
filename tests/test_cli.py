@@ -106,6 +106,54 @@ class TestDbSubcommands:
         result = runner.invoke(cli, ["db", "init", "--help"])
         assert result.exit_code == 0
 
+    def test_db_init_bootstraps_tapdb_namespace_config(self, runner, monkeypatch):
+        """db init should create namespaced TapDB config before local startup."""
+        calls = []
+
+        monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+        monkeypatch.setattr(
+            db_commands,
+            "_runtime_env",
+            lambda: {
+                "TAPDB_ENV": "dev",
+                "TAPDB_CLIENT_ID": "bloom",
+                "TAPDB_DATABASE_NAME": "bloom",
+            },
+        )
+        monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+        monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "5566")
+        monkeypatch.setattr(
+            db_commands,
+            "_run_tapdb",
+            lambda args, check=True: calls.append((args, check)) or 0,
+        )
+        monkeypatch.setattr(db_commands, "_seed_tapdb_templates", lambda *args, **kwargs: None)
+        monkeypatch.setattr(db_commands, "_seed_bloom_templates", lambda: None)
+
+        result = runner.invoke(cli, ["db", "init"])
+
+        assert result.exit_code == 0
+        assert calls[:4] == [
+            (
+                [
+                    "config",
+                    "init",
+                    "--client-id",
+                    "bloom",
+                    "--database-name",
+                    "bloom",
+                    "--env",
+                    "dev",
+                    "--db-port",
+                    "dev=5566",
+                ],
+                True,
+            ),
+            (["pg", "init", "dev"], False),
+            (["pg", "start-local", "dev", "--port", "5566"], True),
+            (["db", "setup", "dev", "--include-workflow"], True),
+        ]
+
     def test_db_migrate_help(self, runner):
         """Test bloom db migrate --help."""
         result = runner.invoke(cli, ["db", "migrate", "--help"])

@@ -124,6 +124,29 @@ def _run_tapdb(args: List[str], check: bool = True) -> int:
     return result.returncode
 
 
+def _ensure_tapdb_namespace_config(env_name: str) -> None:
+    """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
+    env = _runtime_env()
+    client_id = (env.get("TAPDB_CLIENT_ID") or "").strip()
+    database_name = (env.get("TAPDB_DATABASE_NAME") or "").strip()
+    if not client_id or not database_name:
+        return
+
+    args = [
+        "config",
+        "init",
+        "--client-id",
+        client_id,
+        "--database-name",
+        database_name,
+        "--env",
+        env_name,
+    ]
+    if env_name in {"dev", "test"}:
+        args.extend(["--db-port", f"{env_name}={_local_pg_port(env_name)}"])
+    _run_tapdb(args)
+
+
 def _seed_bloom_templates() -> None:
     """Seed Bloom legacy template configs into TAPDB generic_template."""
     summary = seed_bloom_templates()
@@ -172,6 +195,7 @@ def db_init(force: bool):
     """Initialize database/runtime via tapdb orchestration."""
     env_name = _current_env()
     console.print(f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]")
+    _ensure_tapdb_namespace_config(env_name)
 
     if env_name in {"dev", "test"}:
         _ensure_schema_available_for_bloom_root()
