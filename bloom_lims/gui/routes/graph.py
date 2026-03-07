@@ -18,6 +18,14 @@ from bloom_lims.gui.jinja import templates
 router = APIRouter()
 
 
+DAGS_DIRECTORY = "dags"
+
+
+def _build_dag_filename(timestamp: datetime | None = None) -> str:
+    dag_timestamp = (timestamp or datetime.now()).strftime("%Y%m%d%H%M%S")
+    return os.path.join(DAGS_DIRECTORY, f"dag_{dag_timestamp}.json")
+
+
 GRAPH_CATEGORY_COLORS = {
     "workflow": "#00FF7F",
     "workflow_step": "#ADFF2F",
@@ -273,7 +281,8 @@ async def get_dagv2(
 @router.post("/update_dag")
 async def update_dag(request: Request, _auth=Depends(require_auth)):
     input_json = await request.json()
-    filename = f"dag_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+    os.makedirs(DAGS_DIRECTORY, exist_ok=True)
+    filename = _build_dag_filename()
     with open(filename, "w") as f:
         json.dump(input_json, f)
     return {"status": "success", "filename": filename}

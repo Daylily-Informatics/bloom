@@ -1057,6 +1057,21 @@ class TestDAGEndpoints:
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
+    def test_update_dag_post_writes_under_dags(self, client, monkeypatch, tmp_path):
+        """Test update DAG writes files under dags/ and not repo root."""
+        monkeypatch.chdir(tmp_path)
+        response = client.post(
+            "/update_dag",
+            json={"euid": "EX1", "nodes": [], "edges": []},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "success"
+        assert payload["filename"].startswith("dags/dag_")
+        assert (tmp_path / payload["filename"]).exists()
+        assert not list(tmp_path.glob("dag_*"))
+
     def test_add_new_edge_post(self, client):
         """Test add new edge POST endpoint."""
         response = client.post(

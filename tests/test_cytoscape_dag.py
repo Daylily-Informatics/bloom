@@ -20,6 +20,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
 
+from bloom_lims.gui.routes.graph import _build_dag_filename
+
 
 class TestDAGDataStructure:
     """Tests for DAG data structure validation."""
@@ -486,12 +488,10 @@ class TestDAGAPIEndpoints:
 
             assert result == {"elements": {"nodes": [], "edges": []}}
 
-    def test_update_dag_creates_timestamped_file(self):
-        """Test that update_dag creates a timestamped JSON file."""
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        filename = f"dag_{timestamp}.json"
-        assert "dag_" in filename
-        assert ".json" in filename
+    def test_update_dag_creates_timestamped_file_under_dags(self):
+        """Test that DAG files are named under the dags directory."""
+        filename = _build_dag_filename(datetime(2026, 3, 7, 1, 2, 3))
+        assert filename == "dags/dag_20260307010203.json"
 
     def test_delete_object_endpoint_structure(self):
         """Test delete_object endpoint request structure."""
