@@ -24,7 +24,6 @@ class ActionExecuteRequest:
     action_group: str
     action_key: str
     captured_data: dict[str, Any]
-    legacy_action_ds: dict[str, Any] | None = None
 
 
 class ActionExecutionError(Exception):
@@ -55,27 +54,13 @@ class ActionExecutionError(Exception):
 
 
 def normalize_action_execute_payload(payload: dict[str, Any]) -> ActionExecuteRequest:
-    """Normalize old and new request payloads into a shared execute contract."""
+    """Normalize strict action execute payload into a shared execute contract."""
     if not isinstance(payload, dict):
         raise ActionExecutionError(status_code=400, detail="Request body must be a JSON object")
 
-    euid = str(
-        payload.get("euid")
-        or payload.get("obj_euid")
-        or payload.get("step_euid")
-        or ""
-    ).strip()
+    euid = str(payload.get("euid") or "").strip()
     action_group = str(payload.get("action_group") or "").strip()
-    action_key = str(payload.get("action_key") or payload.get("action") or "").strip()
-
-    captured_data: dict[str, Any] = {}
-    legacy_action_ds = None
-
-    if isinstance(payload.get("captured_data"), dict):
-        captured_data = copy.deepcopy(payload.get("captured_data") or {})
-    elif isinstance(payload.get("ds"), dict):
-        legacy_action_ds = copy.deepcopy(payload.get("ds") or {})
-        captured_data = copy.deepcopy((legacy_action_ds or {}).get("captured_data") or {})
+    action_key = str(payload.get("action_key") or "").strip()
 
     if not euid:
         raise ActionExecutionError(status_code=400, detail="Missing required field: euid", error_fields=["euid"])
@@ -91,13 +76,18 @@ def normalize_action_execute_payload(payload: dict[str, Any]) -> ActionExecuteRe
             detail="Missing required field: action_key",
             error_fields=["action_key"],
         )
+    if not isinstance(payload.get("captured_data"), dict):
+        raise ActionExecutionError(
+            status_code=400,
+            detail="Missing required field: captured_data",
+            error_fields=["captured_data"],
+        )
 
     return ActionExecuteRequest(
         euid=euid,
         action_group=action_group,
         action_key=action_key,
-        captured_data=captured_data,
-        legacy_action_ds=legacy_action_ds,
+        captured_data=copy.deepcopy(payload.get("captured_data") or {}),
     )
 
 
@@ -177,7 +167,6 @@ def _resolve_action_definition(
     instance: Any,
     action_group: str,
     action_key: str,
-    legacy_action_ds: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     action_groups = (instance.json_addl or {}).get("action_groups", {})
     if not isinstance(action_groups, dict):
@@ -194,21 +183,13 @@ def _resolve_action_definition(
         )
 
     actions = group_data.get("actions", {})
-    action_data = actions.get(action_key)
+    normalized_key = action_key.strip("/")
+    action_data = actions.get(action_key) or actions.get(normalized_key)
     if not isinstance(action_data, dict):
-        if isinstance(legacy_action_ds, dict) and legacy_action_ds:
-            logger.warning(
-                "Falling back to client action payload for %s/%s on %s",
-                action_group,
-                action_key,
-                instance.euid,
-            )
-            action_data = copy.deepcopy(legacy_action_ds)
-        else:
-            raise ActionExecutionError(
-                status_code=404,
-                detail=f"Action not found: {action_key}",
-            )
+        raise ActionExecutionError(
+            status_code=404,
+            detail=f"Action not found: {action_key}",
+        )
 
     resolved = copy.deepcopy(action_data)
     if not isinstance(resolved.get("captured_data"), dict):
@@ -315,7 +296,6 @@ def execute_action_for_instance(
             instance,
             request_data.action_group,
             request_data.action_key,
-            legacy_action_ds=request_data.legacy_action_ds,
         )
 
         required_fields = _extract_required_fields_from_ui_schema(action_definition)
@@ -338,6 +318,8 @@ def execute_action_for_instance(
             actor_user_id=actor_user_id,
             user_preferences=user_preferences,
         )
+        action_ds["action_key"] = request_data.action_key
+        action_ds["action_group"] = request_data.action_group
 
         executor = _resolve_executor(instance, bdb)
         executor.set_actor_context(user_id=actor_user_id, email=actor_email)

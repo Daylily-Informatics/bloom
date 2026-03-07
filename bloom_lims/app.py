@@ -5,6 +5,7 @@ This keeps `main.py` as a thin entrypoint while preserving `uvicorn main:app`.
 
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import FastAPI
@@ -14,7 +15,6 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
 from bloom_lims.gui.errors import register_exception_handlers
-from bloom_lims.gui.router import router as gui_router
 from bloom_lims.tapdb_metrics import request_method_var, request_path_var, stop_all_writers
 
 
@@ -58,7 +58,12 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(api_v1_router)
-    app.include_router(gui_router)
+    try:
+        from bloom_lims.gui.router import router as gui_router
+    except ModuleNotFoundError as exc:
+        logging.warning("Skipping GUI router due to missing optional dependency: %s", exc.name)
+    else:
+        app.include_router(gui_router)
 
     register_exception_handlers(app)
     return app

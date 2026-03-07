@@ -21,6 +21,9 @@ from bloom_lims.schemas.external_specimens import (
 class ExternalSpecimenService:
     """Creates, updates, and queries external specimens in Bloom."""
 
+    EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
+    EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
+
     def __init__(self, *, app_username: str):
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
@@ -61,8 +64,6 @@ class ExternalSpecimenService:
 
         specimen_props = self._props(specimen)
         specimen_props.update(payload.properties or {})
-        specimen_props["atlas_refs"] = atlas_refs
-        specimen_props["atlas_validation"] = atlas_meta
         if payload.specimen_name:
             specimen_props["name"] = payload.specimen_name
         if idempotency_key:
@@ -76,6 +77,12 @@ class ExternalSpecimenService:
         )
         if container is not None:
             self._ensure_container_link(container.euid, specimen.euid)
+
+        self._replace_external_references(
+            specimen=specimen,
+            atlas_refs=atlas_refs,
+            atlas_validation=atlas_meta,
+        )
 
         self.bdb.session.commit()
         return self._to_response(specimen, created=True)
@@ -110,13 +117,13 @@ class ExternalSpecimenService:
             specimen_props.update(payload.properties)
         if payload.specimen_name:
             specimen_props["name"] = payload.specimen_name
+        atlas_refs: dict[str, Any] | None = None
+        atlas_meta: dict[str, Any] | None = None
         if payload.atlas_refs is not None:
             atlas_refs, atlas_meta = self._validate_atlas_refs(
                 payload.atlas_refs,
                 container_euid=payload.container_euid,
             )
-            specimen_props["atlas_refs"] = atlas_refs
-            specimen_props["atlas_validation"] = atlas_meta
         self._write_props(specimen, specimen_props)
 
         if payload.container_euid:
@@ -127,6 +134,13 @@ class ExternalSpecimenService:
                 raise ValueError(f"EUID is not a container: {payload.container_euid}")
             self._ensure_container_link(container.euid, specimen.euid)
 
+        if atlas_refs is not None:
+            self._replace_external_references(
+                specimen=specimen,
+                atlas_refs=atlas_refs,
+                atlas_validation=atlas_meta or {},
+            )
+
         self.bdb.session.commit()
         return self._to_response(specimen, created=True)
 
@@ -134,7 +148,7 @@ class ExternalSpecimenService:
         filters = {
             "order_number": refs.order_number,
             "patient_id": refs.patient_id,
-            "shipment_number": refs.shipment_number or refs.package_number,
+            "shipment_number": refs.shipment_number,
             "kit_barcode": refs.kit_barcode,
         }
         normalized_filters = {
@@ -155,9 +169,8 @@ class ExternalSpecimenService:
         )
         results: list[ExternalSpecimenResponse] = []
         for instance in query:
-            props = self._props(instance)
-            atlas_refs = props.get("atlas_refs")
-            if not isinstance(atlas_refs, dict):
+            atlas_refs = self._atlas_refs_for_specimen(instance)
+            if not atlas_refs:
                 continue
             is_match = True
             for key, expected in normalized_filters.items():
@@ -238,8 +251,7 @@ class ExternalSpecimenService:
         payload = {
             "order_number": refs.order_number,
             "patient_id": refs.patient_id,
-            "shipment_number": refs.shipment_number or refs.package_number,
-            "package_number": refs.package_number,
+            "shipment_number": refs.shipment_number,
             "kit_barcode": refs.kit_barcode,
         }
         normalized = {
@@ -316,8 +328,7 @@ class ExternalSpecimenService:
         context_values = {
             "order_number": str(order.get("order_number") or "").strip(),
             "patient_id": str(patient.get("patient_id") or "").strip(),
-            "shipment_number": str(links.get("shipment_number") or links.get("package_number") or "").strip(),
-            "package_number": str(links.get("package_number") or "").strip(),
+            "shipment_number": str(links.get("shipment_number") or "").strip(),
             "kit_barcode": str(links.get("testkit_barcode") or "").strip(),
         }
 
@@ -352,14 +363,14 @@ class ExternalSpecimenService:
             "order_number": order.get("order_number"),
             "patient_id": patient.get("patient_id"),
             "testkit_barcode": links.get("testkit_barcode"),
-            "package_number": links.get("package_number"),
+            "shipment_number": links.get("shipment_number"),
             "test_order_count": len(test_order_ids),
             "test_order_ids": test_order_ids,
         }
 
     def _to_response(self, specimen, *, created: bool) -> ExternalSpecimenResponse:
         props = self._props(specimen)
-        atlas_refs = props.get("atlas_refs") if isinstance(props.get("atlas_refs"), dict) else {}
+        atlas_refs = self._atlas_refs_for_specimen(specimen)
         container = self._linked_container_euid(specimen)
         return ExternalSpecimenResponse(
             specimen_euid=specimen.euid,
@@ -426,3 +437,74 @@ class ExternalSpecimenService:
             if "not found" in msg or "no template found" in msg:
                 return None
             raise
+
+    def _atlas_refs_for_specimen(self, specimen) -> dict[str, str]:
+        refs: dict[str, str] = {}
+        for lineage in get_parent_lineages(specimen):
+            if lineage.is_deleted:
+                continue
+            if lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP:
+                continue
+            external_ref = lineage.child_instance
+            if external_ref is None or external_ref.is_deleted:
+                continue
+            if (
+                external_ref.category != "generic"
+                or external_ref.type != "generic"
+                or external_ref.subtype != "external_object_link"
+            ):
+                continue
+            payload = self._props(external_ref)
+            if str(payload.get("provider") or "").strip() != "atlas":
+                continue
+            key = str(payload.get("reference_type") or "").strip()
+            value = str(payload.get("reference_value") or "").strip()
+            if key and value:
+                refs[key] = value
+        return refs
+
+    def _replace_external_references(
+        self,
+        *,
+        specimen,
+        atlas_refs: dict[str, Any],
+        atlas_validation: dict[str, Any],
+    ) -> None:
+        existing_refs = []
+        for lineage in get_parent_lineages(specimen):
+            if lineage.is_deleted:
+                continue
+            if lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP:
+                continue
+            child = lineage.child_instance
+            if child is None:
+                continue
+            existing_refs.append((lineage, child))
+
+        for lineage, child in existing_refs:
+            lineage.is_deleted = True
+            child.is_deleted = True
+
+        for reference_type, reference_value in sorted(atlas_refs.items()):
+            value = str(reference_value or "").strip()
+            if not value:
+                continue
+            validation_payload = atlas_validation.get(reference_type)
+            ref_payload = {
+                "properties": {
+                    "provider": "atlas",
+                    "reference_type": str(reference_type),
+                    "reference_value": value,
+                    "foreign_reference": value,
+                    "validation": validation_payload if isinstance(validation_payload, dict) else {},
+                }
+            }
+            ref_obj = self.bobj.create_instance_by_code(
+                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
+                {"json_addl": ref_payload},
+            )
+            self.bobj.create_generic_instance_lineage_by_euids(
+                specimen.euid,
+                ref_obj.euid,
+                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+            )

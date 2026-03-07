@@ -17,15 +17,15 @@ def _iter_action_templates():
             for version, data in versions.items():
                 if not isinstance(data, dict):
                     continue
-                action_template = data.get("action_template")
-                if isinstance(action_template, dict):
-                    yield path, action_name, version, action_template
+                action_definition = data.get("action_definition")
+                if isinstance(action_definition, dict):
+                    yield path, action_name, version, action_definition
 
 
 def test_every_action_template_has_ui_schema_fields():
     missing = []
-    for path, action_name, version, action_template in _iter_action_templates():
-        ui_schema = action_template.get("ui_schema")
+    for path, action_name, version, action_definition in _iter_action_templates():
+        ui_schema = action_definition.get("ui_schema")
         fields = ui_schema.get("fields") if isinstance(ui_schema, dict) else None
         if not isinstance(fields, list):
             missing.append(f"{path}:{action_name}:{version}: missing ui_schema.fields")
@@ -44,8 +44,8 @@ def test_every_action_template_has_ui_schema_fields():
 
 def test_no_legacy_html_captured_data_fields_remain():
     offenders = []
-    for path, action_name, version, action_template in _iter_action_templates():
-        captured_data = action_template.get("captured_data")
+    for path, action_name, version, action_definition in _iter_action_templates():
+        captured_data = action_definition.get("captured_data")
         if not isinstance(captured_data, dict):
             continue
 

@@ -1,7 +1,7 @@
 {
   "move-among-ay-top-queues": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "child_workflow_object": {},
         "workflow_step_to_attach_as_child": {},

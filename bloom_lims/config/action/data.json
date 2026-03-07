@@ -1,7 +1,7 @@
 {
   "record_cfdna_quant_outcome": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Record Quantification Outcome",
         "method_name": "do_action_record_cfdna_quant_outcome",
         "action_executed": "0",
@@ -32,7 +32,7 @@
   },
   "log-temperature": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Log Temperature",
         "method_name": "do_action_log_temperature",
         "action_executed": "0",

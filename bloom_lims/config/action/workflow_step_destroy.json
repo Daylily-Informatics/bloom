@@ -1,7 +1,7 @@
 {
   "complete_specimen_destroy": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {},
         "action_name": "Reverse Destroy",

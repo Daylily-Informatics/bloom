@@ -1,7 +1,7 @@
 {
   "create-pool-from-containers": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Create A Pool",
@@ -56,7 +56,7 @@
   },
   "create_pool_from_containers__extraction_plate_filled": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Create Pool From Containers",

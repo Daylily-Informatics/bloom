@@ -54,19 +54,7 @@ class BloomWorkflow(BloomObj):
         return self.create_instances(template_euid)
 
     def do_action(self, wf_euid, action, action_group, action_ds={}):
-
-        action_method = action_ds["method_name"]
-        now_dt = get_datetime_string()
-        if action_method == "do_action_create_and_link_child":
-            self.do_action_create_and_link_child(wf_euid, action_ds, None)
-        elif action_method == "do_action_create_package_and_first_workflow_step":
-            self.do_action_create_package_and_first_workflow_step(wf_euid, action_ds)
-        elif action_method == "do_action_destroy_specimen_containers":
-            self.do_action_destroy_specimen_containers(wf_euid, action_ds)
-        else:
-            return super().do_action(wf_euid, action, action_group, action_ds)
-
-        return self._do_action_base(wf_euid, action, action_group, action_ds, now_dt)
+        return super().do_action(wf_euid, action, action_group, action_ds)
 
     def do_action_destroy_specimen_containers(self, wf_euid, action_ds):
         wf = self.get_by_euid(wf_euid)
@@ -120,62 +108,7 @@ class BloomWorkflowStep(BloomObj):
     #        feels like it would be better more generalized. For now, most actions being jammed through this approach, even if the parent is now a WFS
     # .      Though... also.... is there benefit to restricting actions to be required to be associated with a WFS?  Ask Adam his thoughts.
     def do_action(self, wfs_euid, action, action_group, action_ds={}):
-        now_dt = get_datetime_string()
-
-        action_method = action_ds["method_name"]
-        if action_method == "do_action_create_and_link_child":
-            self.do_action_create_and_link_child(wfs_euid, action_ds)
-        elif action_method == "do_action_create_input":
-            self.do_action_create_input(wfs_euid, action_ds)
-        elif (
-            action_method
-            == "do_action_create_child_container_and_link_child_workflow_step"
-        ):
-            self.do_action_create_child_container_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_create_test_req_and_link_child_workflow_step":
-            self.do_action_create_test_req_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_xcreate_test_req_and_link_child_workflow_step":
-            self.do_action_xcreate_test_req_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_ycreate_test_req_and_link_child_workflow_step":
-            self.do_action_ycreate_test_req_and_link_child_workflow_step(
-                wfs_euid, action_ds
-            )
-        elif action_method == "do_action_add_container_to_assay_q":
-            self.do_action_add_container_to_assay_q(wfs_euid, action_ds)
-        elif action_method == "do_action_move_instances_to_queue":
-            self.do_action_move_instances_to_queue(wfs_euid, action_ds)
-        elif action_method == "do_action_plate_create_fill_auto":
-            self.do_action_plate_create_fill_auto(wfs_euid, action_ds)
-        elif action_method == "do_action_plate_create_fill_directed":
-            self.do_action_plate_create_fill_directed(wfs_euid, action_ds)
-        elif action_method == "do_action_existing_plate_fill_auto":
-            self.do_action_existing_plate_fill_auto(wfs_euid, action_ds)
-        elif action_method == "do_action_existing_plate_fill_directed":
-            self.do_action_existing_plate_fill_directed(wfs_euid, action_ds)
-        elif action_method == "do_action_save_quant_data":
-            self.do_action_save_quant_data(wfs_euid, action_ds)
-        elif action_method == "do_action_fill_plate_undirected":
-            self.do_action_fill_plate_undirected(wfs_euid, action_ds)
-        elif action_method == "do_action_fill_plate_directed":
-            self.do_action_fill_plate_directed(wfs_euid, action_ds)
-        elif action_method == "do_action_link_tubes_auto":
-            self.do_action_link_tubes_auto(wfs_euid, action_ds)
-        elif action_method == "do_action_cfdna_quant":
-            self.do_action_cfdna_quant(wfs_euid, action_ds)
-        elif action_method == "do_action_stamp_copy_plate":
-            self.do_action_stamp_copy_plate(wfs_euid, action_ds)
-        elif action_method == "do_action_log_temperature":
-            self.do_action_log_temperature(wfs_euid, action_ds)
-        else:
-            return super().do_action(wfs_euid, action, action_group, action_ds)
-
-        return self._do_action_base(wfs_euid, action, action_group, action_ds, now_dt)
+        return super().do_action(wfs_euid, action, action_group, action_ds)
 
     def _add_random_values_to_plate(self, plate):
         for i in plate.parent_of_lineages:

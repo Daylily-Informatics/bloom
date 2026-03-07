@@ -222,6 +222,22 @@ def test_execute_action_missing_required_field_returns_400(client, write_user_ov
     assert required_field in payload.get("error_fields", [])
 
 
+def test_execute_action_rejects_legacy_ds_payload(client, write_user_override):
+    euid, action_group, action_key = _find_any_action_target()
+    response = client.post(
+        "/api/v1/actions/execute",
+        json={
+            "euid": euid,
+            "action_group": action_group,
+            "action_key": action_key,
+            "ds": {"captured_data": {}},
+        },
+    )
+    assert response.status_code == 400
+    payload = response.json()
+    assert "captured_data" in payload.get("error_fields", [])
+
+
 def test_execute_action_set_object_status_success(client, write_user_override):
     euid, action_group, action_key, target_status = _find_set_status_target()
 

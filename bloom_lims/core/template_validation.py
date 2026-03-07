@@ -71,7 +71,7 @@ class TemplateValidator:
     
     # Required fields for different template types
     REQUIRED_FIELDS = {
-        "action": ["action_template"],
+        "action": ["action_definition"],
         "workflow": ["action_imports"],
         "workflow_step": ["action_imports"],
     }

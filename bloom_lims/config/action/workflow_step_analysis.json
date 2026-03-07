@@ -1,7 +1,7 @@
 {
   "download_quant_data": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {},
         "child_data_obj": {},

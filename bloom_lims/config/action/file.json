@@ -1,7 +1,7 @@
 {
   "download_file": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Download A File",
         "method_name": "do_action_download_file",
         "action_executed": "0",
