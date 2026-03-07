@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from bloom_lims.cli import cli
 
+db_commands = importlib.import_module("bloom_lims.cli.db")
 gui_commands = importlib.import_module("bloom_lims.cli.gui")
 
 
@@ -124,6 +125,31 @@ class TestDbSubcommands:
         """Test bloom db shell --help."""
         result = runner.invoke(cli, ["db", "shell", "--help"])
         assert result.exit_code == 0
+
+    def test_ensure_schema_available_replaces_broken_symlink(
+        self, tmp_path, monkeypatch
+    ):
+        """Dangling schema symlinks should be replaced before bootstrap."""
+        project_root = tmp_path / "project"
+        source = tmp_path / "tapdb" / "schema" / "tapdb_schema.sql"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("-- schema\n", encoding="utf-8")
+
+        target = project_root / "schema" / "tapdb_schema.sql"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.symlink_to(tmp_path / "missing" / "tapdb_schema.sql")
+
+        monkeypatch.setattr(db_commands, "_bloom_root", lambda: project_root)
+        monkeypatch.setattr(
+            db_commands,
+            "_resolve_tapdb_schema_source",
+            lambda: source,
+        )
+
+        db_commands._ensure_schema_available_for_bloom_root()
+
+        assert target.is_symlink()
+        assert target.resolve() == source.resolve()
 
 
 class TestGuiLocalhostPolicy:

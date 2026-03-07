@@ -68,10 +68,15 @@ def _ensure_schema_available_for_bloom_root() -> None:
     if source is None:
         return
 
+    if target.is_symlink():
+        target.unlink()
+
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         target.symlink_to(source)
     except Exception:
+        if target.exists() or target.is_symlink():
+            target.unlink()
         shutil.copy2(source, target)
 
 
