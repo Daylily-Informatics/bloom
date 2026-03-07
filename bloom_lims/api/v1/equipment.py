@@ -64,7 +64,6 @@ async def list_equipment(
             "items": [
                 {
                     "euid": obj.euid,
-                    "uuid": str(obj.uuid),
                     "name": obj.name,
                     "equipment_type": obj.type,
                     "subtype": obj.subtype,
@@ -99,7 +98,6 @@ async def get_equipment(euid: str):
 
         return {
             "euid": equipment.euid,
-            "uuid": str(equipment.uuid),
             "name": equipment.name,
             "equipment_type": equipment.type,
             "subtype": equipment.subtype,
@@ -137,7 +135,6 @@ async def create_equipment(data: EquipmentCreateSchema):
         return {
             "success": True,
             "euid": equipment.euid,
-            "uuid": str(equipment.uuid),
             "message": "Equipment created successfully",
         }
     except HTTPException:

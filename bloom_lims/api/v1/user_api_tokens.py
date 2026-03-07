@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,11 +22,18 @@ class TokenCreateRequest(BaseModel):
     note: str | None = None
 
 
-def _parse_user_uuid(user: APIUser) -> uuid.UUID:
-    try:
-        return uuid.UUID(str(user.user_id))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Authenticated user_id is not a UUID") from exc
+def _require_user_id(user: APIUser) -> str:
+    normalized = str(user.user_id or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Authenticated user_id is required")
+    return normalized
+
+
+def _require_token_id(token_id: str) -> str:
+    normalized = str(token_id or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Invalid token_id")
+    return normalized
 
 
 def _token_row_to_dict(
@@ -57,11 +63,11 @@ def _token_row_to_dict(
 
 @router.get("")
 async def list_user_tokens(user: APIUser = Depends(require_api_auth)):
-    user_uuid = _parse_user_uuid(user)
+    user_id = _require_user_id(user)
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
-        rows = service.list_user_tokens(user_id=user_uuid)
+        rows = service.list_user_tokens(user_id=user_id)
         items = [
             _token_row_to_dict(
                 token,
@@ -80,14 +86,14 @@ async def create_user_token(
     payload: TokenCreateRequest,
     user: APIUser = Depends(require_api_auth),
 ):
-    user_uuid = _parse_user_uuid(user)
+    user_id = _require_user_id(user)
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
         service.groups.ensure_system_groups()
         created = service.create_token(
-            owner_user_id=user_uuid,
-            actor_user_id=user_uuid,
+            owner_user_id=user_id,
+            actor_user_id=user_id,
             actor_roles=user.roles,
             actor_groups=user.groups,
             payload=TokenCreateInput(
@@ -117,18 +123,15 @@ async def revoke_user_token(
     token_id: str,
     user: APIUser = Depends(require_api_auth),
 ):
-    user_uuid = _parse_user_uuid(user)
-    try:
-        token_uuid = uuid.UUID(token_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid token_id") from exc
+    user_id = _require_user_id(user)
+    normalized_token_id = _require_token_id(token_id)
 
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
         revoked = service.revoke_token(
-            token_id=token_uuid,
-            actor_user_id=user_uuid,
+            token_id=normalized_token_id,
+            actor_user_id=user_id,
             actor_roles=user.roles,
         )
         if revoked is None:
@@ -154,18 +157,15 @@ async def get_user_token_usage(
     limit: int = Query(100, ge=1, le=1000),
     user: APIUser = Depends(require_api_auth),
 ):
-    user_uuid = _parse_user_uuid(user)
-    try:
-        token_uuid = uuid.UUID(token_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid token_id") from exc
+    user_id = _require_user_id(user)
+    normalized_token_id = _require_token_id(token_id)
 
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
         usage_rows = service.usage_for_token(
-            token_id=token_uuid,
-            actor_user_id=user_uuid,
+            token_id=normalized_token_id,
+            actor_user_id=user_id,
             actor_roles=user.roles,
             limit=limit,
         )

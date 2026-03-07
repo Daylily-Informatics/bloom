@@ -81,7 +81,6 @@ async def list_objects(
             "items": [
                 {
                     "euid": obj.euid,
-                    "uuid": str(obj.uuid),
                     "name": obj.name,
                     "type": obj.type,
                     "subtype": obj.subtype,
@@ -118,7 +117,6 @@ async def get_object(euid: str, user: APIUser = Depends(require_read)):
         
         return {
             "euid": obj.euid,
-            "uuid": str(obj.uuid),
             "name": obj.name,
             "type": obj.type,
             "subtype": obj.subtype,
@@ -151,7 +149,7 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
         bo = BloomObj(bdb)
         bo.set_actor_context(user_id=user.user_id, email=user.email)
 
-        # TapDB requires instances be created from templates (template_uuid NOT NULL).
+        # TapDB requires instances be created from templates (template_uid is required).
         category = (data.category or "").strip().lower()
         if not category or category == "instance":
             category = "content"
@@ -198,7 +196,6 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
         return {
             "success": True,
             "euid": obj.euid,
-            "uuid": str(obj.uuid),
             "message": "Object created successfully",
         }
 

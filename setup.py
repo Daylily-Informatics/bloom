@@ -28,8 +28,10 @@ setup(
     version=get_version(),
     packages=find_packages(),
     install_requires=[
-        "daylily-tapdb==0.1.30",
+        "daylily-tapdb==0.1.32",
         "daylily-cognito==0.1.24",
+        "pydantic>=2.6.0",
+        "pydantic-settings>=2.0.0",
         "psutil>=5.9.0",
     ],
     entry_points={

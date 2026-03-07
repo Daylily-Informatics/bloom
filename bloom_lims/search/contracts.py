@@ -101,7 +101,6 @@ class SearchResultItem(BaseModel):
 
     record_type: RecordType
     euid: str = ""
-    uuid: str = ""
     name: str = ""
     category: str = ""
     type: str = ""

@@ -56,7 +56,6 @@ async def list_templates(
             "items": [
                 {
                     "euid": t.euid,
-                    "uuid": str(t.uuid),
                     "name": t.name,
                     "category": t.category,
                     "type": t.type,
@@ -89,7 +88,6 @@ async def get_template(euid: str, user: APIUser = Depends(require_api_auth)):
 
         return {
             "euid": template.euid,
-            "uuid": str(template.uuid),
             "name": template.name,
             "category": template.category,
             "type": template.type,

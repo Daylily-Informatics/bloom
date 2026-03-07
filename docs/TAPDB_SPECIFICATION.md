@@ -11,7 +11,8 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.3.1 | 2026-02-04 | Field naming convention note: API/code uses category/type/subtype; DB columns remain super_type/btype/b_sub_type with ORM synonyms for backward compatibility |
+| 1.3.2 | 2026-03-07 | Bloom cutover note: runtime code now uses canonical TapDB `uid`/`*_uid` fields directly; no internal UUID compatibility aliases remain |
+| 1.3.1 | 2026-02-04 | Field naming convention note: API/code uses category/type/subtype; DB columns remain super_type/btype/b_sub_type |
 | 1.3.0 | 2026-01-19 | Second ChatGPT review: transaction patterns, audit verbosity, loader semantics, action group naming, auto-created template stubs |
 | 1.2.0 | 2026-01-19 | First ChatGPT review: soft delete fix, pgcrypto, trigger attachment, lineage prefix, cycle detection |
 | 1.1.0 | 2026-01-19 | EUID prefix tiers, action instances as first-class objects |
@@ -26,12 +27,12 @@
 - `type` (object type within category)
 - `subtype` (specific variant)
 
-**Database Columns** retain legacy names for backward compatibility:
+**Database Columns** retain TapDB's current physical names:
 - `super_type` → maps to `category`
 - `btype` → maps to `type`
 - `b_sub_type` → maps to `subtype`
 
-**Backward Compatibility** is provided via SQLAlchemy `hybrid_property` synonyms in `tapdb_adapter.py`. Both naming conventions work interchangeably in ORM code.
+Bloom runtime code is expected to use canonical TapDB ORM fields directly (`uid`, `template_uid`, `parent_instance_uid`, `child_instance_uid`).
 
 ---
 
@@ -3014,7 +3015,7 @@ from bloom_lims.db import bloom_core, generic_instance
 # After (daylily-tapdb)
 from daylily_tapdb import tapdb_core, generic_instance
 
-# For backward compatibility in BLOOM:
+# Optional local alias in application code:
 from daylily_tapdb import tapdb_core as bloom_core
 ```
 

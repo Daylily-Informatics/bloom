@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -67,8 +66,8 @@ class GroupService:
         self,
         *,
         group_code: str,
-        user_id: uuid.UUID,
-        added_by: uuid.UUID | None,
+        user_id: str,
+        added_by: str | None,
     ) -> GroupMembershipRecord:
         self.ensure_system_groups()
         return self.repo.add_user_to_group(group_code=group_code, user_id=user_id, added_by=added_by)
@@ -77,22 +76,22 @@ class GroupService:
         self,
         *,
         group_code: str,
-        user_id: uuid.UUID,
-        removed_by: uuid.UUID | None,
+        user_id: str,
+        removed_by: str | None,
     ) -> GroupMembershipRecord | None:
         self.ensure_system_groups()
         return self.repo.remove_user_from_group(group_code=group_code, user_id=user_id, removed_by=removed_by)
 
-    def get_group_codes_for_user(self, user_id: uuid.UUID | None) -> list[str]:
+    def get_group_codes_for_user(self, user_id: str | None) -> list[str]:
         self.ensure_system_groups()
-        if user_id is None:
+        if not user_id:
             return []
         return self.repo.get_user_group_codes(user_id=user_id)
 
     def resolve_user_roles_and_groups(
         self,
         *,
-        user_id: uuid.UUID | None,
+        user_id: str | None,
         fallback_role: str | None,
     ) -> GroupResolution:
         fallback = map_legacy_role(fallback_role)

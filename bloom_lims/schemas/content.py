@@ -155,7 +155,6 @@ class ContentResponseSchema(ContentBaseSchema, TimestampMixin):
     """Schema for content API responses."""
     
     euid: str = Field(..., description="Content EUID")
-    uuid: str = Field(..., description="Content UUID")
     status: str = Field(default="active", description="Content status")
     is_deleted: bool = Field(default=False, description="Soft delete flag")
     

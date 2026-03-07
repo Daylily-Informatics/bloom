@@ -111,7 +111,6 @@ class ActionResponseSchema(ActionBaseSchema, TimestampMixin):
     """Schema for action API responses."""
     
     euid: str = Field(..., description="Action EUID")
-    uuid: str = Field(..., description="Action UUID")
     status: str = Field(default="active", description="Action status")
     
     # Execution stats

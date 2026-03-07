@@ -30,7 +30,7 @@ def test_create_container_contract(client):
     resp = client.post("/api/v1/object-creation/create", json=payload)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["euid"] and data["uuid"]
+    assert data["euid"]
 ```
 
 ```python

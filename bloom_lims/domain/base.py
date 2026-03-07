@@ -446,7 +446,7 @@ class BloomObj:
             existing = (
                 self.session.query(self.Base.classes.generic_instance)
                 .filter(
-                    self.Base.classes.generic_instance.template_uuid == template.uuid,
+                    self.Base.classes.generic_instance.template_uid == template.uid,
                     self.Base.classes.generic_instance.is_deleted == False,  # noqa: E712
                 )
                 .first()
@@ -461,7 +461,7 @@ class BloomObj:
             subtype=template.subtype,
             version=template.version,
             json_addl=template.json_addl,
-            template_uuid=template.uuid,
+            template_uid=template.uid,
             bstatus=template.bstatus,
             category=template.category,
             is_singleton=is_singleton,
@@ -508,10 +508,6 @@ class BloomObj:
             )
 
         return parent_instance
-
-    def create_instances_from_uuid(self, uuid):
-        return self.create_instances(self.get(uuid).euid)
-
     # fix naming, instance_type==table_name_prefix
     def create_instances(self, template_euid):
         """
@@ -651,8 +647,8 @@ class BloomObj:
                     layout_ds = ds[i]
                     child_instance = self._create_child_instance(layout_str, layout_ds)
                     lineage_record = self.Base.classes.generic_instance_lineage(
-                        parent_instance_uuid=parent_instance.uuid,
-                        child_instance_uuid=child_instance.uuid,
+                        parent_instance_uid=parent_instance.uid,
+                        child_instance_uid=child_instance.uid,
                         name=f"{parent_instance.name} :: {child_instance.name}",
                         type=parent_instance.type,
                         subtype=parent_instance.subtype,
@@ -676,8 +672,8 @@ class BloomObj:
         parent_instance = self.get_by_euid(parent_instance_euid)
         child_instance = self.get_by_euid(child_instance_euid)
         lineage_record = self.Base.classes.generic_instance_lineage(
-            parent_instance_uuid=parent_instance.uuid,
-            child_instance_uuid=child_instance.uuid,
+            parent_instance_uid=parent_instance.uid,
+            child_instance_uid=child_instance.uid,
             name=f"{parent_instance.name} :: {child_instance.name}",
             type=parent_instance.type,
             subtype=parent_instance.subtype,
@@ -802,67 +798,8 @@ class BloomObj:
 
         return False
 
-    """
-    get methods.  get() assumes a uuid, which is funny as its rarely used. get_by_euid() is the workhorse.
-    """
+    """Lookup methods. EUID is the canonical Bloom object identifier."""
 
-    # It is VERY nice to be able to query all three instance related tables in one go.
-    # Admitedly, this is a far scaled back remnant of a far more elaborate and hair rasising situation when there were more tables.
-    # There is benefit
-    def get(self, uuid):
-        """Global query for uuid across all tables in schema with 'uuid' field
-            note does not handle is_deleted!
-        Args:
-            uuid str(): uuid string
-
-        Returns:
-            [] : Array of rows
-        """
-        res = (
-            self.session.query(self.Base.classes.generic_instance)
-            .filter(
-                self.Base.classes.generic_instance.uuid == uuid,
-                self.Base.classes.generic_instance.is_deleted == self.is_deleted,
-            )
-            .all()
-        )
-        res2 = (
-            self.session.query(self.Base.classes.generic_template)
-            .filter(
-                self.Base.classes.generic_template.uuid == uuid,
-                self.Base.classes.generic_template.is_deleted == self.is_deleted,
-            )
-            .all()
-        )
-        res3 = (
-            self.session.query(self.Base.classes.generic_instance_lineage)
-            .filter(
-                self.Base.classes.generic_instance_lineage.uuid == uuid,
-                self.Base.classes.generic_instance_lineage.is_deleted
-                == self.is_deleted,
-            )
-            .all()
-        )
-
-        combined_result = res + res2 + res3
-
-        if len(combined_result) > 1:
-            raise Exception(
-                f"Multiple {len(combined_results)} templates found for {uuid}"
-            )
-        elif len(combined_result) == 0:
-            self.logger.debug(f"No template found with uuid:", uuid)
-            self.logger.debug(
-                f"On second thought, if we are using a UUID and there is no match.. exception:",
-                uuid,
-            )
-            raise Exception(f"No template found with uuid:", uuid)
-        else:
-            return combined_result[0]
-
-    # It is VERY nice to be able to query all three instance related tables in one go.
-    # Admitedly, this is a far scaled back remnant of a far more elaborate and hair rasising situation when there were more tables.
-    # There is benefit
     def get_by_euid(self, euid):
         """Global query for euid across all tables in schema with 'euid' field
            note: does not handle is_deleted!
@@ -1030,9 +967,9 @@ class BloomObj:
                 al.new_value
             FROM
                 audit_log al
-                LEFT JOIN generic_template gt ON al.rel_table_uuid_fk = gt.uuid
-                LEFT JOIN generic_instance gi ON al.rel_table_uuid_fk = gi.uuid
-                LEFT JOIN generic_instance_lineage gil ON al.rel_table_uuid_fk = gil.uuid
+                LEFT JOIN generic_template gt ON al.rel_table_uid_fk = gt.uid
+                LEFT JOIN generic_instance gi ON al.rel_table_uid_fk = gi.uid
+                LEFT JOIN generic_instance_lineage gil ON al.rel_table_uid_fk = gil.uid
             WHERE
                 al.changed_by = :username
             ORDER BY
@@ -1147,20 +1084,20 @@ class BloomObj:
     def query_cost_of_all_children(self, euid):
         # limited to 10,000 children right now...
         query = text(
-            f"""
+            """
             WITH RECURSIVE descendants AS (
             -- Initial query to get the root instance
-            SELECT gi.uuid, gi.euid, gi.json_addl, gi.created_dt
+            SELECT gi.uid, gi.euid, gi.json_addl, gi.created_dt
             FROM generic_instance gi
-            WHERE gi.euid = '{euid}' -- Replace with your target euid
+            WHERE gi.euid = :euid
 
             UNION ALL
 
             -- Recursive part to get all descendants
-            SELECT child_gi.uuid, child_gi.euid, child_gi.json_addl, child_gi.created_dt
+            SELECT child_gi.uid, child_gi.euid, child_gi.json_addl, child_gi.created_dt
             FROM generic_instance_lineage gil
-            JOIN descendants d ON gil.parent_instance_uuid = d.uuid
-            JOIN generic_instance child_gi ON gil.child_instance_uuid = child_gi.uuid
+            JOIN descendants d ON gil.parent_instance_uid = d.uid
+            JOIN generic_instance child_gi ON gil.child_instance_uid = child_gi.uid
             WHERE NOT child_gi.is_deleted -- Assuming you want to exclude deleted instances
         )
         SELECT d.euid, 
@@ -1174,7 +1111,7 @@ class BloomObj:
         )
 
         # Execute the query
-        result = self.session.execute(query)
+        result = self.session.execute(query, {"euid": str(euid)})
 
         # Extract euids and transit times from the result
         euid_cost_tuples = [(row[0], row[1]) for row in result]
@@ -1184,15 +1121,15 @@ class BloomObj:
     def query_all_fedex_transit_times_by_ay_euid(self, qx_euid):
 
         query = text(
-            f"""SELECT gi.euid,
+            """SELECT gi.euid,
         gi.json_addl -> 'properties' -> 'fedex_tracking_data' -> 0 ->> 'Transit_Time_sec' AS transit_time
         FROM generic_instance AS gi
-        JOIN generic_instance_lineage AS gil1 ON gi.uuid = gil1.child_instance_uuid
-        JOIN generic_instance AS gi_parent1 ON gil1.parent_instance_uuid = gi_parent1.uuid
-        JOIN generic_instance_lineage AS gil2 ON gi_parent1.uuid = gil2.child_instance_uuid
-        JOIN generic_instance AS gi_parent2 ON gil2.parent_instance_uuid = gi_parent2.uuid
+        JOIN generic_instance_lineage AS gil1 ON gi.uid = gil1.child_instance_uid
+        JOIN generic_instance AS gi_parent1 ON gil1.parent_instance_uid = gi_parent1.uid
+        JOIN generic_instance_lineage AS gil2 ON gi_parent1.uid = gil2.child_instance_uid
+        JOIN generic_instance AS gi_parent2 ON gil2.parent_instance_uid = gi_parent2.uid
         WHERE
-        gi_parent2.euid = '{qx_euid}' AND
+        gi_parent2.euid = :qx_euid AND
         gi.type = 'package' AND
         jsonb_typeof(gi.json_addl -> 'properties') = 'object' AND
         jsonb_typeof(gi.json_addl -> 'properties' -> 'fedex_tracking_data') = 'array' AND
@@ -1202,7 +1139,7 @@ class BloomObj:
         )
 
         # Execute the query
-        result = self.session.execute(query)
+        result = self.session.execute(query, {"qx_euid": qx_euid})
 
         # Extract euids and transit times from the result
         euid_transit_time_tuples = [(row[0], row[1]) for row in result]
@@ -1228,7 +1165,7 @@ class BloomObj:
             """WITH RECURSIVE graph_data AS (
                 SELECT
                     gi.euid,
-                    gi.uuid,
+                    gi.uid,
                     gi.name,
                     gi.type,
                     gi.category,
@@ -1248,7 +1185,7 @@ class BloomObj:
 
                 SELECT
                     gi.euid,
-                    gi.uuid,
+                    gi.uid,
                     gi.name,
                     gi.type,
                     gi.category,
@@ -1262,14 +1199,14 @@ class BloomObj:
                 FROM
                     generic_instance_lineage gil
                 JOIN
-                    generic_instance gi ON gi.uuid = gil.child_instance_uuid OR gi.uuid = gil.parent_instance_uuid
+                    generic_instance gi ON gi.uid = gil.child_instance_uid OR gi.uid = gil.parent_instance_uid
                 JOIN
-                    generic_instance parent_instance ON gil.parent_instance_uuid = parent_instance.uuid
+                    generic_instance parent_instance ON gil.parent_instance_uid = parent_instance.uid
                 JOIN
-                    generic_instance child_instance ON gil.child_instance_uuid = child_instance.uuid
+                    generic_instance child_instance ON gil.child_instance_uid = child_instance.uid
                 JOIN
-                    graph_data gd ON (gil.parent_instance_uuid = gd.uuid AND gi.uuid = gil.child_instance_uuid) OR
-                                    (gil.child_instance_uuid = gd.uuid AND gi.uuid = gil.parent_instance_uuid)
+                    graph_data gd ON (gil.parent_instance_uid = gd.uid AND gi.uid = gil.child_instance_uid) OR
+                                    (gil.child_instance_uid = gd.uid AND gi.uid = gil.parent_instance_uid)
                 WHERE
                     gi.is_deleted = FALSE AND gil.is_deleted = FALSE AND gd.depth < :depth
             )
@@ -1334,29 +1271,23 @@ class BloomObj:
     # Delete Methods
     # Do not cascade delete!
 
-    def delete(self, uuid=None, euid=None):
-        if (euid == None and uuid == None) or (euid != None and uuid != None):
-            raise Exception("Must specify one of euid or uuid, not both or neither")
-        obj = None
-        if hasattr(uuid, "euid"):
-            obj = uuid
-        elif euid:
-            obj = self.get_by_euid(euid).uuid
-        else:
-            obj = self.get(uuid)
-
+    def delete(self, euid):
+        if euid is None:
+            raise Exception("euid cannot be None")
+        obj = self.get_by_euid(euid)
         obj.is_deleted = True
         ##self.session.flush()
         self.session.commit()
 
     def delete_by_euid(self, euid):
-        return self.delete(euid=euid)
-
-    def delete_by_uuid(self, uuid):
-        return self.delete(uuid=uuid)
+        return self.delete(euid)
 
     def delete_obj(self, obj):
-        return self.delete(uuid=obj.uuid)
+        if obj is None:
+            raise Exception("obj cannot be None")
+        obj.is_deleted = True
+        ##self.session.flush()
+        self.session.commit()
 
     #
     # Global Object Actions

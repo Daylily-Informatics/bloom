@@ -50,7 +50,6 @@ def _deprecation_headers_dict() -> Dict[str, str]:
 def _legacy_item_from_v2(item: Dict, include_json_addl: bool) -> Dict:
     output = {
         "euid": item.get("euid", ""),
-        "uuid": item.get("uuid", ""),
         "category": item.get("category", ""),
         "type": item.get("type", ""),
         "subtype": item.get("subtype", ""),

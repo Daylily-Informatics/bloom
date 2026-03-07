@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from bloom_lims.db import get_parent_lineages
 from .dependencies import require_api_auth, APIUser
 
 
@@ -70,7 +71,6 @@ async def list_subjects(
             "items": [
                 {
                     "euid": obj.euid,
-                    "uuid": str(obj.uuid),
                     "name": obj.name,
                     "type": obj.type,
                     "subtype": obj.subtype,
@@ -103,7 +103,6 @@ async def get_subject(euid: str, user: APIUser = Depends(require_api_auth)):
 
         return {
             "euid": subject.euid,
-            "uuid": str(subject.uuid),
             "name": subject.name,
             "type": subject.type,
             "subtype": subject.subtype,
@@ -160,7 +159,6 @@ async def create_subject(
         return {
             "success": True,
             "euid": subject.euid,
-            "uuid": str(subject.uuid),
             "message": "Subject created successfully",
         }
     except HTTPException:
@@ -274,7 +272,7 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
             raise HTTPException(status_code=404, detail=f"Subject not found: {euid}")
 
         specimens = []
-        for lineage in subject.parent_of_lineages:
+        for lineage in get_parent_lineages(subject):
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance

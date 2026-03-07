@@ -27,14 +27,12 @@ router = APIRouter(prefix="/external/specimens", tags=["External Specimens"])
 def _specimen_event_payload(response: ExternalSpecimenResponse | dict, extra: dict | None = None) -> dict:
     if isinstance(response, dict):
         specimen_euid = response.get("specimen_euid") or response.get("euid")
-        specimen_uuid = response.get("specimen_uuid") or response.get("uuid")
         container_euid = response.get("container_euid")
         status = response.get("status")
         atlas_refs = response.get("atlas_refs") if isinstance(response.get("atlas_refs"), dict) else {}
         properties = response.get("properties") if isinstance(response.get("properties"), dict) else {}
     else:
         specimen_euid = response.specimen_euid
-        specimen_uuid = response.specimen_uuid
         container_euid = response.container_euid
         status = response.status
         atlas_refs = response.atlas_refs
@@ -44,8 +42,6 @@ def _specimen_event_payload(response: ExternalSpecimenResponse | dict, extra: di
         "euid": specimen_euid,
         "specimen_euid": specimen_euid,
         "container_euid": container_euid,
-        "uuid": specimen_uuid,
-        "specimen_uuid": specimen_uuid,
         "status": status,
         "atlas_refs": atlas_refs,
         "properties": properties,

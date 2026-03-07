@@ -11,13 +11,12 @@ Usage:
         process(euid)
     
     # Decorator-based validation
-    @validated(euid=validate_euid, uuid=validate_uuid)
-    def process_object(euid: str, uuid: str):
+    @validated(euid=validate_euid, type_name=validate_type)
+    def process_object(euid: str, type_name: str):
         ...
 """
 
 import re
-import uuid as uuid_module
 import logging
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Union, TypeVar, ParamSpec
@@ -50,13 +49,6 @@ class ValidationError(ValueError):
 # Format: 2-3 letter prefix + sequence number (no leading zeros)
 # Examples: CX1, CX123, WX1000, MRX42, CWX5
 EUID_PATTERN = re.compile(r'^[A-Z]{2,3}[1-9][0-9]*$')
-
-# UUID pattern (standard UUID v4)
-UUID_PATTERN = re.compile(
-    r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
-    re.IGNORECASE
-)
-
 
 def validate_euid(value: Any, field_name: str = "euid") -> bool:
     """
@@ -97,39 +89,6 @@ def validate_euid(value: Any, field_name: str = "euid") -> bool:
         )
 
     return True
-
-
-def validate_uuid(value: Any, field_name: str = "uuid") -> bool:
-    """
-    Validate a UUID.
-    
-    Args:
-        value: Value to validate (string or UUID object)
-        field_name: Name of the field for error messages
-        
-    Returns:
-        True if valid
-        
-    Raises:
-        ValidationError: If validation fails
-    """
-    if value is None:
-        raise ValidationError(field_name, value, "UUID cannot be None")
-    
-    # Handle UUID objects
-    if isinstance(value, uuid_module.UUID):
-        return True
-    
-    if not isinstance(value, str):
-        raise ValidationError(field_name, value, f"UUID must be a string or UUID object, got {type(value).__name__}")
-    
-    try:
-        uuid_module.UUID(value)
-        return True
-    except ValueError:
-        raise ValidationError(field_name, value, f"Invalid UUID format: '{value}'")
-
-
 def validate_json_addl(value: Any, field_name: str = "json_addl") -> bool:
     """
     Validate json_addl field structure.
@@ -177,12 +136,6 @@ def validate_type(value: Any, field_name: str = "type") -> bool:
         raise ValidationError(field_name, value, "type cannot be empty")
 
     return True
-
-
-# Backward compatibility alias
-validate_btype = validate_type
-
-
 def validate_not_empty(value: Any, field_name: str = "value") -> bool:
     """
     Validate that a value is not empty.
@@ -240,8 +193,8 @@ def validated(**validators: Callable[[Any, str], bool]) -> Callable[[Callable[P,
     Decorator to validate function arguments.
 
     Usage:
-        @validated(euid=validate_euid, uuid=validate_uuid)
-        def process_object(euid: str, uuid: str):
+        @validated(euid=validate_euid, type_name=validate_type)
+        def process_object(euid: str, type_name: str):
             ...
 
     Args:

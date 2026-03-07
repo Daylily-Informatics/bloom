@@ -56,7 +56,6 @@ class ExternalSpecimenUpdateRequest(BaseModel):
 
 class ExternalSpecimenResponse(BaseModel):
     specimen_euid: str
-    specimen_uuid: str
     container_euid: str | None
     status: str
     atlas_refs: dict[str, Any]

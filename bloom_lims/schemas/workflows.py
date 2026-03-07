@@ -108,7 +108,6 @@ class WorkflowStepResponseSchema(WorkflowStepSchema, TimestampMixin):
     """Schema for workflow step in API responses."""
     
     euid: str = Field(..., description="Step EUID")
-    uuid: str = Field(..., description="Step UUID")
     status: str = Field(default="pending", description="Step status")
     workflow_euid: str = Field(..., description="Parent workflow EUID")
     
@@ -126,7 +125,6 @@ class WorkflowResponseSchema(WorkflowBaseSchema, TimestampMixin):
     """Schema for workflow API responses."""
     
     euid: str = Field(..., description="Workflow EUID")
-    uuid: str = Field(..., description="Workflow UUID")
     status: str = Field(default="pending", description="Workflow status")
     
     # Progress tracking

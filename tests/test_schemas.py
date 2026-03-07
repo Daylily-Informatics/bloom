@@ -209,6 +209,35 @@ class TestEquipmentSchemas:
         assert record.maintenance_type == "preventive"
 
 
+class TestPublicResponseSchemas:
+    """Tests for public response schema contracts."""
+
+    def test_public_response_schemas_do_not_expose_uuid_fields(self):
+        from bloom_lims.schemas.actions import ActionResponseSchema
+        from bloom_lims.schemas.containers import ContainerPositionSchema, ContainerResponseSchema
+        from bloom_lims.schemas.content import ContentResponseSchema
+        from bloom_lims.schemas.equipment import EquipmentResponseSchema
+        from bloom_lims.schemas.files import FileResponseSchema, FileSetResponseSchema
+        from bloom_lims.schemas.objects import ObjectResponseSchema
+        from bloom_lims.schemas.workflows import WorkflowResponseSchema, WorkflowStepResponseSchema
+
+        schemas = [
+            ActionResponseSchema,
+            ContainerPositionSchema,
+            ContainerResponseSchema,
+            ContentResponseSchema,
+            EquipmentResponseSchema,
+            FileResponseSchema,
+            FileSetResponseSchema,
+            ObjectResponseSchema,
+            WorkflowResponseSchema,
+            WorkflowStepResponseSchema,
+        ]
+
+        for schema in schemas:
+            assert "uuid" not in schema.model_fields
+
+
 class TestDomainUtils:
     """Tests for bloom_lims.domain.utils module."""
 
@@ -619,10 +648,12 @@ class TestDomainBaseImportsExtended:
         from bloom_lims.domain.base import BloomObj
         assert hasattr(BloomObj, 'get_by_euid')
 
-    def test_bloom_obj_has_get_method(self):
-        """Test BloomObj has get method."""
+    def test_bloom_obj_does_not_have_uuid_helpers(self):
+        """Test BloomObj no longer exposes UUID helper methods."""
         from bloom_lims.domain.base import BloomObj
-        assert hasattr(BloomObj, 'get')
+        assert not hasattr(BloomObj, 'get')
+        assert not hasattr(BloomObj, 'delete_by_uuid')
+        assert not hasattr(BloomObj, 'create_instances_from_uuid')
 
     def test_bloom_obj_has_create_instance(self):
         """Test BloomObj has create_instance method."""

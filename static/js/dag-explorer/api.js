@@ -153,16 +153,16 @@ const DAGAPI = (function() {
 
     /**
      * Add a new edge between nodes
-     * @param {string} parentUuid - Parent node UUID
-     * @param {string} childUuid - Child node UUID
+     * @param {string} parentEuid - Parent node EUID
+     * @param {string} childEuid - Child node EUID
      * @returns {Promise} Promise resolving to new edge data
      */
-    function addNewEdge(parentUuid, childUuid) {
+    function addNewEdge(parentEuid, childEuid) {
         return request({
             url: '/add_new_edge',
             method: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ parent_uuid: parentUuid, child_uuid: childUuid })
+            data: JSON.stringify({ parent_euid: parentEuid, child_euid: childEuid })
         });
     }
 

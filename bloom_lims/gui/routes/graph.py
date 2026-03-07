@@ -52,13 +52,11 @@ def _graph_node_color(category: str, obj_type: str, subtype: str) -> str:
 def _normalize_graph_request_params(
     start_euid: str | None,
     depth: int | None,
-    legacy_start: str | None,
-    legacy_depth: int | None,
 ) -> tuple[str, int]:
-    resolved_start = (start_euid or legacy_start or "AY1").strip() or "AY1"
+    resolved_start = (start_euid or "AY1").strip() or "AY1"
 
     try:
-        resolved_depth = int(depth if depth is not None else legacy_depth if legacy_depth is not None else 4)
+        resolved_depth = int(depth if depth is not None else 4)
     except (TypeError, ValueError):
         resolved_depth = 4
 
@@ -138,9 +136,7 @@ async def dagg(request: Request, _auth=Depends(require_auth)):
 @router.get("/dindex2", response_class=HTMLResponse)
 async def dindex2(
     request: Request,
-    globalFilterLevel: int = Query(default=6),
     globalZoom: float = Query(default=0),
-    globalStartNodeEUID: str | None = Query(default=None),
     start_euid: str | None = Query(default=None),
     depth: int | None = Query(default=None, ge=1, le=10),
     auth=Depends(require_auth),
@@ -148,8 +144,6 @@ async def dindex2(
     resolved_start_euid, resolved_depth = _normalize_graph_request_params(
         start_euid=start_euid,
         depth=depth,
-        legacy_start=globalStartNodeEUID,
-        legacy_depth=globalFilterLevel,
     )
     user_data = auth if isinstance(auth, dict) else request.session.get("user_data", {})
     user_role = _resolve_auth_role(auth, request)
@@ -157,9 +151,7 @@ async def dindex2(
     template = templates.get_template("modern/dag_explorer.html")
     context = {
         "request": request,
-        "globalFilterLevel": resolved_depth,
         "globalZoom": globalZoom,
-        "globalStartNodeEUID": resolved_start_euid,
         "start_euid": resolved_start_euid,
         "depth": resolved_depth,
         "is_admin": user_role == "admin",
@@ -178,8 +170,6 @@ async def api_graph_data(
     resolved_start_euid, resolved_depth = _normalize_graph_request_params(
         start_euid=start_euid,
         depth=depth,
-        legacy_start=None,
-        legacy_depth=None,
     )
     user_email = _resolve_auth_email(auth, request)
     logging.info(
@@ -230,9 +220,8 @@ async def api_graph_object_detail(
         object_kind = "lineage"
 
     payload = {
-        "uuid": str(obj.uuid),
         "euid": obj.euid,
-        "name": obj.name,
+        "name": getattr(obj, "name", None),
         "type": object_kind,
         "obj_type": getattr(obj, "type", ""),
         "category": getattr(obj, "category", ""),
@@ -245,16 +234,22 @@ async def api_graph_object_detail(
     }
 
     if object_kind == "lineage":
-        parent_obj = (
-            bobj.session.query(instance_cls)
-            .filter(instance_cls.uuid == obj.parent_instance_uuid)
-            .first()
-        )
-        child_obj = (
-            bobj.session.query(instance_cls)
-            .filter(instance_cls.uuid == obj.child_instance_uuid)
-            .first()
-        )
+        parent_instance_uid = getattr(obj, "parent_instance_uid", None)
+        child_instance_uid = getattr(obj, "child_instance_uid", None)
+        parent_obj = None
+        child_obj = None
+        if parent_instance_uid is not None:
+            parent_obj = (
+                bobj.session.query(instance_cls)
+                .filter(instance_cls.uid == parent_instance_uid)
+                .first()
+            )
+        if child_instance_uid is not None:
+            child_obj = (
+                bobj.session.query(instance_cls)
+                .filter(instance_cls.uid == child_instance_uid)
+                .first()
+            )
         payload["relationship_type"] = getattr(obj, "relationship_type", "generic") or "generic"
         payload["source"] = child_obj.euid if child_obj else None
         payload["target"] = parent_obj.euid if parent_obj else None
@@ -288,9 +283,15 @@ async def update_dag(request: Request, _auth=Depends(require_auth)):
 async def add_new_edge(request: Request, _auth=Depends(require_auth)):
     logging.warning("Deprecated endpoint /add_new_edge used; prefer POST /api/lineage")
     input_data = await request.json()
-    parent_euid = input_data["parent_uuid"]
-    child_euid = input_data["child_uuid"]
-    bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    parent_euid = (input_data.get("parent_euid") or "").strip()
+    child_euid = (input_data.get("child_euid") or "").strip()
+    if not parent_euid or not child_euid:
+        raise HTTPException(status_code=400, detail="parent_euid and child_euid are required")
+    if parent_euid == child_euid:
+        raise HTTPException(status_code=400, detail="parent_euid and child_euid must differ")
+
+    user_email = _resolve_auth_email(_auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
     new_edge = bobj.create_generic_instance_lineage_by_euids(parent_euid, child_euid)
     bobj.session.flush()
     bobj.session.commit()
@@ -303,7 +304,7 @@ async def delete_node(request: Request, _auth=Depends(require_auth)):
     input_data = await request.json()
     node_euid = input_data["euid"]
     bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    bobj.delete(euid=node_euid)
+    bobj.delete_by_euid(node_euid)
     bobj.session.flush()
     bobj.session.commit()
 
@@ -323,7 +324,7 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     try:
         edge = bobdb.get_by_euid(edge_euid)
-        bobdb.delete(edge)
+        bobdb.delete_obj(edge)
         bobdb.session.flush()
         bobdb.session.commit()
         return {
@@ -352,12 +353,12 @@ async def delete_edge(request: Request, _auth=Depends(require_auth)):
 
 @router.get("/get_node_info")
 async def get_node_info(request: Request, euid, _auth=Depends(require_auth)):
-    bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    user_email = _resolve_auth_email(_auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
     node_dat = bobj.get_by_euid(euid)
 
     if node_dat:
         return {
-            "uuid": str(node_dat.uuid),
             "name": node_dat.name,
             "type": node_dat.type,
             "euid": node_dat.euid,
@@ -426,8 +427,8 @@ async def api_create_lineage(
     existing = (
         bobj.session.query(lineage_cls)
         .filter(
-            lineage_cls.parent_instance_uuid == parent_obj.uuid,
-            lineage_cls.child_instance_uuid == child_obj.uuid,
+            lineage_cls.parent_instance_uid == parent_obj.uid,
+            lineage_cls.child_instance_uid == child_obj.uid,
             lineage_cls.relationship_type == relationship_type,
             lineage_cls.is_deleted == False,
         )
@@ -455,7 +456,7 @@ async def api_create_lineage(
             relationship_type,
             user_email,
         )
-        return {"success": True, "euid": str(new_lineage.euid), "uuid": str(new_lineage.uuid)}
+        return {"success": True, "euid": str(new_lineage.euid)}
     except HTTPException:
         raise
     except Exception as exc:
@@ -488,7 +489,7 @@ async def api_delete_object(
         raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
 
     try:
-        bobj.delete(obj)
+        bobj.delete_obj(obj)
         bobj.session.flush()
         bobj.session.commit()
         logging.info(

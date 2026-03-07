@@ -17,8 +17,8 @@ Fixtures:
 """
 
 import os
+import secrets
 import tempfile
-import uuid
 from pathlib import Path
 
 import pytest
@@ -44,7 +44,7 @@ def pytest_configure(config):
     if not (os.environ.get("TAPDB_CONFIG_PATH") or "").strip():
         local_port = str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566").strip()
         user = str(os.environ.get("USER") or "postgres").strip()
-        tmp_path = Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{uuid.uuid4().hex}.yaml"
+        tmp_path = Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
         tmp_path.write_text(
             "\n".join(
                 [

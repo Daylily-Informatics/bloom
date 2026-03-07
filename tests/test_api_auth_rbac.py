@@ -1,9 +1,10 @@
 """Focused tests for Bloom RBAC/token auth additions."""
 
+import asyncio
 import os
 import sys
-import uuid
 from datetime import datetime, timedelta
+from time import time_ns
 
 import pytest
 from fastapi import HTTPException
@@ -28,12 +29,12 @@ def external_token_auth_override():
     def _override():
         return APIUser(
             email="token-client@example.com",
-            user_id=str(uuid.uuid4()),
+            user_id="token-client-user",
             roles=["INTERNAL_READ_WRITE"],
             auth_source="token",
             is_service_account=True,
             token_scope="internal_rw",
-            token_id=str(uuid.uuid4()),
+            token_id="token-client-token",
         )
 
     app.dependency_overrides[require_external_token_auth] = _override
@@ -44,7 +45,7 @@ def external_token_auth_override():
 
 
 def _create_token(client: TestClient) -> str:
-    token_name = f"pytest-token-{uuid.uuid4()}"
+    token_name = f"pytest-token-{time_ns()}"
     create_response = client.post(
         "/api/v1/user-tokens",
         json={
@@ -60,29 +61,27 @@ def _create_token(client: TestClient) -> str:
     return payload["token"]["token_id"]
 
 
-@pytest.mark.asyncio
-async def test_require_write_blocks_read_only_user():
+def test_require_write_blocks_read_only_user():
     user = APIUser(
         email="ro@example.com",
-        user_id=str(uuid.uuid4()),
+        user_id="ro-user-1",
         roles=["INTERNAL_READ_ONLY"],
     )
     with pytest.raises(HTTPException) as exc:
-        await require_write(user)
+        asyncio.run(require_write(user))
     assert exc.value.status_code == 403
     assert "Write permission required" in exc.value.detail
 
 
-@pytest.mark.asyncio
-async def test_require_external_token_auth_blocks_non_token_user():
+def test_require_external_token_auth_blocks_non_token_user():
     user = APIUser(
         email="session@example.com",
-        user_id=str(uuid.uuid4()),
+        user_id="session-user-1",
         roles=["INTERNAL_READ_WRITE"],
         auth_source="session",
     )
     with pytest.raises(HTTPException) as exc:
-        await require_external_token_auth(user)
+        asyncio.run(require_external_token_auth(user))
     assert exc.value.status_code == 401
 
 
@@ -134,7 +133,7 @@ def test_user_tokens_default_expiry_is_48_hours(client):
     response = client.post(
         "/api/v1/user-tokens",
         json={
-            "token_name": f"pytest-default-expiry-{uuid.uuid4()}",
+            "token_name": f"pytest-default-expiry-{time_ns()}",
             "scope": "internal_ro",
         },
     )
@@ -154,7 +153,7 @@ def test_admin_group_membership_endpoints_list_add_get_delete(client):
     assert groups_payload["total"] >= 1
 
     target_group = "API_ACCESS"
-    member_user_id = str(uuid.uuid4())
+    member_user_id = f"member-user-{time_ns()}"
 
     add_response = client.post(
         f"/api/v1/admin/groups/{target_group}/members",
@@ -210,7 +209,6 @@ def test_external_specimens_post_create(client, monkeypatch, external_token_auth
             captured["idempotency_key"] = idempotency_key
             return {
                 "specimen_euid": "SP-TEST1",
-                "specimen_uuid": str(uuid.uuid4()),
                 "container_euid": "CX-TEST1",
                 "status": "active",
                 "atlas_refs": {"order_number": "ORD-100"},
@@ -255,7 +253,6 @@ def test_external_specimens_get_by_reference(client, monkeypatch, external_token
             return [
                 {
                     "specimen_euid": "SP-TEST2",
-                    "specimen_uuid": str(uuid.uuid4()),
                     "container_euid": "CX-TEST2",
                     "status": "active",
                     "atlas_refs": {"order_number": "ORD-200"},
@@ -286,7 +283,6 @@ def test_external_specimens_get_by_euid(client, monkeypatch, external_token_auth
             assert specimen_euid == "SP-TEST3"
             return {
                 "specimen_euid": "SP-TEST3",
-                "specimen_uuid": str(uuid.uuid4()),
                 "container_euid": "CX-TEST3",
                 "status": "active",
                 "atlas_refs": {"patient_id": "PAT-3"},
@@ -318,7 +314,6 @@ def test_external_specimens_patch_update(client, monkeypatch, external_token_aut
             assert body["status"] == "inactive"
             return {
                 "specimen_euid": specimen_euid,
-                "specimen_uuid": str(uuid.uuid4()),
                 "container_euid": "CX-TEST4",
                 "status": body["status"],
                 "atlas_refs": {"shipment_number": "SHIP-4"},

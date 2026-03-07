@@ -1204,7 +1204,6 @@ function renderDetailsPanel({ euid, objectData, graphData, isNode }) {
     }
 
     const preferredKeys = [
-        "uuid",
         "euid",
         "name",
         "type",

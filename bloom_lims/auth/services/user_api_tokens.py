@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -91,8 +90,8 @@ class UserAPITokenService:
     def create_token(
         self,
         *,
-        owner_user_id: uuid.UUID,
-        actor_user_id: uuid.UUID,
+        owner_user_id: str,
+        actor_user_id: str,
         actor_roles: list[str],
         actor_groups: list[str],
         payload: TokenCreateInput,
@@ -127,7 +126,7 @@ class UserAPITokenService:
         )
         return TokenCreateResult(token=token, revision=revision, plaintext_token=plaintext)
 
-    def list_user_tokens(self, *, user_id: uuid.UUID) -> list[tuple[UserTokenRecord, UserTokenRevisionRecord]]:
+    def list_user_tokens(self, *, user_id: str) -> list[tuple[UserTokenRecord, UserTokenRevisionRecord]]:
         rows: list[tuple[UserTokenRecord, UserTokenRevisionRecord]] = []
         for token in self.repo.list_tokens(user_id=user_id):
             revision = self.repo.get_latest_revision(token.id)
@@ -145,14 +144,14 @@ class UserAPITokenService:
             rows.append((token, revision))
         return rows
 
-    def get_token(self, *, token_id: uuid.UUID) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
+    def get_token(self, *, token_id: str) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
         return self.repo.get_token(token_id)
 
     def revoke_token(
         self,
         *,
-        token_id: uuid.UUID,
-        actor_user_id: uuid.UUID,
+        token_id: str,
+        actor_user_id: str,
         actor_roles: list[str],
     ) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
         current = self.repo.get_token(token_id)
@@ -216,7 +215,7 @@ class UserAPITokenService:
             revision=latest_revision,
         )
 
-    def mark_token_used(self, *, token_id: uuid.UUID) -> None:
+    def mark_token_used(self, *, token_id: str) -> None:
         token_result = self.repo.get_token(token_id)
         if token_result is None:
             return
@@ -238,8 +237,8 @@ class UserAPITokenService:
     def log_usage(
         self,
         *,
-        token_id: uuid.UUID,
-        user_id: uuid.UUID,
+        token_id: str,
+        user_id: str,
         endpoint: str,
         http_method: str,
         response_status: int,
@@ -261,8 +260,8 @@ class UserAPITokenService:
     def usage_for_token(
         self,
         *,
-        token_id: uuid.UUID,
-        actor_user_id: uuid.UUID,
+        token_id: str,
+        actor_user_id: str,
         actor_roles: list[str],
         limit: int = 100,
     ) -> list[UserTokenUsageRecord]:

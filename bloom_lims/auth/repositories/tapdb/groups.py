@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -18,8 +17,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.auth.repositories.tapdb.identity import (
-    ensure_uuid_property,
-    parse_uuid,
+    ensure_public_id_property,
+    normalize_public_id,
     resolve_public_id,
 )
 
@@ -60,7 +59,7 @@ def _to_dt(value: Any) -> datetime | None:
 
 @dataclass(frozen=True)
 class GroupRecord:
-    id: uuid.UUID
+    id: str
     group_code: str
     name: str
     description: str | None
@@ -73,15 +72,15 @@ class GroupRecord:
 
 @dataclass(frozen=True)
 class GroupMembershipRecord:
-    id: uuid.UUID
-    group_id: uuid.UUID
+    id: str
+    group_id: str
     group_code: str
-    user_id: uuid.UUID
+    user_id: str
     is_active: bool
     joined_at: datetime | None
-    added_by: uuid.UUID | None
+    added_by: str | None
     deactivated_at: datetime | None
-    deactivated_by: uuid.UUID | None
+    deactivated_by: str | None
     euid: str | None = None
 
 
@@ -138,7 +137,7 @@ class TapdbGroupRepository:
             return group
         return None
 
-    def get_user_group_codes(self, user_id: uuid.UUID) -> list[str]:
+    def get_user_group_codes(self, user_id: str) -> list[str]:
         group_lookup = {group.id: group.group_code for group in self.list_groups(include_inactive=False)}
         memberships = self._list_memberships(user_id=user_id, include_inactive=False)
         codes: list[str] = []
@@ -163,8 +162,8 @@ class TapdbGroupRepository:
         self,
         *,
         group_code: str,
-        user_id: uuid.UUID,
-        added_by: uuid.UUID | None,
+        user_id: str,
+        added_by: str | None,
     ) -> GroupMembershipRecord:
         self._ensure_templates_bootstrapped()
         group = self.get_group_by_code(group_code)
@@ -186,7 +185,6 @@ class TapdbGroupRepository:
             return restored
 
         membership_properties = {
-            "id": str(uuid.uuid4()),
             "group_id": str(group.id),
             "group_code": group.group_code,
             "user_id": str(user_id),
@@ -196,7 +194,7 @@ class TapdbGroupRepository:
             "deactivated_at": None,
             "deactivated_by": None,
         }
-        ensure_uuid_property(membership_properties, "id")
+        ensure_public_id_property(membership_properties, "id", prefix="gmem")
         membership_instance = self.factory.create_instance(
             session=self.db,
             template_code=GROUP_MEMBERSHIP_TEMPLATE_CODE,
@@ -223,8 +221,8 @@ class TapdbGroupRepository:
         self,
         *,
         group_code: str,
-        user_id: uuid.UUID,
-        removed_by: uuid.UUID | None,
+        user_id: str,
+        removed_by: str | None,
     ) -> GroupMembershipRecord | None:
         group = self.get_group_by_code(group_code)
         if group is None:
@@ -245,8 +243,8 @@ class TapdbGroupRepository:
     def _list_memberships(
         self,
         *,
-        group_id: uuid.UUID | None = None,
-        user_id: uuid.UUID | None = None,
+        group_id: str | None = None,
+        user_id: str | None = None,
         include_inactive: bool,
     ) -> list[GroupMembershipRecord]:
         memberships: list[GroupMembershipRecord] = []
@@ -266,22 +264,22 @@ class TapdbGroupRepository:
     def _find_membership(
         self,
         *,
-        group_id: uuid.UUID,
-        user_id: uuid.UUID,
+        group_id: str,
+        user_id: str,
     ) -> generic_instance | None:
         for membership_instance in self._instances_for_template(GROUP_MEMBERSHIP_TEMPLATE_CODE):
             props = self._props(membership_instance)
-            if parse_uuid(props.get("group_id")) != group_id:
+            if normalize_public_id(props.get("group_id")) != group_id:
                 continue
-            if parse_uuid(props.get("user_id")) != user_id:
+            if normalize_public_id(props.get("user_id")) != user_id:
                 continue
             return membership_instance
         return None
 
-    def _find_group_instance(self, group_id: uuid.UUID) -> generic_instance | None:
+    def _find_group_instance(self, group_id: str) -> generic_instance | None:
         for group_instance in self._instances_for_template(GROUP_TEMPLATE_CODE):
             props = self._props(group_instance)
-            if resolve_public_id(group_instance, props) == group_id:
+            if resolve_public_id(group_instance, props, prefix="grp") == group_id:
                 return group_instance
         return None
 
@@ -292,16 +290,15 @@ class TapdbGroupRepository:
         name: str,
         description: str | None,
         is_system_group: bool,
-        created_by: uuid.UUID | None,
+        created_by: str | None,
     ) -> GroupRecord:
         group_properties = {
-            "id": str(uuid.uuid4()),
             "group_code": group_code,
             "is_system_group": bool(is_system_group),
             "is_active": True,
             "created_by": str(created_by) if created_by else None,
         }
-        group_public_id = ensure_uuid_property(group_properties, "id")
+        group_public_id = ensure_public_id_property(group_properties, "id", prefix="grp")
 
         group_instance = self.factory.create_instance(
             session=self.db,
@@ -311,7 +308,6 @@ class TapdbGroupRepository:
         )
 
         revision_properties = {
-            "id": str(uuid.uuid4()),
             "group_id": str(group_public_id),
             "revision_no": 1,
             "name": name,
@@ -321,6 +317,7 @@ class TapdbGroupRepository:
             "created_by": str(created_by) if created_by else None,
             "created_at": datetime.now(UTC).isoformat(),
         }
+        ensure_public_id_property(revision_properties, "id", prefix="grev")
         revision_instance = self.factory.create_instance(
             session=self.db,
             template_code=GROUP_REVISION_TEMPLATE_CODE,
@@ -344,7 +341,7 @@ class TapdbGroupRepository:
         group_code = str(props.get("group_code", "")).strip().upper()
         if not group_code:
             return None
-        group_id = resolve_public_id(group_instance, props)
+        group_id = resolve_public_id(group_instance, props, prefix="grp")
         revision = self._latest_revision_for_group(group_id)
         revision_props = self._props(revision) if revision is not None else {}
         return GroupRecord(
@@ -366,9 +363,9 @@ class TapdbGroupRepository:
         group_code: str | None = None,
     ) -> GroupMembershipRecord | None:
         props = self._props(membership_instance)
-        membership_id = resolve_public_id(membership_instance, props)
-        group_id = parse_uuid(props.get("group_id"))
-        user_id = parse_uuid(props.get("user_id"))
+        membership_id = resolve_public_id(membership_instance, props, prefix="gmem")
+        group_id = normalize_public_id(props.get("group_id"))
+        user_id = normalize_public_id(props.get("user_id"))
         if group_id is None or user_id is None:
             return None
         normalized_group_code = str(props.get("group_code") or group_code or "").strip().upper()
@@ -383,17 +380,17 @@ class TapdbGroupRepository:
             user_id=user_id,
             is_active=bool(props.get("is_active", True)),
             joined_at=_to_dt(props.get("joined_at")) or membership_instance.created_dt,
-            added_by=parse_uuid(props.get("added_by")),
+            added_by=normalize_public_id(props.get("added_by")),
             deactivated_at=_to_dt(props.get("deactivated_at")),
-            deactivated_by=parse_uuid(props.get("deactivated_by")),
+            deactivated_by=normalize_public_id(props.get("deactivated_by")),
             euid=membership_instance.euid,
         )
 
-    def _latest_revision_for_group(self, group_id: uuid.UUID) -> generic_instance | None:
+    def _latest_revision_for_group(self, group_id: str) -> generic_instance | None:
         revisions: list[generic_instance] = []
         for revision_instance in self._instances_for_template(GROUP_REVISION_TEMPLATE_CODE):
             props = self._props(revision_instance)
-            if parse_uuid(props.get("group_id")) != group_id:
+            if normalize_public_id(props.get("group_id")) != group_id:
                 continue
             revisions.append(revision_instance)
         if not revisions:

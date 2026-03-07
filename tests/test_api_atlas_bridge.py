@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
+import secrets
 import sys
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,27 +25,31 @@ def _clear_overrides():
     app.dependency_overrides.clear()
 
 
+def _opaque_id(prefix: str) -> str:
+    return f"{prefix}-{secrets.token_hex(8)}"
+
+
 def _external_rw_user() -> APIUser:
     return APIUser(
         email="atlas-bridge@example.com",
-        user_id=str(uuid.uuid4()),
+        user_id=_opaque_id("user"),
         roles=["INTERNAL_READ_WRITE"],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",
-        token_id=str(uuid.uuid4()),
+        token_id=_opaque_id("token"),
     )
 
 
 def _external_ro_user() -> APIUser:
     return APIUser(
         email="atlas-bridge-ro@example.com",
-        user_id=str(uuid.uuid4()),
+        user_id=_opaque_id("user"),
         roles=["INTERNAL_READ_ONLY"],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_ro",
-        token_id=str(uuid.uuid4()),
+        token_id=_opaque_id("token"),
     )
 
 

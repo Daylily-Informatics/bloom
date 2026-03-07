@@ -38,8 +38,6 @@ def _specimen_content_event_payload(content, extra: dict | None = None) -> dict:
     payload = {
         "euid": content.euid,
         "specimen_euid": content.euid,
-        "uuid": str(content.uuid),
-        "specimen_uuid": str(content.uuid),
         "name": content.name,
         "category": content.category,
         "type": content.type,
@@ -86,7 +84,6 @@ async def list_content(
             "items": [
                 {
                     "euid": obj.euid,
-                    "uuid": str(obj.uuid),
                     "name": obj.name,
                     "content_type": obj.type,
                     "subtype": obj.subtype,
@@ -118,7 +115,6 @@ async def get_content(euid: str, user: APIUser = Depends(require_read)):
         
         return {
             "euid": content.euid,
-            "uuid": str(content.uuid),
             "name": content.name,
             "content_type": content.type,
             "subtype": content.subtype,
@@ -161,7 +157,6 @@ async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(requir
         return {
             "success": True,
             "euid": sample.euid,
-            "uuid": str(sample.uuid),
             "message": "Sample created successfully",
         }
     except HTTPException:
@@ -196,7 +191,6 @@ async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(re
         return {
             "success": True,
             "euid": specimen.euid,
-            "uuid": str(specimen.uuid),
             "message": "Specimen created successfully",
         }
     except HTTPException:
@@ -231,7 +225,6 @@ async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(requ
         return {
             "success": True,
             "euid": reagent.euid,
-            "uuid": str(reagent.uuid),
             "message": "Reagent created successfully",
         }
     except HTTPException:

@@ -4,9 +4,6 @@ BLOOM LIMS Lineage Module
 This module contains lineage tracking functionality for BLOOM LIMS.
 Lineage tracks the relationships and history of objects as they move
 through processing workflows.
-
-For backward compatibility, this module re-exports functionality that was
-originally in bloom_lims/bobjs.py.
 """
 
 import logging
@@ -87,10 +84,8 @@ def create_lineage(
         
         if root_object:
             lineage_json['root_euid'] = root_object.euid
-            lineage_json['root_uuid'] = str(root_object.uuid)
             lineage_json['members'].append({
                 'euid': root_object.euid,
-                'uuid': str(root_object.uuid),
                 'depth': 0,
                 'added_at': datetime.utcnow().isoformat(),
             })
@@ -199,7 +194,6 @@ def add_to_lineage(
 
         lineage.json_addl['members'].append({
             'euid': obj.euid,
-            'uuid': str(obj.uuid),
             'depth': depth,
             'parent_euid': parent_euid.upper() if parent_euid else None,
             'added_at': datetime.utcnow().isoformat(),
@@ -300,7 +294,7 @@ def get_object_lineage(
     return get_lineage_tree(session, base, lineage_euid)
 
 
-# Re-export for backward compatibility
+# Export the lineage object alias via BloomObj.
 try:
     from bloom_lims.bobjs import BloomObj as _BloomObj
     BloomLineage = _BloomObj

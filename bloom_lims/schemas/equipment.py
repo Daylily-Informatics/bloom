@@ -97,7 +97,6 @@ class EquipmentResponseSchema(EquipmentBaseSchema, TimestampMixin):
     """Schema for equipment API responses."""
     
     euid: str = Field(..., description="Equipment EUID")
-    uuid: str = Field(..., description="Equipment UUID")
     status: str = Field(default="active", description="Record status")
     is_deleted: bool = Field(default=False, description="Soft delete flag")
     

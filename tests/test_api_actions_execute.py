@@ -1,9 +1,8 @@
-"""Tests for /api/v1/actions/execute and /workflow_step_action alias."""
+"""Tests for /api/v1/actions/execute."""
 
 import os
+import secrets
 import sys
-import uuid
-from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -32,7 +31,7 @@ def write_user_override():
     async def _override() -> APIUser:
         return APIUser(
             email="actions-rw@example.com",
-            user_id=str(uuid.uuid4()),
+            user_id=f"user-{secrets.token_hex(8)}",
             roles=["INTERNAL_READ_WRITE"],
             auth_source="session",
         )
@@ -243,27 +242,6 @@ def test_execute_action_set_object_status_success(client, write_user_override):
     assert _get_status(euid) == target_status
 
 
-def test_workflow_step_action_alias_returns_json_error(client):
+def test_workflow_step_action_alias_removed(client):
     response = client.post("/workflow_step_action", json={})
-    assert response.status_code == 400
-    assert response.headers.get("content-type", "").startswith("application/json")
-    payload = response.json()
-    assert payload.get("detail") == "Missing required field: euid"
-    assert payload.get("error_fields") == ["euid"]
-
-
-def test_workflow_step_action_alias_success(client):
-    euid, action_group, action_key, target_status = _find_set_status_target()
-    response = client.post(
-        "/workflow_step_action",
-        json={
-            "euid": euid,
-            "action_group": action_group,
-            "action_key": action_key,
-            "captured_data": {"object_status": target_status},
-        },
-    )
-    assert response.status_code == 200
-    payload: dict[str, Any] = response.json()
-    assert payload.get("status") == "success"
-    assert payload.get("euid") == euid
+    assert response.status_code == 404

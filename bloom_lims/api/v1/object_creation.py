@@ -71,7 +71,6 @@ class CreateObjectRequest(BaseModel):
 class CreateObjectResponse(BaseModel):
     """Response for object creation."""
     euid: str
-    uuid: str
     name: str
     category: str
     type: str
@@ -397,7 +396,6 @@ async def create_object(
                 {
                     "euid": new_instance.euid,
                     "container_euid": new_instance.euid,
-                    "uuid": str(new_instance.uuid),
                     "name": new_instance.name,
                     "category": new_instance.category,
                     "type": new_instance.type,
@@ -410,7 +408,6 @@ async def create_object(
 
         return CreateObjectResponse(
             euid=new_instance.euid,
-            uuid=str(new_instance.uuid),
             name=new_instance.name or "",
             category=new_instance.category,
             type=new_instance.type,

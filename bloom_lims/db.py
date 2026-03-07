@@ -36,6 +36,8 @@ from bloom_lims.tapdb_adapter import (
     file_set_instance_lineage,
     file_set_template,
     file_template,
+    get_child_lineages,
+    get_parent_lineages,
     generic_instance,
     generic_instance_lineage,
     generic_template,
@@ -107,5 +109,7 @@ __all__ = [
     "file_reference_instance",
     "file_set_instance_lineage",
     "file_reference_instance_lineage",
+    "get_parent_lineages",
+    "get_child_lineages",
     "audit_log",
 ]

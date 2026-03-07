@@ -37,7 +37,7 @@ Features:
 
 import asyncio
 import logging
-import uuid
+import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -157,7 +157,7 @@ class BatchProcessor:
     def create_job(self, operation: str, total: int) -> BatchJob:
         """Create a new batch job."""
         job = BatchJob(
-            job_id=str(uuid.uuid4()),
+            job_id=f"job_{secrets.token_hex(16)}",
             operation=operation,
             progress=BatchProgress(total=total),
         )
@@ -236,7 +236,7 @@ class BatchProcessor:
                             subtype=template.subtype,
                             category=template.category,
                             json_addl=json_addl,
-                            parent_template_uuid=template.uuid,
+                            template_uid=template.uid,
                         )
                         self._session.add(instance)
 

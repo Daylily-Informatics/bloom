@@ -30,7 +30,7 @@ Features:
 
 import asyncio
 import logging
-import uuid
+import secrets
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -287,7 +287,7 @@ class BackgroundTaskManager:
         Returns:
             Task ID for tracking
         """
-        task_id = task_id or str(uuid.uuid4())
+        task_id = task_id or f"task_{secrets.token_hex(16)}"
 
         async with self._lock:
             # Cleanup old tasks if at capacity

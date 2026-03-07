@@ -60,7 +60,6 @@ class FileResponseSchema(FileBaseSchema, TimestampMixin):
     """Schema for file API responses."""
     
     euid: str = Field(..., description="File EUID")
-    uuid: str = Field(..., description="File UUID")
     status: str = Field(default="active", description="File status")
     is_deleted: bool = Field(default=False, description="Soft delete flag")
     
@@ -107,7 +106,6 @@ class FileSetResponseSchema(FileSetBaseSchema, TimestampMixin):
     """Schema for file set API responses."""
     
     euid: str = Field(..., description="File set EUID")
-    uuid: str = Field(..., description="File set UUID")
     status: str = Field(default="active", description="Status")
     
     file_count: int = Field(default=0, description="Number of files in set")

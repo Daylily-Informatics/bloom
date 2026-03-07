@@ -59,7 +59,7 @@ async def list_lineages(
             ).first()
             if parent:
                 query = query.filter(
-                    bdb.Base.classes.generic_instance_lineage.parent_instance_uuid == parent.uuid
+                    bdb.Base.classes.generic_instance_lineage.parent_instance_uid == parent.uid
                 )
         
         if child_euid:
@@ -68,7 +68,7 @@ async def list_lineages(
             ).first()
             if child:
                 query = query.filter(
-                    bdb.Base.classes.generic_instance_lineage.child_instance_uuid == child.uuid
+                    bdb.Base.classes.generic_instance_lineage.child_instance_uid == child.uid
                 )
         
         total = query.count()
@@ -78,10 +78,10 @@ async def list_lineages(
         return {
             "items": [
                 {
-                    "uuid": str(lin.uuid),
+                    "euid": lin.euid,
                     "parent_euid": lin.parent_instance.euid if lin.parent_instance else None,
                     "child_euid": lin.child_instance.euid if lin.child_instance else None,
-                    "relationship_type": lin.json_addl.get("relationship_type") if lin.json_addl else None,
+                    "relationship_type": lin.relationship_type,
                 }
                 for lin in items
             ],
@@ -115,18 +115,15 @@ async def create_lineage(
             raise HTTPException(status_code=404, detail=f"Child not found: {data.child_euid}")
         
         # Create lineage
-        lineage = bo.create_lineage(parent, child)
-        
-        if data.relationship_type:
-            lineage.json_addl = lineage.json_addl or {}
-            lineage.json_addl["relationship_type"] = data.relationship_type
-            bdb.session.commit()
+        lineage = bo.create_lineage(parent, child, relationship_type=data.relationship_type or "generic")
+        bdb.session.commit()
         
         return {
             "success": True,
-            "uuid": str(lineage.uuid),
+            "euid": lineage.euid,
             "parent_euid": data.parent_euid,
             "child_euid": data.child_euid,
+            "relationship_type": lineage.relationship_type,
             "message": "Lineage created successfully",
         }
     except HTTPException:
@@ -136,29 +133,23 @@ async def create_lineage(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{uuid}", response_model=Dict[str, Any])
+@router.delete("/{lineage_euid}", response_model=Dict[str, Any])
 async def delete_lineage(
-    uuid: str,
+    lineage_euid: str,
     hard_delete: bool = Query(False, description="Permanently delete"),
     user: APIUser = Depends(require_api_auth),
 ):
     """Delete a lineage (soft delete by default)."""
     try:
         bdb = get_bdb(user.email)
-        # TapDB schema uses BIGINT identity keys (historical column name: uuid).
-        try:
-            lineage_id = int(uuid)
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid lineage id: {uuid}")
-
         lineage = (
             bdb.session.query(bdb.Base.classes.generic_instance_lineage)
-            .filter(bdb.Base.classes.generic_instance_lineage.uuid == lineage_id)
+            .filter(bdb.Base.classes.generic_instance_lineage.euid == lineage_euid)
             .first()
         )
         
         if not lineage:
-            raise HTTPException(status_code=404, detail=f"Lineage not found: {uuid}")
+            raise HTTPException(status_code=404, detail=f"Lineage not found: {lineage_euid}")
         
         if hard_delete:
             bdb.session.delete(lineage)
@@ -169,11 +160,11 @@ async def delete_lineage(
         
         return {
             "success": True,
-            "uuid": uuid,
+            "euid": lineage_euid,
             "message": f"Lineage {'permanently deleted' if hard_delete else 'soft deleted'}",
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting lineage {uuid}: {e}")
+        logger.error(f"Error deleting lineage {lineage_euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

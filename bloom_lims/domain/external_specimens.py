@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 from bloom_lims.schemas.external_specimens import (
     AtlasReferences,
@@ -200,10 +200,10 @@ class ExternalSpecimenService:
         specimen = self._safe_get_by_euid(specimen_euid)
         if container is None or specimen is None:
             return
-        for lineage in container.parent_of_lineages:
+        for lineage in get_parent_lineages(container):
             if lineage.is_deleted:
                 continue
-            if lineage.child_instance_uuid == specimen.uuid:
+            if lineage.child_instance_uid == specimen.uid:
                 return
         self.bobj.create_generic_instance_lineage_by_euids(
             container_euid,
@@ -363,7 +363,6 @@ class ExternalSpecimenService:
         container = self._linked_container_euid(specimen)
         return ExternalSpecimenResponse(
             specimen_euid=specimen.euid,
-            specimen_uuid=str(specimen.uuid),
             container_euid=container,
             status=specimen.bstatus,
             atlas_refs=atlas_refs,
@@ -373,7 +372,7 @@ class ExternalSpecimenService:
         )
 
     def _linked_container_euid(self, specimen) -> str | None:
-        for lineage in specimen.child_of_lineages:
+        for lineage in get_child_lineages(specimen):
             if lineage.is_deleted:
                 continue
             parent = lineage.parent_instance

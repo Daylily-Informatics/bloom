@@ -2,8 +2,7 @@
 BLOOM LIMS Core Module
 
 This module contains the core domain objects for BLOOM LIMS, organized into
-focused submodules. For backward compatibility, all classes are re-exported
-from this module and from bloom_lims.bobjs.
+focused submodules.
 
 Submodules:
     - base_objects: BloomObj base class and common methods
@@ -16,11 +15,8 @@ Submodules:
     - cache: Caching utilities
 
 Usage:
-    # New style (recommended)
+    # Core imports
     from bloom_lims.core import BloomObj, BloomWorkflow
-
-    # Legacy style (backward compatible)
-    from bloom_lims.bobjs import BloomObj, BloomWorkflow
 
     # Validation
     from bloom_lims.core.validation import validate_euid, validated
@@ -37,7 +33,6 @@ from .base_objects import (
     BloomObjMixin,
     create_bloom_obj,
     get_bloom_obj_by_euid,
-    get_bloom_obj_by_uuid,
 )
 
 from .workflows import (
@@ -81,10 +76,8 @@ from .lineage import (
 from .validation import (
     ValidationError,
     validate_euid,
-    validate_uuid,
     validate_json_addl,
     validate_type,
-    validate_btype,  # Backward compatibility alias
     validate_not_empty,
     validate_positive_int,
     validated,
@@ -181,7 +174,6 @@ __all__ = [
     "BloomObjMixin",
     "create_bloom_obj",
     "get_bloom_obj_by_euid",
-    "get_bloom_obj_by_uuid",
     # Workflows
     "BloomWorkflow",
     "BloomWorkflowStep",
@@ -214,10 +206,8 @@ __all__ = [
     # Validation
     "ValidationError",
     "validate_euid",
-    "validate_uuid",
     "validate_json_addl",
     "validate_type",
-    "validate_btype",  # Backward compatibility alias
     "validate_not_empty",
     "validate_positive_int",
     "validated",

@@ -30,7 +30,14 @@
         },
         "ui_schema": {
           "title": "Add Specimen to Assay Queue",
-          "fields": []
+          "fields": [
+            {
+              "name": "assay_selection",
+              "type": "select",
+              "required": true,
+              "options_source": "workflow_assays"
+            }
+          ]
         }
       },
       "properties": {
@@ -70,7 +77,14 @@
         },
         "ui_schema": {
           "title": "Add Specimen to Assay Queue",
-          "fields": []
+          "fields": [
+            {
+              "name": "assay_selection",
+              "type": "select",
+              "required": true,
+              "options_source": "workflow_assays"
+            }
+          ]
         }
       },
       "properties": {

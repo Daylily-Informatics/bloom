@@ -487,7 +487,7 @@
         <button id="toggleFilterBtn" class="btn btn-outline btn-sm" title="Toggle minimal recursion">
             <i class="fas fa-filter"></i> Filter: {{ udat.get('wf_filter', 'off') }}
         </button>
-        <a href="/dindex2?globalStartNodeEUID={{ workflow.euid }}" target="bloom_dag" class="btn btn-outline btn-sm" title="View DAG">
+        <a href="/dindex2?start_euid={{ workflow.euid }}" target="bloom_dag" class="btn btn-outline btn-sm" title="View DAG">
             <i class="fas fa-project-diagram"></i> DAG
         </a>
     </div>
@@ -541,7 +541,7 @@
                 <a href="/euid_details?euid={{ trx.euid }}" class="text-highlight" style="font-weight: 600;">{{ trx.euid }}</a>
                 <span class="text-muted">{{ trx.json_addl.get('properties', {}).get('name', '') }}</span>
                 <span class="badge bg-{{ 'success' if trx.bstatus == 'active' else 'secondary' }}">{{ trx.bstatus }}</span>
-                <a href="/dindex2?globalStartNodeEUID={{ trx.euid }}" target="bloom_dag" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+                <a href="/dindex2?start_euid={{ trx.euid }}" target="bloom_dag" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
             </div>
             {% set trx_action_groups = action_groups_by_euid.get(trx.euid, {}) if action_groups_by_euid is defined else {} %}
             {% if trx_action_groups %}
@@ -666,7 +666,7 @@
             <!-- Links OUTSIDE the button so they work independently -->
             <span class="step-links">
                 <a href="/euid_details?euid={{ step.euid }}" title="View details">{{ step.euid }}</a>
-                <a href="/dindex2?globalStartNodeEUID={{ step.euid }}" target="bloom_dag" title="View DAG">🕸️</a>
+                <a href="/dindex2?start_euid={{ step.euid }}" target="bloom_dag" title="View DAG">🕸️</a>
                 {% if step_type == 'plate' or step_type == 'rack' %}
                 <a href="/plate_visualization?plate_euid={{ step.euid }}" title="View plate"><i class="fas fa-th"></i></a>
                 {% endif %}
@@ -794,7 +794,7 @@
                             <span class="child-container-type">{{ container.type }}</span>
                             <a href="/euid_details?euid={{ container.euid }}" class="child-container-euid">{{ container.euid }}</a>
                             <span class="text-muted" style="font-size: 0.75rem;">{{ container.json_addl.get('properties', {}).get('name', '') }}</span>
-                            <a href="/dindex2?globalStartNodeEUID={{ container.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+                            <a href="/dindex2?start_euid={{ container.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
                             {% if container.type == 'plate' or container.type == 'rack' %}
                             <a href="/plate_visualization?plate_euid={{ container.euid }}" title="View plate" style="color: var(--color-highlight);"><i class="fas fa-th"></i></a>
                             {% endif %}
@@ -820,7 +820,7 @@
                                 </span>
                                 {% endif %}
                             </span>
-                            <a href="/dindex2?globalStartNodeEUID={{ content.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
+                            <a href="/dindex2?start_euid={{ content.euid }}" target="bloom_dag" class="ms-auto" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
                         </div>
                         {% endif %}
                         {% endfor %}

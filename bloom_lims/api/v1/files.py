@@ -61,7 +61,6 @@ async def list_files(
             "items": [
                 {
                     "euid": obj.euid,
-                    "uuid": str(obj.uuid),
                     "name": obj.name,
                     "file_type": obj.type,
                     "status": obj.bstatus,
@@ -95,7 +94,6 @@ async def get_file(euid: str):
 
         return {
             "euid": file_obj.euid,
-            "uuid": str(file_obj.uuid),
             "name": file_obj.name,
             "file_type": file_obj.type,
             "status": file_obj.bstatus,
@@ -143,7 +141,6 @@ async def create_file(
         return {
             "success": True,
             "euid": new_file.euid,
-            "uuid": str(new_file.uuid),
             "message": "File created successfully",
         }
     except json.JSONDecodeError:

@@ -113,7 +113,7 @@ def create_bloom_obj(
     type: str,
     subtype: Optional[str] = None,
     json_addl: Optional[Dict[str, Any]] = None,
-    template_uuid: Optional[str] = None,
+    template_uid: Optional[str] = None,
     **kwargs,
 ) -> Any:
     """
@@ -127,7 +127,7 @@ def create_bloom_obj(
         type: Object type
         subtype: Object subtype (optional)
         json_addl: Additional JSON data (optional)
-        template_uuid: Template UUID if creating from template (optional)
+        template_uid: Template UID if creating from template (optional)
         **kwargs: Additional fields to set
 
     Returns:
@@ -149,7 +149,7 @@ def create_bloom_obj(
             type=type,
             subtype=subtype,
             json_addl=json_addl or {},
-            template_uuid=template_uuid,
+            template_uid=template_uid,
             **kwargs,
         )
         session.add(obj)
@@ -202,45 +202,6 @@ def get_bloom_obj_by_euid(
         return query.first()
     except Exception as e:
         logger.error(f"Error looking up EUID {euid}: {e}")
-        return None
-
-
-def get_bloom_obj_by_uuid(
-    session: Session,
-    base,
-    uuid: str,
-    include_deleted: bool = False,
-) -> Optional[Any]:
-    """
-    Get a BloomObj by its UUID.
-
-    Args:
-        session: SQLAlchemy session
-        base: SQLAlchemy automap base
-        uuid: Universal Unique Identifier
-        include_deleted: Include soft-deleted objects
-
-    Returns:
-        The object if found, None otherwise
-    """
-    logger.debug(f"Looking up object by UUID: {uuid}")
-
-    if not uuid:
-        return None
-
-    try:
-        query = session.query(base.classes.generic_instance).filter(
-            base.classes.generic_instance.uuid == uuid
-        )
-
-        if not include_deleted:
-            query = query.filter(
-                base.classes.generic_instance.is_deleted == False
-            )
-
-        return query.first()
-    except Exception as e:
-        logger.error(f"Error looking up UUID {uuid}: {e}")
         return None
 
 

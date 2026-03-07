@@ -3,12 +3,10 @@ Tests for bloom_lims.core.validation module.
 """
 
 import pytest
-import uuid
 
 from bloom_lims.core.validation import (
     ValidationError,
     validate_euid,
-    validate_uuid,
     validate_json_addl,
     validate_type,
     validate_not_empty,
@@ -70,34 +68,6 @@ class TestValidateEuid:
         with pytest.raises(ValidationError) as exc_info:
             validate_euid("CX01")
         assert "No leading zeros" in str(exc_info.value)
-
-
-class TestValidateUuid:
-    """Tests for validate_uuid function."""
-    
-    def test_valid_uuid_string(self):
-        """Test validation of valid UUID string."""
-        valid_uuid = str(uuid.uuid4())
-        assert validate_uuid(valid_uuid) is True
-    
-    def test_valid_uuid_object(self):
-        """Test validation of UUID object."""
-        valid_uuid = uuid.uuid4()
-        assert validate_uuid(valid_uuid) is True
-    
-    def test_none_uuid(self):
-        """Test that None raises ValidationError."""
-        with pytest.raises(ValidationError) as exc_info:
-            validate_uuid(None)
-        assert "cannot be None" in str(exc_info.value)
-    
-    def test_invalid_uuid_format(self):
-        """Test that invalid format raises ValidationError."""
-        with pytest.raises(ValidationError) as exc_info:
-            validate_uuid("not-a-uuid")
-        assert "Invalid UUID format" in str(exc_info.value)
-
-
 class TestValidateJsonAddl:
     """Tests for validate_json_addl function."""
     
@@ -350,11 +320,6 @@ class TestValidatorImports:
         from bloom_lims.core.validation import validate_euid
         assert callable(validate_euid)
 
-    def test_import_validate_uuid(self):
-        """Test validate_uuid import."""
-        from bloom_lims.core.validation import validate_uuid
-        assert callable(validate_uuid)
-
     def test_import_validate_json_addl(self):
         """Test validate_json_addl import."""
         from bloom_lims.core.validation import validate_json_addl
@@ -448,15 +413,6 @@ class TestCoreValidationAdditional:
         assert validate_euid("CX1") == True
         assert validate_euid("WF123") == True
         assert validate_euid("MRX42") == True
-
-    def test_validate_uuid_valid_format(self):
-        """Test validate_uuid with valid UUID format."""
-        from bloom_lims.core.validation import validate_uuid
-        import uuid
-
-        # Valid UUID should pass
-        valid_uuid = str(uuid.uuid4())
-        assert validate_uuid(valid_uuid) == True
 
     def test_validate_json_addl_with_dict(self):
         """Test validate_json_addl with dictionary."""

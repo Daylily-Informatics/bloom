@@ -19,8 +19,6 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from urllib.parse import urlencode
-
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
@@ -93,7 +91,6 @@ def get_relationship_data(obj):
                         else []
                     ),
                     "euid": rel_obj.euid,
-                    "uuid": rel_obj.uuid,
                     "polymorphic_discriminator": rel_obj.polymorphic_discriminator,
                     "category": rel_obj.category,
                     "type": rel_obj.type,
@@ -118,7 +115,6 @@ def get_relationship_data(obj):
                             else []
                         ),
                         "euid": rel_obj.euid,
-                        "uuid": rel_obj.uuid,
                         "polymorphic_discriminator": rel_obj.polymorphic_discriminator,
                         "category": rel_obj.category,
                         "type": rel_obj.type,
@@ -645,35 +641,6 @@ async def controls_redirect():
     return RedirectResponse(url="/control_overview", status_code=307)
 
 
-@router.get("/dag")
-async def dag_redirect(request: Request):
-    query_params = str(request.query_params)
-    url = "/dindex2" + ("?" + query_params if query_params else "")
-    return RedirectResponse(url=url, status_code=307)
-
-
-@router.get("/dag_explorer")
-async def dag_explorer_redirect(request: Request):
-    query_params = str(request.query_params)
-    url = "/dindex2" + ("?" + query_params if query_params else "")
-    return RedirectResponse(url=url, status_code=307)
-
-
-@router.get("/graph")
-async def graph_redirect(request: Request):
-    params = dict(request.query_params)
-
-    if "start_euid" in params and "globalStartNodeEUID" not in params:
-        params["globalStartNodeEUID"] = params["start_euid"]
-    if "depth" in params and "globalFilterLevel" not in params:
-        params["globalFilterLevel"] = params["depth"]
-
-    url = "/dindex2"
-    if params:
-        url = f"{url}?{urlencode(params)}"
-    return RedirectResponse(url=url, status_code=307)
-
-
 @router.post("/query_by_euids", response_class=HTMLResponse)
 async def query_by_euids(request: Request, file_euids: str = Form(...)):
     try:
@@ -844,15 +811,6 @@ async def _create_from_template(request: Request, euid: str):
     if template:
         return RedirectResponse(url=f"/euid_details?euid={template[0][0].euid}", status_code=303)
     return RedirectResponse(url="/equipment_overview", status_code=303)
-
-
-@router.get("/uuid_details", response_class=HTMLResponse)
-async def uuid_details(request: Request, uuid: str, _auth=Depends(require_auth)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    obj = bobdb.get(uuid)
-    return RedirectResponse(url=f"/euid_details?euid={obj.euid}")
-
-
 @router.get("/vertical_exp", response_class=HTMLResponse)
 async def vertical_exp(request: Request, euid=None, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -980,7 +938,7 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
         return (
             bobdb.session.query(
                 bobdb.Base.classes.generic_instance.subtype,
-                func.count(bobdb.Base.classes.generic_instance.uuid),
+                func.count(bobdb.Base.classes.generic_instance.uid),
             )
             .filter(
                 bobdb.Base.classes.generic_instance.created_dt >= cutoff_date,
@@ -1062,7 +1020,6 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
 async def euid_details(
     request: Request,
     euid: str = Query(..., description="The EUID to fetch details for"),
-    _uuid: str = Query(None, description="Optional UUID parameter"),
     is_deleted: bool = Query(False, description="Flag to include deleted items"),
     _auth=Depends(require_auth),
 ):
@@ -1135,56 +1092,6 @@ async def euid_details(
     except Exception as e:
         logging.error("Error in euid_details for %s: %s", euid, e, exc_info=True)
         raise e
-
-
-@router.get("/un_delete_by_uuid")
-async def un_delete_by_uuid(
-    request: Request,
-    uuid: str = Query(..., description="The UUID to un-delete"),
-    euid: str = Query(..., description="The EUID associated with the UUID"),
-    _auth=Depends(require_auth),
-    is_deleted: bool = True,
-):
-    try:
-        bobdb = BloomObj(
-            BLOOMdb3(app_username=request.session["user_data"]["email"]),
-            is_deleted=is_deleted,
-        )
-
-        obj = bobdb.get(uuid)
-        if not obj:
-            raise HTTPException(status_code=404, detail="Object not found")
-
-        obj.is_deleted = False
-        bobdb.session.commit()
-
-        logging.info("Successfully un-deleted object with UUID: %s and EUID: %s", uuid, euid)
-        return RedirectResponse(url=f"/euid_details?euid={euid}", status_code=303)
-
-    except Exception as e:
-        logging.error(
-            "Error un-deleting object with UUID: %s and EUID: %s - %s",
-            uuid,
-            euid,
-            e,
-            exc_info=True,
-        )
-        if is_deleted:
-            try:
-                logging.info("Retrying with is_deleted=True for UUID: %s and EUID: %s", uuid, euid)
-                return await un_delete_by_uuid(request, uuid, euid, _auth, is_deleted=False)
-            except Exception as inner_e:
-                logging.error(
-                    "Retry failed for UUID: %s and EUID: %s - %s",
-                    uuid,
-                    euid,
-                    inner_e,
-                    exc_info=True,
-                )
-                raise HTTPException(status_code=404, detail="Object not found after retry")
-        raise HTTPException(status_code=404, detail="Object not found")
-
-
 @router.get("/bloom_schema_report", response_class=HTMLResponse)
 async def bloom_schema_report(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -1230,7 +1137,7 @@ async def delete_object(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     try:
         obj = bobdb.get_by_euid(euid)
-        bobdb.delete(obj)
+        bobdb.delete_obj(obj)
         bobdb.session.flush()
         bobdb.session.commit()
         return {
