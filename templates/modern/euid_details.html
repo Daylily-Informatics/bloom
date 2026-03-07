@@ -23,7 +23,7 @@
       <i class="fas fa-plus-circle"></i> Create Instance
     </a>
     {% endif %}
-    <a href="/dindex2?globalStartNodeEUID={{ obj.euid }}" class="btn btn-primary btn-sm" title="View in DAG Explorer">
+    <a href="/dindex2?start_euid={{ obj.euid }}" class="btn btn-primary btn-sm" title="View in DAG Explorer">
       <i class="fas fa-project-diagram"></i> Graph
     </a>
     <button class="btn btn-outline btn-sm" onclick="copyToClipboard('{{ obj.euid }}')" title="Copy EUID">
@@ -127,17 +127,11 @@
             {% endif %}
           </div>
         </div>
-        <div class="detail-item" style="grid-column: span 2;">
-          <div class="detail-label">UUID</div>
-          <div class="detail-value font-mono" style="font-size: 0.8rem;">
-            <a href="/uuid_details?uuid={{ obj.uuid }}" class="link-uuid">{{ obj.uuid }}</a>
-          </div>
-        </div>
         {% if obj.category == 'file' and obj.json_addl and obj.json_addl.properties and obj.json_addl.properties.current_s3_uri %}
         <div class="detail-item" style="grid-column: span 2;">
           <div class="detail-label">S3 URI</div>
           <div class="detail-value" style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;">
-            <a href="{{ obj.json_addl.properties.current_s3_uri }}" target="_blank" class="link-uuid font-mono" style="word-break: break-all;">
+            <a href="{{ obj.json_addl.properties.current_s3_uri }}" target="_blank" class="link-uri font-mono" style="word-break: break-all;">
               {{ obj.json_addl.properties.current_s3_uri }}
             </a>
             {% if obj.json_addl.properties.current_s3_bucket_name and obj.json_addl.properties.current_s3_key %}
@@ -163,7 +157,7 @@
     </div>
     <div class="card-body">
       <div class="action-list">
-        <a href="/dindex2?globalStartNodeEUID={{ obj.euid }}" class="btn btn-primary btn-block">
+        <a href="/dindex2?start_euid={{ obj.euid }}" class="btn btn-primary btn-block">
           <i class="fas fa-project-diagram"></i> View Graph
         </a>
         {% if obj.type == 'workflow' %}
@@ -577,8 +571,8 @@
   font-size: 0.875rem;
 }
 .link-euid-secondary:hover { color: var(--color-highlight); text-decoration: underline; }
-.link-uuid { color: var(--color-gray-400); text-decoration: none; }
-.link-uuid:hover { color: var(--color-highlight); text-decoration: underline; }
+.link-uri { color: var(--color-gray-400); text-decoration: none; }
+.link-uri:hover { color: var(--color-highlight); text-decoration: underline; }
 
 .collapsible-nav {
   display: flex;

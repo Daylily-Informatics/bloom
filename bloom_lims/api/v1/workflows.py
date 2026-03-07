@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from bloom_lims.db import get_parent_lineages
 from .dependencies import APIUser, require_read, require_write
 
 
@@ -49,7 +50,6 @@ async def list_workflows(
             "items": [
                 {
                     "euid": wf.euid,
-                    "uuid": str(wf.uuid),
                     "name": wf.name,
                     "type": wf.type,
                     "status": wf.bstatus,
@@ -83,7 +83,6 @@ async def get_workflow(euid: str, user: APIUser = Depends(require_read)):
         
         return {
             "euid": workflow.euid,
-            "uuid": str(workflow.uuid),
             "name": workflow.name,
             "type": workflow.type,
             "status": workflow.bstatus,
@@ -174,7 +173,6 @@ async def create_workflow(
         return {
             "success": True,
             "euid": workflow.euid,
-            "uuid": str(workflow.uuid),
             "name": workflow.name,
             "status": workflow.bstatus,
             "message": "Workflow created successfully",
@@ -260,14 +258,13 @@ async def get_workflow_steps(euid: str, user: APIUser = Depends(require_read)):
 
         # Get workflow steps (children with type containing 'step' or 'queue')
         steps = []
-        for lineage in workflow.parent_of_lineages:
+        for lineage in get_parent_lineages(workflow):
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
             if child.type in ["queue", "step"] or "step" in child.type:
                 steps.append({
                     "euid": child.euid,
-                    "uuid": str(child.uuid),
                     "name": child.name,
                     "type": child.type,
                     "subtype": child.subtype,

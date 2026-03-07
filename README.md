@@ -297,7 +297,7 @@ category / type / subtype / version
 | Aspect | Template | Instance |
 |--------|----------|----------|
 | `is_template` | `True` | `False` |
-| `template_uuid` | `NULL` | Points to template |
+| `template_uid` | `NULL` | Points to template |
 | Purpose | Define structure | Represent real objects |
 | `json_addl` | Contains `instantiation_layouts` | Contains `properties`, `actions` |
 
@@ -379,7 +379,7 @@ subjects = list_subjects_for_object(bob, "CX123")
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `uuid` | UUID | Primary key |
+| `uid` | Database identifier | Immutable internal row identifier |
 | `euid` | Text | Enterprise Unique Identifier (human-readable, variable length) |
 | `name` | String(400) | Object name |
 | `category` | String(100) | Top-level classification |
@@ -388,7 +388,7 @@ subjects = list_subjects_for_object(bob, "CX123")
 | `version` | String(100) | Version string |
 | `is_template` | Boolean | True if this is a template |
 | `is_singleton` | Boolean | True if only one instance allowed |
-| `template_uuid` | UUID | Reference to template (for instances) |
+| `template_uid` | Database identifier | Reference to template (for instances) |
 | `json_addl` | JSONB | Flexible JSON storage for properties, actions, etc. |
 | `bstatus` | String(100) | Object status (active, complete, destroyed, etc.) |
 | `bstate` | String(100) | Object state |
@@ -404,9 +404,9 @@ subjects = list_subjects_for_object(bob, "CX123")
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `uuid` | UUID | Primary key |
-| `parent_instance_uuid` | UUID | Parent object UUID |
-| `child_instance_uuid` | UUID | Child object UUID |
+| `uid` | Database identifier | Immutable internal row identifier |
+| `parent_instance_uid` | Database identifier | Parent object internal identifier |
+| `child_instance_uid` | Database identifier | Child object internal identifier |
 | `relationship_type` | String | Type of relationship |
 | `created_dt` | DateTime | Creation timestamp |
 | `is_deleted` | Boolean | Soft delete flag |
@@ -416,7 +416,7 @@ subjects = list_subjects_for_object(bob, "CX123")
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `uuid` | UUID | Primary key |
+| `uid` | Database identifier | Immutable internal row identifier |
 | `euid` | Text | Enterprise Unique Identifier (human-readable) |
 | `name` | String(400) | Equipment name |
 | `equipment_type` | String(100) | Type of equipment |
@@ -428,9 +428,9 @@ subjects = list_subjects_for_object(bob, "CX123")
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `uuid` | UUID | Primary key |
-| `parent_data_uuid` | UUID | Parent data UUID |
-| `child_data_uuid` | UUID | Child data UUID |
+| `uid` | Database identifier | Immutable internal row identifier |
+| `parent_data_uid` | Database identifier | Parent data internal identifier |
+| `child_data_uid` | Database identifier | Child data internal identifier |
 | `relationship_type` | String | Type of data relationship |
 
 ### 4.2 EUID Format
@@ -950,7 +950,6 @@ Content-Type: application/json
   "success": true,
   "data": {
     "euid": "CX1234",
-    "uuid": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Sample Tube 001",
     "category": "container",
     "type": "tube",
@@ -1487,19 +1486,19 @@ pytest
 ## 18. Design Principles
 
 ### Enterprise UIDs
-* [stripe uuid](https://stripe.com/docs/api/identity/object#identity_object-verification-document)
+* [Stripe object identifiers](https://stripe.com/docs/api/identity/object#identity_object-verification-document)
 
-#### Each Object Has A UUID & UUIDs Are Immutable & UUIDs Are Not Reused Or Applied To Other Objects
-* Using a UUID on children objects for convenience will lead to a mess as the need to know details about each object is next to impossible when a UUID is assigned to multiple objects.
+#### Each Object Has An Immutable EUID
+* Reusing identifiers across objects leads to ambiguity; Bloom assigns one stable enterprise identifier per object.
 
-#### The UID Identifies The Object Class And The UUID w/in The Class
-* That is all [reference regarding not putting metadata in a uuid](https://stackoverflow.com/questions/19989481/what-is-the-best-way-to-store-metadata-for-a-file-in-postgresql)
+#### The Prefix Identifies The Object Class
+* Keep business metadata out of identifiers so object labels stay stable and query semantics stay simple.
 
-#### Exhaustive Metadata About An Object May Be Queried Using The Enterprise UUID.
-##### Metadata may also be printed on labels along with the UUID.
-* Keeping metadata out of the UUID formula is a fundamental requirement in building flexible and scalable systems. FUNDAMENTAL.
+#### Exhaustive Metadata About An Object May Be Queried Using The Enterprise UID
+##### Metadata may also be printed on labels along with the EUID.
+* Keeping metadata out of the identifier formula is a fundamental requirement in building flexible and scalable systems.
 
-#### Trust The Database To Manage The UUIDs
+#### Trust The Database To Manage Internal UIDs
 
 ### Clear And Concise Data Model
 
@@ -1610,8 +1609,8 @@ more TEST.LOG
 ##### Assume Case Insensitivity In All File Names
 * Given we can not be certain where files will be reconstituted, we must assume that files might be created in a case insensitive file system when allowing download.
 
-##### Bloom UUIDs and EUIDs Are Safe As File Names
-A widely adopted UUID spec (and used by postgres), [rfc4122](https://datatracker.ietf.org/doc/html/rfc4122), treats uc and lc as the same character. Bloom EUIDs only contain uc characters in a prefix followed by integers.
+##### Bloom EUIDs Are Safe As File Names
+Bloom EUIDs only contain uppercase characters in a prefix followed by integers, which keeps them portable as file names across common file systems.
 
 ---
 
@@ -1709,9 +1708,6 @@ bobj = BloomObj(BLOOMdb3())
 # By EUID (format: PREFIX + sequence number, e.g., CX1234, WX100)
 obj = bobj.get_by_euid("CX1234")
 
-# By UUID
-obj = bobj.get_by_uuid("550e8400-e29b-41d4-a716-446655440000")
-
 # By type (templates)
 templates = bobj.query_template_by_component_v2(
     category="container",
@@ -1743,7 +1739,7 @@ results = bobj.search_objects(
 | Term | Definition |
 |------|------------|
 | **EUID** | Enterprise Unique Identifier - Prefix + sequence number (e.g., `CX123`, `WX1000`) |
-| **UUID** | Universally Unique Identifier - Standard 128-bit identifier |
+| **UID** | Database-managed internal identifier used for row-level relationships |
 | **Template** | Blueprint for creating object instances |
 | **Instance** | Actual object created from a template |
 | **Lineage** | Parent-child relationship between objects |

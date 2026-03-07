@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -19,11 +17,11 @@ class GroupMemberAddRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
 
 
-def _parse_uuid(value: str, *, field_name: str) -> uuid.UUID:
-    try:
-        return uuid.UUID(str(value))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid {field_name}") from exc
+def _require_id(value: str | None, *, field_name: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}")
+    return normalized
 
 
 @router.get("/groups")
@@ -85,15 +83,15 @@ async def add_group_member(
     payload: GroupMemberAddRequest,
     user: APIUser = Depends(require_admin),
 ):
-    actor_uuid = _parse_uuid(user.user_id, field_name="authenticated user_id")
-    member_uuid = _parse_uuid(payload.user_id, field_name="user_id")
+    actor_user_id = _require_id(user.user_id, field_name="authenticated user_id")
+    member_user_id = _require_id(payload.user_id, field_name="user_id")
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = GroupService(bdb.session)
         member = service.add_user_to_group(
             group_code=group_code,
-            user_id=member_uuid,
-            added_by=actor_uuid,
+            user_id=member_user_id,
+            added_by=actor_user_id,
         )
         return {
             "id": str(member.id),
@@ -114,15 +112,15 @@ async def remove_group_member(
     member_user_id: str,
     user: APIUser = Depends(require_admin),
 ):
-    actor_uuid = _parse_uuid(user.user_id, field_name="authenticated user_id")
-    member_uuid = _parse_uuid(member_user_id, field_name="member_user_id")
+    actor_user_id = _require_id(user.user_id, field_name="authenticated user_id")
+    normalized_member_user_id = _require_id(member_user_id, field_name="member_user_id")
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = GroupService(bdb.session)
         removed = service.remove_user_from_group(
             group_code=group_code,
-            user_id=member_uuid,
-            removed_by=actor_uuid,
+            user_id=normalized_member_user_id,
+            removed_by=actor_user_id,
         )
         if removed is None:
             raise HTTPException(status_code=404, detail="Group membership not found")
@@ -171,14 +169,14 @@ async def revoke_admin_user_token(
     token_id: str,
     user: APIUser = Depends(require_admin),
 ):
-    actor_uuid = _parse_uuid(user.user_id, field_name="authenticated user_id")
-    token_uuid = _parse_uuid(token_id, field_name="token_id")
+    actor_user_id = _require_id(user.user_id, field_name="authenticated user_id")
+    normalized_token_id = _require_id(token_id, field_name="token_id")
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
         revoked = service.revoke_token(
-            token_id=token_uuid,
-            actor_user_id=actor_uuid,
+            token_id=normalized_token_id,
+            actor_user_id=actor_user_id,
             actor_roles=user.roles,
         )
         if revoked is None:
@@ -201,11 +199,11 @@ async def get_admin_token_usage(
     limit: int = Query(100, ge=1, le=2000),
     user: APIUser = Depends(require_admin),
 ):
-    token_uuid = _parse_uuid(token_id, field_name="token_id")
+    normalized_token_id = _require_id(token_id, field_name="token_id")
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
-        usage_rows = service.repo.get_usage_logs(token_id=token_uuid, limit=limit)
+        usage_rows = service.repo.get_usage_logs(token_id=normalized_token_id, limit=limit)
         return {
             "items": [
                 {

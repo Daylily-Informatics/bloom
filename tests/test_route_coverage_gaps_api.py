@@ -148,7 +148,13 @@ def test_containers_content_link_layout_and_delete(client: TestClient, bdb) -> N
             },
         )
     assert create_container.status_code == 200, create_container.text
-    container_euid = create_container.json()["euid"]
+    create_container_payload = create_container.json()
+    assert "uuid" not in create_container_payload
+    container_euid = create_container_payload["euid"]
+
+    container_get = client.get(f"/api/v1/containers/{container_euid}")
+    assert container_get.status_code == 200, container_get.text
+    assert "uuid" not in container_get.json()
 
     create_sample = client.post(
         "/api/v1/content/samples",
@@ -158,7 +164,13 @@ def test_containers_content_link_layout_and_delete(client: TestClient, bdb) -> N
         },
     )
     assert create_sample.status_code == 200, create_sample.text
-    content_euid = create_sample.json()["euid"]
+    create_sample_payload = create_sample.json()
+    assert "uuid" not in create_sample_payload
+    content_euid = create_sample_payload["euid"]
+
+    content_get = client.get(f"/api/v1/content/{content_euid}")
+    assert content_get.status_code == 200, content_get.text
+    assert "uuid" not in content_get.json()
 
     # Place content in container (API v1 route)
     link_resp = client.post(
@@ -190,23 +202,31 @@ def test_content_create_update_and_delete_endpoints(client: TestClient, bdb) -> 
         json={"template_euid": sample_template, "name": "gdna-sample"},
     )
     assert sample.status_code == 200, sample.text
-    sample_euid = sample.json()["euid"]
+    sample_payload = sample.json()
+    assert "uuid" not in sample_payload
+    sample_euid = sample_payload["euid"]
 
     specimen = client.post(
         "/api/v1/content/specimens",
         json={"template_euid": specimen_template, "name": "blood-specimen", "specimen_type": "blood"},
     )
     assert specimen.status_code == 200, specimen.text
+    assert "uuid" not in specimen.json()
 
     reagent = client.post(
         "/api/v1/content/reagents",
         json={"template_euid": reagent_template, "name": "naoh-reagent", "reagent_type": "naoh"},
     )
     assert reagent.status_code == 200, reagent.text
+    assert "uuid" not in reagent.json()
 
     with patch("bloom_lims.integrations.atlas.events.emit_bloom_event", return_value=None):
         update = client.put(f"/api/v1/content/{sample_euid}", json={"name": "updated-name"})
     assert update.status_code == 200, update.text
+
+    updated_sample = client.get(f"/api/v1/content/{sample_euid}")
+    assert updated_sample.status_code == 200, updated_sample.text
+    assert "uuid" not in updated_sample.json()
 
 
 def test_objects_crud_endpoints(client: TestClient) -> None:
@@ -221,7 +241,13 @@ def test_objects_crud_endpoints(client: TestClient) -> None:
         },
     )
     assert create.status_code == 200, create.text
-    euid = create.json()["euid"]
+    create_payload = create.json()
+    assert "uuid" not in create_payload
+    euid = create_payload["euid"]
+
+    get_resp = client.get(f"/api/v1/objects/{euid}")
+    assert get_resp.status_code == 200, get_resp.text
+    assert "uuid" not in get_resp.json()
 
     update = client.put(f"/api/v1/objects/{euid}", json={"name": "coverage-object-updated"})
     assert update.status_code == 200, update.text
@@ -253,9 +279,26 @@ def test_lineages_create_and_delete(client: TestClient) -> None:
         json={"parent_euid": parent["euid"], "child_euid": child["euid"], "relationship_type": "generic"},
     )
     assert create.status_code == 200, create.text
-    lineage_uuid = create.json()["uuid"]
+    create_payload = create.json()
+    assert "uuid" not in create_payload
+    lineage_euid = create_payload["euid"]
 
-    delete = client.delete(f"/api/v1/lineages/{lineage_uuid}")
+    listing = client.get(
+        "/api/v1/lineages/",
+        params={"parent_euid": parent["euid"], "child_euid": child["euid"]},
+    )
+    assert listing.status_code == 200, listing.text
+    listing_payload = listing.json()
+    assert any(
+        item["euid"] == lineage_euid
+        and item["parent_euid"] == parent["euid"]
+        and item["child_euid"] == child["euid"]
+        for item in listing_payload["items"]
+    )
+    for item in listing_payload["items"]:
+        assert "uuid" not in item
+
+    delete = client.delete(f"/api/v1/lineages/{lineage_euid}")
     assert delete.status_code == 200, delete.text
 
 
@@ -265,7 +308,13 @@ def test_subjects_workflows_and_steps(client: TestClient, bdb) -> None:
 
     subj = client.post("/api/v1/subjects/", json={"template_euid": subj_template, "name": "subj-1", "external_id": "X1"})
     assert subj.status_code == 200, subj.text
-    subj_euid = subj.json()["euid"]
+    subj_payload = subj.json()
+    assert "uuid" not in subj_payload
+    subj_euid = subj_payload["euid"]
+
+    subj_get = client.get(f"/api/v1/subjects/{subj_euid}")
+    assert subj_get.status_code == 200, subj_get.text
+    assert "uuid" not in subj_get.json()
 
     subj_update = client.put(f"/api/v1/subjects/{subj_euid}", json={"status": "active"})
     assert subj_update.status_code == 200, subj_update.text
@@ -275,7 +324,13 @@ def test_subjects_workflows_and_steps(client: TestClient, bdb) -> None:
 
     wf = client.post(f"/api/v1/workflows/?template_euid={wf_template}&name=coverage-workflow")
     assert wf.status_code == 200, wf.text
-    wf_euid = wf.json()["euid"]
+    wf_payload = wf.json()
+    assert "uuid" not in wf_payload
+    wf_euid = wf_payload["euid"]
+
+    wf_get = client.get(f"/api/v1/workflows/{wf_euid}")
+    assert wf_get.status_code == 200, wf_get.text
+    assert "uuid" not in wf_get.json()
 
     wf_update = client.put(f"/api/v1/workflows/{wf_euid}?status=in_progress", json={"properties": {"note": "x"}})
     assert wf_update.status_code == 200, wf_update.text
@@ -283,6 +338,8 @@ def test_subjects_workflows_and_steps(client: TestClient, bdb) -> None:
     steps = client.get(f"/api/v1/workflows/{wf_euid}/steps")
     assert steps.status_code == 200, steps.text
     assert steps.json()["workflow_euid"] == wf_euid
+    for step in steps.json()["steps"]:
+        assert "uuid" not in step
 
 
 def test_equipment_create_and_maintenance(client: TestClient, bdb) -> None:
@@ -297,7 +354,13 @@ def test_equipment_create_and_maintenance(client: TestClient, bdb) -> None:
         },
     )
     assert eq.status_code == 200, eq.text
-    eq_euid = eq.json()["euid"]
+    eq_payload = eq.json()
+    assert "uuid" not in eq_payload
+    eq_euid = eq_payload["euid"]
+
+    eq_get = client.get(f"/api/v1/equipment/{eq_euid}")
+    assert eq_get.status_code == 200, eq_get.text
+    assert "uuid" not in eq_get.json()
 
     maint = client.post(
         f"/api/v1/equipment/{eq_euid}/maintenance",
@@ -314,6 +377,7 @@ def test_equipment_create_and_maintenance(client: TestClient, bdb) -> None:
 def test_file_sets_and_files_create_endpoints(client: TestClient) -> None:
     file_set = client.post("/api/v1/file-sets/", json={"name": "fs-coverage", "file_type": "generic"})
     assert file_set.status_code == 200, file_set.text
+    assert "uuid" not in file_set.json()
 
     def _fake_file(*_args, **_kwargs):
         return SimpleNamespace(
@@ -328,3 +392,4 @@ def test_file_sets_and_files_create_endpoints(client: TestClient) -> None:
             data={"file_metadata": json.dumps({"name": "file-coverage"})},
         )
         assert resp.status_code == 200, resp.text
+        assert "uuid" not in resp.json()

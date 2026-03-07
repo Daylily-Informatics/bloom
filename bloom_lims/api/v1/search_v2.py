@@ -83,7 +83,6 @@ async def search_v2_export(
             headers = [
                 "record_type",
                 "euid",
-                "uuid",
                 "name",
                 "category",
                 "type",
@@ -100,7 +99,6 @@ async def search_v2_export(
                     [
                         item.get("record_type", ""),
                         item.get("euid", ""),
-                        item.get("uuid", ""),
                         item.get("name", ""),
                         item.get("category", ""),
                         item.get("type", ""),

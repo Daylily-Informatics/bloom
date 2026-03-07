@@ -32,8 +32,8 @@ class _FakeTemplate:
 
 
 class _FakeLineage:
-    parent_instance_uuid = "parent_instance_uuid"
-    child_instance_uuid = "child_instance_uuid"
+    parent_instance_uid = "parent_instance_uid"
+    child_instance_uid = "child_instance_uid"
     relationship_type = "relationship_type"
     is_deleted = "is_deleted"
 
@@ -41,12 +41,12 @@ class _FakeLineage:
 class _FakeInstance:
     euid = "euid"
     is_deleted = "is_deleted"
-    uuid = "uuid"
+    uid = "uid"
 
 
 def _fake_bobj_for_object_detail(euid: str = "CX-TEST"):
     fake_instance = _FakeInstance()
-    fake_instance.uuid = "uuid-1"
+    fake_instance.uid = 101
     fake_instance.euid = euid
     fake_instance.name = "Test Container"
     fake_instance.type = "tube"
@@ -71,9 +71,9 @@ def _fake_bobj_for_object_detail(euid: str = "CX-TEST"):
 
 
 def _fake_bobj_for_lineage_create(existing_lineage=False):
-    parent_obj = SimpleNamespace(uuid="parent-uuid", euid="PARENT-1")
-    child_obj = SimpleNamespace(uuid="child-uuid", euid="CHILD-1")
-    found_existing = SimpleNamespace(uuid="lineage-existing") if existing_lineage else None
+    parent_obj = SimpleNamespace(uid=11, euid="PARENT-1")
+    child_obj = SimpleNamespace(uid=22, euid="CHILD-1")
+    found_existing = SimpleNamespace(euid="LN-EXISTING") if existing_lineage else None
 
     class _FakeQuery:
         def __init__(self, value):
@@ -119,7 +119,6 @@ def _fake_bobj_for_lineage_create(existing_lineage=False):
     )
     fake_bobj.create_generic_instance_lineage_by_euids.return_value = SimpleNamespace(
         euid="LN-NEW",
-        uuid="ln-uuid-1",
     )
     return fake_bobj
 
@@ -148,7 +147,7 @@ def _fake_bobj_for_delete():
 
 class TestGraphViewerRoutes:
     def test_dindex2_renders_graph_bootstrap(self, client):
-        response = client.get("/dindex2?globalStartNodeEUID=AY1&globalFilterLevel=4")
+        response = client.get("/dindex2?start_euid=AY1&depth=4")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "/static/js/graph.js" in response.text
@@ -160,13 +159,9 @@ class TestGraphViewerRoutes:
         assert "I + left click node" in response.text
         assert "initGraphPage()" in response.text
 
-    def test_graph_alias_redirects_to_dindex2(self, client):
+    def test_graph_alias_route_removed(self, client):
         response = client.get("/graph?start_euid=AY1&depth=3", follow_redirects=False)
-        assert response.status_code == 307
-        location = response.headers["location"]
-        assert location.startswith("/dindex2?")
-        assert "globalStartNodeEUID=AY1" in location
-        assert "globalFilterLevel=3" in location
+        assert response.status_code == 404
 
 
 class TestGraphViewerApis:
@@ -244,8 +239,22 @@ class TestGraphViewerApis:
         assert payload["euid"] == "CX-TEST"
         assert payload["category"] == "container"
         assert payload["type"] == "instance"
+        assert "uuid" not in payload
         assert "btype" not in payload
         assert "b_sub_type" not in payload
+
+    def test_get_node_info_returns_payload_without_uuid(self, client):
+        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ):
+            response = client.get("/get_node_info?euid=CX-TEST")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["euid"] == "CX-TEST"
+        assert payload["name"] == "Test Container"
+        assert "uuid" not in payload
 
     def test_api_lineage_rejects_non_admin(self, client):
         def _non_admin_auth():
@@ -275,6 +284,7 @@ class TestGraphViewerApis:
         payload = response.json()
         assert payload["success"] is True
         assert payload["euid"] == "LN-NEW"
+        assert "uuid" not in payload
 
     def test_api_lineage_duplicate_returns_409(self, client):
         fake_bobj = _fake_bobj_for_lineage_create(existing_lineage=True)
@@ -286,6 +296,32 @@ class TestGraphViewerApis:
                 json={"parent_euid": "PARENT-1", "child_euid": "CHILD-1", "relationship_type": "generic"},
             )
         assert response.status_code == 409
+
+    def test_add_new_edge_rejects_legacy_uuid_keys(self, client):
+        response = client.post(
+            "/add_new_edge",
+            json={"parent_uuid": "PARENT-1", "child_uuid": "CHILD-1"},
+        )
+
+        assert response.status_code == 400
+        assert "parent_euid and child_euid are required" in response.text
+
+    def test_add_new_edge_accepts_euid_keys(self, client):
+        fake_bobj = MagicMock()
+        fake_bobj.create_generic_instance_lineage_by_euids.return_value = SimpleNamespace(euid="LN-EDGE")
+
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ):
+            response = client.post(
+                "/add_new_edge",
+                json={"parent_euid": "PARENT-1", "child_euid": "CHILD-1"},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["euid"] == "LN-EDGE"
+        assert "uuid" not in payload
 
     def test_api_object_delete_rejects_non_admin(self, client):
         def _non_admin_auth():

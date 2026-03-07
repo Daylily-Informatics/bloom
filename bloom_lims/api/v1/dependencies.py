@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import uuid
 from typing import Any
 
 from fastapi import Depends, HTTPException, Header, Request
@@ -92,15 +91,6 @@ def _is_truthy(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _to_uuid(value: str | None) -> uuid.UUID | None:
-    if value is None:
-        return None
-    try:
-        return uuid.UUID(str(value))
-    except (TypeError, ValueError):
-        return None
-
-
 def _is_dev_bypass_active() -> bool:
     bypass = _is_truthy(os.environ.get("BLOOM_DEV_AUTH_BYPASS"))
     if not bypass:
@@ -149,8 +139,8 @@ def _resolve_roles_and_groups(
     fallback_role: str | None,
 ) -> tuple[list[str], list[str], list[str]]:
     normalized_fallback = map_legacy_role(fallback_role)
-    user_uuid = _to_uuid(user_id)
-    if user_uuid is None:
+    normalized_user_id = str(user_id or "").strip()
+    if not normalized_user_id:
         roles = normalize_roles([normalized_fallback], fallback=normalized_fallback)
         permissions = sorted(effective_permissions(roles))
         return roles, [], permissions
@@ -159,7 +149,7 @@ def _resolve_roles_and_groups(
     try:
         groups = GroupService(bdb.session)
         resolution = groups.resolve_user_roles_and_groups(
-            user_id=user_uuid,
+            user_id=normalized_user_id,
             fallback_role=normalized_fallback,
         )
         permissions = sorted(effective_permissions(resolution.roles))
@@ -281,7 +271,7 @@ async def get_api_user(
     if _is_dev_bypass_active():
         return APIUser(
             email="api-dev@daylilyinformatics.com",
-            user_id="00000000-0000-0000-0000-000000000001",
+            user_id="dev-bypass-admin",
             roles=[Role.ADMIN.value],
             groups=[Role.ADMIN.value, API_ACCESS_GROUP],
             permissions=sorted(permission.value for permission in Permission),

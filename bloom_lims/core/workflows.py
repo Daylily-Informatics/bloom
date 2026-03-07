@@ -3,9 +3,6 @@ BLOOM LIMS Workflows Module
 
 This module contains workflow and workflow step functionality for BLOOM LIMS.
 Workflows manage the processing pipeline for samples and other lab objects.
-
-For backward compatibility, this module re-exports functionality that was
-originally in bloom_lims/bobjs.py.
 """
 
 import logging
@@ -23,6 +20,47 @@ from bloom_lims.exceptions import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _workflow_step_number(step: Any) -> Optional[int]:
+    json_addl = step.json_addl if isinstance(step.json_addl, dict) else {}
+    properties = json_addl.get('properties', {})
+    raw_value = properties.get('step_number', json_addl.get('step_number'))
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _workflow_step_sort_key(step: Any) -> tuple[int, str]:
+    step_number = _workflow_step_number(step)
+    return (step_number if step_number is not None else 10**9, getattr(step, 'euid', ''))
+
+
+def _attach_step_to_workflow(session: Session, base, workflow: Any, step: Any) -> None:
+    lineage_class = getattr(base.classes, 'generic_instance_lineage')
+    parent_category = getattr(workflow, 'category', None) or 'workflow'
+    child_category = getattr(step, 'category', None) or 'workflow_step'
+    lineage = lineage_class(
+        parent_instance_uid=workflow.uid,
+        child_instance_uid=step.uid,
+        name=f"{workflow.name} :: {step.name}",
+        type=workflow.type,
+        subtype=workflow.subtype,
+        version=workflow.version,
+        json_addl=workflow.json_addl or {},
+        bstatus=workflow.bstatus,
+        category='generic',
+        parent_type=(
+            f"{parent_category}:{workflow.type}:{workflow.subtype}:{workflow.version}"
+        ),
+        child_type=(
+            f"{child_category}:{step.type}:{step.subtype}:{step.version}"
+        ),
+        polymorphic_discriminator='generic_instance_lineage',
+        relationship_type='generic',
+    )
+    session.add(lineage)
 
 
 class BloomWorkflowMixin:
@@ -168,22 +206,24 @@ def create_workflow_step(
 
     try:
         step_class = getattr(base.classes, 'workflow_step_instance')
+        step_json = dict(json_addl or {})
+        properties = dict(step_json.get('properties') or {})
+        properties.setdefault('step_number', step_number)
+        step_json['properties'] = properties
 
         step = step_class(
             name=name,
             type=step_type.lower(),
-            json_addl={
-                'step_number': step_number,
-                **(json_addl or {}),
-            },
+            json_addl=step_json,
             bstatus='pending',
             category='workflow_step',
             polymorphic_discriminator='workflow_step_instance',
-            parent_workflow_uuid=workflow.uuid,
             **kwargs,
         )
 
         session.add(step)
+        session.flush()
+        _attach_step_to_workflow(session, base, workflow, step)
         session.flush()
         return step
 
@@ -234,7 +274,7 @@ def get_workflow_by_euid(
 def get_workflow_steps(
     session: Session,
     base,
-    workflow_uuid: str,
+    workflow_euid: str,
     status: Optional[str] = None,
 ) -> List[Any]:
     """
@@ -243,26 +283,35 @@ def get_workflow_steps(
     Args:
         session: SQLAlchemy session
         base: SQLAlchemy automap base
-        workflow_uuid: Parent workflow UUID
+        workflow_euid: Parent workflow EUID
         status: Filter by status (optional)
 
     Returns:
         List of workflow step objects
     """
-    logger.debug(f"Getting steps for workflow: {workflow_uuid}")
+    logger.debug(f"Getting steps for workflow: {workflow_euid}")
 
     try:
-        query = session.query(base.classes.workflow_step_instance).filter(
-            base.classes.workflow_step_instance.parent_workflow_uuid == workflow_uuid
-        )
+        workflow = get_workflow_by_euid(session, base, workflow_euid, include_steps=False)
+        if not workflow:
+            return []
 
-        if status:
-            query = query.filter(
-                base.classes.workflow_step_instance.bstatus == status
-            )
+        steps = []
+        for lineage in getattr(workflow, 'parent_of_lineages', []) or []:
+            if getattr(lineage, 'is_deleted', False):
+                continue
 
-        # Order by step number from json_addl
-        return query.all()
+            step = getattr(lineage, 'child_instance', None)
+            if step is None or getattr(step, 'is_deleted', False):
+                continue
+            if getattr(step, 'category', None) != 'workflow_step':
+                continue
+            if status and getattr(step, 'bstatus', None) != status:
+                continue
+            steps.append(step)
+
+        steps.sort(key=_workflow_step_sort_key)
+        return steps
 
     except Exception as e:
         logger.error(f"Error getting workflow steps: {e}")
@@ -309,8 +358,11 @@ def advance_workflow(
             action="advance"
         )
 
+    if not isinstance(workflow.json_addl, dict):
+        workflow.json_addl = {}
+
     # Get current step and mark as complete
-    steps = get_workflow_steps(session, base, workflow.uuid, status='pending')
+    steps = get_workflow_steps(session, base, workflow.euid, status='pending')
     if not steps:
         workflow.bstatus = 'complete'
         workflow.json_addl['completed_at'] = datetime.utcnow().isoformat()
@@ -320,6 +372,8 @@ def advance_workflow(
     # Complete current step
     current_step = steps[0]
     current_step.bstatus = 'completed'
+    if not isinstance(current_step.json_addl, dict):
+        current_step.json_addl = {}
     current_step.json_addl['completed_at'] = datetime.utcnow().isoformat()
     if completed_by:
         current_step.json_addl['completed_by'] = completed_by
@@ -327,22 +381,21 @@ def advance_workflow(
         current_step.json_addl['result'] = step_result
 
     # Check if more steps remain
-    remaining_steps = get_workflow_steps(session, base, workflow.uuid, status='pending')
+    remaining_steps = get_workflow_steps(session, base, workflow.euid, status='pending')
     if not remaining_steps:
         workflow.bstatus = 'complete'
         workflow.json_addl['completed_at'] = datetime.utcnow().isoformat()
     else:
         workflow.bstatus = 'in_progress'
-        workflow.json_addl['current_step'] = remaining_steps[0].json_addl.get('step_number', 1)
+        workflow.json_addl['current_step'] = _workflow_step_number(remaining_steps[0]) or 1
 
     session.flush()
     return workflow
 
 
-# Re-export BloomWorkflow and BloomWorkflowStep for backward compatibility
+# Export workflow object aliases via BloomObj.
 try:
     from bloom_lims.bobjs import BloomObj as _BloomObj
-    # These would be specific workflow classes if defined separately
     BloomWorkflow = _BloomObj
     BloomWorkflowStep = _BloomObj
 except ImportError:

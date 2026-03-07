@@ -152,7 +152,6 @@ def get_container_contents(
                 contents.append({
                     'position': pos,
                     'euid': obj_info.get('euid'),
-                    'uuid': obj_info.get('uuid'),
                     'name': obj_info.get('name'),
                     'type': obj_info.get('type'),
                 })
@@ -237,7 +236,6 @@ def place_in_container(
         # Place object
         container.json_addl['contents'][position] = {
             'euid': obj.euid,
-            'uuid': str(obj.uuid),
             'name': obj.name,
             'type': obj.type,
             'placed_at': __import__('datetime').datetime.utcnow().isoformat(),

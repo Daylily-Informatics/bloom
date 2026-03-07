@@ -120,7 +120,6 @@ class UserSchema(UserBaseSchema, TimestampMixin):
     """Schema for user API responses."""
     
     id: str = Field(..., description="User ID")
-    uuid: Optional[str] = Field(None, description="User UUID")
     is_active: bool = Field(default=True, description="Account active flag")
     is_verified: bool = Field(default=False, description="Email verified flag")
     roles: List[str] = Field(default_factory=list, description="User roles")

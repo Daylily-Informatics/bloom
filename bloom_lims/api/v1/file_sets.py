@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from bloom_lims.db import get_parent_lineages
 from .dependencies import require_api_auth, APIUser
 
 
@@ -67,7 +68,6 @@ async def list_file_sets(
             "items": [
                 {
                     "euid": fs.euid,
-                    "uuid": str(fs.uuid),
                     "name": fs.name,
                     "file_type": fs.subtype,
                     "status": fs.bstatus,
@@ -99,7 +99,7 @@ async def get_file_set(euid: str, user: APIUser = Depends(require_api_auth)):
 
         # Get files in set
         files = []
-        for lineage in file_set.parent_of_lineages:
+        for lineage in get_parent_lineages(file_set):
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
@@ -112,7 +112,6 @@ async def get_file_set(euid: str, user: APIUser = Depends(require_api_auth)):
 
         return {
             "euid": file_set.euid,
-            "uuid": str(file_set.uuid),
             "name": file_set.name,
             "file_type": file_set.subtype,
             "status": file_set.bstatus,
@@ -139,7 +138,7 @@ async def create_file_set(
 
         bo = BloomObj(bdb)
 
-        # Instances must be created from templates in TapDB (template_uuid is NOT NULL).
+        # Instances must be created from templates in TapDB (template_uid is required).
         subtype = (data.file_type or "generic").strip().lower() or "generic"
         templates = bo.query_template_by_component_v2("file", "file_set", subtype, "1.0")
         if not templates and subtype != "generic":
@@ -172,7 +171,6 @@ async def create_file_set(
         return {
             "success": True,
             "euid": file_set.euid,
-            "uuid": str(file_set.uuid),
             "message": "File set created successfully",
         }
     except HTTPException:

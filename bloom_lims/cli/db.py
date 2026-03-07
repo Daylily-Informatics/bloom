@@ -22,6 +22,8 @@ from bloom_lims.config import (
 
 console = Console()
 
+_DEFAULT_AUDIT_LOG_EUID_PREFIX = "TAG"
+
 
 def _bloom_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -68,10 +70,15 @@ def _ensure_schema_available_for_bloom_root() -> None:
     if source is None:
         return
 
+    if target.is_symlink():
+        target.unlink()
+
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         target.symlink_to(source)
     except Exception:
+        if target.exists() or target.is_symlink():
+            target.unlink()
         shutil.copy2(source, target)
 
 
@@ -110,6 +117,75 @@ def _local_pg_port(env_name: str) -> str:
     ).strip()
 
 
+def _local_ui_port(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_UI_PORT"
+    return (env.get(scoped_key) or env.get("BLOOM_UI_PORT") or "8912").strip()
+
+
+def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_AUDIT_LOG_EUID_PREFIX"
+    return (
+        env.get(scoped_key)
+        or env.get("BLOOM_TAPDB_AUDIT_LOG_EUID_PREFIX")
+        or _DEFAULT_AUDIT_LOG_EUID_PREFIX
+    ).strip()
+
+
+def _tapdb_support_email(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_SUPPORT_EMAIL"
+    return (
+        env.get(scoped_key)
+        or env.get("BLOOM_UI__SUPPORT_EMAIL")
+        or get_settings().ui.support_email
+    ).strip()
+
+
+def _tapdb_namespace_config_path(client_id: str, database_name: str) -> Path:
+    env = _runtime_env()
+    explicit_path = (env.get("TAPDB_CONFIG_PATH") or "").strip()
+    if explicit_path:
+        return Path(explicit_path).expanduser()
+    return Path.home() / ".config" / "tapdb" / client_id / database_name / "tapdb-config.yaml"
+
+
+def _normalize_tapdb_namespace_config(env_name: str, client_id: str, database_name: str) -> None:
+    import yaml
+
+    config_path = _tapdb_namespace_config_path(client_id, database_name)
+    if not config_path.exists():
+        return
+
+    with config_path.open(encoding="utf-8") as handle:
+        root = yaml.safe_load(handle) or {}
+    if not isinstance(root, dict):
+        return
+
+    envs = root.get("environments")
+    if not isinstance(envs, dict):
+        return
+
+    env_cfg = envs.get(env_name)
+    if not isinstance(env_cfg, dict):
+        return
+
+    updated = False
+    if not str(env_cfg.get("audit_log_euid_prefix") or "").strip():
+        env_cfg["audit_log_euid_prefix"] = _tapdb_audit_log_euid_prefix(env_name)
+        updated = True
+    if not str(env_cfg.get("support_email") or "").strip():
+        env_cfg["support_email"] = _tapdb_support_email(env_name)
+        updated = True
+    if not updated:
+        return
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with config_path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(root, handle, sort_keys=False)
+
+
 def _run_tapdb(args: List[str], check: bool = True) -> int:
     cmd = _tapdb_base_cmd() + args
     env = _runtime_env()
@@ -117,6 +193,37 @@ def _run_tapdb(args: List[str], check: bool = True) -> int:
     if check and result.returncode != 0:
         raise SystemExit(result.returncode)
     return result.returncode
+
+
+def _ensure_tapdb_namespace_config(env_name: str) -> None:
+    """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
+    env = _runtime_env()
+    client_id = (env.get("TAPDB_CLIENT_ID") or "").strip()
+    database_name = (env.get("TAPDB_DATABASE_NAME") or "").strip()
+    if not client_id or not database_name:
+        return
+
+    args = [
+        "config",
+        "init",
+        "--client-id",
+        client_id,
+        "--database-name",
+        database_name,
+        "--env",
+        env_name,
+    ]
+    if env_name in {"dev", "test"}:
+        args.extend(
+            [
+                "--db-port",
+                f"{env_name}={_local_pg_port(env_name)}",
+                "--ui-port",
+                f"{env_name}={_local_ui_port(env_name)}",
+            ]
+        )
+    _run_tapdb(args)
+    _normalize_tapdb_namespace_config(env_name, client_id, database_name)
 
 
 def _seed_bloom_templates() -> None:
@@ -167,6 +274,7 @@ def db_init(force: bool):
     """Initialize database/runtime via tapdb orchestration."""
     env_name = _current_env()
     console.print(f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]")
+    _ensure_tapdb_namespace_config(env_name)
 
     if env_name in {"dev", "test"}:
         _ensure_schema_available_for_bloom_root()

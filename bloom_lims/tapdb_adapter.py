@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from typing import Optional
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from daylily_tapdb import TAPDBConnection
 from daylily_tapdb.models.audit import audit_log
@@ -68,23 +68,83 @@ from bloom_lims.config import get_tapdb_db_config
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
 
 
-def _translate_bloom_kwargs(kwargs: dict) -> dict:
-    """Preserve kwargs as-is using canonical TapDB field names."""
-    return dict(kwargs)
+class _LineageQueryProxy:
+    """Lightweight proxy that preserves iterable/.all() behavior for lineage access."""
+
+    def __init__(self, query):
+        self._query = query
+
+    def __iter__(self):
+        return iter(self._query)
+
+    def __len__(self):
+        if isinstance(self._query, list):
+            return len(self._query)
+        return self._query.count()
+
+    def __bool__(self):
+        if isinstance(self._query, list):
+            return bool(self._query)
+        return self._query.first() is not None
+
+    def all(self):
+        if isinstance(self._query, list):
+            return list(self._query)
+        return self._query.all()
+
+    def first(self):
+        if isinstance(self._query, list):
+            return self._query[0] if self._query else None
+        return self._query.first()
+
+    def count(self):
+        if isinstance(self._query, list):
+            return len(self._query)
+        return self._query.count()
+
+    def __getitem__(self, item):
+        return self._query[item]
+
+    def __getattr__(self, name):
+        return getattr(self._query, name)
 
 
-def _patch_init_for_bloom_compat(cls) -> None:
-    """Patch class __init__ once to preserve constructor passthrough."""
-    if getattr(cls, "__bloom_init_patched__", False):
-        return
+def _query_lineages_for_instance(instance, *, fk_attr_name: str):
+    """Return a query-like proxy for lineage traversal using canonical TapDB FKs."""
+    session = object_session(instance)
+    if session is None:
+        return _LineageQueryProxy([])
 
-    original_init = cls.__init__
+    lineage_attr = getattr(generic_instance_lineage, fk_attr_name)
+    query = session.query(generic_instance_lineage).filter(lineage_attr == instance.uid)
+    return _LineageQueryProxy(query)
 
-    def patched_init(self, **kwargs):
-        original_init(self, **_translate_bloom_kwargs(kwargs))
 
-    cls.__init__ = patched_init
-    cls.__bloom_init_patched__ = True
+def get_parent_lineages(instance):
+    """Return parent->child lineages using canonical TapDB FKs."""
+    return _query_lineages_for_instance(instance, fk_attr_name="parent_instance_uid")
+
+
+def get_child_lineages(instance):
+    """Return child->parent lineages using canonical TapDB FKs."""
+    return _query_lineages_for_instance(instance, fk_attr_name="child_instance_uid")
+
+
+def _query_instance_for_lineage(lineage, *, fk_attr_name: str):
+    """Resolve parent/child instance via explicit query against canonical TapDB FKs."""
+    session = object_session(lineage)
+    if session is None:
+        return None
+
+    instance_uid = getattr(lineage, fk_attr_name, None)
+    if instance_uid is None:
+        return None
+
+    return (
+        session.query(generic_instance)
+        .filter(generic_instance.uid == instance_uid)
+        .first()
+    )
 
 
 file_set_template = file_template
@@ -260,7 +320,6 @@ class BLOOMdb3:
         ]
 
         for cls in classes_to_register:
-            _patch_init_for_bloom_compat(cls)
             setattr(self.Base.classes, cls.__name__, cls)
 
         setattr(self.Base.classes, "file_set_template", file_template)
@@ -346,5 +405,7 @@ __all__ = [
     "file_reference_instance",
     "file_set_instance_lineage",
     "file_reference_instance_lineage",
+    "get_parent_lineages",
+    "get_child_lineages",
     "audit_log",
 ]

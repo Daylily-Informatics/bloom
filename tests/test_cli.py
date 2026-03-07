@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from bloom_lims.cli import cli
 
+db_commands = importlib.import_module("bloom_lims.cli.db")
 gui_commands = importlib.import_module("bloom_lims.cli.gui")
 
 
@@ -105,6 +106,144 @@ class TestDbSubcommands:
         result = runner.invoke(cli, ["db", "init", "--help"])
         assert result.exit_code == 0
 
+    def test_db_init_bootstraps_tapdb_namespace_config(self, runner, monkeypatch):
+        """db init should create namespaced TapDB config before local startup."""
+        calls = []
+
+        monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+        monkeypatch.setattr(
+            db_commands,
+            "_runtime_env",
+            lambda: {
+                "TAPDB_ENV": "dev",
+                "TAPDB_CLIENT_ID": "bloom",
+                "TAPDB_DATABASE_NAME": "bloom",
+            },
+        )
+        monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+        monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "5566")
+        monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: "8912")
+        monkeypatch.setattr(
+            db_commands,
+            "_run_tapdb",
+            lambda args, check=True: calls.append((args, check)) or 0,
+        )
+        monkeypatch.setattr(db_commands, "_seed_tapdb_templates", lambda *args, **kwargs: None)
+        monkeypatch.setattr(db_commands, "_seed_bloom_templates", lambda: None)
+
+        result = runner.invoke(cli, ["db", "init"])
+
+        assert result.exit_code == 0
+        assert calls[:4] == [
+            (
+                [
+                    "config",
+                    "init",
+                    "--client-id",
+                    "bloom",
+                    "--database-name",
+                    "bloom",
+                    "--env",
+                    "dev",
+                    "--db-port",
+                    "dev=5566",
+                    "--ui-port",
+                    "dev=8912",
+                ],
+                True,
+            ),
+            (["pg", "init", "dev"], False),
+            (["pg", "start-local", "dev", "--port", "5566"], True),
+            (["db", "setup", "dev", "--include-workflow"], True),
+        ]
+
+    def test_ensure_tapdb_namespace_config_fills_required_metadata(
+        self, monkeypatch, tmp_path
+    ):
+        """TapDB namespace config bootstrap should fill Bloom-required metadata."""
+        calls = []
+        config_path = tmp_path / "tapdb-config.yaml"
+        config_path.write_text(
+            "\n".join(
+                [
+                    "meta:",
+                    "  config_version: 2",
+                    "  client_id: bloom",
+                    "  database_name: bloom",
+                    "environments:",
+                    "  dev:",
+                    "    engine_type: local",
+                    "    host: localhost",
+                    '    port: "5566"',
+                    '    ui_port: "8912"',
+                    '    user: "postgres"',
+                    '    password: ""',
+                    '    database: "tapdb_bloom_dev"',
+                    '    cognito_user_pool_id: ""',
+                    '    audit_log_euid_prefix: ""',
+                    '    support_email: ""',
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(
+            db_commands,
+            "_runtime_env",
+            lambda: {
+                "TAPDB_CLIENT_ID": "bloom",
+                "TAPDB_DATABASE_NAME": "bloom",
+            },
+        )
+        monkeypatch.setattr(
+            db_commands,
+            "_tapdb_namespace_config_path",
+            lambda _client_id, _database_name: config_path,
+        )
+        monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "5566")
+        monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: "8912")
+        monkeypatch.setattr(
+            db_commands,
+            "_tapdb_audit_log_euid_prefix",
+            lambda _env: "TAG",
+        )
+        monkeypatch.setattr(
+            db_commands,
+            "_tapdb_support_email",
+            lambda _env: "support@dyly.bio",
+        )
+        monkeypatch.setattr(
+            db_commands,
+            "_run_tapdb",
+            lambda args, check=True: calls.append((args, check)) or 0,
+        )
+
+        db_commands._ensure_tapdb_namespace_config("dev")
+
+        assert calls == [
+            (
+                [
+                    "config",
+                    "init",
+                    "--client-id",
+                    "bloom",
+                    "--database-name",
+                    "bloom",
+                    "--env",
+                    "dev",
+                    "--db-port",
+                    "dev=5566",
+                    "--ui-port",
+                    "dev=8912",
+                ],
+                True,
+            )
+        ]
+        text = config_path.read_text(encoding="utf-8")
+        assert 'audit_log_euid_prefix: TAG' in text
+        assert 'support_email: support@dyly.bio' in text
+
     def test_db_migrate_help(self, runner):
         """Test bloom db migrate --help."""
         result = runner.invoke(cli, ["db", "migrate", "--help"])
@@ -124,6 +263,31 @@ class TestDbSubcommands:
         """Test bloom db shell --help."""
         result = runner.invoke(cli, ["db", "shell", "--help"])
         assert result.exit_code == 0
+
+    def test_ensure_schema_available_replaces_broken_symlink(
+        self, tmp_path, monkeypatch
+    ):
+        """Dangling schema symlinks should be replaced before bootstrap."""
+        project_root = tmp_path / "project"
+        source = tmp_path / "tapdb" / "schema" / "tapdb_schema.sql"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("-- schema\n", encoding="utf-8")
+
+        target = project_root / "schema" / "tapdb_schema.sql"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.symlink_to(tmp_path / "missing" / "tapdb_schema.sql")
+
+        monkeypatch.setattr(db_commands, "_bloom_root", lambda: project_root)
+        monkeypatch.setattr(
+            db_commands,
+            "_resolve_tapdb_schema_source",
+            lambda: source,
+        )
+
+        db_commands._ensure_schema_available_for_bloom_root()
+
+        assert target.is_symlink()
+        assert target.resolve() == source.resolve()
 
 
 class TestGuiLocalhostPolicy:

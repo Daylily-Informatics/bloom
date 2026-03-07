@@ -95,14 +95,15 @@ def test_list_scripts_executes_handler(client: TestClient) -> None:
     assert "scripts" in resp.json()
 
 
-def test_graph_redirect_aliases(client: TestClient) -> None:
-    resp = client.get("/dag", params={"globalStartNodeEUID": "CX-1"}, follow_redirects=False)
-    assert resp.status_code == 307
-    assert "/dindex2" in resp.headers.get("location", "")
+def test_legacy_graph_alias_routes_are_removed(client: TestClient) -> None:
+    resp = client.get("/dag", params={"start_euid": "CX-1"}, follow_redirects=False)
+    assert resp.status_code == 404
 
     resp = client.get("/dag_explorer", follow_redirects=False)
-    assert resp.status_code == 307
-    assert "/dindex2" in resp.headers.get("location", "")
+    assert resp.status_code == 404
+
+    resp = client.get("/graph", params={"start_euid": "CX-1"}, follow_redirects=False)
+    assert resp.status_code == 404
 
 
 def test_cogs_and_node_info_routes(client: TestClient) -> None:
@@ -154,35 +155,29 @@ def test_queue_details_renders(client: TestClient) -> None:
     assert "text/html" in resp.headers.get("content-type", "")
 
 
-def test_uuid_details_update_object_name_and_undelete(client: TestClient) -> None:
+def test_legacy_uuid_alias_routes_are_removed(client: TestClient) -> None:
+    _warm_session(client)
+    details_resp = client.get("/uuid_details", params={"euid": "CX-REMOVED"}, follow_redirects=False)
+    assert details_resp.status_code == 404
+
+    restore_resp = client.get("/un_delete_by_uuid", params={"euid": "CX-REMOVED"}, follow_redirects=False)
+    assert restore_resp.status_code == 404
+
+    uuid_query_resp = client.get("/uuid_details", params={"uuid": "00000000-0000-0000-0000-000000000000"})
+    assert uuid_query_resp.status_code == 404
+
+
+def test_euid_details_page_does_not_emit_uuid_alias_links(client: TestClient) -> None:
     _warm_session(client)
     obj = client.post(
         "/api/v1/object-creation/create",
-        json={"category": "container", "type": "tube", "subtype": "tube-generic-10ml", "version": "1.0", "name": "uuid-tube"},
+        json={"category": "container", "type": "tube", "subtype": "tube-generic-10ml", "version": "1.0", "name": "alias-guard"},
     ).json()
 
-    resp = client.get("/uuid_details", params={"uuid": obj["uuid"]}, follow_redirects=False)
-    assert resp.status_code in (302, 303, 307)
-    assert "/euid_details" in resp.headers.get("location", "")
-
-    resp = client.get(
-        "/update_object_name",
-        params={"euid": obj["euid"], "name": "uuid-tube-updated"},
-        headers={"Referer": "/"},
-        follow_redirects=False,
-    )
-    assert resp.status_code == 303
-
-    # Soft-delete via API, then undelete via GUI helper.
-    del_resp = client.put(f"/api/v1/objects/{obj['euid']}", json={"is_deleted": True})
-    assert del_resp.status_code == 200, del_resp.text
-
-    resp = client.get(
-        "/un_delete_by_uuid",
-        params={"uuid": obj["uuid"], "euid": obj["euid"]},
-        follow_redirects=False,
-    )
-    assert resp.status_code == 303
+    resp = client.get("/euid_details", params={"euid": obj["euid"]})
+    assert resp.status_code == 200
+    assert "/uuid_details?uuid=" not in resp.text
+    assert f"/dindex2?start_euid={obj['euid']}" in resp.text
 
 
 def test_user_audit_logs_renders(client: TestClient) -> None:

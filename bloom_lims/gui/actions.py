@@ -60,7 +60,10 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
         for action_data in actions.values():
             if not isinstance(action_data, dict):
                 continue
-            captured = action_data.get("captured_data", {})
+            captured = action_data.get("captured_data")
+            if not isinstance(captured, dict):
+                captured = {}
+                action_data["captured_data"] = captured
             if isinstance(captured, dict) and "___workflow/assay/" in captured:
                 if assay_selection_options is None:
                     assay_selection_options = _build_assay_selection_options(bobdb)
@@ -78,7 +81,11 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
                 if field.get("options_source") == "workflow_assays":
                     if assay_selection_options is None:
                         assay_selection_options = _build_assay_selection_options(bobdb)
+                    if assay_selection_html is None:
+                        assay_selection_html = _build_assay_selection_html(assay_selection_options)
                     field["options"] = copy.deepcopy(assay_selection_options)
+                    if field.get("name") == "assay_selection":
+                        captured.setdefault("___workflow/assay/", assay_selection_html)
 
     return hydrated
 

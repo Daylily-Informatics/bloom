@@ -50,7 +50,6 @@ class ContainerPositionSchema(BloomBaseSchema):
     
     position: str = Field(..., description="Well position (e.g., A1)")
     euid: Optional[str] = Field(None, description="EUID of object at this position")
-    uuid: Optional[str] = Field(None, description="UUID of object at this position")
     name: Optional[str] = Field(None, description="Name of object at this position")
     type: Optional[str] = Field(None, description="Type of object at this position")
     placed_at: Optional[datetime] = Field(None, description="When object was placed")
@@ -116,7 +115,6 @@ class ContainerResponseSchema(ContainerBaseSchema, TimestampMixin):
     """Schema for container API responses."""
     
     euid: str = Field(..., description="Container EUID")
-    uuid: str = Field(..., description="Container UUID")
     status: str = Field(default="active", description="Container status")
     is_deleted: bool = Field(default=False, description="Soft delete flag")
     

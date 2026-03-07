@@ -347,18 +347,23 @@ class TestQueueEndpoints:
         assert response.status_code in [200, 302, 303]
 
 
-class TestDeleteEndpoints:
-    """Tests for delete/undelete endpoints."""
+class TestDeleteAliasEndpoints:
+    """Tests for delete/undelete alias endpoints."""
 
     def test_delete_by_euid_requires_euid(self, client):
         """Test delete by EUID requires euid parameter."""
         response = client.get("/delete_by_euid")
         assert response.status_code == 422
 
-    def test_un_delete_by_uuid_requires_uuid(self, client):
-        """Test undelete by UUID requires uuid parameter."""
+    def test_un_delete_by_uuid_route_removed(self, client):
+        """Legacy undelete alias route must be retired."""
         response = client.get("/un_delete_by_uuid")
-        assert response.status_code == 422
+        assert response.status_code == 404
+
+    def test_un_delete_by_uuid_uuid_lookup_route_removed(self, client):
+        """Legacy undelete alias route must stay unavailable even for UUID queries."""
+        response = client.get("/un_delete_by_uuid?uuid=invalid-uuid")
+        assert response.status_code == 404
 
 
 class TestScriptsEndpoint:
@@ -906,7 +911,7 @@ class TestGraphAndVisualizationEndpoints:
         response = client.get("/get_node_info")
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    def test_get_node_property_requires_uuid(self, client):
+    def test_get_node_property_requires_euid(self, client):
         """Test get_node_property endpoint."""
         response = client.get("/get_node_property")
         assert response.status_code in [200, 307, 400, 422, 500]
@@ -932,9 +937,9 @@ class TestDataModificationEndpoints:
         """Test save JSON addl key POST endpoint."""
         response = client.post(
             "/save_json_addl_key",
-            json={"uuid": "test-uuid", "key": "test", "value": "test"},
+            json={"euid": "EX1", "json_addl_key": "test", "json_data": {"value": "test"}},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [200, 307, 400, 404, 422, 500]
 
     def test_update_accordion_state_post(self, client):
         """Test update accordion state POST endpoint."""
@@ -963,10 +968,15 @@ class TestAdminAndConfigEndpoints:
         response = client.get("/update_object_name")
         assert response.status_code in [200, 307, 400, 422, 500]
 
-    def test_uuid_details_requires_uuid(self, client):
-        """Test UUID details endpoint requires UUID parameter."""
+    def test_uuid_details_route_removed(self, client):
+        """Legacy UUID details alias route must be retired."""
         response = client.get("/uuid_details")
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
+
+    def test_uuid_details_uuid_lookup_route_removed(self, client):
+        """Legacy UUID details alias route must stay unavailable for UUID queries."""
+        response = client.get("/uuid_details?uuid=invalid-uuid")
+        assert response.status_code == 404
 
     def test_vertical_exp_requires_euid(self, client):
         """Test vertical exp endpoint requires EUID parameter."""
@@ -1008,20 +1018,20 @@ class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
     def test_workflow_step_action_post(self, client):
-        """Test workflow step action POST endpoint."""
+        """Legacy workflow step action endpoint must be removed."""
         response = client.post(
             "/workflow_step_action",
             json={"step_euid": "WF1", "action": "complete"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_update_obj_json_addl_properties_post(self, client):
         """Test update object JSON addl properties POST endpoint."""
         response = client.post(
             "/update_obj_json_addl_properties",
-            data={"uuid": "test-uuid", "properties": "{}"},
+            data={"obj_euid": "EX1", "json_note": "test"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [200, 307, 400, 404, 422, 500]
 
 
 class TestDeleteEndpoints:
@@ -1031,7 +1041,7 @@ class TestDeleteEndpoints:
         """Test delete object POST endpoint."""
         response = client.post(
             "/delete_object",
-            json={"uuid": "00000000-0000-0000-0000-000000000000"},
+            json={"euid": "EX1"},
         )
         assert response.status_code in [200, 307, 400, 404, 422, 500]
 
@@ -1087,7 +1097,7 @@ class TestFileCreationEndpoints:
         """Test download file POST endpoint."""
         response = client.post(
             "/download_file",
-            data={"file_euid": "FI1"},
+            data={"euid": "FI1", "download_type": "flat", "create_metadata_file": "no", "ret_json": "1"},
         )
         assert response.status_code in [200, 307, 400, 404, 422, 500]
 
@@ -1258,9 +1268,9 @@ class TestWorkflowEndpoints:
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
     def test_workflow_step_action_requires_data(self, client):
-        """Test workflow step action requires data."""
+        """Legacy workflow step action endpoint must stay unavailable."""
         response = client.post("/workflow_step_action", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_update_accordion_state(self, client):
         """Test update accordion state endpoint."""
@@ -1271,15 +1281,15 @@ class TestWorkflowEndpoints:
 class TestObjectManagementEndpoints:
     """Tests for object management endpoints."""
 
-    def test_uuid_details(self, client):
-        """Test UUID details endpoint."""
+    def test_uuid_details_removed(self, client):
+        """Legacy UUID details endpoint must be removed."""
         response = client.get("/uuid_details")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
-    def test_un_delete_by_uuid(self, client):
-        """Test undelete by UUID endpoint."""
+    def test_un_delete_by_uuid_removed(self, client):
+        """Legacy undelete alias endpoint must be removed."""
         response = client.get("/un_delete_by_uuid")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_delete_by_euid(self, client):
         """Test delete by EUID endpoint."""
@@ -1294,8 +1304,8 @@ class TestObjectManagementEndpoints:
 
     def test_update_obj_json_addl_properties(self, client):
         """Test update object JSON addl properties."""
-        response = client.post("/update_obj_json_addl_properties", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        response = client.post("/update_obj_json_addl_properties", data={"obj_euid": "EX1"})
+        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_update_object_name(self, client):
         """Test update object name endpoint."""
@@ -1424,21 +1434,14 @@ class TestJSONDataEndpoints:
     """Tests for JSON data manipulation endpoints."""
 
     def test_save_json_update(self, client):
-        """Test save JSON update endpoint."""
-        response = client.post("/save_json_update", json={
-            "uuid": "test-uuid",
-            "json_data": {}
-        })
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        """Legacy save JSON update endpoint must be removed."""
+        response = client.post("/save_json_update", json={"euid": "EX1", "json_data": {}})
+        assert response.status_code == 404
 
     def test_update_json_value(self, client):
-        """Test update JSON value endpoint."""
-        response = client.post("/update_json_value", json={
-            "uuid": "test-uuid",
-            "key": "test_key",
-            "value": "test_value"
-        })
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        """Legacy update JSON value endpoint must be removed."""
+        response = client.post("/update_json_value", json={"euid": "EX1", "key": "test_key", "value": "test_value"})
+        assert response.status_code == 404
 
 
 class TestControlsAndReagentsEndpoints:
@@ -1592,7 +1595,10 @@ class TestFileOperationEndpoints:
 
     def test_download_file(self, client):
         """Test download file endpoint."""
-        response = client.post("/download_file", json={"file_uuid": "invalid"})
+        response = client.post(
+            "/download_file",
+            data={"euid": "FI1", "download_type": "flat", "create_metadata_file": "no", "ret_json": "1"},
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_create_file(self, client):
@@ -1620,9 +1626,9 @@ class TestWorkflowOperationEndpoints:
     """Tests for workflow operation endpoints."""
 
     def test_workflow_step_action(self, client):
-        """Test workflow step action endpoint."""
+        """Legacy workflow step action endpoint must be retired."""
         response = client.post("/workflow_step_action", json={})
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestObjectOperationEndpoints:
@@ -1630,7 +1636,7 @@ class TestObjectOperationEndpoints:
 
     def test_delete_object(self, client):
         """Test delete object endpoint."""
-        response = client.post("/delete_object", json={"uuid": "invalid"})
+        response = client.post("/delete_object", json={"euid": "invalid"})
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_delete_by_euid(self, client):
@@ -1638,19 +1644,19 @@ class TestObjectOperationEndpoints:
         response = client.get("/delete_by_euid?euid=INVALID1")
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    def test_un_delete_by_uuid(self, client):
-        """Test un-delete by UUID endpoint."""
+    def test_un_delete_by_uuid_missing_euid(self, client):
+        """Legacy undelete alias route must not exist for UUID queries."""
         response = client.get("/un_delete_by_uuid?uuid=invalid-uuid")
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestDAGOperationEndpoints:
     """Tests for DAG operation endpoints."""
 
     def test_add_new_edge(self, client):
-        """Test add new edge endpoint."""
+        """Deprecated add_new_edge must require canonical EUID keys."""
         response = client.post("/add_new_edge", json={})
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 400
 
     def test_delete_edge(self, client):
         """Test delete edge endpoint."""
@@ -1735,19 +1741,15 @@ class TestJSONUpdateEndpoints:
 
     def test_update_obj_json_addl_properties(self, client):
         """Test update object JSON addl properties endpoint."""
-        response = client.post("/update_obj_json_addl_properties", json={
-            "uuid": "invalid",
-            "properties": {}
-        })
+        response = client.post("/update_obj_json_addl_properties", data={"obj_euid": "EX1", "test_key": "test"})
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_save_json_addl_key(self, client):
         """Test save JSON addl key endpoint."""
-        response = client.post("/save_json_addl_key", json={
-            "uuid": "invalid",
-            "key": "test",
-            "value": "test"
-        })
+        response = client.post(
+            "/save_json_addl_key",
+            json={"euid": "EX1", "json_addl_key": "test", "json_data": {"value": "test"}},
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 

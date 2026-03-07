@@ -6,8 +6,8 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import sys
-import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -25,6 +25,14 @@ from bloom_lims.integrations.atlas.events import AtlasEventClient
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import app  # noqa: E402
+
+
+def _suffix(nbytes: int = 4) -> str:
+    return secrets.token_hex(nbytes)
+
+
+def _opaque(prefix: str, nbytes: int = 8) -> str:
+    return f"{prefix}-{_suffix(nbytes)}"
 
 
 class _FakeAtlasLookupService:
@@ -72,12 +80,12 @@ def _clear_overrides():
 def _token_user() -> APIUser:
     return APIUser(
         email="atlas-contract@example.com",
-        user_id=str(uuid.uuid4()),
+        user_id=_opaque("user"),
         roles=["INTERNAL_READ_WRITE"],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",
-        token_id=str(uuid.uuid4()),
+        token_id=_opaque("token"),
     )
 
 
@@ -127,13 +135,13 @@ def _create_specimen_payload(
 ) -> dict:
     payload = {
         "specimen_template_code": "content/specimen/blood-whole/1.0",
-        "specimen_name": f"specimen-{uuid.uuid4().hex[:8]}",
+        "specimen_name": f"specimen-{_suffix()}",
         "status": "active",
         "properties": {"source": "atlas-contract-test"},
         "atlas_refs": {
             "order_number": order_number,
             "patient_id": patient_id,
-            "kit_barcode": f"KIT-{uuid.uuid4().hex[:6]}",
+            "kit_barcode": f"KIT-{_suffix(3)}",
         },
     }
     if container_euid:
@@ -161,19 +169,19 @@ def _build_client(monkeypatch) -> TestClient:
 
 def test_create_empty_container_via_object_creation_contract(monkeypatch):
     with _build_client(monkeypatch) as client:
-        created = _create_container(client, name=f"atlas-contract-{uuid.uuid4().hex[:8]}")
+        created = _create_container(client, name=f"atlas-contract-{_suffix()}")
         assert created["euid"]
-        assert created["uuid"]
+        assert "uuid" not in created
         assert created["category"] == "container"
         assert created["type"] == "tube"
         assert created["subtype"]
 
 
-def test_patch_container_compat_alias_accepts_metadata(monkeypatch):
+def test_put_container_accepts_metadata(monkeypatch):
     with _build_client(monkeypatch) as client:
-        created = _create_container(client, name=f"atlas-patch-{uuid.uuid4().hex[:8]}")
+        created = _create_container(client, name=f"atlas-patch-{_suffix()}")
         euid = created["euid"]
-        response = client.patch(
+        response = client.put(
             f"/api/v1/containers/{euid}",
             json={"status": "in_progress", "metadata": {"atlas_sync": "ok"}},
         )
@@ -188,15 +196,15 @@ def test_patch_container_compat_alias_accepts_metadata(monkeypatch):
 
 def test_create_specimen_with_existing_container_contract(monkeypatch):
     with _build_client(monkeypatch) as client:
-        container = _create_container(client, name=f"atlas-existing-container-{uuid.uuid4().hex[:8]}")
+        container = _create_container(client, name=f"atlas-existing-container-{_suffix()}")
         specimen = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{uuid.uuid4().hex[:8]}",
-                patient_id=f"PAT-{uuid.uuid4().hex[:8]}",
+                order_number=f"ORD-{_suffix()}",
+                patient_id=f"PAT-{_suffix()}",
                 container_euid=container["euid"],
             ),
-            idempotency_key=f"idem-{uuid.uuid4()}",
+            idempotency_key=_opaque("idem", 16),
         )
         assert specimen["specimen_euid"]
         assert specimen["container_euid"] == container["euid"]
@@ -225,10 +233,10 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
     app.dependency_overrides[require_external_token_auth] = _token_user
 
     with TestClient(app) as client:
-        container = _create_container(client, name=f"atlas-context-mismatch-{uuid.uuid4().hex[:8]}")
+        container = _create_container(client, name=f"atlas-context-mismatch-{_suffix()}")
         response = client.post(
             "/api/v1/external/specimens",
-            headers={"Idempotency-Key": f"idem-{uuid.uuid4()}"},
+            headers={"Idempotency-Key": _opaque("idem", 16)},
             json={
                 "specimen_template_code": "content/specimen/blood-whole/1.0",
                 "specimen_name": "context-mismatch",
@@ -269,7 +277,7 @@ def test_container_context_summary_persisted_in_validation_metadata(monkeypatch)
     app.dependency_overrides[require_external_token_auth] = _token_user
 
     with TestClient(app) as client:
-        container = _create_container(client, name=f"atlas-context-match-{uuid.uuid4().hex[:8]}")
+        container = _create_container(client, name=f"atlas-context-match-{_suffix()}")
         created = _create_specimen(
             client,
             payload={
@@ -285,7 +293,7 @@ def test_container_context_summary_persisted_in_validation_metadata(monkeypatch)
                     "package_number": "PKG-MATCH",
                 },
             },
-            idempotency_key=f"idem-{uuid.uuid4()}",
+            idempotency_key=_opaque("idem", 16),
         )
 
     validation = created["properties"].get("atlas_validation", {})
@@ -301,10 +309,10 @@ def test_create_specimen_auto_container_contract(monkeypatch):
         specimen = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{uuid.uuid4().hex[:8]}",
-                patient_id=f"PAT-{uuid.uuid4().hex[:8]}",
+                order_number=f"ORD-{_suffix()}",
+                patient_id=f"PAT-{_suffix()}",
             ),
-            idempotency_key=f"idem-{uuid.uuid4()}",
+            idempotency_key=_opaque("idem", 16),
         )
         assert specimen["specimen_euid"]
         assert specimen["container_euid"]
@@ -315,10 +323,10 @@ def test_get_patch_delete_specimen_contract_sequence(monkeypatch):
         created = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{uuid.uuid4().hex[:8]}",
-                patient_id=f"PAT-{uuid.uuid4().hex[:8]}",
+                order_number=f"ORD-{_suffix()}",
+                patient_id=f"PAT-{_suffix()}",
             ),
-            idempotency_key=f"idem-{uuid.uuid4()}",
+            idempotency_key=_opaque("idem", 16),
         )
         specimen_euid = created["specimen_euid"]
 
@@ -343,14 +351,14 @@ def test_get_patch_delete_specimen_contract_sequence(monkeypatch):
 
 def test_lookup_specimens_by_reference_order_number(monkeypatch):
     with _build_client(monkeypatch) as client:
-        order_number = f"ORD-{uuid.uuid4().hex[:8]}"
+        order_number = f"ORD-{_suffix()}"
         created = _create_specimen(
             client,
             payload=_create_specimen_payload(
                 order_number=order_number,
-                patient_id=f"PAT-{uuid.uuid4().hex[:8]}",
+                patient_id=f"PAT-{_suffix()}",
             ),
-            idempotency_key=f"idem-{uuid.uuid4()}",
+            idempotency_key=_opaque("idem", 16),
         )
         lookup = client.get(
             "/api/v1/external/specimens/by-reference",
@@ -369,9 +377,9 @@ def test_unsupported_template_returns_validation_error(monkeypatch):
                 "specimen_template_code": "content/specimen/saliva/1.0",
                 "specimen_name": "unsupported-template",
                 "status": "active",
-                "atlas_refs": {"patient_id": f"PAT-{uuid.uuid4().hex[:8]}"},
+                "atlas_refs": {"patient_id": f"PAT-{_suffix()}"},
             },
-            headers={"Idempotency-Key": f"idem-{uuid.uuid4()}"},
+            headers={"Idempotency-Key": _opaque("idem", 16)},
         )
         assert response.status_code == 400
         detail = response.json()["detail"]
@@ -447,7 +455,7 @@ def test_event_delivery_failure_is_fail_open(monkeypatch):
     monkeypatch.setattr(events_mod.requests, "post", fake_post)
 
     with TestClient(app) as client:
-        created = _create_container(client, name=f"atlas-fail-open-{uuid.uuid4().hex[:8]}")
+        created = _create_container(client, name=f"atlas-fail-open-{_suffix()}")
         assert created["euid"]
         fetched = client.get(f"/api/v1/containers/{created['euid']}")
         assert fetched.status_code == 200

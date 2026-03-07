@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import json
 import logging
-import uuid
+import secrets
 from typing import Any
 
 import requests
@@ -51,10 +51,10 @@ class AtlasEventClient:
                 logger.warning("Atlas event skipped (%s)", reason)
             return None
 
-        event_uuid = (event_id or str(uuid.uuid4())).strip()
+        resolved_event_id = (event_id or f"event_{secrets.token_hex(16)}").strip()
         body = {
             "organization_id": str(self.settings.organization_id).strip(),
-            "event_id": event_uuid,
+            "event_id": resolved_event_id,
             "event_type": str(event_type).strip(),
             "payload": payload or {},
         }
@@ -69,7 +69,7 @@ class AtlasEventClient:
             "Content-Type": "application/json",
             "Accept": "application/json",
             "X-Bloom-Signature": f"sha256={signature}",
-            "X-Bloom-Event-Id": event_uuid,
+            "X-Bloom-Event-Id": resolved_event_id,
         }
 
         endpoint = self._endpoint()
@@ -91,7 +91,7 @@ class AtlasEventClient:
                 response = None
             else:
                 if 200 <= response.status_code < 300:
-                    return event_uuid
+                    return resolved_event_id
                 last_error = f"status={response.status_code} body={response.text[:256]}"
 
             if attempt < max_retries:
@@ -99,7 +99,7 @@ class AtlasEventClient:
 
         logger.warning(
             "Atlas event delivery failed (fail-open): event_id=%s event_type=%s endpoint=%s error=%s",
-            event_uuid,
+            resolved_event_id,
             event_type,
             endpoint,
             last_error,

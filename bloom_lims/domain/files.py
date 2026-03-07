@@ -43,7 +43,13 @@ class BloomFile(BloomObj):
             )
 
         self.bucket_prefix = bucket_prefix
-        self.s3_client = boto3.client("s3")
+        self._s3_client = None
+
+    @property
+    def s3_client(self):
+        if self._s3_client is None:
+            self._s3_client = boto3.client("s3")
+        return self._s3_client
 
     def _euid_numeric_value(self, euid):
         euid_str = str(euid or "").strip().upper()

@@ -6,7 +6,7 @@ import copy
 import html
 import logging
 import re
-import uuid
+import secrets
 from dataclasses import dataclass
 from typing import Any
 
@@ -283,7 +283,7 @@ def _map_exception(exc: Exception) -> ActionExecutionError:
     if "validation" in msg.lower() or "invalid" in msg.lower():
         return ActionExecutionError(status_code=400, detail=msg)
 
-    error_id = str(uuid.uuid4())
+    error_id = f"error_{secrets.token_hex(12)}"
     logger.exception("Unhandled action execution error id=%s: %s", error_id, msg)
     return ActionExecutionError(
         status_code=500,

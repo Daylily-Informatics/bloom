@@ -185,7 +185,6 @@ def create_aliquot(
     aliquot_json = {
         'is_aliquot': True,
         'parent_sample_euid': parent_sample.euid,
-        'parent_sample_uuid': str(parent_sample.uuid),
         'aliquot_number': existing_aliquots + 1,
         'created_from_parent_at': datetime.utcnow().isoformat(),
     }

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections import defaultdict
 from datetime import datetime
 
@@ -121,7 +120,6 @@ async def workflow_details(request: Request, workflow_euid, _auth=Depends(requir
             for child in _iter_active_children(current):
                 child_key = (
                     getattr(child, "euid", None)
-                    or getattr(child, "uuid", None)
                     or id(child)
                 )
                 if child_key in visited:

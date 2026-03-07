@@ -81,7 +81,6 @@ class SearchRepository:
             to_item=lambda row: SearchResultItem(
                 record_type="instance",
                 euid=str(getattr(row, "euid", "") or ""),
-                uuid=str(getattr(row, "uuid", "") or ""),
                 name=str(getattr(row, "name", "") or ""),
                 category=str(getattr(row, "category", "") or ""),
                 type=str(getattr(row, "type", "") or ""),
@@ -121,7 +120,6 @@ class SearchRepository:
             to_item=lambda row: SearchResultItem(
                 record_type="template",
                 euid=str(getattr(row, "euid", "") or ""),
-                uuid=str(getattr(row, "uuid", "") or ""),
                 name=str(getattr(row, "name", "") or ""),
                 category=str(getattr(row, "category", "") or ""),
                 type=str(getattr(row, "type", "") or ""),
@@ -166,7 +164,6 @@ class SearchRepository:
             to_item=lambda row: SearchResultItem(
                 record_type="lineage",
                 euid=str(getattr(row, "euid", "") or ""),
-                uuid=str(getattr(row, "uuid", "") or ""),
                 name=str(getattr(row, "name", "") or ""),
                 category=str(getattr(row, "category", "") or ""),
                 type=str(getattr(row, "parent_type", "") or ""),
@@ -176,8 +173,8 @@ class SearchRepository:
                 modified_dt=getattr(row, "modified_dt", None),
                 timestamp=getattr(row, "created_dt", None) or getattr(row, "modified_dt", None),
                 metadata={
-                    "parent_instance_uuid": getattr(row, "parent_instance_uuid", None),
-                    "child_instance_uuid": getattr(row, "child_instance_uuid", None),
+                    "parent_instance_euid": getattr(getattr(row, "parent_instance", None), "euid", None),
+                    "child_instance_euid": getattr(getattr(row, "child_instance", None), "euid", None),
                     "relationship_type": getattr(row, "relationship_type", ""),
                     "json_addl": getattr(row, "json_addl", {}) or {},
                 },
@@ -231,7 +228,6 @@ class SearchRepository:
             to_item=lambda row: SearchResultItem(
                 record_type="audit",
                 euid=str(getattr(row, "euid", "") or ""),
-                uuid=str(getattr(row, "uuid", "") or ""),
                 name=str(getattr(row, "rel_table_name", "") or ""),
                 category=str(getattr(row, "category", "") or ""),
                 type=str(getattr(row, "rel_table_name", "") or ""),

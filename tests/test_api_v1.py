@@ -26,6 +26,11 @@ def client():
     return TestClient(app)
 
 
+def _assert_items_do_not_expose_uuid(payload):
+    for item in payload.get("items", []):
+        assert "uuid" not in item
+
+
 class TestAPIRoot:
     """Tests for API root endpoints."""
     
@@ -50,6 +55,7 @@ class TestObjectsAPI:
         assert "items" in data
         assert "total" in data
         assert "page" in data
+        _assert_items_do_not_expose_uuid(data)
     
     def test_list_objects_with_filters(self, client):
         """Test listing objects with filters."""
@@ -74,14 +80,15 @@ class TestContainersAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
     
     def test_get_container_not_found(self, client):
         """Test getting non-existent container."""
         response = client.get("/api/v1/containers/NONEXISTENT_EUID")
         assert response.status_code == 404
 
-    def test_patch_container_alias_accepts_metadata(self, client):
-        """Test PATCH /containers compatibility alias and metadata mapping."""
+    def test_put_container_accepts_metadata(self, client):
+        """Test canonical PUT /containers update and metadata mapping."""
         subtypes_resp = client.get("/api/v1/object-creation/subtypes?category=container&type=tube")
         assert subtypes_resp.status_code == 200
         subtypes = subtypes_resp.json().get("subtypes", [])
@@ -103,9 +110,11 @@ class TestContainersAPI:
             },
         )
         assert create_resp.status_code == 200
-        container_euid = create_resp.json()["euid"]
+        create_payload = create_resp.json()
+        assert "uuid" not in create_payload
+        container_euid = create_payload["euid"]
 
-        patch_resp = client.patch(
+        patch_resp = client.put(
             f"/api/v1/containers/{container_euid}",
             json={"status": "in_progress", "metadata": {"atlas_sync": "ok"}},
         )
@@ -114,6 +123,7 @@ class TestContainersAPI:
         get_resp = client.get(f"/api/v1/containers/{container_euid}")
         assert get_resp.status_code == 200
         payload = get_resp.json()
+        assert "uuid" not in payload
         assert payload["status"] == "in_progress"
         assert payload["json_addl"]["properties"]["metadata"]["atlas_sync"] == "ok"
 
@@ -128,6 +138,7 @@ class TestContentAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
     
     def test_get_content_not_found(self, client):
         """Test getting non-existent content."""
@@ -145,6 +156,7 @@ class TestWorkflowsAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
     
     def test_get_workflow_not_found(self, client):
         """Test getting non-existent workflow."""
@@ -162,6 +174,7 @@ class TestTemplatesAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
     
     def test_list_templates_by_category(self, client):
         """Test listing templates by category."""
@@ -182,6 +195,7 @@ class TestSubjectsAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
     
     def test_get_subject_not_found(self, client):
         """Test getting non-existent subject."""
@@ -199,6 +213,8 @@ class TestLineagesAPI:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        for item in data["items"]:
+            assert "uuid" not in item
 
 
 class TestStatsAPI:
@@ -308,6 +324,7 @@ class TestSearchAPIV2:
         response = client.post("/api/v1/search/v2/export", json=payload)
         assert response.status_code == 200
         assert "application/json" in response.headers.get("content-type", "")
+        assert '"uuid"' not in response.text
 
     def test_search_v2_export_tsv(self, client):
         payload = {
@@ -324,6 +341,7 @@ class TestSearchAPIV2:
         response = client.post("/api/v1/search/v2/export", json=payload)
         assert response.status_code == 200
         assert "text/tab-separated-values" in response.headers.get("content-type", "")
+        assert "\tuuid\t" not in f"\t{response.text.splitlines()[0]}\t"
 
 
 class TestBulkContainerAPI:
@@ -373,6 +391,7 @@ class TestEquipmentAPI:
         # API returns paginated response with 'items' key
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
 
     def test_get_equipment_not_found(self, client):
         """Test getting non-existent equipment."""
@@ -392,6 +411,7 @@ class TestFilesAPI:
         # API returns paginated response
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
 
     def test_list_file_sets(self, client):
         """Test listing file sets."""
@@ -401,6 +421,7 @@ class TestFilesAPI:
         # API returns paginated response
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
 
 
 class TestActionsAPI:
@@ -433,6 +454,7 @@ class TestSubjectsAPIExtended:
         assert "total" in data
         assert "page" in data
         assert "page_size" in data
+        _assert_items_do_not_expose_uuid(data)
 
 
 class TestObjectCreationAPI:
@@ -560,11 +582,14 @@ class TestTemplatesAPIExtended:
         response = client.get("/api/v1/templates/?page_size=1")
         assert response.status_code == 200
         data = response.json()
+        _assert_items_do_not_expose_uuid(data)
         if data["items"]:
             euid = data["items"][0].get("euid")
             if euid:
                 response = client.get(f"/api/v1/templates/{euid}")
                 assert response.status_code in [200, 404]
+                if response.status_code == 200:
+                    assert "uuid" not in response.json()
 
 
 class TestWorkflowsAPIExtended:
@@ -577,6 +602,7 @@ class TestWorkflowsAPIExtended:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
 
 
 class TestContainersAPIExtended:
@@ -589,6 +615,7 @@ class TestContainersAPIExtended:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
 
     def test_list_containers_with_type_filter(self, client):
         """Test listing containers with type filter."""
@@ -596,6 +623,7 @@ class TestContainersAPIExtended:
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
+        _assert_items_do_not_expose_uuid(data)
 
 
 class TestContentAPIExtended:
@@ -608,6 +636,7 @@ class TestContentAPIExtended:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        _assert_items_do_not_expose_uuid(data)
 
 
 class TestLineagesAPIExtended:
@@ -620,6 +649,8 @@ class TestLineagesAPIExtended:
         data = response.json()
         assert "items" in data
         assert "total" in data
+        for item in data["items"]:
+            assert "uuid" not in item
 
 
 class TestStatsAPIExtended:
@@ -701,14 +732,14 @@ class TestObjectsAPIExtended:
         response = client.get("/api/v1/objects/")
         assert response.status_code in [200, 404]
 
-    def test_get_object_by_uuid(self, client):
-        """Test getting object by UUID."""
-        response = client.get("/api/v1/objects/00000000-0000-0000-0000-000000000000")
+    def test_get_object_by_euid_path(self, client):
+        """Test getting object through the canonical EUID path."""
+        response = client.get("/api/v1/objects/CX1")
         assert response.status_code in [404, 422, 500]
 
     def test_get_object_by_euid(self, client):
         """Test getting object by EUID."""
-        response = client.get("/api/v1/objects/euid/CX1")
+        response = client.get("/api/v1/objects/CX1")
         assert response.status_code in [200, 404, 422]
 
 
@@ -929,15 +960,15 @@ class TestObjectsAPI:
             data = response.json()
             assert isinstance(data, (list, dict))
 
-    def test_get_object_by_uuid_invalid(self, client):
-        """Test getting object by invalid UUID."""
-        response = client.get("/api/v1/objects/invalid-uuid")
-        assert response.status_code in [404, 405, 422, 500]
-
     def test_get_object_by_euid_invalid(self, client):
         """Test getting object by invalid EUID."""
-        response = client.get("/api/v1/objects/euid/INVALID123")
+        response = client.get("/api/v1/objects/INVALID123")
         assert response.status_code in [404, 422, 500]
+
+    def test_get_object_by_removed_legacy_euid_route(self, client):
+        """Test removed legacy object alias route stays gone."""
+        response = client.get("/api/v1/objects/euid/INVALID123")
+        assert response.status_code == 404
 
 
 class TestSubjectsAPI:
@@ -1212,6 +1243,7 @@ class TestWorksetsAPI:
         assert "total" in data
         assert "page" in data
         assert "page_size" in data
+        _assert_items_do_not_expose_uuid(data)
 
     def test_list_worksets_with_filters(self, client):
         """Test listing worksets with status filter."""
@@ -1219,6 +1251,7 @@ class TestWorksetsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["page_size"] == 10
+        _assert_items_do_not_expose_uuid(data)
 
     def test_list_worksets_with_workflow_filter(self, client):
         """Test listing worksets with workflow filter."""
@@ -1226,6 +1259,7 @@ class TestWorksetsAPI:
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
+        _assert_items_do_not_expose_uuid(data)
 
     def test_get_workset_not_found(self, client):
         """Test getting non-existent workset."""
@@ -1256,6 +1290,7 @@ class TestWorksetsAPI:
             data = response.json()
             assert "success" in data
             assert "euid" in data or "message" in data
+            assert "uuid" not in data
 
     def test_add_members_workset_not_found(self, client):
         """Test adding members to non-existent workset."""
@@ -1281,8 +1316,8 @@ class TestWorksetsAPI:
     def test_get_workset_by_anchor_response(self, client):
         """Test finding workset by anchor returns expected structure."""
         # Use a unique anchor that likely doesn't have a workset
-        import uuid
-        unique_anchor = f"TEST_ANCHOR_{uuid.uuid4().hex[:8]}"
+        import secrets
+        unique_anchor = f"TEST_ANCHOR_{secrets.token_hex(4)}"
         response = client.get(f"/api/v1/worksets/by-anchor/{unique_anchor}")
         # Should return 404 for non-existent anchor, or 200 with workset info
         assert response.status_code in [200, 404]
@@ -1290,6 +1325,7 @@ class TestWorksetsAPI:
             data = response.json()
             assert "euid" in data
             assert "anchor_euid" in data
+            assert "uuid" not in data
 
 
 class TestTrackingAPI:

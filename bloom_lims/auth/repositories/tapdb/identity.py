@@ -2,42 +2,62 @@
 
 from __future__ import annotations
 
-import uuid
+import hashlib
+import re
+import secrets
 from typing import Any
 
 from daylily_tapdb.models.instance import generic_instance
 
-_PUBLIC_ID_NAMESPACE = uuid.UUID("ee74fef0-c7c5-4c7b-a2bc-2f8f7c10f8b0")
+
+def _normalize_prefix(prefix: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "", str(prefix or "").strip().lower())
+    return normalized or "auth"
 
 
-def parse_uuid(value: Any) -> uuid.UUID | None:
+def normalize_public_id(value: Any) -> str | None:
     if value is None:
         return None
-    if isinstance(value, uuid.UUID):
-        return value
-    try:
-        return uuid.UUID(str(value))
-    except (TypeError, ValueError):
+    candidate = str(value).strip()
+    if not candidate:
         return None
+    return candidate
 
 
-def ensure_uuid_property(properties: dict[str, Any], key: str = "id") -> uuid.UUID:
-    parsed = parse_uuid(properties.get(key))
-    if parsed is not None:
-        properties[key] = str(parsed)
-        return parsed
-    created = uuid.uuid4()
-    properties[key] = str(created)
+def generate_public_id(*, prefix: str = "auth") -> str:
+    created = f"{_normalize_prefix(prefix)}_{secrets.token_hex(16)}"
     return created
 
 
-def fallback_public_id(instance: generic_instance) -> uuid.UUID:
+def ensure_public_id_property(
+    properties: dict[str, Any],
+    key: str = "id",
+    *,
+    prefix: str = "auth",
+) -> str:
+    resolved = normalize_public_id(properties.get(key))
+    if resolved is not None:
+        properties[key] = resolved
+        return resolved
+    created = generate_public_id(prefix=prefix)
+    properties[key] = created
+    return created
+
+
+def fallback_public_id(instance: generic_instance, *, prefix: str = "auth") -> str:
     seed = (
-        f"{instance.euid or ''}|"
-        f"{instance.category}/{instance.type}/{instance.subtype}/{instance.version}|"
-        f"{instance.uuid}"
+        f"{normalize_public_id(getattr(instance, 'uid', None)) or ''}|"
+        f"{normalize_public_id(getattr(instance, 'euid', None)) or ''}|"
+        f"{normalize_public_id(getattr(instance, 'template_uid', None)) or ''}|"
+        f"{normalize_public_id(getattr(instance, 'tenant_id', None)) or ''}|"
+        f"{normalize_public_id(getattr(instance, 'name', None)) or ''}|"
+        f"{getattr(instance, 'category', '')}/"
+        f"{getattr(instance, 'type', '')}/"
+        f"{getattr(instance, 'subtype', '')}/"
+        f"{getattr(instance, 'version', '')}"
     )
-    return uuid.uuid5(_PUBLIC_ID_NAMESPACE, seed)
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]
+    return f"{_normalize_prefix(prefix)}_{digest}"
 
 
 def resolve_public_id(
@@ -46,10 +66,11 @@ def resolve_public_id(
     *,
     key: str = "id",
     aliases: tuple[str, ...] = (),
-) -> uuid.UUID:
-    for candidate in (key, *aliases, "id", "public_id", "uuid"):
-        parsed = parse_uuid(properties.get(candidate))
-        if parsed is not None:
-            return parsed
-    return fallback_public_id(instance)
+    prefix: str = "auth",
+) -> str:
+    for candidate in (key, *aliases, "id", "public_id"):
+        resolved = normalize_public_id(properties.get(candidate))
+        if resolved is not None:
+            return resolved
+    return fallback_public_id(instance, prefix=prefix)
 

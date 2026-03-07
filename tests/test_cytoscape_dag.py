@@ -502,11 +502,11 @@ class TestDAGAPIEndpoints:
     def test_add_new_edge_request_structure(self):
         """Test add_new_edge endpoint request structure."""
         request_data = {
-            "parent_uuid": "CX1",
-            "child_uuid": "CX2"
+            "parent_euid": "CX1",
+            "child_euid": "CX2"
         }
-        assert "parent_uuid" in request_data
-        assert "child_uuid" in request_data
+        assert "parent_euid" in request_data
+        assert "child_euid" in request_data
 
 
 class TestGraphDataValidation:

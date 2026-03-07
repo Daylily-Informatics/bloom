@@ -106,7 +106,6 @@ class ObjectResponseSchema(ObjectBaseSchema, TimestampMixin):
     """Schema for BloomObj API responses."""
     
     euid: str = Field(..., description="Entity Unique Identifier")
-    uuid: str = Field(..., description="Universal Unique Identifier")
     status: str = Field(default="active", description="Object status")
     is_deleted: bool = Field(default=False, description="Soft delete flag")
     is_singleton: bool = Field(default=False, description="Singleton instance flag")

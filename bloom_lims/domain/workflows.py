@@ -24,28 +24,6 @@ class BloomWorkflow(BloomObj):
         super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
 
     # This can be made more widely useful now that i've detangled the wf-wfs special relationship
-    def get_sorted_uuid(self, workflow_id):
-        wfobj = self.get(workflow_id)
-
-        def sort_key(child_instance):
-            # Fetch the step_number if it exists, otherwise return a high value to sort it at the end
-            return int(
-                child_instance.json_addl["properties"].get("step_number", float("inf"))
-            )
-
-        # Assuming wfobj is your top-level object
-        workflow_steps = []
-
-        for lineage in wfobj.parent_of_lineages:
-            child_instance = lineage.child_instance
-            if child_instance.category == "workflow_step":
-                workflow_steps.append(child_instance)
-        workflow_steps.sort(key=sort_key)
-        wfobj.workflow_steps_sorted = workflow_steps
-
-        return wfobj
-
-    # This can be made more widely useful now that i've detangled the wf-wfs special relationship
     def get_sorted_euid(self, workflow_euid):
         wfobj = self.get_by_euid(workflow_euid)
 
@@ -97,8 +75,7 @@ class BloomWorkflow(BloomObj):
             wfs = self.create_instance_by_code(
                 layout_str, action_ds["child_workflow_step_obj"][layout_str]
             )
-            self.create_generic_instance_lineage_by_euids(wf.uuid, wfs.euid)
-            # wfs.workflow_instance_uuid = wf.uuid
+            self.create_generic_instance_lineage_by_euids(wf.euid, wfs.euid)
             ##self.session.flush()
             self.session.commit()
 
@@ -671,7 +648,7 @@ class BloomWorkflowStep(BloomObj):
             self.session.commit()
         self.create_generic_instance_lineage_by_euids(wfs.euid, child_wfs.euid)
 
-        new_plt_parts = self.create_instances_from_uuid(str(in_plt.template_uuid))
+        new_plt_parts = self.create_instances(self.get_by_euid(in_plt.euid).template.euid)
         new_plt = new_plt_parts[0][0]
         new_wells = new_plt_parts[1]
         self.create_generic_instance_lineage_by_euids(child_wfs.euid, new_plt.euid)
@@ -684,9 +661,7 @@ class BloomWorkflowStep(BloomObj):
             self.create_generic_instance_lineage_by_euids(in_well.euid, new_w.euid)
             if len(wells_ds[nwn]) > 1:
                 in_samp = wells_ds[nwn][1]
-                new_samp = self.create_instances_from_uuid(str(in_samp.template_uuid))[
-                    0
-                ][0]
+                new_samp = self.create_instances(self.get_by_euid(in_samp.euid).template.euid)[0][0]
                 self.create_generic_instance_lineage_by_euids(
                     in_samp.euid, new_samp.euid
                 )
@@ -916,7 +891,6 @@ class BloomWorkflowStep(BloomObj):
         return child_wfs
 
     def do_action_fill_plate_directed(self, wfs_euid, action_ds):
-        # Legacy compatibility alias
         return self.do_action_plate_create_fill_directed(wfs_euid, action_ds)
 
     def do_action_move_instances_to_queue(self, wfs_euid, action_ds):

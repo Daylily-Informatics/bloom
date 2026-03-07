@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
+from bloom_lims.db import get_parent_lineages
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
     ContainerCreateSchema,
@@ -41,7 +42,6 @@ def _container_event_payload(container, extra: dict[str, Any] | None = None) -> 
     payload = {
         "euid": container.euid,
         "container_euid": container.euid,
-        "uuid": str(container.uuid),
         "name": container.name,
         "category": container.category,
         "type": container.type,
@@ -97,7 +97,6 @@ async def list_containers(
             "items": [
                 {
                     "euid": obj.euid,
-                    "uuid": str(obj.uuid),
                     "name": obj.name,
                     "container_type": obj.type,
                     "subtype": obj.subtype,
@@ -133,7 +132,6 @@ async def get_container(
         
         result = {
             "euid": container.euid,
-            "uuid": str(container.uuid),
             "name": container.name,
             "container_type": container.type,
             "subtype": container.subtype,
@@ -143,7 +141,7 @@ async def get_container(
 
         if include_contents:
             contents = []
-            for lineage in container.parent_of_lineages:
+            for lineage in get_parent_lineages(container):
                 child = lineage.child_instance
                 contents.append({
                     "euid": child.euid,
@@ -194,7 +192,6 @@ async def create_container(
         return {
             "success": True,
             "euid": container.euid,
-            "uuid": str(container.uuid),
             "message": "Container created successfully",
         }
     except HTTPException:
@@ -337,16 +334,6 @@ async def delete_container(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/{euid}", response_model=Dict[str, Any])
-async def patch_container(
-    euid: str,
-    data: ContainerUpdateSchema,
-    user: APIUser = Depends(require_write),
-):
-    """Compatibility alias for Atlas integration clients."""
-    return await update_container(euid=euid, data=data, user=user)
-
-
 @router.post("/{container_euid}/contents")
 async def add_content_to_container(
     container_euid: str,
@@ -386,7 +373,7 @@ async def remove_content_from_container(
             raise HTTPException(status_code=404, detail=f"Container not found: {container_euid}")
 
         # Find and remove the lineage
-        for lineage in container.parent_of_lineages:
+        for lineage in get_parent_lineages(container):
             if lineage.child_instance.euid == content_euid and not lineage.is_deleted:
                 lineage.is_deleted = True
                 bdb.session.commit()
@@ -418,7 +405,7 @@ async def get_container_layout(
             raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
 
         layout = {}
-        for lineage in container.parent_of_lineages:
+        for lineage in get_parent_lineages(container):
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
@@ -432,7 +419,7 @@ async def get_container_layout(
                     "contents": [],
                 }
                 # Get well contents
-                for well_lineage in child.parent_of_lineages:
+                for well_lineage in get_parent_lineages(child):
                     if well_lineage.is_deleted:
                         continue
                     content = well_lineage.child_instance

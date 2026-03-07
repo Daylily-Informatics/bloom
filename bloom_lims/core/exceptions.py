@@ -134,19 +134,15 @@ class BloomNotFoundError(BloomError):
         self,
         message: str = "Object not found",
         euid: Optional[str] = None,
-        uuid: Optional[str] = None,
         object_type: Optional[str] = None,
         **kwargs
     ):
         self.euid = euid
-        self.uuid = uuid
         self.object_type = object_type
         
         details = kwargs.pop("details", {})
         if euid:
             details["euid"] = euid
-        if uuid:
-            details["uuid"] = uuid
         if object_type:
             details["object_type"] = object_type
         

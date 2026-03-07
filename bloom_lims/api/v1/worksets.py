@@ -114,7 +114,6 @@ async def get_workset(euid: str, user: APIUser = Depends(require_api_auth)):
 
         return {
             "euid": workset.euid,
-            "uuid": str(workset.uuid),
             "name": props.get("name", workset.name),
             "subtype": workset.subtype,
             "subject_key": props.get("subject_key", ""),
