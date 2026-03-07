@@ -606,14 +606,10 @@ class BloomObj:
                     action_key = f"{r.category}/{r.type}/{r.subtype}/{r.version}"
                     action_payload = None
                     if isinstance(r.json_addl, dict):
-                        # Bloom legacy templates store "action_template"; newer TapDB
-                        # core actions use "action_definition".
-                        action_payload = r.json_addl.get("action_template") or r.json_addl.get(
-                            "action_definition"
-                        )
+                        action_payload = r.json_addl.get("action_definition")
                     if action_payload is None:
                         self.logger.warning(
-                            "Skipping action import %s: no action_template/action_definition",
+                            "Skipping action import %s: missing action_definition",
                             action_key,
                         )
                         continue
@@ -1293,38 +1289,25 @@ class BloomObj:
     # Global Object Actions
     #
     def do_action(self, euid, action, action_group, action_ds, now_dt=""):
-
-        r = None
-        action_method = action_ds["method_name"]
-        now_dt = get_datetime_string()
-        if action_method == "do_action_set_object_status":
-            r = self.do_action_set_object_status(euid, action_ds, action_group, action)
-        elif action_method == "do_action_print_barcode_label":
-            r = self.do_action_print_barcode_label(euid, action_ds)
-
-        elif action_method == "do_action_destroy_specimen_containers":
-            r = self.do_action_destroy_specimen_containers(euid, action_ds)
-        elif action_method == "do_action_create_package_and_first_workflow_step_assay":
-            r = self.do_action_create_package_and_first_workflow_step_assay(
-                euid, action_ds
-            )
-        elif action_method == "do_action_move_workset_to_another_queue":
-            r = self.do_action_move_workset_to_another_queue(euid, action_ds)
-        elif action_method == "do_stamp_plates_into_plate":
-            r = self.do_stamp_plates_into_plate(euid, action_ds)
-        elif action_method == "do_action_download_file":
-            r = self.do_action_download_file(euid, action_ds)
-        elif action_method == "do_action_add_file_to_file_set":
-            r = self.do_action_add_file_to_file_set(euid, action_ds)
-        elif action_method == "do_action_remove_file_from_file_set":
-            r = self.do_action_remove_file_from_file_set(euid, action_ds)
-        elif action_method == "do_action_add_relationships":
-            r = self.do_action_add_relationships(euid, action_ds)
-        elif action_method == "do_action_create_subject_and_anchor":
-            r = self.do_action_create_subject_and_anchor(euid, action_ds)
+        action_code = str(action_ds.get("action_key") or action or "").strip("/")
+        parts = [p for p in action_code.split("/") if p]
+        if len(parts) >= 3:
+            action_name = parts[2]
+        elif parts:
+            action_name = parts[-1]
         else:
-            raise Exception(f"Unknown do_action method {action_method}")
+            raise Exception("Missing action key for action execution")
 
+        handler_name = f"do_action_{action_name}"
+        handler = getattr(self, handler_name, None)
+        if not callable(handler):
+            raise Exception(f"Unknown action handler {handler_name}")
+
+        now_dt = get_datetime_string()
+        if handler_name == "do_action_set_object_status":
+            r = handler(euid, action_ds, action_group, action)
+        else:
+            r = handler(euid, action_ds)
         self._do_action_base(euid, action, action_group, action_ds, now_dt)
         return r
 

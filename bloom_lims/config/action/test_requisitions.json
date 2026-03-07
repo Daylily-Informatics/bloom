@@ -1,7 +1,7 @@
 {
   "add_container_to_assay_q": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Add Specimen to Assay Queue",
@@ -48,7 +48,7 @@
   },
   "add_container_to_assay_q__pan_cancer_panel": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Add Specimen to Assay Queue",
@@ -95,7 +95,7 @@
   },
   "set_verification_state": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Verify Test Req",

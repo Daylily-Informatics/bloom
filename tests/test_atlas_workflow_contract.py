@@ -209,6 +209,8 @@ def test_create_specimen_with_existing_container_contract(monkeypatch):
         assert specimen["specimen_euid"]
         assert specimen["container_euid"] == container["euid"]
         assert specimen["atlas_refs"]["order_number"].startswith("ORD-")
+        assert "atlas_refs" not in specimen["properties"]
+        assert "atlas_validation" not in specimen["properties"]
 
 
 def test_container_context_validation_mismatch_returns_400(monkeypatch):
@@ -255,7 +257,7 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
     assert "mismatch" in response.json()["detail"].lower()
 
 
-def test_container_context_summary_persisted_in_validation_metadata(monkeypatch):
+def test_container_context_summary_is_projected_through_explicit_reference_objects(monkeypatch):
     class _ContextMatchingAtlasService(_FakeAtlasLookupService):
         def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
             _ = container_euid
@@ -266,7 +268,7 @@ def test_container_context_summary_persisted_in_validation_metadata(monkeypatch)
                     "order": {"order_number": "ORD-MATCH"},
                     "patient": {"patient_id": "PAT-MATCH"},
                     "test_orders": [{"test_order_id": "TO-1"}, {"test_order_id": "TO-2"}],
-                    "links": {"testkit_barcode": "KIT-MATCH", "package_number": "PKG-MATCH"},
+                    "links": {"testkit_barcode": "KIT-MATCH", "shipment_number": "SHIP-MATCH"},
                 },
                 from_cache=False,
                 stale=False,
@@ -290,18 +292,18 @@ def test_container_context_summary_persisted_in_validation_metadata(monkeypatch)
                     "order_number": "ORD-MATCH",
                     "patient_id": "PAT-MATCH",
                     "kit_barcode": "KIT-MATCH",
-                    "package_number": "PKG-MATCH",
+                    "shipment_number": "SHIP-MATCH",
                 },
             },
             idempotency_key=_opaque("idem", 16),
         )
 
-    validation = created["properties"].get("atlas_validation", {})
-    assert "container_trf_context" in validation
-    summary = validation["container_trf_context"]["summary"]
-    assert summary["order_number"] == "ORD-MATCH"
-    assert summary["patient_id"] == "PAT-MATCH"
-    assert summary["test_order_count"] == 2
+    assert created["atlas_refs"]["order_number"] == "ORD-MATCH"
+    assert created["atlas_refs"]["patient_id"] == "PAT-MATCH"
+    assert created["atlas_refs"]["kit_barcode"] == "KIT-MATCH"
+    assert created["atlas_refs"]["shipment_number"] == "SHIP-MATCH"
+    assert "atlas_refs" not in created["properties"]
+    assert "atlas_validation" not in created["properties"]
 
 
 def test_create_specimen_auto_container_contract(monkeypatch):

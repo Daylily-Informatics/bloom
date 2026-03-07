@@ -18,7 +18,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-import matplotlib.pyplot as plt
 import pandas as pd
 from fastapi import (
     APIRouter,
@@ -41,6 +40,11 @@ from bloom_lims.bvars import BloomVars
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import require_auth
 from bloom_lims.gui.jinja import templates
+
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:  # pragma: no cover - optional GUI dependency
+    plt = None
 
 
 router = APIRouter()
@@ -765,6 +769,9 @@ async def visual_report(request: Request):
     import base64
     import io
 
+    if plt is None:
+        raise HTTPException(status_code=503, detail="matplotlib is required for visual reports")
+
     file_path = "~/Downloads/dewey_search.tsv"
     data = pd.read_csv(file_path, sep="\t")
 
@@ -1124,4 +1131,3 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
             writer.writerow({**row, **result})
 
     return FileResponse(fin_tsv_path, media_type="text/tab-separated-values")
-

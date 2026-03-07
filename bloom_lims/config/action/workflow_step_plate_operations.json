@@ -1,7 +1,7 @@
 {
   "stamp_copy_plate": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {
           "workflow_step/plate-operations/stamp-copy-plate/*/": {
             "json_addl": {
@@ -42,7 +42,7 @@
   },
   "cfdna_quant": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {
           "workflow_step/analysis/gdna-quantified/*/": {
             "json_addl": {

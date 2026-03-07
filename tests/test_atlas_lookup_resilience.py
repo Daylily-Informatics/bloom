@@ -38,23 +38,26 @@ def test_atlas_client_prefers_integration_lookup_path(monkeypatch):
     assert calls[0].endswith("/api/integrations/bloom/v1/lookups/orders/ORD-100")
 
 
-def test_atlas_client_falls_back_to_legacy_lookup_path(monkeypatch):
+def test_atlas_client_does_not_fall_back_to_legacy_lookup_path(monkeypatch):
     calls = []
 
     def fake_get(url, headers=None, timeout=None, verify=None):
         calls.append(url)
-        if url.endswith("/api/integrations/bloom/v1/lookups/orders/ORD-101"):
-            return _FakeResponse(404, {"detail": "not found"})
-        return _FakeResponse(200, {"order_number": "ORD-101"})
+        return _FakeResponse(404, {"detail": "not found"})
 
     monkeypatch.setattr(atlas_client_mod.requests, "get", fake_get)
     client = AtlasClient(base_url="https://atlas.example.org", token="tok")
 
-    payload = client.get_order("ORD-101")
-    assert payload["order_number"] == "ORD-101"
-    assert len(calls) == 2
+    try:
+        client.get_order("ORD-101")
+    except AtlasClientError as exc:
+        assert exc.status_code == 404
+        assert exc.path == "/api/integrations/bloom/v1/lookups/orders/ORD-101"
+    else:  # pragma: no cover - defensive
+        raise AssertionError("Expected AtlasClientError for 404 lookup response")
+
+    assert len(calls) == 1
     assert calls[0].endswith("/api/integrations/bloom/v1/lookups/orders/ORD-101")
-    assert calls[1].endswith("/api/orders/ORD-101")
 
 
 def test_atlas_service_returns_stale_cached_payload_on_upstream_error(monkeypatch):

@@ -1,7 +1,7 @@
 {
   "cfdna_post_extraction_quant": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {
           "workflow_step/extraction-steps/cfdna-quantified/*/": {
             "json_addl": {

@@ -1,7 +1,7 @@
 {
   "set-child-object": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Set Object As Child",
         "method_name": "do_action_set_child_object",
         "action_executed": "0",

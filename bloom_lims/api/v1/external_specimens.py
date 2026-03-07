@@ -111,7 +111,6 @@ async def find_external_specimens_by_reference(
     order_number: str | None = Query(None),
     patient_id: str | None = Query(None),
     shipment_number: str | None = Query(None),
-    package_number: str | None = Query(None),
     kit_barcode: str | None = Query(None),
     user: APIUser = Depends(require_external_token_auth),
 ):
@@ -119,7 +118,6 @@ async def find_external_specimens_by_reference(
         order_number=order_number,
         patient_id=patient_id,
         shipment_number=shipment_number,
-        package_number=package_number,
         kit_barcode=kit_barcode,
     )
     service = ExternalSpecimenService(app_username=user.email)

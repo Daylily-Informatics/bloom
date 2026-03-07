@@ -46,76 +46,17 @@ class AtlasClient:
     def is_configured(self) -> bool:
         return bool(self.base_url and self.token)
 
-    def _get_with_fallback(self, preferred_path: str, fallback_path: str, *, label: str) -> dict[str, Any]:
-        try:
-            return self._get_json(preferred_path)
-        except AtlasClientError:
-            logger.warning(
-                "Atlas preferred lookup path failed for %s; falling back to legacy path (%s -> %s)",
-                label,
-                preferred_path,
-                fallback_path,
-            )
-            return self._get_json(fallback_path)
-
     def get_order(self, order_number: str) -> dict[str, Any]:
-        return self._get_with_fallback(
-            f"/api/integrations/bloom/v1/lookups/orders/{order_number}",
-            f"/api/orders/{order_number}",
-            label="order lookup",
-        )
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/orders/{order_number}")
 
     def get_patient(self, patient_id: str) -> dict[str, Any]:
-        return self._get_with_fallback(
-            f"/api/integrations/bloom/v1/lookups/patients/{patient_id}",
-            f"/api/patients/{patient_id}",
-            label="patient lookup",
-        )
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/patients/{patient_id}")
 
     def get_shipment(self, shipment_number: str) -> dict[str, Any]:
-        return self._get_with_fallback(
-            f"/api/integrations/bloom/v1/lookups/shipments/{shipment_number}",
-            f"/api/shipments/{shipment_number}",
-            label="shipment lookup",
-        )
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/shipments/{shipment_number}")
 
     def get_testkit(self, kit_barcode: str) -> dict[str, Any]:
-        # Preferred org-scoped integration lookup route.
-        try:
-            return self._get_json(f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}")
-        except AtlasClientError:
-            logger.warning(
-                "Atlas preferred integration testkit lookup failed; falling back to legacy paths"
-            )
-
-        # Secondary fallback direct route if Atlas exposes it.
-        try:
-            return self._get_json(f"/api/testkits/{kit_barcode}")
-        except AtlasClientError:
-            logger.debug("Direct Atlas testkit endpoint not available, falling back to search")
-
-        payload = {
-            "query": kit_barcode,
-            "record_types": ["testkit"],
-            "filters": {"barcode": [kit_barcode]},
-            "page": 1,
-            "page_size": 10,
-        }
-        result = self._post_json("/api/search/v2/query", payload)
-        items = result.get("items", [])
-        if not isinstance(items, list):
-            raise AtlasClientError("Atlas testkit search returned malformed payload")
-        for item in items:
-            barcode = (
-                item.get("barcode")
-                or item.get("kit_barcode")
-                or item.get("properties", {}).get("barcode")
-            )
-            if str(barcode).strip() == str(kit_barcode).strip():
-                return item
-        if items:
-            return items[0]
-        raise AtlasClientError(f"Atlas testkit not found for barcode '{kit_barcode}'")
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}")
 
     def get_container_trf_context(self, container_euid: str, tenant_id: str) -> dict[str, Any]:
         path = f"/api/integrations/bloom/v1/lookups/containers/{container_euid}/trf-context"

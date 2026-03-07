@@ -1,7 +1,7 @@
 {
   "add-container-to": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "attach_under_root_workflow": {},
         "workflow_to_attach": {},
@@ -36,7 +36,7 @@
   },
   "remove-container-from": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {},
         "test_requisition_obj": {},
@@ -70,7 +70,7 @@
   },
   "download-inventory-tsv": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {},
         "test_requisition_obj": {},
@@ -104,7 +104,7 @@
   },
   "log-temperature": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {
           "data/generic/temperature-log/*/": {

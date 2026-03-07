@@ -1,7 +1,7 @@
 {
   "download_plate_map": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Download Plate Map TSV",
@@ -34,7 +34,7 @@
   },
   "stamp_plates_into_plate": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Stamp plates into plate",
@@ -80,7 +80,7 @@
   },
   "stamp_plates_into_plate__extraction_plate_filled": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_enabled": "1",
         "action_executed": "0",
         "action_name": "Add Plates to Plate",

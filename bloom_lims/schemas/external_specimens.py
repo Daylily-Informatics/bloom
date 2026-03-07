@@ -11,14 +11,7 @@ class AtlasReferences(BaseModel):
     order_number: str | None = None
     patient_id: str | None = None
     shipment_number: str | None = None
-    package_number: str | None = None
     kit_barcode: str | None = None
-
-    @model_validator(mode="after")
-    def normalize_package_alias(self) -> "AtlasReferences":
-        if self.package_number and not self.shipment_number:
-            self.shipment_number = self.package_number
-        return self
 
 
 class ExternalSpecimenCreateRequest(BaseModel):
@@ -38,7 +31,6 @@ class ExternalSpecimenCreateRequest(BaseModel):
                 refs.order_number,
                 refs.patient_id,
                 refs.shipment_number,
-                refs.package_number,
                 refs.kit_barcode,
             ]
         ):
@@ -67,4 +59,3 @@ class ExternalSpecimenResponse(BaseModel):
 class ExternalSpecimenLookupResponse(BaseModel):
     items: list[ExternalSpecimenResponse]
     total: int
-

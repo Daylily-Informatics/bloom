@@ -1,7 +1,7 @@
 {
   "set_object_status": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Set Status",
         "method_name": "do_action_set_object_status",
         "action_executed": "0",
@@ -29,7 +29,7 @@
   },
   "print_barcode_label": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Print Label",
         "method_name": "do_action_print_barcode_label",
         "action_executed": "0",
@@ -61,7 +61,7 @@
   },
   "add-relationships": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Add Parent or Child Relationship(s)",
         "method_name": "do_action_add_relationships",
         "action_executed": "0",
@@ -85,7 +85,7 @@
   },
   "create-subject-and-anchor": {
     "1.0": {
-      "action_template": {
+      "action_definition": {
         "action_name": "Create Subject (Decision Scope)",
         "method_name": "do_action_create_subject_and_anchor",
         "action_executed": "0",
