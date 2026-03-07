@@ -16,7 +16,13 @@ import re
 
 
 @pytest.fixture
-def s3_bucket():
+def s3_bucket(monkeypatch):
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    monkeypatch.delenv("AWS_DEFAULT_PROFILE", raising=False)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
     with mock_aws():
         s3 = boto3.client('s3', region_name='us-east-1')
         bucket_name = 'daylily-dewey-0'
