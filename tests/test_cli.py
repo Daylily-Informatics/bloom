@@ -122,6 +122,7 @@ class TestDbSubcommands:
         )
         monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
         monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "5566")
+        monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: "8912")
         monkeypatch.setattr(
             db_commands,
             "_run_tapdb",
@@ -146,6 +147,8 @@ class TestDbSubcommands:
                     "dev",
                     "--db-port",
                     "dev=5566",
+                    "--ui-port",
+                    "dev=8912",
                 ],
                 True,
             ),
@@ -153,6 +156,93 @@ class TestDbSubcommands:
             (["pg", "start-local", "dev", "--port", "5566"], True),
             (["db", "setup", "dev", "--include-workflow"], True),
         ]
+
+    def test_ensure_tapdb_namespace_config_fills_required_metadata(
+        self, monkeypatch, tmp_path
+    ):
+        """TapDB namespace config bootstrap should fill Bloom-required metadata."""
+        calls = []
+        config_path = tmp_path / "tapdb-config.yaml"
+        config_path.write_text(
+            "\n".join(
+                [
+                    "meta:",
+                    "  config_version: 2",
+                    "  client_id: bloom",
+                    "  database_name: bloom",
+                    "environments:",
+                    "  dev:",
+                    "    engine_type: local",
+                    "    host: localhost",
+                    '    port: "5566"',
+                    '    ui_port: "8912"',
+                    '    user: "postgres"',
+                    '    password: ""',
+                    '    database: "tapdb_bloom_dev"',
+                    '    cognito_user_pool_id: ""',
+                    '    audit_log_euid_prefix: ""',
+                    '    support_email: ""',
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(
+            db_commands,
+            "_runtime_env",
+            lambda: {
+                "TAPDB_CLIENT_ID": "bloom",
+                "TAPDB_DATABASE_NAME": "bloom",
+            },
+        )
+        monkeypatch.setattr(
+            db_commands,
+            "_tapdb_namespace_config_path",
+            lambda _client_id, _database_name: config_path,
+        )
+        monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "5566")
+        monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: "8912")
+        monkeypatch.setattr(
+            db_commands,
+            "_tapdb_audit_log_euid_prefix",
+            lambda _env: "TAG",
+        )
+        monkeypatch.setattr(
+            db_commands,
+            "_tapdb_support_email",
+            lambda _env: "support@dyly.bio",
+        )
+        monkeypatch.setattr(
+            db_commands,
+            "_run_tapdb",
+            lambda args, check=True: calls.append((args, check)) or 0,
+        )
+
+        db_commands._ensure_tapdb_namespace_config("dev")
+
+        assert calls == [
+            (
+                [
+                    "config",
+                    "init",
+                    "--client-id",
+                    "bloom",
+                    "--database-name",
+                    "bloom",
+                    "--env",
+                    "dev",
+                    "--db-port",
+                    "dev=5566",
+                    "--ui-port",
+                    "dev=8912",
+                ],
+                True,
+            )
+        ]
+        text = config_path.read_text(encoding="utf-8")
+        assert 'audit_log_euid_prefix: TAG' in text
+        assert 'support_email: support@dyly.bio' in text
 
     def test_db_migrate_help(self, runner):
         """Test bloom db migrate --help."""

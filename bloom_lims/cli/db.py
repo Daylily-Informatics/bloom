@@ -22,6 +22,8 @@ from bloom_lims.config import (
 
 console = Console()
 
+_DEFAULT_AUDIT_LOG_EUID_PREFIX = "TAG"
+
 
 def _bloom_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -115,6 +117,75 @@ def _local_pg_port(env_name: str) -> str:
     ).strip()
 
 
+def _local_ui_port(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_UI_PORT"
+    return (env.get(scoped_key) or env.get("BLOOM_UI_PORT") or "8912").strip()
+
+
+def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_AUDIT_LOG_EUID_PREFIX"
+    return (
+        env.get(scoped_key)
+        or env.get("BLOOM_TAPDB_AUDIT_LOG_EUID_PREFIX")
+        or _DEFAULT_AUDIT_LOG_EUID_PREFIX
+    ).strip()
+
+
+def _tapdb_support_email(env_name: str) -> str:
+    env = _runtime_env()
+    scoped_key = f"TAPDB_{env_name.upper()}_SUPPORT_EMAIL"
+    return (
+        env.get(scoped_key)
+        or env.get("BLOOM_UI__SUPPORT_EMAIL")
+        or get_settings().ui.support_email
+    ).strip()
+
+
+def _tapdb_namespace_config_path(client_id: str, database_name: str) -> Path:
+    env = _runtime_env()
+    explicit_path = (env.get("TAPDB_CONFIG_PATH") or "").strip()
+    if explicit_path:
+        return Path(explicit_path).expanduser()
+    return Path.home() / ".config" / "tapdb" / client_id / database_name / "tapdb-config.yaml"
+
+
+def _normalize_tapdb_namespace_config(env_name: str, client_id: str, database_name: str) -> None:
+    import yaml
+
+    config_path = _tapdb_namespace_config_path(client_id, database_name)
+    if not config_path.exists():
+        return
+
+    with config_path.open(encoding="utf-8") as handle:
+        root = yaml.safe_load(handle) or {}
+    if not isinstance(root, dict):
+        return
+
+    envs = root.get("environments")
+    if not isinstance(envs, dict):
+        return
+
+    env_cfg = envs.get(env_name)
+    if not isinstance(env_cfg, dict):
+        return
+
+    updated = False
+    if not str(env_cfg.get("audit_log_euid_prefix") or "").strip():
+        env_cfg["audit_log_euid_prefix"] = _tapdb_audit_log_euid_prefix(env_name)
+        updated = True
+    if not str(env_cfg.get("support_email") or "").strip():
+        env_cfg["support_email"] = _tapdb_support_email(env_name)
+        updated = True
+    if not updated:
+        return
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with config_path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(root, handle, sort_keys=False)
+
+
 def _run_tapdb(args: List[str], check: bool = True) -> int:
     cmd = _tapdb_base_cmd() + args
     env = _runtime_env()
@@ -143,8 +214,16 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
         env_name,
     ]
     if env_name in {"dev", "test"}:
-        args.extend(["--db-port", f"{env_name}={_local_pg_port(env_name)}"])
+        args.extend(
+            [
+                "--db-port",
+                f"{env_name}={_local_pg_port(env_name)}",
+                "--ui-port",
+                f"{env_name}={_local_ui_port(env_name)}",
+            ]
+        )
     _run_tapdb(args)
+    _normalize_tapdb_namespace_config(env_name, client_id, database_name)
 
 
 def _seed_bloom_templates() -> None:
