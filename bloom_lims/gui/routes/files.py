@@ -220,7 +220,7 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
 
     accordion_states = dict(request.session)
     user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
+    style = {"skin_css": user_data.get("style_css", "/static/modern/css/bloom_modern.css")}
     upload_group_key = generate_unique_upload_key()
 
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -314,21 +314,10 @@ async def dewey(request: Request, _auth=Depends(require_auth)):
 
 @router.get("/bulk_create_files", response_class=HTMLResponse)
 async def bulk_create_files(request: Request, _auth=Depends(require_auth)):
-    request.session.pop("form_data", None)
-
-    accordion_states = dict(request.session)
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/bulk_create_files.html").render(
-        request=request,
-        accordion_states=accordion_states,
-        style=style,
-        udat=user_data,
-        page_title="Bulk Create Files",
+    return JSONResponse(
+        status_code=410,
+        content={"detail": "Legacy bulk-create-files page has been retired. Use /dewey."},
     )
-
-    return HTMLResponse(content=content)
 
 
 @router.post("/create_file")
@@ -507,13 +496,22 @@ async def create_file(
                             }
                         )
 
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-        content = templates.get_template("legacy/create_file_report.html").render(
-            request=request, results=results, style=style, udat=user_data
+        rows = []
+        for item in results:
+            rows.append(
+                "<tr>"
+                f"<td>{item.get('identifier','')}</td>"
+                f"<td>{item.get('status','')}</td>"
+                f"<td>{item.get('original','')}</td>"
+                "</tr>"
+            )
+        content = (
+            "<html><body><h2>File Create Report</h2>"
+            "<table border='1'><thead><tr><th>Identifier</th><th>Status</th><th>Original</th></tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table><p><a href='/dewey'>Back to Dewey</a></p>"
+            "</body></html>"
         )
-
-        return HTMLResponse(content=content)
+        return HTMLResponse(content=content, status_code=200)
 
     except ValueError as ve:
         logging.error("Input error: %s", ve)
@@ -522,19 +520,10 @@ async def create_file(
     except Exception as e:
         logging.error("Error creating file: %s", e)
 
-        accordion_states = dict(request.session)
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-        content = templates.get_template("legacy/dewey.html").render(
-            request=request,
-            error=f"An error occurred: {e}",
-            accordion_states=accordion_states,
-            style=style,
-            controlled_properties=controlled_properties,
-            udat=user_data,
+        return HTMLResponse(
+            content=f"<html><body><h2>Error creating file: {e}</h2><p><a href='/dewey'>Back to Dewey</a></p></body></html>",
+            status_code=500,
         )
-
-        return HTMLResponse(content=content)
 
 
 @router.post("/download_file", response_class=HTMLResponse)
@@ -572,34 +561,27 @@ async def download_file(
                 }
             )
 
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-        content = templates.get_template("legacy/trigger_downloads.html").render(
-            request=request,
-            file_download_path=downloaded_file_path,
-            metadata_download_path=metadata_yaml_path,
-            style=style,
-            udat=user_data,
+        content = (
+            "<html><body><h2>Download Ready</h2>"
+            f"<p>File: {downloaded_file_path}</p>"
+            f"<p>Metadata: {metadata_yaml_path or 'N/A'}</p>"
+            "<p><a href='/dewey'>Back to Dewey</a></p>"
+            "</body></html>"
         )
-
-        return HTMLResponse(content=content)
+        return HTMLResponse(content=content, status_code=200)
 
     except Exception as e:
         logging.error("Error downloading file: %s", e)
 
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
         offending_file = str(e).split("/tmp/")[-1]
-
-        content = templates.get_template("legacy/download_error.html").render(
-            request=request,
-            error=f"An error occurred: {e}",
-            style=style,
-            udat=user_data,
-            offending_file=offending_file,
+        return HTMLResponse(
+            content=(
+                "<html><body><h2>Download Error</h2>"
+                f"<p>{e}</p><p>Offending file: {offending_file}</p>"
+                "<p><a href='/dewey'>Back to Dewey</a></p></body></html>"
+            ),
+            status_code=500,
         )
-
-        return HTMLResponse(content=content)
 
 
 def delete_file(file_path: Path):
@@ -766,91 +748,18 @@ async def search_file_sets(
 
 @router.get("/visual_report", response_class=HTMLResponse)
 async def visual_report(request: Request):
-    import base64
-    import io
-
-    if plt is None:
-        raise HTTPException(status_code=503, detail="matplotlib is required for visual reports")
-
-    file_path = "~/Downloads/dewey_search.tsv"
-    data = pd.read_csv(file_path, sep="\t")
-
-    file_types = data["file_type"].value_counts()
-    file_sizes = data["original_file_size_bytes"].dropna()
-    upload_users = data["upload_ui_user"].value_counts()
-
-    plots = []
-
-    def create_plot(series, title, xlabel, ylabel, plot_type="bar"):
-        fig, ax = plt.subplots()
-        if plot_type == "bar":
-            series.plot(kind="bar", ax=ax)
-        elif plot_type == "hist":
-            series.plot(kind="hist", ax=ax, bins=30)
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        figfile = io.BytesIO()
-        plt.savefig(figfile, format="png")
-        figfile.seek(0)
-        return base64.b64encode(figfile.getvalue()).decode("utf8")
-
-    file_types_img = create_plot(file_types, "Distribution of File Types", "File Type", "Count", "bar")
-    file_sizes_img = create_plot(
-        file_sizes,
-        "Distribution of File Sizes",
-        "File Size (bytes)",
-        "Frequency",
-        "hist",
+    return JSONResponse(
+        status_code=410,
+        content={"detail": "Legacy visual report page has been retired."},
     )
-    upload_users_img = create_plot(upload_users, "Files Uploaded by User", "User", "Number of Files", "bar")
-
-    plots.append(file_types_img)
-    plots.append(file_sizes_img)
-    plots.append(upload_users_img)
-
-    template = templates.get_template("legacy/visual_report.html")
-    context = {"request": request, "plots": plots}
-
-    return HTMLResponse(content=template.render(context), status_code=200)
 
 
 @router.get("/create_instance/{template_euid}", response_class=HTMLResponse)
 async def create_instance_form(request: Request, template_euid: str, _auth=Depends(require_auth)):
-    bobj = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-
-    template_instance = bobj.get_by_euid(template_euid)
-    template_data = template_instance.json_addl
-
-    form_fields = generate_form_fields(template_data)
-    ui_form_properties = template_data.get("ui_form_properties", [])
-    ui_form_fields = generate_ui_form_fields(
-        ui_form_properties, template_data.get("controlled_properties", {})
+    return JSONResponse(
+        status_code=410,
+        content={"detail": "Legacy create-instance form has been retired. Use /create_object."},
     )
-
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    controlled_properties_js = json.dumps(template_data.get("controlled_properties", {}))
-
-    content = templates.get_template("legacy/create_instance_form.html").render(
-        request=request,
-        fields=form_fields,
-        ui_fields=ui_form_fields,
-        style=style,
-        udat=user_data,
-        template_euid=template_euid,
-        polymorphic_discriminator=template_instance.polymorphic_discriminator,
-        category=template_instance.category,
-        type=template_instance.type,
-        subtype=template_instance.subtype,
-        version=template_instance.version,
-        name=template_instance.name,
-        controlled_properties=template_data.get("controlled_properties", {}),
-        has_ui_form_properties=bool(ui_form_properties),
-        controlled_properties_js=controlled_properties_js,
-    )
-    return HTMLResponse(content=content)
 
 
 @router.post("/create_instance")
@@ -895,17 +804,13 @@ async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_au
                     }
                 )
 
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-        context = {
-            "request": request,
-            "file_set": file_set,
-            "shared_refs": shared_refs,
-            "style": style,
-            "udat": user_data,
-        }
-        content = templates.get_template("legacy/file_set_urls.html").render(context)
-        return HTMLResponse(content=content)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "file_set_euid": file_set.euid,
+                "shared_refs": shared_refs,
+            },
+        )
 
     except Exception as e:
         logging.error("Error fetching file set URLs: %s", e)
@@ -916,26 +821,10 @@ async def file_set_urls(request: Request, fs_euid: str, _auth=Depends(require_au
 
 @router.get("/admin_template", response_class=HTMLResponse)
 async def get_admin_template(request: Request, euid: str = Query(...)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    obj = bobdb.get_by_euid(euid)
-
-    if not obj:
-        raise HTTPException(status_code=404, detail="Object not found")
-
-    controlled_properties = obj.json_addl.get("controlled_properties", {})
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    template = templates.get_template("legacy/admin_template.html")
-    context = {
-        "request": request,
-        "euid": euid,
-        "controlled_properties": json.dumps(controlled_properties, indent=4),
-        "udat": user_data,
-        "style": style,
-    }
-
-    return HTMLResponse(content=template.render(context))
+    return JSONResponse(
+        status_code=410,
+        content={"detail": "Legacy template-admin page has been retired."},
+    )
 
 
 @router.post("/admin_template", response_class=HTMLResponse)
@@ -944,20 +833,10 @@ async def post_admin_template(
     euid: str = Form(...),
     controlled_properties: str = Form(...),
 ):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    obj = bobdb.get_by_euid(euid)
-
-    if not obj:
-        raise HTTPException(status_code=404, detail="Object not found")
-
-    try:
-        obj.json_addl["controlled_properties"] = json.loads(controlled_properties)
-        flag_modified(obj, "json_addl")
-        bobdb.session.commit()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return RedirectResponse(url=f"/admin_template?euid={euid}", status_code=303)
+    return JSONResponse(
+        status_code=410,
+        content={"detail": "Legacy template-admin page has been retired."},
+    )
 
 
 @router.get("/serve_endpoint/{file_path:path}", response_class=HTMLResponse)

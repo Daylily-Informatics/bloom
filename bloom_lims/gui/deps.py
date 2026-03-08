@@ -17,7 +17,7 @@ from bloom_lims.gui.errors import AuthenticationRequiredException, MissingCognit
 
 
 DEFAULT_USER_PREFERENCES = {
-    "style_css": "/static/legacy/skins/bloom.css",
+    "style_css": "/static/modern/css/bloom_modern.css",
 }
 
 
@@ -153,4 +153,3 @@ def _is_tapdb_reachable(timeout_seconds: float = 0.75) -> bool:
             return True
     except Exception:
         return False
-

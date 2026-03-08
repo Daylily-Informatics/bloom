@@ -1,9 +1,3 @@
-<div class="mb-3">
-    <a href="/bulk_create_files" class="btn btn-outline">
-        <i class="fas fa-list me-1"></i> Bulk File Creation
-    </a>
-</div>
-
 <form id="createFileForm" data-form="register" action="/create_file" method="post" enctype="multipart/form-data">
     <input type="hidden" name="upload_group_key_ifnone" value="{{ upload_group_key }}">
     <input type="hidden" value="na" id="name" name="name">
@@ -134,4 +128,3 @@ document.addEventListener('DOMContentLoaded', () => {
     if (timeInpute) timeInpute.addEventListener('change', updateMergedFielde);
 });
 </script>
-

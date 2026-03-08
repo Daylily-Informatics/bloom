@@ -121,9 +121,6 @@
             <a href="/euid_details?euid={{ obj_dict.parent_template_euid }}" class="link-euid">{{ obj_dict.parent_template_euid }}</a>
             {% else %}
             <span class="badge badge-info">TEMPLATE</span>
-            <a href="/admin_template?euid={{ obj.euid }}" class="btn btn-outline btn-sm" style="margin-left: var(--spacing-xs);">
-              <i class="fas fa-edit"></i> Admin Edit
-            </a>
             {% endif %}
           </div>
         </div>
@@ -697,7 +694,7 @@
 
 {% block extra_js %}
 <!-- Action Buttons (shared functions for workflow actions) -->
-<script src="/static/legacy/action_buttons.js"></script>
+<script src="/static/modern/js/action_buttons.js"></script>
 <!-- JSONEditor JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.js"></script>
 <script>

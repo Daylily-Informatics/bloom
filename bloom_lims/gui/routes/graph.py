@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3
@@ -137,8 +137,7 @@ def _build_graph_elements_for_start(bobj: BloomObj, start_euid: str, depth: int)
 
 @router.get("/dagg", response_class=HTMLResponse)
 async def dagg(request: Request, _auth=Depends(require_auth)):
-    content = templates.get_template("legacy/dag.html").render()
-    return HTMLResponse(content=content)
+    return RedirectResponse(url="/dindex2", status_code=303)
 
 
 @router.get("/dindex2", response_class=HTMLResponse)

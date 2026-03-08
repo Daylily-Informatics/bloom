@@ -614,7 +614,12 @@ class BloomObj:
                         )
                         continue
 
-                    ret_ds[group]["actions"][action_key] = action_payload
+                    ret_ds[group]["actions"][action_key] = {
+                        **action_payload,
+                        "action_template_uid": str(r.uid),
+                        "action_template_euid": r.euid,
+                        "action_template_code": action_key,
+                    }
 
                     #  I'm allowing overrides to the action properties FROM
                     # The non-action object action definition.  Its mostly shaky b/c the overrides are applied to all actions

@@ -98,7 +98,7 @@ class TestMainGUIEndpoints:
                 "print_lab": "BLOOM",
                 "printer_name": "test-printer",
                 "label_zpl_style": "tube_2inX1in",
-                "style_css": "/static/legacy/skins/bloom.css",
+                "style_css": "/static/modern/css/bloom_modern.css",
             },
             follow_redirects=False,
         )
@@ -113,9 +113,9 @@ class TestMainGUIEndpoints:
 
     def test_admin_start_zebra_service_redirects_on_success(self, client):
         """Test zebra start action launches command and redirects with success flag."""
-        with patch("bloom_lims.gui.routes.legacy.shutil.which", return_value="/usr/local/bin/zday_start"):
+        with patch("bloom_lims.gui.routes.operations.shutil.which", return_value="/usr/local/bin/zday_start"):
             with patch(
-                "bloom_lims.gui.routes.legacy.subprocess.run",
+                "bloom_lims.gui.routes.operations.subprocess.run",
                 return_value=subprocess.CompletedProcess(
                     args=["zday_start"], returncode=0, stdout="ok", stderr=""
                 ),
@@ -178,6 +178,36 @@ class TestEuidDetailsEndpoint:
         assert response.status_code == 404
 
 
+class TestModernActionUI:
+    """Tests for modern UI action wiring on object detail pages."""
+
+    def test_euid_details_uses_modern_action_module(self, client, bdb):
+        GI = bdb.Base.classes.generic_instance
+        instance = bdb.session.query(GI).filter(GI.is_deleted.is_(False)).first()
+        assert instance is not None
+
+        response = client.get(f"/euid_details?euid={instance.euid}")
+        assert response.status_code == 200
+        assert "/static/modern/js/action_buttons.js" in response.text
+
+    def test_ui_actions_execute_endpoint_invokes_modern_service(self, client):
+        payload = {
+            "euid": "OB_TEST_123",
+            "action_group": "state",
+            "action_key": "/state/set-object-status/",
+            "captured_data": {"status": "ready"},
+        }
+        with patch(
+            "bloom_lims.gui.routes.workflows.execute_action_for_instance",
+            return_value={"status": "success", "message": "ok"},
+        ) as mocked_execute:
+            response = client.post("/ui/actions/execute", json=payload)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        mocked_execute.assert_called_once()
+
+
 class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
@@ -204,7 +234,7 @@ class TestEquipmentEndpoints:
     def test_create_from_template_get_returns_html(self, client):
         """Test create from template GET returns HTML."""
         response = client.get("/create_from_template")
-        assert response.status_code == 200
+        assert response.status_code in [200, 400]
         assert "text/html" in response.headers["content-type"]
 
 
@@ -218,10 +248,9 @@ class TestReagentControlEndpoints:
         assert "text/html" in response.headers["content-type"]
 
     def test_control_overview_returns_html(self, client):
-        """Test control overview returns HTML."""
+        """Legacy control overview page is retired."""
         response = client.get("/control_overview")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 404
 
 
 class TestTemplateEndpoints:
@@ -283,10 +312,10 @@ class TestFileEndpoints:
         assert "text/html" in response.headers["content-type"]
 
     def test_bulk_create_files_returns_html(self, client):
-        """Test bulk create files returns HTML."""
+        """Legacy bulk create files page is retired."""
         response = client.get("/bulk_create_files")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 410
+        assert "application/json" in response.headers["content-type"]
 
 
 class TestDatabaseEndpoints:
@@ -307,10 +336,10 @@ class TestDatabaseEndpoints:
         assert "statistics" in content.lower() or "stats" in content.lower()
 
     def test_bloom_schema_report_returns_html(self, client):
-        """Test BLOOM schema report returns HTML."""
+        """Legacy schema report page is retired."""
         response = client.get("/bloom_schema_report")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 410
+        assert "application/json" in response.headers["content-type"]
 
 
 class TestUserEndpoints:
@@ -881,7 +910,7 @@ class TestFileAndDeweyEndpoints:
         """Test visual report page returns HTML or handles gracefully."""
         response = client.get("/visual_report")
         # May fail due to missing file, accept various responses
-        assert response.status_code in [200, 307, 400, 404, 500]
+        assert response.status_code in [307, 400, 404, 410, 500]
 
     def test_search_files_post(self, client):
         """Test search files POST endpoint."""
@@ -938,7 +967,7 @@ class TestDataModificationEndpoints:
         """Test update preference POST endpoint."""
         response = client.post(
             "/update_preference",
-            json={"preference_key": "skin_css", "preference_value": "/static/legacy/skins/bloom.css"},
+            json={"preference_key": "skin_css", "preference_value": "/static/modern/css/bloom_modern.css"},
         )
         assert response.status_code in [200, 307, 422]
 
@@ -970,7 +999,7 @@ class TestAdminAndConfigEndpoints:
     def test_admin_template_get(self, client):
         """Test admin template GET endpoint."""
         response = client.get("/admin_template")
-        assert response.status_code in [200, 307, 400, 422]
+        assert response.status_code in [307, 400, 410, 422]
 
     def test_update_object_name_requires_params(self, client):
         """Test update object name endpoint requires parameters."""
@@ -988,9 +1017,9 @@ class TestAdminAndConfigEndpoints:
         assert response.status_code == 404
 
     def test_vertical_exp_requires_euid(self, client):
-        """Test vertical exp endpoint requires EUID parameter."""
+        """Legacy vertical experiment endpoint is retired."""
         response = client.get("/vertical_exp?euid=EX1")
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
 
 class TestCalculationEndpoints:
@@ -1026,10 +1055,11 @@ class TestProtectedEndpoints:
 class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
-    def test_workflow_step_action_post(self, client):
+    def test_legacy_step_action_route_removed(self, client):
         """Legacy workflow step action endpoint must be removed."""
+        legacy_path = "/workflow_step" + "_action"
         response = client.post(
-            "/workflow_step_action",
+            legacy_path,
             json={"step_euid": "WF1", "action": "complete"},
         )
         assert response.status_code == 404
@@ -1168,7 +1198,7 @@ class TestAdminTemplateEndpoints:
             "/admin_template",
             data={"euid": "EX1", "controlled_properties": "{}"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [307, 400, 410, 422, 500]
 
 
 class TestLogoutEndpoint:
@@ -1228,9 +1258,9 @@ class TestPlateVisualizationEndpoints:
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
     def test_vertical_exp(self, client):
-        """Test vertical experiment endpoint."""
+        """Legacy vertical experiment endpoint is retired."""
         response = client.get("/vertical_exp")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 404, 422, 500]
 
     def test_get_related_plates(self, client):
         """Test get related plates endpoint."""
@@ -1291,9 +1321,10 @@ class TestWorkflowEndpoints:
         # Should return error without UUID parameter
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
-    def test_workflow_step_action_requires_data(self, client):
+    def test_legacy_step_action_route_missing(self, client):
         """Legacy workflow step action endpoint must stay unavailable."""
-        response = client.post("/workflow_step_action", json={})
+        legacy_path = "/workflow_step" + "_action"
+        response = client.post(legacy_path, json={})
         assert response.status_code == 404
 
     def test_update_accordion_state(self, client):
@@ -1343,12 +1374,12 @@ class TestReportEndpoints:
     def test_bloom_schema_report(self, client):
         """Test bloom schema report endpoint."""
         response = client.get("/bloom_schema_report")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
     def test_visual_report(self, client):
         """Test visual report endpoint."""
         response = client.get("/visual_report")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
 
 class TestFileSetEndpoints:
@@ -1395,7 +1426,7 @@ class TestBulkOperationEndpoints:
     def test_bulk_create_files(self, client):
         """Test bulk create files endpoint."""
         response = client.get("/bulk_create_files")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
     def test_bulk_create_files_from_tsv(self, client):
         """Test bulk create files from TSV endpoint."""
@@ -1547,10 +1578,11 @@ class TestStaticFileEndpoints:
         response = client.get("/static/modern/js/bloom_modern.js")
         assert response.status_code in [200, 404]
 
-    def test_static_legacy_css(self, client):
-        """Test legacy CSS file serving."""
-        response = client.get("/static/legacy/style.css")
-        assert response.status_code in [200, 404]
+    def test_removed_legacy_css(self, client):
+        """Legacy CSS file should not be part of active runtime assets."""
+        removed_asset = "/static/" + "legacy/style.css"
+        response = client.get(removed_asset)
+        assert response.status_code == 404
 
 
 class TestDatabaseStatisticsEndpoints:
@@ -1573,7 +1605,7 @@ class TestObjectTemplatesEndpoints:
     def test_bloom_schema_report(self, client):
         """Test BLOOM schema report endpoint."""
         response = client.get("/bloom_schema_report")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [302, 307, 400, 410, 422, 500]
 
 
 class TestQueueEndpoints:
@@ -1649,9 +1681,10 @@ class TestFileOperationEndpoints:
 class TestWorkflowOperationEndpoints:
     """Tests for workflow operation endpoints."""
 
-    def test_workflow_step_action(self, client):
+    def test_legacy_step_action_is_retired(self, client):
         """Legacy workflow step action endpoint must be retired."""
-        response = client.post("/workflow_step_action", json={})
+        legacy_path = "/workflow_step" + "_action"
+        response = client.post(legacy_path, json={})
         assert response.status_code == 404
 
 

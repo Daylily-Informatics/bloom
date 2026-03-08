@@ -1,6 +1,0 @@
-<div style="width:90%; text-align:center; color:gray;">        
-    <br>
-                <h3>Single Sign-On Required</h3>
-                    <small>Direct login is disabled. Please authenticate through the Cognito SSO flow.</small>
-                        <br>
-        </div>  
