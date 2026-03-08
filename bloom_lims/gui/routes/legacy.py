@@ -190,6 +190,8 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
 
     user_email = request.session["user_data"]["email"]
     user_data = request.session.get("user_data", {})
+    if show_type == "accessioning":
+        show_type = "all"
 
     bobdb = BloomObj(BLOOMdb3(app_username=user_email))
     ay_ds = {}
@@ -207,8 +209,6 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
 
     if show_type == "assay":
         atype["type"] = "Assays"
-    elif show_type == "accessioning":
-        atype["type"] = "Accessioning"
     else:
         atype["type"] = "All Assays, etc"
 
@@ -228,13 +228,6 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
         for q in ay_ds[i].parent_of_lineages:
             if q.is_deleted:
                 continue
-            if show_type == "accessioning":
-                for fex_tup in bobdb.query_all_fedex_transit_times_by_ay_euid(q.child_instance.euid):
-                    try:
-                        ay_dss[i]["tit_s"] += float(fex_tup[1])
-                        ay_dss[i]["tot_fx"] += 1
-                    except Exception as e:
-                        print(e)
             wset = ""
             child_json = q.child_instance.json_addl if isinstance(q.child_instance.json_addl, dict) else {}
             child_props = (

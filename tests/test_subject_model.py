@@ -57,7 +57,14 @@ class TestSubjectTemplateMap:
         """Test that template map contains all expected subject kinds."""
         from bloom_lims.subjecting import SUBJECT_TEMPLATE_MAP
         
-        expected_kinds = ["accession", "analysis_bundle", "report", "generic"]
+        expected_kinds = [
+            "analysis_bundle",
+            "report",
+            "generic",
+            "workset",
+            "workset_extraction",
+            "workset_sequencing",
+        ]
         for kind in expected_kinds:
             assert kind in SUBJECT_TEMPLATE_MAP
 
@@ -157,4 +164,3 @@ class TestListMembersForSubject:
         
         result = list_members_for_subject(mock_bob, "NONEXISTENT")
         assert result == {"anchor": [], "members": []}
-

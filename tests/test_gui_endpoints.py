@@ -143,16 +143,25 @@ class TestAssaysEndpoint:
         assert "text/html" in response.headers["content-type"]
 
     def test_assays_show_type_accessioning(self, client):
-        """Test assays with show_type=accessioning (was failing before TapDB fix)."""
+        """Accessioning show_type is retired and should normalize to non-accession output."""
         response = client.get("/assays?show_type=accessioning")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+        assert '<option value="all" selected' in response.text
 
     def test_assays_show_type_assay(self, client):
         """Test assays with show_type=assay parameter."""
         response = client.get("/assays?show_type=assay")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+
+    def test_admin_has_api_token_management_panels(self, client):
+        """Admin page renders API token user and token-management panels."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "API Token Administration" in response.text
+        assert "API Access Users" in response.text
+        assert "Issued Tokens" in response.text
 
 
 class TestEuidDetailsEndpoint:

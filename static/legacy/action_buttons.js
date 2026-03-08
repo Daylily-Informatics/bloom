@@ -21,10 +21,19 @@ function getActionSchema(actionData) {
     if (!actionData || typeof actionData !== 'object') {
         return null;
     }
-    if (actionData.ui_schema && Array.isArray(actionData.ui_schema.fields)) {
+    if (actionData.ui_schema && typeof actionData.ui_schema === 'object') {
         return actionData.ui_schema;
     }
     return null;
+}
+
+function getSchemaFields(schema) {
+    if (!schema || !Array.isArray(schema.fields)) {
+        return [];
+    }
+    return schema.fields.filter(function(field) {
+        return field && typeof field === 'object' && String(field.name || '').trim().length > 0;
+    });
 }
 
 function createFormContainer(uniqueFormId) {
@@ -324,16 +333,9 @@ async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName
         var actionData = actionDataJson || {};
         var schema = getActionSchema(actionData);
         var captureMode = String(actionData.capture_data || '').toLowerCase();
-        var fields = schema && Array.isArray(schema.fields) ? schema.fields : [];
+        var fields = getSchemaFields(schema);
 
         if (captureMode === 'no' || fields.length === 0) {
-            if (captureMode !== 'no') {
-                var schemaMessage = 'Action template is missing ui_schema.fields: ' + actionName;
-                if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
-                    window.BloomToast.error('Action Error', schemaMessage);
-                }
-                return;
-            }
             await performWorkflowStepAction({
                 euid: stepEuid,
                 action_group: actionGroup,
@@ -352,7 +354,7 @@ async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName
         formContainer.appendChild(errorPanel);
         formContainer.appendChild(form);
 
-        await buildSchemaFields(form, schema);
+        await buildSchemaFields(form, { fields: fields });
 
         var submitButton = document.createElement('button');
         submitButton.type = 'submit';
