@@ -71,12 +71,36 @@ def _iter_instance_actions(limit: int = 2000):
 def _find_instance_euid(*, allow_terminal: bool = True) -> str | None:
     bdb = BLOOMdb3(app_username="pytest-actions")
     try:
+        bobj = BloomObj(bdb)
         query = (
             bdb.session.query(bdb.Base.classes.generic_instance)
             .filter(bdb.Base.classes.generic_instance.is_deleted == False)
             .limit(4000)
         )
         for instance in query:
+            status = str(getattr(instance, "bstatus", "") or "")
+            if not allow_terminal and status in TERMINAL_STATUSES:
+                continue
+            return instance.euid
+
+        # CI test DB can be template-only; create one disposable instance for action tests.
+        templates = (
+            bdb.session.query(bdb.Base.classes.generic_template)
+            .filter(bdb.Base.classes.generic_template.is_deleted == False)
+            .limit(4000)
+        )
+        for template in templates:
+            if str(getattr(template, "type", "") or "").lower() == "assay":
+                continue
+            try:
+                created = bobj.create_instances(template.euid)
+            except Exception:
+                continue
+
+            if not created or not created[0]:
+                continue
+
+            instance = created[0][0]
             status = str(getattr(instance, "bstatus", "") or "")
             if not allow_terminal and status in TERMINAL_STATUSES:
                 continue
