@@ -1,39 +1,45 @@
-# Bloom Queue Refactor Execution Plan
+# Bloom Queue Refactor Execution Summary
 
-## Goal
+## Status
 
-Refactor Bloom into the authoritative beta owner of material objects and queue-driven wet-lab execution state, without relying on the legacy workflow/workflow-step runtime for active beta paths.
+This refactor is complete for the active beta path.
 
-## Current Findings
+Bloom is now the beta authority for material lineage and queue-driven wet-lab execution without depending on workflow/workflow-step runtime on the supported Atlas/Ursa path.
 
-- `bloom_lims/core/action_execution.py` still routes through legacy object/workflow executors and legacy required-field extraction.
-- `bloom_lims/domain/base.py` still contains active `do_action_*` plumbing and grouped action payload assumptions.
-- `bloom_lims/domain/workflows.py` still performs queue routing through workflow-step objects.
-- `bloom_lims/domain/external_specimens.py` still uses broad scans for reference and idempotency lookup paths.
-- No resolver currently exists for `run_euid + index_string`.
+## Active Model
 
-## Decisions
+- queue membership is represented by graph relationships
+- Atlas intent enters Bloom through explicit test-process-item reference objects
+- lineage is preserved from accepted material through extraction, library prep, pooling, run creation, and sequenced library assignment
+- the canonical resolver unit is `sequenced_library_assignment`
 
-- The beta queue model will be explicit and first-class; it will not be represented as active workflow/workflow-step runtime.
-- Bloom will preserve material lineage with `generic_instance_lineage`.
-- Atlas links will stay explicit through external-object link instances rather than embedded private identifiers.
-- Public beta APIs will be EUID-only.
-- Existing workflow code may remain on disk temporarily, but it must not remain on the active beta-critical path.
+## Canonical Resolver
 
-## Implementation Outline
+Bloom resolves:
 
-1. Add queue-domain services for beta queue definition, membership, transition, and lineage-aware movement.
-2. Add sequencing-run and run-index resolution services that return Atlas order and test-order EUIDs.
-3. Keep external specimen creation as the Atlas entry point for accepted material, but rewrite its lookup paths to avoid broad scans.
-4. Remove workflow router exposure from the active beta API surface and stop documenting workflow/workflow-step as the primary model.
-5. Replace or isolate legacy action execution paths so beta queue transitions use modern TapDB-backed execution only.
+- `run_euid`
+- `flowcell_id`
+- `lane`
+- `library_barcode`
 
-## Required Validation
+Bloom returns:
 
-- create/register container plus specimen with Atlas external links
-- place accepted material into an extraction queue
-- map extraction output into plate/well lineage
-- advance through post-extract QC and lib prep queue selection
-- create pool and sequencing run
-- resolve `run_euid + index_string`
-- confirm public API payloads do not expose private UUIDs
+- `sequenced_library_assignment_euid`
+- `atlas_tenant_id`
+- `atlas_trf_euid`
+- `atlas_test_euid`
+- `atlas_test_process_item_euid`
+
+## Legacy Isolation
+
+Retired workflow and `do_action` surfaces are not part of the active beta route. If a path depends on workflow-step runtime, accession ownership, or legacy action execution, treat it as non-beta.
+
+## Validation
+
+Focused validation for the active beta path:
+
+```bash
+source bloom_activate.sh
+pytest --no-cov tests/test_api_atlas_bridge.py tests/test_atlas_lookup_resilience.py tests/test_queue_flow.py tests/test_run_resolver.py tests/test_beta_cross_repo_smoke.py
+ruff check bloom_lims tests
+```
