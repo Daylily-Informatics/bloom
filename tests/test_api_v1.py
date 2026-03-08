@@ -8,6 +8,7 @@ import os
 import sys
 import pytest
 from unittest.mock import patch, MagicMock
+from types import SimpleNamespace
 
 # Set up auth bypass BEFORE importing FastAPI app
 # Uses the dev-only bypass (blocked when APP_ENV=production)
@@ -162,6 +163,152 @@ class TestWorkflowsAPI:
         """Test getting non-existent workflow."""
         response = client.get("/api/v1/workflows/NONEXISTENT_EUID")
         assert response.status_code == 404
+
+    def test_advance_workflow_success(self, client):
+        """Test advancing a workflow uses modern endpoint contract."""
+
+        class _Session:
+            def __init__(self):
+                self.committed = False
+
+            def commit(self):
+                self.committed = True
+
+        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+        fake_workflow = SimpleNamespace(euid="WF_ADV", bstatus="in_progress")
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.core.workflows.advance_workflow", return_value=fake_workflow):
+                response = client.post("/api/v1/workflows/WF_ADV/advance", json={"ok": True})
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["euid"] == "WF_ADV"
+        assert payload["status"] == "in_progress"
+
+    def test_create_workflow_success(self, client):
+        """Test creating a workflow from template."""
+
+        class _Session:
+            def __init__(self):
+                self.committed = False
+
+            def commit(self):
+                self.committed = True
+
+        class _BloomWorkflow:
+            def __init__(self, _bdb):
+                self.user = None
+
+            def set_actor_context(self, user_id=None, email=None):
+                self.user = (user_id, email)
+
+            def create_instances(self, _template_euid):
+                wf = SimpleNamespace(euid="WF_NEW", name="new-workflow", bstatus="queued")
+                return [[wf]]
+
+            def track_user_interaction(self, *_args, **_kwargs):
+                return None
+
+        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+                response = client.post("/api/v1/workflows/?template_euid=TEMPLATE1&name=renamed")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["euid"] == "WF_NEW"
+        assert payload["name"] == "renamed"
+
+    def test_update_workflow_success(self, client):
+        """Test updating workflow metadata."""
+
+        class _Session:
+            def commit(self):
+                return None
+
+        workflow = SimpleNamespace(
+            euid="WF_UPD",
+            name="before",
+            bstatus="queued",
+            json_addl={"properties": {"x": 1}},
+        )
+
+        class _BloomWorkflow:
+            def __init__(self, _bdb):
+                pass
+
+            def set_actor_context(self, **_kwargs):
+                return None
+
+            def get_by_euid(self, _euid):
+                return workflow
+
+            def track_user_interaction(self, *_args, **_kwargs):
+                return None
+
+        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+                with patch("sqlalchemy.orm.attributes.flag_modified", lambda *_args, **_kwargs: None):
+                    response = client.put(
+                        "/api/v1/workflows/WF_UPD?name=after&status=completed",
+                        json={"reviewed": True},
+                    )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert workflow.name == "after"
+        assert workflow.bstatus == "completed"
+        assert workflow.json_addl["reviewed"] is True
+
+    def test_get_workflow_steps_success(self, client):
+        """Test workflow steps list is derived from workflow lineage."""
+
+        child_step = SimpleNamespace(
+            euid="WS_1",
+            name="Step 1",
+            type="step",
+            subtype="extraction",
+            bstatus="queued",
+            json_addl={"properties": {"order": 2}},
+        )
+        child_queue = SimpleNamespace(
+            euid="WQ_1",
+            name="Queue 1",
+            type="queue",
+            subtype="default",
+            bstatus="queued",
+            json_addl={"properties": {"order": 1}},
+        )
+        lineage_step = SimpleNamespace(is_deleted=False, child_instance=child_step)
+        lineage_queue = SimpleNamespace(is_deleted=False, child_instance=child_queue)
+
+        class _BloomWorkflow:
+            def __init__(self, _bdb):
+                pass
+
+            def get_by_euid(self, _euid):
+                return SimpleNamespace(euid="WF_STEPS")
+
+        fake_db = SimpleNamespace(session=SimpleNamespace(), Base=SimpleNamespace(classes=SimpleNamespace()))
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+                with patch(
+                    "bloom_lims.api.v1.workflows.get_parent_lineages",
+                    return_value=[lineage_step, lineage_queue],
+                ):
+                    response = client.get("/api/v1/workflows/WF_STEPS/steps")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["count"] == 2
+        assert [step["euid"] for step in payload["steps"]] == ["WQ_1", "WS_1"]
 
 
 class TestTemplatesAPI:

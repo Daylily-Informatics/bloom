@@ -1,4 +1,4 @@
-"""Shared action execution service used by API and GUI routes."""
+"""TapDB-pattern GUI action execution service."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bloom_lims.core.exceptions import BloomValidationError
+from bloom_lims.core.tapdb_action_dispatcher import BloomTapDBActionDispatcher
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
 
@@ -193,6 +194,14 @@ def _resolve_action_definition(
     resolved = copy.deepcopy(action_data)
     if not isinstance(resolved.get("captured_data"), dict):
         resolved["captured_data"] = {}
+    if not resolved.get("action_template_uid"):
+        raise ActionExecutionError(
+            status_code=409,
+            detail=(
+                f"Action {action_key} is missing TapDB template metadata "
+                "(action_template_uid). Re-seed templates and recreate the object."
+            ),
+        )
     return resolved
 
 
@@ -323,14 +332,20 @@ def execute_action_for_instance(
         )
         action_ds["action_key"] = request_data.action_key
         action_ds["action_group"] = request_data.action_group
+        action_ds["_raw_action_key"] = request_data.action_key
 
         executor = _resolve_executor(instance, bdb)
         executor.set_actor_context(user_id=actor_user_id, email=actor_email)
-        result = executor.do_action(
-            request_data.euid,
-            action=request_data.action_key,
+        dispatcher = BloomTapDBActionDispatcher(executor)
+        result = dispatcher.execute_action(
+            session=bdb.session,
+            instance=instance,
             action_group=request_data.action_group,
+            action_key=request_data.action_key,
             action_ds=action_ds,
+            captured_data=request_data.captured_data,
+            create_action_record=True,
+            user=actor_email,
         )
 
         message = f"{request_data.action_key} performed for EUID {request_data.euid}"

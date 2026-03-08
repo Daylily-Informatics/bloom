@@ -131,9 +131,9 @@ def test_cogs_and_node_info_routes(client: TestClient) -> None:
 def test_plate_routes_with_and_without_valid_plate(client: TestClient) -> None:
     _warm_session(client)
 
-    # plate_carosel2: give a missing plate (handler should still execute and return a string)
+    # plate_carosel2 is retired from modern GUI.
     resp = client.get("/plate_carosel2", params={"plate_euid": "CX-NOT-REAL"})
-    assert resp.status_code == 200
+    assert resp.status_code == 404
 
     # plate_visualization: create a real plate with wells
     plate = _create_plate_instance(client)
@@ -141,9 +141,9 @@ def test_plate_routes_with_and_without_valid_plate(client: TestClient) -> None:
     assert resp.status_code == 200
     assert "text/html" in resp.headers.get("content-type", "")
 
-    # get_related_plates is currently wired to accept an object but receives a string param; just ensure handler runs.
+    # get_related_plates is retired from modern GUI.
     resp = client.get("/get_related_plates", params={"main_plate": plate["euid"]})
-    assert resp.status_code == 500
+    assert resp.status_code == 404
 
 
 def test_queue_details_renders(client: TestClient) -> None:
@@ -191,8 +191,7 @@ def test_create_instance_form_renders(client: TestClient, bdb) -> None:
     _warm_session(client)
     template_euid = _get_any_template_euid(bdb)
     resp = client.get(f"/create_instance/{template_euid}")
-    assert resp.status_code == 200
-    assert "text/html" in resp.headers.get("content-type", "")
+    assert resp.status_code == 410
 
 
 def test_file_set_urls_and_admin_template_pages(client: TestClient, bdb) -> None:
@@ -202,12 +201,12 @@ def test_file_set_urls_and_admin_template_pages(client: TestClient, bdb) -> None
 
     resp = client.get("/file_set_urls", params={"fs_euid": fs["euid"]})
     assert resp.status_code == 200
-    assert "text/html" in resp.headers.get("content-type", "")
+    assert "application/json" in resp.headers.get("content-type", "")
 
     template_euid = _get_any_template_euid(bdb)
-    # Ensure session exists (admin_template reads session but does not depend on require_auth).
+    # Admin template editor was retired.
     resp = client.get("/admin_template", params={"euid": template_euid})
-    assert resp.status_code in (200, 404, 500)
+    assert resp.status_code == 410
 
 
 def test_query_by_euids_create_and_download_file_flows(client: TestClient, tmp_path: Path) -> None:
@@ -220,7 +219,7 @@ def test_query_by_euids_create_and_download_file_flows(client: TestClient, tmp_p
         bstatus="created",
         json_addl={"properties": {"name": "file-1", "lab_code": "X"}},
     )
-    with patch("bloom_lims.gui.routes.legacy.BloomFile.get_by_euid", return_value=fake_file):
+    with patch("bloom_lims.gui.routes.operations.BloomFile.get_by_euid", return_value=fake_file):
         resp = client.post("/query_by_euids", data={"file_euids": "FX-1"})
         assert resp.status_code == 200
         assert "text/html" in resp.headers.get("content-type", "")

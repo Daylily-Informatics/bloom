@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 """
-Legacy and miscellaneous GUI endpoints.
-
-This module intentionally keeps the pre-existing handlers mostly unchanged while
-`main.py` is refactored into a thin entrypoint.
+Operational and miscellaneous GUI endpoints.
 """
 
 import csv
@@ -157,30 +154,12 @@ def highlight_json_changes(old_json_str, new_json_str):
 
 @router.get("/index2", response_class=HTMLResponse)
 async def index2(request: Request, _=Depends(require_auth)):
-    count = request.session.get("count", 0)
-    count += 1
-    request.session["count"] = count
-
-    template = templates.get_template("legacy/index2.html")
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-    context = {"request": request, "style": style, "udat": user_data}
-
-    return HTMLResponse(content=template.render(context), status_code=200)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @router.get("/lims", response_class=HTMLResponse)
 async def lims(request: Request, _=Depends(require_auth)):
-    count = request.session.get("count", 0)
-    count += 1
-    request.session["count"] = count
-
-    template = templates.get_template("legacy/lims_main.html")
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-    context = {"request": request, "style": style, "udat": user_data}
-
-    return HTMLResponse(content=template.render(context), status_code=200)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @router.get("/assays", response_class=HTMLResponse)
@@ -337,9 +316,7 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     if "print_lab" in user_data:
         bobdb.get_lab_printers(user_data["print_lab"])
 
-    csss = []
-    for css in sorted(os.popen("ls -1 static/legacy/skins/*css").readlines()):
-        csss.append(css.rstrip())
+    csss = ["/static/modern/css/bloom_modern.css"]
 
     printer_info = {
         "print_lab": bobdb.printer_labs,
@@ -347,7 +324,6 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "label_zpl_style": bobdb.zpl_label_styles,
         "style_css": csss,
     }
-    csss = ["/static/legacy/skins/" + os.path.basename(css) for css in csss]
     printer_info["style_css"] = csss
 
     from bloom_lims._version import get_version
@@ -631,7 +607,7 @@ async def reagents_redirect():
 
 @router.get("/controls")
 async def controls_redirect():
-    return RedirectResponse(url="/control_overview", status_code=307)
+    raise HTTPException(status_code=404, detail="Controls overview has been retired.")
 
 
 @router.post("/query_by_euids", response_class=HTMLResponse)
@@ -657,29 +633,21 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
                 row[key] = result.json_addl["properties"].get(key, "N/A")
             table_data.append(row)
 
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-        content = templates.get_template("legacy/search_results.html").render(
-            request=request,
-            columns=columns,
-            table_data=table_data,
-            style=style,
-            udat=user_data,
+        rows = []
+        for row in table_data:
+            cells = "".join(f"<td>{row.get(col, '')}</td>" for col in columns)
+            rows.append(f"<tr>{cells}</tr>")
+        header = "".join(f"<th>{col}</th>" for col in columns)
+        content = (
+            "<html><body><h2>Query Results</h2>"
+            "<table border='1'><thead><tr>"
+            f"{header}</tr></thead><tbody>{''.join(rows)}</tbody></table></body></html>"
         )
-        return HTMLResponse(content=content)
+        return HTMLResponse(content=content, status_code=200)
 
     except Exception as e:
         logging.error(f"Error querying files: {e}", exc_info=True)
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-        content = templates.get_template("legacy/search_error.html").render(
-            request=request,
-            error=f"An error occurred: {e}",
-            style=style,
-            udat=user_data,
-        )
-        return HTMLResponse(content=content)
+        return HTMLResponse(content=f"<html><body><h2>Error: {e}</h2></body></html>", status_code=500)
 
 
 @router.get("/update_object_name", response_class=HTMLResponse)
@@ -748,28 +716,7 @@ async def reagent_overview(request: Request, _auth=Depends(require_auth)):
 
 @router.get("/control_overview", response_class=HTMLResponse)
 async def control_overview(request: Request, _auth=Depends(require_auth)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-
-    control_instances = (
-        bobdb.session.query(bobdb.Base.classes.content_instance)
-        .filter_by(is_deleted=False, type="control")
-        .all()
-    )
-    control_templates = (
-        bobdb.session.query(bobdb.Base.classes.content_template)
-        .filter_by(is_deleted=False, type="control")
-        .all()
-    )
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/control_overview.html").render(
-        style=style,
-        instance_list=control_instances,
-        template_list=control_templates,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    raise HTTPException(status_code=404, detail="Control overview has been retired.")
 
 
 @router.get("/create_from_template", response_class=HTMLResponse)
@@ -788,15 +735,10 @@ async def create_from_template_post(
 
 async def _create_from_template(request: Request, euid: str):
     if euid is None:
-        user_data = request.session.get("user_data", {})
-        style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-        content = templates.get_template("legacy/search_error.html").render(
-            request=request,
-            error="Missing required 'euid' parameter for template creation",
-            style=style,
-            udat=user_data,
+        return HTMLResponse(
+            content="<html><body><h2>Missing required 'euid' parameter for template creation</h2></body></html>",
+            status_code=400,
         )
-        return HTMLResponse(content=content)
 
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     template = bobdb.create_instances(euid)
@@ -806,81 +748,19 @@ async def _create_from_template(request: Request, euid: str):
     return RedirectResponse(url="/equipment_overview", status_code=303)
 @router.get("/vertical_exp", response_class=HTMLResponse)
 async def vertical_exp(request: Request, euid=None, _auth=Depends(require_auth)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    instance = bobdb.get_by_euid(euid)
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/vertical_exp.html").render(
-        style=style, instance=instance, udat=request.session["user_data"]
-    )
-    return HTMLResponse(content=content)
+    raise HTTPException(status_code=404, detail="Vertical explorer has been retired.")
 
 
 @router.get("/plate_carosel2", response_class=HTMLResponse)
 async def plate_carosel(
     request: Request, plate_euid: str = Query(...), _auth=Depends(require_auth)
 ):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-
-    try:
-        main_plate = bobdb.get_by_euid(plate_euid)
-    except Exception:
-        main_plate = None
-    if not main_plate:
-        return "Main plate not found."
-
-    related_plates = await get_related_plates(main_plate)
-    related_plates.append(main_plate)
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/vertical_exp.html").render(
-        style=style,
-        main_plate=main_plate,
-        related_plates=related_plates,
-        udat=request.session["user_data"],
-    )
-    return HTMLResponse(content=content)
+    raise HTTPException(status_code=404, detail="Plate carousel has been retired.")
 
 
 @router.get("/get_related_plates", response_class=HTMLResponse)
 async def get_related_plates(request: Request, main_plate, _auth=Depends(require_auth)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    related_plates = []
-
-    for parent_lineage in main_plate.parent_of_lineages:
-        if parent_lineage.is_deleted:
-            continue
-        if parent_lineage.child_instance.type == "plate":
-            related_plates.append(parent_lineage.child_instance)
-
-    for child_lineage in main_plate.child_of_lineages:
-        if child_lineage.is_deleted:
-            continue
-        if child_lineage.parent_instance.type == "plate":
-            related_plates.append(child_lineage.parent_instance)
-
-    related_plates = list({plate.euid: plate for plate in related_plates}.values())
-
-    for plate in related_plates:
-        num_rows = 0
-        num_cols = 0
-        for lineage in plate.parent_of_lineages:
-            if lineage.is_deleted:
-                continue
-            if (
-                lineage.parent_instance.euid == plate.euid
-                and lineage.child_instance.type == "well"
-            ):
-                cd = lineage.child_instance.json_addl.get("cont_address", {})
-                num_rows = max(num_rows, int(cd.get("row_idx", 0)))
-                num_cols = max(num_cols, int(cd.get("col_idx", 0)))
-        plate.json_addl["properties"]["num_rows"] = num_rows + 1
-        plate.json_addl["properties"]["num_cols"] = num_cols + 1
-        flag_modified(plate, "json_addl")
-
-    return related_plates
+    raise HTTPException(status_code=404, detail="Related plate expansion has been retired.")
 
 
 @router.get("/plate_visualization", response_class=HTMLResponse)
@@ -1087,27 +967,12 @@ async def euid_details(
         raise e
 @router.get("/bloom_schema_report", response_class=HTMLResponse)
 async def bloom_schema_report(request: Request, _auth=Depends(require_auth)):
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    a_stat = bobdb.query_generic_instance_and_lin_stats()
-    b_stats = bobdb.query_generic_template_stats()
-    reports = [[a_stat[0]], [a_stat[1]], b_stats]
-    nrows = 0
-    for i in b_stats:
-        nrows += int(i["Total_Templates"])
-    for ii in a_stat:
-        nrows += int(ii["Total_Instances"])
-
-    user_data = request.session.get("user_data", {})
-    style = {"skin_css": user_data.get("style_css", "/static/legacy/skins/bloom.css")}
-
-    content = templates.get_template("legacy/bloom_schema_report.html").render(
-        request=request,
-        reports=reports,
-        nrows=nrows,
-        style=style,
-        udat=request.session["user_data"],
+    return JSONResponse(
+        status_code=410,
+        content={
+            "detail": "Legacy schema report page has been retired.",
+        },
     )
-    return HTMLResponse(content=content)
 
 
 @router.get("/delete_by_euid", response_class=HTMLResponse)
@@ -1196,10 +1061,10 @@ async def user_home(request: Request):
         cfg_fedex=True,
     )
 
-    skins_directory = Path("static/legacy/skins")
+    skins_directory = Path("static/modern/css")
     if skins_directory.exists():
         css_files = [
-            f"/static/legacy/skins/{css_file.name}"
+            f"/static/modern/css/{css_file.name}"
             for css_file in sorted(skins_directory.glob("*.css"))
         ]
     else:

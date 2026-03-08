@@ -11,6 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
+from bloom_lims.domain.beta_actions import BloomBetaActionRecorder
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaExtractionCreateRequest,
@@ -69,6 +70,7 @@ class BetaLabService:
     def __init__(self, *, app_username: str):
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
+        self.action_recorder = BloomBetaActionRecorder(self.bdb.session)
 
     def close(self) -> None:
         self.bdb.close()
@@ -113,6 +115,24 @@ class BetaLabService:
             specimen,
             atlas_context=payload.atlas_context.model_dump(),
         )
+        self._record_action(
+            target_instance=specimen,
+            action_key="register_accepted_material",
+            captured_data={
+                "specimen_template_code": payload.specimen_template_code,
+                "specimen_name": payload.specimen_name,
+                "container_euid": payload.container_euid,
+                "container_template_code": payload.container_template_code,
+                "status": payload.status,
+                "atlas_context": payload.atlas_context.model_dump(),
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "specimen_euid": specimen.euid,
+                "container_euid": container.euid if container is not None else None,
+            },
+        )
         self.bdb.session.commit()
         return self._material_response(specimen, created=True)
 
@@ -137,13 +157,32 @@ class BetaLabService:
                     existing, replay=replay
                 )
 
-        return self._transition_material(
+        response = self._transition_material(
             material=material,
             queue_name=queue_name,
             metadata=metadata or {},
             idempotency_key=idempotency_key,
             replay=replay,
         )
+        self._record_action(
+            target_instance=material,
+            action_key="move_material_to_queue",
+            captured_data={
+                "material_euid": material_euid,
+                "queue_name": queue_name,
+                "metadata": metadata or {},
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "material_euid": response.material_euid,
+                "queue_euid": response.queue_euid,
+                "queue_name": response.queue_name,
+                "current_queue": response.current_queue,
+            },
+        )
+        self.bdb.session.commit()
+        return response
 
     def create_extraction(
         self,
@@ -214,6 +253,30 @@ class BetaLabService:
             idempotency_key=f"{idempotency_key}:post_extract_qc"
             if idempotency_key
             else None,
+        )
+        self._record_action(
+            target_instance=output,
+            action_key="create_extraction",
+            captured_data={
+                "source_specimen_euid": payload.source_specimen_euid,
+                "plate_euid": payload.plate_euid,
+                "plate_template_code": payload.plate_template_code,
+                "plate_name": payload.plate_name,
+                "well_name": payload.well_name,
+                "extraction_type": payload.extraction_type,
+                "output_name": payload.output_name,
+                "atlas_test_process_item_euid": payload.atlas_test_process_item_euid,
+                "metadata": payload.metadata or {},
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "source_specimen_euid": source.euid,
+                "extraction_output_euid": output.euid,
+                "plate_euid": plate.euid,
+                "well_euid": well.euid,
+                "current_queue": response.current_queue,
+            },
         )
         self.bdb.session.commit()
         return BetaExtractionResponse(
@@ -290,6 +353,23 @@ class BetaLabService:
             )
             next_queue = transition.current_queue
 
+        self._record_action(
+            target_instance=output,
+            action_key="record_post_extract_qc",
+            captured_data={
+                "extraction_output_euid": payload.extraction_output_euid,
+                "passed": bool(payload.passed),
+                "next_queue": payload.next_queue,
+                "metrics": payload.metrics or {},
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "extraction_output_euid": output.euid,
+                "qc_passed": bool(payload.passed),
+                "current_queue": next_queue,
+            },
+        )
         self.bdb.session.commit()
         return BetaPostExtractQCResponse(
             extraction_output_euid=output.euid,
@@ -356,6 +436,23 @@ class BetaLabService:
             queue_name=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
             metadata={"stage": "library_prep"},
             idempotency_key=f"{idempotency_key}:queue" if idempotency_key else None,
+        )
+        self._record_action(
+            target_instance=lib_output,
+            action_key="create_library_prep",
+            captured_data={
+                "source_extraction_output_euid": payload.source_extraction_output_euid,
+                "platform": payload.platform,
+                "output_name": payload.output_name,
+                "metadata": payload.metadata or {},
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "source_extraction_output_euid": source.euid,
+                "library_prep_output_euid": lib_output.euid,
+                "current_queue": transition.current_queue,
+            },
         )
         self.bdb.session.commit()
         return BetaLibraryPrepResponse(
@@ -439,6 +536,24 @@ class BetaLabService:
             queue_name=self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
             metadata={"platform": payload.platform},
             idempotency_key=f"{idempotency_key}:queue" if idempotency_key else None,
+        )
+        self._record_action(
+            target_instance=pool,
+            action_key="create_pool",
+            captured_data={
+                "member_euids": [member.euid for member in members],
+                "platform": payload.platform,
+                "pool_name": payload.pool_name,
+                "metadata": payload.metadata or {},
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "pool_euid": pool.euid,
+                "pool_container_euid": pool_container.euid,
+                "current_queue": transition.current_queue,
+                "member_count": len(members),
+            },
         )
         self.bdb.session.commit()
         return BetaPoolResponse(
@@ -554,6 +669,27 @@ class BetaLabService:
                 relationship_type="beta_run_artifact",
             )
 
+        self._record_action(
+            target_instance=run,
+            action_key="create_run",
+            captured_data={
+                "pool_euid": payload.pool_euid,
+                "platform": payload.platform,
+                "flowcell_id": payload.flowcell_id,
+                "run_name": payload.run_name,
+                "status": payload.status,
+                "assignments": [assignment.model_dump() for assignment in payload.assignments],
+                "artifacts": [artifact.model_dump() for artifact in payload.artifacts],
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "run_euid": run.euid,
+                "pool_euid": pool.euid,
+                "assignment_count": len(payload.assignments),
+                "artifact_count": len(payload.artifacts),
+            },
+        )
         self.bdb.session.commit()
         return BetaRunResponse(
             run_euid=run.euid,
@@ -1088,6 +1224,22 @@ class BetaLabService:
                 continue
             return parent.euid
         return None
+
+    def _record_action(
+        self,
+        *,
+        target_instance,
+        action_key: str,
+        captured_data: dict[str, Any],
+        result: dict[str, Any],
+    ) -> None:
+        self.action_recorder.record(
+            target_instance=target_instance,
+            action_key=action_key,
+            captured_data=captured_data,
+            result=result,
+            executed_by=self.bdb.app_username,
+        )
 
     def _material_response(self, specimen, *, created: bool) -> BetaMaterialResponse:
         return BetaMaterialResponse(

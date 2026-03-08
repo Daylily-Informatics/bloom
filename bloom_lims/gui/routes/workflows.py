@@ -223,3 +223,22 @@ async def update_obj_json_addl_properties(
 
     return RedirectResponse(url=referer, status_code=303)
 
+
+@router.post("/ui/actions/execute")
+async def execute_ui_action(request: Request, _auth=Depends(require_auth)):
+    payload = await request.json()
+    user_data = request.session.get("user_data", {})
+    actor_email = str(user_data.get("email") or "bloomui-user")
+    actor_user_id = user_data.get("sub") or user_data.get("user_id")
+    try:
+        request_data = normalize_action_execute_payload(payload)
+        result = execute_action_for_instance(
+            request_data,
+            app_username=actor_email,
+            actor_email=actor_email,
+            actor_user_id=actor_user_id,
+            user_preferences=user_data,
+        )
+        return JSONResponse(content=result)
+    except ActionExecutionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_payload())
