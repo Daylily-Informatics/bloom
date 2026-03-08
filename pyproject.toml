@@ -12,7 +12,7 @@
 # =============================================================================
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -59,8 +59,9 @@ dev = [
 [project.scripts]
 bloom = "bloom_lims.cli:main"
 
-[tool.setuptools.dynamic]
-version = {attr = "bloom_lims._version.FALLBACK_VERSION"}
+[tool.setuptools_scm]
+version_file = "bloom_lims/_scm_version.py"
+fallback_version = "0.0.0.dev0"
 
 [tool.setuptools.packages.find]
 where = ["."]
