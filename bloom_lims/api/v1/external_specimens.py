@@ -7,8 +7,8 @@ import logging
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
-from bloom_lims.db import BLOOMdb3
 from bloom_lims.bobjs import BloomObj
+from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.external_specimens import ExternalSpecimenService
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas.external_specimens import (
@@ -24,13 +24,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/external/specimens", tags=["External Specimens"])
 
 
-def _specimen_event_payload(response: ExternalSpecimenResponse | dict, extra: dict | None = None) -> dict:
+def _specimen_event_payload(
+    response: ExternalSpecimenResponse | dict, extra: dict | None = None
+) -> dict:
     if isinstance(response, dict):
         specimen_euid = response.get("specimen_euid") or response.get("euid")
         container_euid = response.get("container_euid")
         status = response.get("status")
-        atlas_refs = response.get("atlas_refs") if isinstance(response.get("atlas_refs"), dict) else {}
-        properties = response.get("properties") if isinstance(response.get("properties"), dict) else {}
+        atlas_refs = (
+            response.get("atlas_refs")
+            if isinstance(response.get("atlas_refs"), dict)
+            else {}
+        )
+        properties = (
+            response.get("properties")
+            if isinstance(response.get("properties"), dict)
+            else {}
+        )
     else:
         specimen_euid = response.specimen_euid
         container_euid = response.container_euid
@@ -80,8 +90,14 @@ async def create_external_specimen(
 ):
     service = ExternalSpecimenService(app_username=user.email)
     try:
-        result = service.create_specimen(payload=payload, idempotency_key=idempotency_key)
-        created_flag = result.get("created", True) if isinstance(result, dict) else bool(result.created)
+        result = service.create_specimen(
+            payload=payload, idempotency_key=idempotency_key
+        )
+        created_flag = (
+            result.get("created", True)
+            if isinstance(result, dict)
+            else bool(result.created)
+        )
         specimen_euid = (
             result.get("specimen_euid")
             if isinstance(result, dict)
@@ -112,6 +128,9 @@ async def find_external_specimens_by_reference(
     patient_id: str | None = Query(None),
     shipment_number: str | None = Query(None),
     kit_barcode: str | None = Query(None),
+    atlas_tenant_id: str | None = Query(None),
+    atlas_order_euid: str | None = Query(None),
+    atlas_test_order_euid: str | None = Query(None),
     user: APIUser = Depends(require_external_token_auth),
 ):
     refs = AtlasReferences(
@@ -119,6 +138,9 @@ async def find_external_specimens_by_reference(
         patient_id=patient_id,
         shipment_number=shipment_number,
         kit_barcode=kit_barcode,
+        atlas_tenant_id=atlas_tenant_id,
+        atlas_order_euid=atlas_order_euid,
+        atlas_test_order_euid=atlas_test_order_euid,
     )
     service = ExternalSpecimenService(app_username=user.email)
     try:
@@ -175,7 +197,9 @@ async def update_external_specimen(
             relationship_type="user_updated",
         )
         emit_bloom_event("specimen.updated", _specimen_event_payload(result))
-        result_status = result.get("status") if isinstance(result, dict) else result.status
+        result_status = (
+            result.get("status") if isinstance(result, dict) else result.status
+        )
         if previous_status is not None and previous_status != result_status:
             emit_bloom_event(
                 "specimen.status_changed",

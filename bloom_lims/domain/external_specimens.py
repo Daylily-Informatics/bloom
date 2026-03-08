@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
@@ -23,6 +24,15 @@ class ExternalSpecimenService:
 
     EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
     EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
+    _ATLAS_REFERENCE_FIELDS = (
+        "order_number",
+        "patient_id",
+        "shipment_number",
+        "kit_barcode",
+        "atlas_tenant_id",
+        "atlas_order_euid",
+        "atlas_test_order_euid",
+    )
 
     def __init__(self, *, app_username: str):
         self.bdb = BLOOMdb3(app_username=app_username)
@@ -144,12 +154,11 @@ class ExternalSpecimenService:
         self.bdb.session.commit()
         return self._to_response(specimen, created=True)
 
-    def find_by_references(self, refs: AtlasReferences) -> list[ExternalSpecimenResponse]:
+    def find_by_references(
+        self, refs: AtlasReferences
+    ) -> list[ExternalSpecimenResponse]:
         filters = {
-            "order_number": refs.order_number,
-            "patient_id": refs.patient_id,
-            "shipment_number": refs.shipment_number,
-            "kit_barcode": refs.kit_barcode,
+            field: getattr(refs, field) for field in self._ATLAS_REFERENCE_FIELDS
         }
         normalized_filters = {
             key: str(value).strip()
@@ -159,28 +168,35 @@ class ExternalSpecimenService:
         if not normalized_filters:
             return []
 
-        query = (
+        matching_parent_uids: set[int] | None = None
+        for key, expected in normalized_filters.items():
+            parent_uids = self._find_parent_uids_for_reference(
+                reference_type=key,
+                reference_value=expected,
+            )
+            if matching_parent_uids is None:
+                matching_parent_uids = parent_uids
+            else:
+                matching_parent_uids &= parent_uids
+            if not matching_parent_uids:
+                return []
+
+        if not matching_parent_uids:
+            return []
+
+        rows = (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
+                self.bdb.Base.classes.generic_instance.uid.in_(
+                    sorted(matching_parent_uids)
+                ),
                 self.bdb.Base.classes.generic_instance.category == "content",
-                self.bdb.Base.classes.generic_instance.is_deleted == False,
+                self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
             )
+            .order_by(self.bdb.Base.classes.generic_instance.euid.asc())
             .all()
         )
-        results: list[ExternalSpecimenResponse] = []
-        for instance in query:
-            atlas_refs = self._atlas_refs_for_specimen(instance)
-            if not atlas_refs:
-                continue
-            is_match = True
-            for key, expected in normalized_filters.items():
-                actual = str(atlas_refs.get(key, "")).strip()
-                if actual != expected:
-                    is_match = False
-                    break
-            if is_match:
-                results.append(self._to_response(instance, created=True))
-        return results
+        return [self._to_response(row, created=True) for row in rows]
 
     def _resolve_or_create_container(
         self,
@@ -228,19 +244,19 @@ class ExternalSpecimenService:
         expected = str(key).strip()
         if not expected:
             return None
-        rows = (
+        return (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
                 self.bdb.Base.classes.generic_instance.category == "content",
-                self.bdb.Base.classes.generic_instance.is_deleted == False,
+                self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
+                func.jsonb_extract_path_text(
+                    self.bdb.Base.classes.generic_instance.json_addl["properties"],
+                    "external_idempotency_key",
+                )
+                == expected,
             )
-            .all()
+            .first()
         )
-        for row in rows:
-            props = self._props(row)
-            if str(props.get("external_idempotency_key", "")).strip() == expected:
-                return row
-        return None
 
     def _validate_atlas_refs(
         self,
@@ -253,6 +269,9 @@ class ExternalSpecimenService:
             "patient_id": refs.patient_id,
             "shipment_number": refs.shipment_number,
             "kit_barcode": refs.kit_barcode,
+            "atlas_tenant_id": refs.atlas_tenant_id,
+            "atlas_order_euid": refs.atlas_order_euid,
+            "atlas_test_order_euid": refs.atlas_test_order_euid,
         }
         normalized = {
             key: str(value).strip()
@@ -264,7 +283,15 @@ class ExternalSpecimenService:
 
         validation_meta: dict[str, Any] = {}
         try:
-            if container_euid:
+            if container_euid and any(
+                key in normalized
+                for key in (
+                    "order_number",
+                    "patient_id",
+                    "shipment_number",
+                    "kit_barcode",
+                )
+            ):
                 tenant_id = self.atlas.get_required_tenant_id()
                 ctx_result = self.atlas.get_container_trf_context(
                     container_euid,
@@ -279,7 +306,9 @@ class ExternalSpecimenService:
                     "from_cache": ctx_result.from_cache,
                     "stale": ctx_result.stale,
                     "fetched_at": ctx_result.fetched_at.isoformat(),
-                    "summary": self._build_container_context_summary(ctx_result.payload),
+                    "summary": self._build_container_context_summary(
+                        ctx_result.payload
+                    ),
                 }
 
             if "order_number" in normalized:
@@ -322,7 +351,9 @@ class ExternalSpecimenService:
         context: dict[str, Any],
     ) -> None:
         order = context.get("order") if isinstance(context.get("order"), dict) else {}
-        patient = context.get("patient") if isinstance(context.get("patient"), dict) else {}
+        patient = (
+            context.get("patient") if isinstance(context.get("patient"), dict) else {}
+        )
         links = context.get("links") if isinstance(context.get("links"), dict) else {}
 
         context_values = {
@@ -345,11 +376,19 @@ class ExternalSpecimenService:
                     f"provided='{provided_value}' context='{expected_value}'"
                 )
 
-    def _build_container_context_summary(self, context: dict[str, Any]) -> dict[str, Any]:
+    def _build_container_context_summary(
+        self, context: dict[str, Any]
+    ) -> dict[str, Any]:
         order = context.get("order") if isinstance(context.get("order"), dict) else {}
-        patient = context.get("patient") if isinstance(context.get("patient"), dict) else {}
+        patient = (
+            context.get("patient") if isinstance(context.get("patient"), dict) else {}
+        )
         links = context.get("links") if isinstance(context.get("links"), dict) else {}
-        test_orders = context.get("test_orders") if isinstance(context.get("test_orders"), list) else []
+        test_orders = (
+            context.get("test_orders")
+            if isinstance(context.get("test_orders"), list)
+            else []
+        )
         test_order_ids = []
         for entry in test_orders:
             if not isinstance(entry, dict):
@@ -397,7 +436,9 @@ class ExternalSpecimenService:
         clean = str(code or "").strip().strip("/")
         parts = clean.split("/")
         if len(parts) != 4:
-            raise ValueError(f"Template code must be category/type/subtype/version: {code}")
+            raise ValueError(
+                f"Template code must be category/type/subtype/version: {code}"
+            )
         return clean
 
     def _props(self, instance) -> dict[str, Any]:
@@ -463,6 +504,41 @@ class ExternalSpecimenService:
                 refs[key] = value
         return refs
 
+    def _find_parent_uids_for_reference(
+        self,
+        *,
+        reference_type: str,
+        reference_value: str,
+    ) -> set[int]:
+        lineage_cls = self.bdb.Base.classes.generic_instance_lineage
+        instance_cls = self.bdb.Base.classes.generic_instance
+        rows = (
+            self.bdb.session.query(lineage_cls.parent_instance_uid)
+            .join(instance_cls, lineage_cls.child_instance_uid == instance_cls.uid)
+            .filter(
+                lineage_cls.is_deleted.is_(False),
+                lineage_cls.relationship_type == self.EXTERNAL_REFERENCE_RELATIONSHIP,
+                instance_cls.is_deleted.is_(False),
+                instance_cls.category == "generic",
+                instance_cls.type == "generic",
+                instance_cls.subtype == "external_object_link",
+                func.jsonb_extract_path_text(
+                    instance_cls.json_addl["properties"], "provider"
+                )
+                == "atlas",
+                func.jsonb_extract_path_text(
+                    instance_cls.json_addl["properties"], "reference_type"
+                )
+                == str(reference_type).strip(),
+                func.jsonb_extract_path_text(
+                    instance_cls.json_addl["properties"], "reference_value"
+                )
+                == str(reference_value).strip(),
+            )
+            .all()
+        )
+        return {parent_uid for (parent_uid,) in rows if parent_uid is not None}
+
     def _replace_external_references(
         self,
         *,
@@ -496,7 +572,9 @@ class ExternalSpecimenService:
                     "reference_type": str(reference_type),
                     "reference_value": value,
                     "foreign_reference": value,
-                    "validation": validation_payload if isinstance(validation_payload, dict) else {},
+                    "validation": validation_payload
+                    if isinstance(validation_payload, dict)
+                    else {},
                 }
             }
             ref_obj = self.bobj.create_instance_by_code(

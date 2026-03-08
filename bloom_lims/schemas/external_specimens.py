@@ -12,6 +12,9 @@ class AtlasReferences(BaseModel):
     patient_id: str | None = None
     shipment_number: str | None = None
     kit_barcode: str | None = None
+    atlas_tenant_id: str | None = None
+    atlas_order_euid: str | None = None
+    atlas_test_order_euid: str | None = None
 
 
 class ExternalSpecimenCreateRequest(BaseModel):
@@ -32,6 +35,9 @@ class ExternalSpecimenCreateRequest(BaseModel):
                 refs.patient_id,
                 refs.shipment_number,
                 refs.kit_barcode,
+                refs.atlas_tenant_id,
+                refs.atlas_order_euid,
+                refs.atlas_test_order_euid,
             ]
         ):
             raise ValueError("At least one Atlas reference is required")
