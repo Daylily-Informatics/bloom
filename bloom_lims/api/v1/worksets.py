@@ -35,7 +35,7 @@ def get_bob(bdb):
 class WorksetCreateSchema(BaseModel):
     """Schema for creating a workset."""
     anchor_euid: str = Field(..., description="EUID of the anchor object (first workflow step)")
-    workset_type: str = Field("accession", description="Type: accession, extraction, sequencing")
+    workset_type: str = Field("generic", description="Type: generic, extraction, sequencing")
     workflow_euid: Optional[str] = Field(None, description="Parent workflow EUID")
     executed_by: Optional[str] = Field(None, description="Username of executor")
     name: Optional[str] = Field(None, description="Custom workset name")
@@ -320,4 +320,3 @@ async def get_workset_by_anchor(
     except Exception as e:
         logger.error(f"Error finding workset by anchor {anchor_euid}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

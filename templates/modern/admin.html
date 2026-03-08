@@ -132,6 +132,87 @@
   </div>
 </div>
 
+<h2 class="section-title" style="margin-top: var(--spacing-xl);"><i class="fas fa-key"></i> API Token Administration</h2>
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-users-cog"></i> API Access Users</h3>
+    </div>
+    <div class="card-body">
+      <form id="api-access-user-form" class="input-group" style="margin-bottom: var(--spacing-md);">
+        <input type="text" id="api-access-user-id" class="form-input" placeholder="User ID (email, subject, or service ID)" style="flex: 1;">
+        <button type="submit" class="btn btn-primary btn-sm">Add API User</button>
+      </form>
+      <div id="api-access-user-status" class="text-sm text-muted" style="margin-bottom: var(--spacing-sm);"></div>
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Active</th>
+            </tr>
+          </thead>
+          <tbody id="api-access-users-body">
+            <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-key"></i> Issue Token</h3>
+    </div>
+    <div class="card-body">
+      <form id="issue-token-form">
+        <div class="form-group">
+          <label class="form-label">Token Name</label>
+          <input type="text" id="issue-token-name" class="form-input" required placeholder="e.g. bloom-admin-cli">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Scope</label>
+          <select id="issue-token-scope" class="form-select">
+            <option value="internal_ro">internal_ro</option>
+            <option value="internal_rw">internal_rw</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expires In (days)</label>
+          <input type="number" id="issue-token-days" class="form-input" value="30" min="1" max="3650">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Issue Token</button>
+      </form>
+      <div id="issue-token-result" class="text-sm text-muted" style="margin-top: var(--spacing-md);"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-fingerprint"></i> Issued Tokens</h3>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Token Name</th>
+            <th>User ID</th>
+            <th>Prefix</th>
+            <th>Status</th>
+            <th>Expires</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="admin-tokens-body">
+          <tr><td colspan="6" class="text-muted">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- External Integrations -->
 <h2 class="section-title" style="margin-top: var(--spacing-xl);"><i class="fas fa-plug"></i> External Integrations</h2>
 <div class="grid grid-2">
@@ -424,6 +505,175 @@ function applyTheme(theme) {
     document.body.classList.remove('theme-light');
   }
 }
+
+function renderApiAccessUsers(items) {
+  const body = document.getElementById('api-access-users-body');
+  if (!body) return;
+  if (!Array.isArray(items) || items.length === 0) {
+    body.innerHTML = '<tr><td colspan="2" class="text-muted">No API_ACCESS users found</td></tr>';
+    return;
+  }
+  body.innerHTML = items.map((item) => (
+    '<tr>' +
+      '<td class="text-mono">' + (item.user_id || '') + '</td>' +
+      '<td>' + (item.is_active ? 'yes' : 'no') + '</td>' +
+    '</tr>'
+  )).join('');
+}
+
+function renderAdminTokens(items) {
+  const body = document.getElementById('admin-tokens-body');
+  if (!body) return;
+  if (!Array.isArray(items) || items.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" class="text-muted">No tokens found</td></tr>';
+    return;
+  }
+  body.innerHTML = items.map((item) => (
+    '<tr>' +
+      '<td>' + (item.token_name || '') + '</td>' +
+      '<td class="text-mono">' + (item.user_id || '') + '</td>' +
+      '<td class="text-mono">' + (item.token_prefix || '') + '</td>' +
+      '<td>' + (item.status || '') + '</td>' +
+      '<td class="text-mono">' + (item.expires_at || '') + '</td>' +
+      '<td><button class="btn btn-sm btn-danger" data-token-id="' + item.token_id + '">Revoke</button></td>' +
+    '</tr>'
+  )).join('');
+}
+
+async function loadApiAccessUsers() {
+  const resp = await fetch('/api/v1/admin/groups/API_ACCESS/members');
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || 'Failed loading API_ACCESS members');
+  }
+  renderApiAccessUsers(payload.items || []);
+}
+
+async function loadAdminTokens() {
+  const resp = await fetch('/api/v1/admin/user-tokens');
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || 'Failed loading admin token list');
+  }
+  renderAdminTokens(payload.items || []);
+}
+
+async function addApiAccessUser(userId) {
+  const resp = await fetch('/api/v1/admin/groups/API_ACCESS/members', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || 'Failed adding API_ACCESS membership');
+  }
+  return payload;
+}
+
+async function issueUserToken(tokenName, scope, expiresInDays) {
+  const resp = await fetch('/api/v1/user-tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      token_name: tokenName,
+      scope: scope,
+      expires_in_days: expiresInDays,
+    }),
+  });
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || 'Failed issuing token');
+  }
+  return payload;
+}
+
+async function revokeAdminToken(tokenId) {
+  const resp = await fetch('/api/v1/admin/user-tokens/' + encodeURIComponent(tokenId), {
+    method: 'DELETE',
+  });
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || 'Failed revoking token');
+  }
+  return payload;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const userForm = document.getElementById('api-access-user-form');
+  const status = document.getElementById('api-access-user-status');
+  const tokenForm = document.getElementById('issue-token-form');
+  const tokenResult = document.getElementById('issue-token-result');
+  const tokenTable = document.getElementById('admin-tokens-body');
+
+  loadApiAccessUsers().catch((err) => {
+    if (status) status.textContent = err.message;
+  });
+  loadAdminTokens().catch((err) => {
+    if (tokenResult) tokenResult.textContent = err.message;
+  });
+
+  if (userForm) {
+    userForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const input = document.getElementById('api-access-user-id');
+      const userId = input ? input.value.trim() : '';
+      if (!userId) {
+        status.textContent = 'User ID is required';
+        return;
+      }
+      addApiAccessUser(userId)
+        .then(() => {
+          status.textContent = 'API_ACCESS membership added';
+          if (input) input.value = '';
+          return loadApiAccessUsers();
+        })
+        .catch((err) => {
+          status.textContent = err.message;
+        });
+    });
+  }
+
+  if (tokenForm) {
+    tokenForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const tokenName = document.getElementById('issue-token-name').value.trim();
+      const scope = document.getElementById('issue-token-scope').value;
+      const days = Number(document.getElementById('issue-token-days').value || '30');
+      if (!tokenName) {
+        tokenResult.textContent = 'Token name is required';
+        return;
+      }
+      issueUserToken(tokenName, scope, days)
+        .then((payload) => {
+          tokenResult.innerHTML =
+            'Token issued for current admin user. Plaintext token: <code>' +
+            payload.plaintext_token +
+            '</code>';
+          tokenForm.reset();
+          document.getElementById('issue-token-days').value = '30';
+          return loadAdminTokens();
+        })
+        .catch((err) => {
+          tokenResult.textContent = err.message;
+        });
+    });
+  }
+
+  if (tokenTable) {
+    tokenTable.addEventListener('click', function(event) {
+      const target = event.target;
+      if (!target || !target.dataset || !target.dataset.tokenId) {
+        return;
+      }
+      revokeAdminToken(target.dataset.tokenId)
+        .then(() => loadAdminTokens())
+        .catch((err) => {
+          tokenResult.textContent = err.message;
+        });
+    });
+  }
+});
 
 function trackPackage(event) {
   event.preventDefault();

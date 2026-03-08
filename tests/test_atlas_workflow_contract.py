@@ -21,6 +21,10 @@ from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
 from bloom_lims.config import AtlasSettings
 from bloom_lims.integrations.atlas.events import AtlasEventClient
 
+pytestmark = pytest.mark.skip(
+    reason="Bloom accessioning workflow contracts are retired; Atlas owns accessioning."
+)
+
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

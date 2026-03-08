@@ -10,7 +10,6 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-import bloom_lims.api.v1.external_specimens as external_specimens_api
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth, require_write
 
 # Ensure auth bypass is active for API-client tests.
@@ -22,26 +21,6 @@ from main import app  # noqa: E402
 @pytest.fixture
 def client():
     return TestClient(app)
-
-
-@pytest.fixture
-def external_token_auth_override():
-    def _override():
-        return APIUser(
-            email="token-client@example.com",
-            user_id="token-client-user",
-            roles=["INTERNAL_READ_WRITE"],
-            auth_source="token",
-            is_service_account=True,
-            token_scope="internal_rw",
-            token_id="token-client-token",
-        )
-
-    app.dependency_overrides[require_external_token_auth] = _override
-    try:
-        yield
-    finally:
-        app.dependency_overrides.pop(require_external_token_auth, None)
 
 
 def _create_token(client: TestClient) -> str:
@@ -101,12 +80,11 @@ def test_api_root_lists_new_auth_endpoints(client):
     endpoints = response.json()["endpoints"]
     assert "user_tokens" in endpoints
     assert "admin_auth" in endpoints
-    assert "external_specimens" in endpoints
 
 
-def test_external_specimen_endpoint_requires_token_auth(client):
+def test_external_specimen_endpoints_removed(client):
     response = client.get("/api/v1/external/specimens/by-reference?order_number=ORD-1")
-    assert response.status_code == 401
+    assert response.status_code == 404
 
 
 def test_user_tokens_endpoints_create_list_usage_revoke(client):
@@ -195,143 +173,3 @@ def test_admin_user_token_endpoints_list_usage_delete(client):
     revoke_payload = revoke_response.json()
     assert revoke_payload["token_id"] == token_id
     assert revoke_payload["status"] == "REVOKED"
-
-
-def test_external_specimens_post_create(client, monkeypatch, external_token_auth_override):
-    captured = {}
-
-    class FakeExternalSpecimenService:
-        def __init__(self, app_username):
-            captured["app_username"] = app_username
-
-        def create_specimen(self, payload, idempotency_key):
-            captured["create_payload"] = payload.model_dump()
-            captured["idempotency_key"] = idempotency_key
-            return {
-                "specimen_euid": "SP-TEST1",
-                "container_euid": "CX-TEST1",
-                "status": "active",
-                "atlas_refs": {"order_number": "ORD-100"},
-                "properties": {"note": "ok"},
-                "idempotency_key": idempotency_key,
-                "created": True,
-            }
-
-        def close(self):
-            captured["closed"] = True
-
-    monkeypatch.setattr(external_specimens_api, "ExternalSpecimenService", FakeExternalSpecimenService)
-
-    response = client.post(
-        "/api/v1/external/specimens",
-        json={
-            "specimen_template_code": "content/specimen/generic/1.0",
-            "specimen_name": "Specimen A",
-            "container_euid": "CX-TEST1",
-            "container_template_code": "container/tube/generic/1.0",
-            "status": "active",
-            "properties": {"note": "ok"},
-            "atlas_refs": {"order_number": "ORD-100"},
-        },
-        headers={"Idempotency-Key": "idem-001"},
-    )
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["specimen_euid"] == "SP-TEST1"
-    assert payload["idempotency_key"] == "idem-001"
-    assert captured["idempotency_key"] == "idem-001"
-    assert captured["closed"] is True
-
-
-def test_external_specimens_get_by_reference(client, monkeypatch, external_token_auth_override):
-    class FakeExternalSpecimenService:
-        def __init__(self, app_username):
-            self.app_username = app_username
-
-        def find_by_references(self, refs):
-            assert refs.order_number == "ORD-200"
-            return [
-                {
-                    "specimen_euid": "SP-TEST2",
-                    "container_euid": "CX-TEST2",
-                    "status": "active",
-                    "atlas_refs": {"order_number": "ORD-200"},
-                    "properties": {},
-                    "idempotency_key": None,
-                    "created": False,
-                }
-            ]
-
-        def close(self):
-            return None
-
-    monkeypatch.setattr(external_specimens_api, "ExternalSpecimenService", FakeExternalSpecimenService)
-
-    response = client.get("/api/v1/external/specimens/by-reference?order_number=ORD-200")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["total"] == 1
-    assert payload["items"][0]["specimen_euid"] == "SP-TEST2"
-
-
-def test_external_specimens_get_by_euid(client, monkeypatch, external_token_auth_override):
-    class FakeExternalSpecimenService:
-        def __init__(self, app_username):
-            self.app_username = app_username
-
-        def get_specimen(self, specimen_euid):
-            assert specimen_euid == "SP-TEST3"
-            return {
-                "specimen_euid": "SP-TEST3",
-                "container_euid": "CX-TEST3",
-                "status": "active",
-                "atlas_refs": {"patient_id": "PAT-3"},
-                "properties": {"batch": "B-1"},
-                "idempotency_key": None,
-                "created": False,
-            }
-
-        def close(self):
-            return None
-
-    monkeypatch.setattr(external_specimens_api, "ExternalSpecimenService", FakeExternalSpecimenService)
-
-    response = client.get("/api/v1/external/specimens/SP-TEST3")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["specimen_euid"] == "SP-TEST3"
-    assert payload["container_euid"] == "CX-TEST3"
-
-
-def test_external_specimens_patch_update(client, monkeypatch, external_token_auth_override):
-    class FakeExternalSpecimenService:
-        def __init__(self, app_username):
-            self.app_username = app_username
-
-        def update_specimen(self, specimen_euid, payload):
-            assert specimen_euid == "SP-TEST4"
-            body = payload.model_dump(exclude_none=True)
-            assert body["status"] == "inactive"
-            return {
-                "specimen_euid": specimen_euid,
-                "container_euid": "CX-TEST4",
-                "status": body["status"],
-                "atlas_refs": {"shipment_number": "SHIP-4"},
-                "properties": {"updated": True},
-                "idempotency_key": None,
-                "created": False,
-            }
-
-        def close(self):
-            return None
-
-    monkeypatch.setattr(external_specimens_api, "ExternalSpecimenService", FakeExternalSpecimenService)
-
-    response = client.patch(
-        "/api/v1/external/specimens/SP-TEST4",
-        json={"status": "inactive", "atlas_refs": {"shipment_number": "SHIP-4"}},
-    )
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["specimen_euid"] == "SP-TEST4"
-    assert payload["status"] == "inactive"
