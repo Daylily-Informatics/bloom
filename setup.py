@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 
 def get_version():
@@ -7,9 +7,7 @@ def get_version():
     import re
 
     # Read version from _version.py without importing (avoids dependency issues)
-    version_file = os.path.join(
-        os.path.dirname(__file__), "bloom_lims", "_version.py"
-    )
+    version_file = os.path.join(os.path.dirname(__file__), "bloom_lims", "_version.py")
 
     with open(version_file, "r") as f:
         content = f.read()
@@ -28,7 +26,7 @@ setup(
     version=get_version(),
     packages=find_packages(),
     install_requires=[
-        "daylily-tapdb==0.1.33",
+        "daylily-tapdb==0.1.35",
         "daylily-cognito==0.1.24",
         "pydantic>=2.6.0",
         "pydantic-settings>=2.0.0",

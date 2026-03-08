@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Code Quality (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Collect changed Python files
+        id: changed
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          event = os.environ["GITHUB_EVENT_NAME"]
+          if event == "pull_request":
+              base_ref = os.environ["GITHUB_BASE_REF"]
+              subprocess.run(
+                  ["git", "fetch", "--depth=1", "origin", base_ref],
+                  check=True,
+              )
+              cmd = ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD", "--", "*.py"]
+          else:
+              has_parent = subprocess.run(
+                  ["git", "rev-parse", "--verify", "HEAD^"],
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+              ).returncode == 0
+              if has_parent:
+                  cmd = ["git", "diff", "--name-only", "HEAD^", "HEAD", "--", "*.py"]
+              else:
+                  cmd = ["git", "ls-files", "*.py"]
+
+          files = [line.strip() for line in subprocess.check_output(cmd, text=True).splitlines() if line.strip()]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"files={json.dumps(files)}\n")
+              fh.write(f"count={len(files)}\n")
+          PY
+
+      - name: Run ruff check
+        if: steps.changed.outputs.count != '0'
+        run: ruff check ${{ join(fromJson(steps.changed.outputs.files), ' ') }}
+
+      - name: Run ruff format check
+        if: steps.changed.outputs.count != '0'
+        run: ruff format --check ${{ join(fromJson(steps.changed.outputs.files), ' ') }}
+
+      - name: Skip ruff when no Python files changed
+        if: steps.changed.outputs.count == '0'
+        run: echo "No Python file changes detected."
+
+  security:
+    name: Security Scanning (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install bandit
+        run: pip install "bandit[toml]"
+
+      - name: Collect changed Python files
+        id: changed
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          event = os.environ["GITHUB_EVENT_NAME"]
+          if event == "pull_request":
+              base_ref = os.environ["GITHUB_BASE_REF"]
+              subprocess.run(
+                  ["git", "fetch", "--depth=1", "origin", base_ref],
+                  check=True,
+              )
+              cmd = ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD", "--", "*.py"]
+          else:
+              has_parent = subprocess.run(
+                  ["git", "rev-parse", "--verify", "HEAD^"],
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+              ).returncode == 0
+              if has_parent:
+                  cmd = ["git", "diff", "--name-only", "HEAD^", "HEAD", "--", "*.py"]
+              else:
+                  cmd = ["git", "ls-files", "*.py"]
+
+          files = [line.strip() for line in subprocess.check_output(cmd, text=True).splitlines() if line.strip()]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"files={json.dumps(files)}\n")
+              fh.write(f"count={len(files)}\n")
+          PY
+
+      - name: Run bandit security scan
+        if: steps.changed.outputs.count != '0'
+        run: bandit -c pyproject.toml ${{ join(fromJson(steps.changed.outputs.files), ' ') }}
+
+      - name: Skip bandit when no Python files changed
+        if: steps.changed.outputs.count == '0'
+        run: echo "No Python file changes detected."
+
+  test:
+    name: Beta Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: ${{ env.PYTHON_VERSION }}
+          activate-environment: BLOOM
+          environment-file: bloom_env.yaml
+          auto-activate-base: false
+
+      - name: Install bloom in editable mode
+        shell: bash -el {0}
+        run: |
+          pip install -e .
+
+      - name: Run beta-critical tests
+        shell: bash -el {0}
+        run: |
+          pytest --no-cov \
+            tests/test_api_atlas_bridge.py \
+            tests/test_atlas_lookup_resilience.py \
+            tests/test_queue_flow.py \
+            tests/test_run_resolver.py \
+            tests/test_beta_cross_repo_smoke.py
