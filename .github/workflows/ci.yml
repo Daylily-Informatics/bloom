@@ -165,6 +165,11 @@ jobs:
         run: |
           pip install -e .
 
+      - name: Initialize local Bloom database
+        shell: bash -el {0}
+        run: |
+          bloom db init
+
       - name: Run beta-critical tests
         shell: bash -el {0}
         run: |
