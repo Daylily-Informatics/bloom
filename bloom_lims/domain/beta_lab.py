@@ -36,6 +36,11 @@ class BetaLabService:
     EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
     EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
     PROCESS_ITEM_REFERENCE_TYPE = "atlas_test_process_item"
+    PATIENT_REFERENCE_TYPE = "atlas_patient"
+    TRF_REFERENCE_TYPE = "atlas_trf"
+    TESTKIT_REFERENCE_TYPE = "atlas_testkit"
+    SHIPMENT_REFERENCE_TYPE = "atlas_shipment"
+    ORGANIZATION_SITE_REFERENCE_TYPE = "atlas_organization_site"
     GENERIC_DATA_TEMPLATE_CODE = "generic/generic/generic/1.0"
     POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
@@ -89,6 +94,11 @@ class BetaLabService:
             if existing is not None:
                 return self._material_response(existing, created=False)
 
+        container = self._resolve_or_create_container(
+            container_euid=payload.container_euid,
+            container_template_code=payload.container_template_code,
+            specimen_name=payload.specimen_name or "accepted-material",
+        )
         specimen = self.bobj.create_instance_by_code(
             payload.specimen_template_code,
             {"json_addl": {"properties": payload.properties or {}}},
@@ -102,16 +112,17 @@ class BetaLabService:
         if idempotency_key:
             specimen_props["idempotency_key"] = idempotency_key
         self._write_props(specimen, specimen_props)
+        self._ensure_container_link(container.euid, specimen.euid)
 
-        container = self._resolve_or_create_container(
-            container_euid=payload.container_euid,
-            container_template_code=payload.container_template_code,
-            specimen_name=payload.specimen_name or specimen.name,
+        self._replace_container_entity_references(
+            container,
+            atlas_context=payload.atlas_context.model_dump(),
         )
-        if container is not None:
-            self._ensure_container_link(container.euid, specimen.euid)
-
         self._replace_process_item_references(
+            container,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self._replace_patient_reference(
             specimen,
             atlas_context=payload.atlas_context.model_dump(),
         )
@@ -981,6 +992,17 @@ class BetaLabService:
             queue_name = str(parent_props.get("queue_name") or "").strip()
             if queue_name:
                 return queue_name
+        # Queue membership is tracked on the physical container for ingress material.
+        # If content lacks direct queue state, fall back to its containing container.
+        for lineage in get_child_lineages(instance):
+            if lineage.is_deleted or lineage.relationship_type != "contains":
+                continue
+            parent = lineage.parent_instance
+            if parent is None or parent.is_deleted or parent.category != "container":
+                continue
+            container_queue = self._current_queue_for_instance(parent)
+            if container_queue:
+                return container_queue
         return None
 
     def _resolve_process_item_context(
@@ -989,34 +1011,14 @@ class BetaLabService:
         *,
         target_process_item_euid: str | None = None,
     ) -> dict[str, str]:
-        visited: set[int] = set()
-        to_visit = [instance]
-        matches: dict[str, dict[str, str]] = {}
+        matches = {
+            ref["atlas_test_process_item_euid"]: ref
+            for ref in self._reachable_process_item_refs(instance)
+        }
         target = str(target_process_item_euid or "").strip()
-        while to_visit:
-            current = to_visit.pop(0)
-            current_uid = getattr(current, "uid", None)
-            if current_uid in visited:
-                continue
-            visited.add(current_uid)
-
-            for ref in self._process_item_refs_for_instance(current):
-                process_item_euid = ref["atlas_test_process_item_euid"]
-                if target and process_item_euid != target:
-                    continue
-                matches[process_item_euid] = ref
-                if target:
-                    return ref
-
-            for lineage in get_child_lineages(current):
-                if lineage.is_deleted:
-                    continue
-                parent = lineage.parent_instance
-                if parent is None or parent.is_deleted:
-                    continue
-                to_visit.append(parent)
-
         if target:
+            if target in matches:
+                return matches[target]
             raise ValueError(
                 "No Atlas test process item could be resolved from "
                 f"Bloom lineage for {instance.euid}: {target}"
@@ -1033,26 +1035,30 @@ class BetaLabService:
             f"Bloom lineage for {instance.euid}"
         )
 
+    def _reachable_process_item_refs(self, instance) -> list[dict[str, str]]:
+        visited: set[int] = set()
+        to_visit = [instance]
+        refs: dict[str, dict[str, str]] = {}
+        while to_visit:
+            current = to_visit.pop(0)
+            current_uid = getattr(current, "uid", None)
+            if current_uid in visited:
+                continue
+            visited.add(current_uid)
+            for ref in self._process_item_refs_for_instance(current):
+                refs[ref["atlas_test_process_item_euid"]] = ref
+            for lineage in get_child_lineages(current):
+                if lineage.is_deleted:
+                    continue
+                parent = lineage.parent_instance
+                if parent is None or parent.is_deleted:
+                    continue
+                to_visit.append(parent)
+        return list(refs.values())
+
     def _process_item_refs_for_instance(self, instance) -> list[dict[str, str]]:
         refs: dict[str, dict[str, str]] = {}
-        for lineage in get_parent_lineages(instance):
-            if (
-                lineage.is_deleted
-                or lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP
-            ):
-                continue
-            external_ref = lineage.child_instance
-            if external_ref is None or external_ref.is_deleted:
-                continue
-            if (
-                external_ref.category != "generic"
-                or external_ref.type != "generic"
-                or external_ref.subtype != "external_object_link"
-            ):
-                continue
-            payload = self._props(external_ref)
-            if str(payload.get("provider") or "").strip() != "atlas":
-                continue
+        for payload in self._atlas_reference_payloads_for_instance(instance):
             ref_type = str(payload.get("reference_type") or "").strip()
             if ref_type != self.PROCESS_ITEM_REFERENCE_TYPE:
                 continue
@@ -1075,25 +1081,51 @@ class BetaLabService:
             }
         return list(refs.values())
 
-    def _replace_process_item_references(self, instance, *, atlas_context: dict[str, Any]) -> None:
-        existing_refs = []
+    def _atlas_reference_payloads_for_instance(self, instance) -> list[dict[str, Any]]:
+        payloads: list[dict[str, Any]] = []
         for lineage in get_parent_lineages(instance):
             if (
                 lineage.is_deleted
                 or lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP
             ):
                 continue
-            child = lineage.child_instance
-            if child is None:
+            external_ref = lineage.child_instance
+            if external_ref is None or external_ref.is_deleted:
                 continue
-            existing_refs.append((lineage, child))
+            if (
+                external_ref.category != "generic"
+                or external_ref.type != "generic"
+                or external_ref.subtype != "external_object_link"
+            ):
+                continue
+            payload = self._props(external_ref)
+            if str(payload.get("provider") or "").strip() != "atlas":
+                continue
+            payloads.append(payload)
+        return payloads
 
-        for lineage, child in existing_refs:
-            payload = self._props(child)
-            if str(payload.get("reference_type") or "").strip() != self.PROCESS_ITEM_REFERENCE_TYPE:
+    def _patient_ref_for_instance(self, instance) -> dict[str, str] | None:
+        for payload in self._atlas_reference_payloads_for_instance(instance):
+            ref_type = str(payload.get("reference_type") or "").strip()
+            if ref_type != self.PATIENT_REFERENCE_TYPE:
                 continue
-            lineage.is_deleted = True
-            child.is_deleted = True
+            atlas_patient_euid = str(payload.get("atlas_patient_euid") or "").strip()
+            if not atlas_patient_euid:
+                atlas_patient_euid = str(payload.get("reference_value") or "").strip()
+            atlas_tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
+            if not (atlas_patient_euid and atlas_tenant_id):
+                continue
+            return {
+                "atlas_tenant_id": atlas_tenant_id,
+                "atlas_patient_euid": atlas_patient_euid,
+            }
+        return None
+
+    def _replace_process_item_references(self, instance, *, atlas_context: dict[str, Any]) -> None:
+        self._delete_reference_type(
+            instance,
+            reference_type=self.PROCESS_ITEM_REFERENCE_TYPE,
+        )
 
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
@@ -1134,6 +1166,101 @@ class BetaLabService:
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
+
+    def _replace_container_entity_references(
+        self,
+        instance,
+        *,
+        atlas_context: dict[str, Any],
+    ) -> None:
+        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
+        reference_fields = (
+            (self.TRF_REFERENCE_TYPE, "atlas_trf_euid"),
+            (self.TESTKIT_REFERENCE_TYPE, "atlas_testkit_euid"),
+            (self.SHIPMENT_REFERENCE_TYPE, "atlas_shipment_euid"),
+            (self.ORGANIZATION_SITE_REFERENCE_TYPE, "atlas_organization_site_euid"),
+        )
+        for reference_type, field_name in reference_fields:
+            self._delete_reference_type(instance, reference_type=reference_type)
+            if not atlas_tenant_id:
+                continue
+            reference_value = str(atlas_context.get(field_name) or "").strip()
+            if not reference_value:
+                continue
+            properties = {
+                "provider": "atlas",
+                "reference_type": reference_type,
+                "reference_value": reference_value,
+                "foreign_reference": reference_value,
+                "atlas_tenant_id": atlas_tenant_id,
+                "validation": {},
+            }
+            if atlas_trf_euid:
+                properties["atlas_trf_euid"] = atlas_trf_euid
+            properties[field_name] = reference_value
+            ref_obj = self.bobj.create_instance_by_code(
+                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
+                {"json_addl": {"properties": properties}},
+            )
+            self.bobj.create_generic_instance_lineage_by_euids(
+                instance.euid,
+                ref_obj.euid,
+                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+            )
+
+    def _replace_patient_reference(self, instance, *, atlas_context: dict[str, Any]) -> None:
+        self._delete_reference_type(
+            instance,
+            reference_type=self.PATIENT_REFERENCE_TYPE,
+        )
+        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        atlas_patient_euid = str(atlas_context.get("atlas_patient_euid") or "").strip()
+        atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
+        if not (atlas_tenant_id and atlas_patient_euid):
+            return
+        ref_obj = self.bobj.create_instance_by_code(
+            self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
+            {
+                "json_addl": {
+                    "properties": {
+                        "provider": "atlas",
+                        "reference_type": self.PATIENT_REFERENCE_TYPE,
+                        "reference_value": atlas_patient_euid,
+                        "foreign_reference": atlas_patient_euid,
+                        "atlas_tenant_id": atlas_tenant_id,
+                        "atlas_patient_euid": atlas_patient_euid,
+                        "atlas_trf_euid": atlas_trf_euid,
+                        "validation": {},
+                    }
+                }
+            },
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            instance.euid,
+            ref_obj.euid,
+            relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+        )
+
+    def _delete_reference_type(self, instance, *, reference_type: str) -> None:
+        existing_refs = []
+        for lineage in get_parent_lineages(instance):
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP
+            ):
+                continue
+            child = lineage.child_instance
+            if child is None:
+                continue
+            existing_refs.append((lineage, child))
+
+        for lineage, child in existing_refs:
+            payload = self._props(child)
+            if str(payload.get("reference_type") or "").strip() != str(reference_type).strip():
+                continue
+            lineage.is_deleted = True
+            child.is_deleted = True
 
     def _find_operation_record(self, *, beta_kind: str, idempotency_key: str):
         return self._find_data_record_by_property(
@@ -1254,13 +1381,50 @@ class BetaLabService:
         )
 
     def _atlas_context_for_instance(self, instance) -> dict[str, Any]:
-        process_items = self._process_item_refs_for_instance(instance)
+        process_items = self._reachable_process_item_refs(instance)
+        patient_ref = self._patient_ref_for_instance(instance)
+        atlas_trf_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type=self.TRF_REFERENCE_TYPE,
+            value_field="atlas_trf_euid",
+        )
+        atlas_testkit_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type=self.TESTKIT_REFERENCE_TYPE,
+            value_field="atlas_testkit_euid",
+        )
+        atlas_shipment_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type=self.SHIPMENT_REFERENCE_TYPE,
+            value_field="atlas_shipment_euid",
+        )
+        atlas_organization_site_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type=self.ORGANIZATION_SITE_REFERENCE_TYPE,
+            value_field="atlas_organization_site_euid",
+        )
         if not process_items:
-            return {"atlas_tenant_id": "", "atlas_trf_euid": "", "process_items": []}
+            return {
+                "atlas_tenant_id": "",
+                "atlas_trf_euid": atlas_trf_euid,
+                "atlas_testkit_euid": atlas_testkit_euid,
+                "atlas_shipment_euid": atlas_shipment_euid,
+                "atlas_organization_site_euid": atlas_organization_site_euid,
+                "atlas_patient_euid": (
+                    patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
+                ),
+                "process_items": [],
+            }
         first = process_items[0]
         return {
             "atlas_tenant_id": first["atlas_tenant_id"],
-            "atlas_trf_euid": first["atlas_trf_euid"],
+            "atlas_trf_euid": first["atlas_trf_euid"] or atlas_trf_euid,
+            "atlas_testkit_euid": atlas_testkit_euid,
+            "atlas_shipment_euid": atlas_shipment_euid,
+            "atlas_organization_site_euid": atlas_organization_site_euid,
+            "atlas_patient_euid": (
+                patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
+            ),
             "process_items": [
                 {
                     "atlas_test_euid": item["atlas_test_euid"],
@@ -1272,6 +1436,39 @@ class BetaLabService:
                 )
             ],
         }
+
+    def _first_reachable_reference_value(
+        self,
+        instance,
+        *,
+        reference_type: str,
+        value_field: str,
+    ) -> str:
+        visited: set[int] = set()
+        to_visit = [instance]
+        while to_visit:
+            current = to_visit.pop(0)
+            current_uid = getattr(current, "uid", None)
+            if current_uid in visited:
+                continue
+            visited.add(current_uid)
+            for payload in self._atlas_reference_payloads_for_instance(current):
+                current_ref_type = str(payload.get("reference_type") or "").strip()
+                if current_ref_type != str(reference_type).strip():
+                    continue
+                value = str(payload.get(value_field) or "").strip()
+                if not value:
+                    value = str(payload.get("reference_value") or "").strip()
+                if value:
+                    return value
+            for lineage in get_child_lineages(current):
+                if lineage.is_deleted:
+                    continue
+                parent = lineage.parent_instance
+                if parent is None or parent.is_deleted:
+                    continue
+                to_visit.append(parent)
+        return ""
 
     def _first_parent(self, instance, relationship_type: str):
         for lineage in get_child_lineages(instance):

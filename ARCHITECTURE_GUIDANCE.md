@@ -40,7 +40,7 @@ Queue movement is explicit. Material lineage is explicit. Atlas identity linkage
 - Atlas sends accepted material into Bloom through explicit APIs.
 - Bloom stores Atlas linkage through external-object references.
 - Bloom preserves lineage from specimen and container to run.
-- Bloom resolves `run_euid + index_string` to Atlas tenant, order, and TRF.test EUIDs.
+- Bloom resolves `run_euid + flowcell_id + lane + library_barcode` to Atlas tenant, order, and TRF.test EUIDs.
 - Public APIs use EUIDs only.
 
 ## Non-Goals

@@ -43,6 +43,20 @@ class TestAPIRoot:
         assert "version" in data
         assert "endpoints" in data
         assert "search_v2" in data["endpoints"]
+        assert "workflows" not in data["endpoints"]
+        assert "worksets" not in data["endpoints"]
+
+
+class TestRetiredAPIRoutes:
+    """Tests for retired API surfaces."""
+
+    def test_workflows_route_is_not_mounted(self, client):
+        response = client.get("/api/v1/workflows/")
+        assert response.status_code == 404
+
+    def test_worksets_route_is_not_mounted(self, client):
+        response = client.get("/api/v1/worksets/")
+        assert response.status_code == 404
 
 
 class TestObjectsAPI:
@@ -147,6 +161,7 @@ class TestContentAPI:
         assert response.status_code == 404
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPI:
     """Tests for /api/v1/workflows endpoints."""
     
@@ -623,6 +638,24 @@ class TestObjectCreationAPI:
         type_names = [item.get("name") or item for item in categories]
         assert any("container" in str(cat).lower() for cat in type_names)
 
+    def test_get_categories_excludes_retired_domains(self, client):
+        """Retired workflow/workflow_step/test_requisition categories are hidden."""
+        response = client.get("/api/v1/object-creation/categories")
+        assert response.status_code == 200
+        categories = response.json().get("categories", [])
+        names = [item.get("name") for item in categories]
+        assert "workflow" not in names
+        assert "workflow_step" not in names
+        assert "test_requisition" not in names
+
+    def test_get_categories_sorted_alphabetically(self, client):
+        """Category list is sorted case-insensitively by display name."""
+        response = client.get("/api/v1/object-creation/categories")
+        assert response.status_code == 200
+        categories = response.json().get("categories", [])
+        display_names = [item.get("display_name", item.get("name", "")) for item in categories]
+        assert display_names == sorted(display_names, key=lambda value: str(value).casefold())
+
     def test_get_types_for_category(self, client):
         """Test getting types for a category."""
         # Use query parameter format
@@ -739,6 +772,7 @@ class TestTemplatesAPIExtended:
                     assert "uuid" not in response.json()
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPIExtended:
     """Extended tests for workflows API endpoints."""
 
@@ -989,6 +1023,7 @@ class TestSubjectsAPIDeep:
         assert response.status_code in [404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPIDeep:
     """Deeper tests for workflows API."""
 
@@ -1169,6 +1204,7 @@ class TestFilesAPI:
         assert response.status_code in [404, 405, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPIDeep:
     """Extended tests for workflows API."""
 
@@ -1292,6 +1328,7 @@ class TestSubjectSpecimens:
         assert response.status_code in [200, 400, 404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowAdvance:
     """Tests for /api/v1/workflows advance endpoint."""
 
@@ -1378,6 +1415,7 @@ class TestAsyncTasks:
         assert response.status_code in [200, 400, 404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workset APIs are retired in queue-centric Bloom beta.")
 class TestWorksetsAPI:
     """Tests for /api/v1/worksets endpoints."""
 

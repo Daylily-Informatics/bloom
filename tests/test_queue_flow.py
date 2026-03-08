@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,6 +29,7 @@ def _external_rw_user() -> APIUser:
         email="beta-queue@example.com",
         user_id=f"user-{token}",
         roles=["INTERNAL_READ_WRITE"],
+        groups=[ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",
@@ -55,6 +57,7 @@ def test_beta_queue_flow_end_to_end():
     atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
+        "atlas_patient_euid": _opaque("patient"),
         "process_items": [
             {
                 "atlas_test_euid": _opaque("test"),
@@ -81,6 +84,10 @@ def test_beta_queue_flow_end_to_end():
         assert material["current_queue"] is None
         assert material["atlas_context"]["atlas_trf_euid"] == atlas_context["atlas_trf_euid"]
         assert (
+            material["atlas_context"]["atlas_patient_euid"]
+            == atlas_context["atlas_patient_euid"]
+        )
+        assert (
             material["atlas_context"]["process_items"][0]["atlas_test_process_item_euid"]
             == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
         )
@@ -98,15 +105,17 @@ def test_beta_queue_flow_end_to_end():
         assert replay.json()["created"] is False
 
         specimen_euid = material["specimen_euid"]
+        container_euid = material["container_euid"]
 
         queued = client.post(
-            f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{specimen_euid}",
+            f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{container_euid}",
             headers={"Idempotency-Key": _opaque("idem-queue")},
             json={"metadata": {"reason": "accepted-material"}},
         )
         assert queued.status_code == 200, queued.text
         queue_body = queued.json()
         _assert_no_uuid_keys(queue_body)
+        assert queue_body["material_euid"] == container_euid
         assert queue_body["current_queue"] == "extraction_prod"
 
         extraction = client.post(

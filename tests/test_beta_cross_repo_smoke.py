@@ -31,6 +31,7 @@ for root in (ATLAS_ROOT, URSA_ROOT):
         sys.path.insert(0, root_str)
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.app import create_app as create_bloom_app
 from daylib.analysis_store import (  # noqa: E402
     AnalysisArtifact,
@@ -82,6 +83,7 @@ def _external_rw_user() -> APIUser:
         email="beta-smoke@example.com",
         user_id=f"user-{token}",
         roles=["INTERNAL_READ_WRITE"],
+        groups=[ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",

@@ -9,7 +9,6 @@ With BLOOM_OAUTH=no, authentication is bypassed for testing.
 
 import os
 import sys
-import subprocess
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -113,18 +112,15 @@ class TestMainGUIEndpoints:
 
     def test_admin_start_zebra_service_redirects_on_success(self, client):
         """Test zebra start action launches command and redirects with success flag."""
-        with patch("bloom_lims.gui.routes.operations.shutil.which", return_value="/usr/local/bin/zday_start"):
+        with patch("bloom_lims.gui.routes.operations._zebra_command_status", return_value=("stopped", "stopped")):
             with patch(
-                "bloom_lims.gui.routes.operations.subprocess.run",
-                return_value=subprocess.CompletedProcess(
-                    args=["zday_start"], returncode=0, stdout="ok", stderr=""
-                ),
-            ) as mocked_run:
+                "bloom_lims.gui.routes.operations._try_start_zebra_background",
+                return_value=("started", "ok"),
+            ):
                 response = client.post("/admin/zebra/start", follow_redirects=False)
 
         assert response.status_code == 303
         assert response.headers.get("location") == "/admin?zebra_started=1"
-        mocked_run.assert_called_once()
 
 
 class TestAssaysEndpoint:
@@ -163,6 +159,20 @@ class TestAssaysEndpoint:
         assert "API Access Users" in response.text
         assert "Issued Tokens" in response.text
 
+    def test_admin_has_atlas_and_ursa_enablement_panels(self, client):
+        """Admin page renders Atlas/Ursa API enablement controls."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "Enable Atlas API" in response.text
+        assert "Enable Ursa API" in response.text
+
+    def test_admin_has_group_membership_management_panel(self, client):
+        """Admin page renders generic group assignment/removal controls."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "Group Membership Management" in response.text
+        assert "Add User To Selected Group" in response.text
+
 
 class TestEuidDetailsEndpoint:
     """Tests for /euid_details endpoint."""
@@ -198,7 +208,7 @@ class TestModernActionUI:
             "captured_data": {"status": "ready"},
         }
         with patch(
-            "bloom_lims.gui.routes.workflows.execute_action_for_instance",
+            "bloom_lims.gui.routes.operations.execute_action_for_instance",
             return_value={"status": "success", "message": "ok"},
         ) as mocked_execute:
             response = client.post("/ui/actions/execute", json=payload)
@@ -208,6 +218,9 @@ class TestModernActionUI:
         mocked_execute.assert_called_once()
 
 
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
 class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
@@ -498,12 +511,9 @@ class TestModernTemplateUsage:
         assert "Assays" in content
 
     def test_workflow_summary_uses_modern_template(self, client):
-        """Test workflow summary uses modern template."""
+        """Workflow summary route is retired."""
         response = client.get("/workflow_summary")
-        assert response.status_code == 200
-        content = response.text
-        assert "bloom_modern.css" in content
-        assert "Workflow" in content
+        assert response.status_code == 404
 
     def test_equipment_overview_uses_modern_template(self, client):
         """Test equipment overview uses modern template."""
@@ -661,6 +671,24 @@ class TestAdminDependencyInfo:
         content = response.text
         assert "BLOOM Version" in content or "bloom_version" in content.lower()
 
+    def test_admin_shows_atlas_webhook_secret_panel(self, client):
+        """Test admin page shows Atlas webhook secret panel."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert "Atlas Webhook Signature Secret" in content
+        assert "X-Bloom-Signature" in content
+
+    def test_admin_shows_atlas_webhook_secret_controls(self, client):
+        """Test admin page renders view/copy/hide controls for webhook secret."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        content = response.text
+        assert 'id="atlas-webhook-secret-value"' in content
+        assert 'id="atlas-webhook-secret-view"' in content
+        assert 'id="atlas-webhook-secret-copy"' in content
+        assert 'id="atlas-webhook-secret-hide"' in content
+
 
 class TestObjectCreationWizard:
     """Tests for object creation wizard functionality."""
@@ -688,12 +716,12 @@ class TestObjectCreationWizard:
         assert "wizard-step" in content
 
     def test_create_object_page_has_assay_shortcut(self, client):
-        """Test create object page exposes the Assay shortcut path."""
+        """Create page must not expose retired workflow-assay shortcut."""
         response = client.get("/create_object")
         assert response.status_code == 200
         content = response.text
-        assert "Shortcut: workflow / assay" in content
-        assert "selectAssayShortcut()" in content
+        assert "Shortcut: workflow / assay" not in content
+        assert "selectAssayShortcut()" not in content
 
     def test_create_object_navigation_link(self, client):
         """Test create object link is in navigation."""
@@ -717,6 +745,22 @@ class TestObjectCreationAPI:
         names = [st["name"] for st in data["categories"]]
         assert "container" in names
         assert "content" in names
+
+    def test_categories_api_excludes_retired_domains(self, client):
+        """Retired workflow/test requisition categories must be absent."""
+        response = client.get("/api/v1/object-creation/categories")
+        assert response.status_code == 200
+        names = [st.get("name") for st in response.json().get("categories", [])]
+        assert "workflow" not in names
+        assert "workflow_step" not in names
+        assert "test_requisition" not in names
+
+    def test_categories_api_is_alpha_sorted(self, client):
+        """Categories should be case-insensitive alpha sorted."""
+        response = client.get("/api/v1/object-creation/categories")
+        assert response.status_code == 200
+        names = [st.get("display_name", st.get("name", "")) for st in response.json().get("categories", [])]
+        assert names == sorted(names, key=lambda value: str(value).casefold())
 
     def test_types_api(self, client):
         """Test types API endpoint for container category."""
@@ -789,6 +833,7 @@ class TestLoginLogoutButtonDisplay:
         assert "Logout" in content or "logout" in content.lower()
         # Should see the user email (from test session)
         assert "john@daylilyinformatics.com" in content or "email" in content.lower()
+        assert 'href="/user_home"' in content
 
     def test_dashboard_shows_logout_with_udat(self, client):
         """Test dashboard page shows logout button when udat is passed."""
@@ -851,10 +896,30 @@ class TestModernUINavigation:
         # Check for main navigation links
         assert 'href="/"' in content  # Dashboard
         assert 'href="/assays"' in content
-        assert 'href="/workflows"' in content
+        assert 'href="/workflows"' not in content
         assert 'href="/admin"' in content
         assert 'href="/create_object"' in content
         assert 'href="/search"' in content
+
+    def test_dashboard_hides_admin_nav_for_non_admin(self, client):
+        from fastapi import Request
+        from bloom_lims.gui.deps import require_auth
+
+        async def _non_admin_auth(request: Request):
+            request.session["user_data"] = {
+                "email": "non-admin@example.com",
+                "role": "user",
+                "dag_fnv2": "",
+            }
+            return request.session["user_data"]
+
+        app.dependency_overrides[require_auth] = _non_admin_auth
+        try:
+            response = client.get("/")
+            assert response.status_code == 200
+            assert 'href="/admin"' not in response.text
+        finally:
+            app.dependency_overrides.pop(require_auth, None)
 
     def test_dashboard_has_no_legacy_link(self, client):
         """Test dashboard does not expose legacy UI link."""
@@ -1052,6 +1117,7 @@ class TestProtectedEndpoints:
         assert response.status_code in [200, 307, 400, 404]
 
 
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
 class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
@@ -1307,6 +1373,7 @@ class TestDagEndpoints:
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
 class TestWorkflowEndpoints:
     """Tests for workflow-related endpoints."""
 
@@ -1519,6 +1586,7 @@ class TestControlsAndReagentsEndpoints:
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
 class TestWorkflowManagementEndpoints:
     """Tests for workflow management endpoints."""
 
@@ -1853,6 +1921,7 @@ class TestAdditionalViewEndpoints:
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
 class TestWorkflowQueryParamCompatibility:
     """Compatibility tests for workflow query parameter names."""
 

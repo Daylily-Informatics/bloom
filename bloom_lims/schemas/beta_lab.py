@@ -27,6 +27,10 @@ class AtlasProcessItemReference(BaseModel):
 class AtlasProcessContext(BaseModel):
     atlas_tenant_id: str
     atlas_trf_euid: str
+    atlas_patient_euid: str | None = None
+    atlas_testkit_euid: str | None = None
+    atlas_shipment_euid: str | None = None
+    atlas_organization_site_euid: str | None = None
     process_items: list[AtlasProcessItemReference]
 
     @model_validator(mode="after")
@@ -35,6 +39,17 @@ class AtlasProcessContext(BaseModel):
             raise ValueError("atlas_tenant_id is required")
         if not self.atlas_trf_euid.strip():
             raise ValueError("atlas_trf_euid is required")
+        if self.atlas_patient_euid is not None and not self.atlas_patient_euid.strip():
+            raise ValueError("atlas_patient_euid must not be empty when provided")
+        if self.atlas_testkit_euid is not None and not self.atlas_testkit_euid.strip():
+            raise ValueError("atlas_testkit_euid must not be empty when provided")
+        if self.atlas_shipment_euid is not None and not self.atlas_shipment_euid.strip():
+            raise ValueError("atlas_shipment_euid must not be empty when provided")
+        if (
+            self.atlas_organization_site_euid is not None
+            and not self.atlas_organization_site_euid.strip()
+        ):
+            raise ValueError("atlas_organization_site_euid must not be empty when provided")
         if not self.process_items:
             raise ValueError("process_items must not be empty")
         return self

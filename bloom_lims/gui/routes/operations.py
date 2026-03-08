@@ -12,6 +12,7 @@ import os
 import random
 import shutil
 import subprocess
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,6 +31,11 @@ from auth.cognito.client import CognitoConfigurationError
 from bloom_lims.bobjs import BloomFile, BloomFileReference, BloomFileSet, BloomObj
 from bloom_lims.bvars import BloomVars
 from bloom_lims.db import BLOOMdb3
+from bloom_lims.core.action_execution import (
+    ActionExecutionError,
+    execute_action_for_instance,
+    normalize_action_execute_payload,
+)
 from bloom_lims.gui.actions import hydrate_dynamic_action_groups as _hydrate_dynamic_action_groups
 from bloom_lims.gui.deps import (
     _get_request_cognito_auth,
@@ -53,6 +59,86 @@ class FormField(BaseModel):
     required: bool = False
     multiple: bool = False
     options: List[str] = []
+
+
+def _session_role(request: Request) -> str:
+    user_data = request.session.get("user_data", {})
+    return str(user_data.get("role", "user")).strip().lower()
+
+
+def _is_admin_session(request: Request) -> bool:
+    return _session_role(request) == "admin"
+
+
+def _admin_forbidden_response(request: Request):
+    accepts = request.headers.get("accept", "").lower()
+    if "application/json" in accepts:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return RedirectResponse(url="/user_home?admin_required=1", status_code=303)
+
+
+def _zebra_command_status() -> tuple[str, str]:
+    """Return zebra service status and command output summary."""
+    zday_path = shutil.which("zday")
+    if not zday_path:
+        return "unknown", "zday command not available"
+
+    try:
+        status_result = subprocess.run(
+            [zday_path, "gui", "status"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        return "unknown", str(exc)
+
+    combined = f"{status_result.stdout or ''}\n{status_result.stderr or ''}".strip()
+    lower = combined.lower()
+    if "not running" in lower:
+        return "stopped", combined
+    if "running" in lower:
+        return "running", combined
+    return "unknown", combined
+
+
+def _try_start_zebra_background() -> tuple[str, str]:
+    """Attempt to start zebra service in non-blocking mode."""
+    zday_path = shutil.which("zday")
+    if zday_path:
+        start_result = subprocess.run(
+            [zday_path, "gui", "start", "--background", "--port", "8118"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+        if start_result.returncode != 0:
+            err = (start_result.stderr or start_result.stdout or "").strip()
+            return "start_failed", err or "zday gui start returned non-zero exit code"
+
+        for _ in range(5):
+            status, details = _zebra_command_status()
+            if status == "running":
+                return "started", details
+            time.sleep(0.4)
+        return "launch_failed", "zebra service start command completed but running status was not observed"
+
+    legacy_path = shutil.which("zday_start")
+    if not legacy_path:
+        return "command_not_found", "Neither zday nor zday_start command is available"
+
+    try:
+        subprocess.Popen(  # noqa: S603,S607
+            [legacy_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return "started", "zday_start launched in background"
+    except Exception as exc:  # pragma: no cover - defensive
+        return "launch_failed", str(exc)
 
 
 def get_well_color(quant_value):
@@ -303,6 +389,9 @@ async def set_filter(request: Request, _auth=Depends(require_auth), curr_val="of
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
     dest_section = {"section": dest}
 
     user_data = request.session.get("user_data", {})
@@ -400,6 +489,13 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "database": os.environ.get("POSTGRES_DB", "bloom_lims"),
         "user": os.environ.get("POSTGRES_USER", "bloom_user"),
     }
+    atlas_webhook_secret = ""
+    try:
+        from bloom_lims.config import get_settings
+
+        atlas_webhook_secret = str(get_settings().atlas.webhook_secret or "")
+    except Exception:
+        atlas_webhook_secret = ""
 
     from bloom_lims.tapdb_metrics import build_metrics_page_context
 
@@ -418,9 +514,12 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "dependency_info": dependency_info,
         "cognito_info": cognito_info,
         "db_info": db_info,
+        "atlas_webhook_secret": atlas_webhook_secret,
+        "atlas_webhook_secret_configured": bool(atlas_webhook_secret.strip()),
         "tapdb_metrics_summary": tapdb_metrics_summary,
         "saved": request.query_params.get("saved") == "1",
         "zebra_started": request.query_params.get("zebra_started") == "1",
+        "zebra_running": request.query_params.get("zebra_running") == "1",
         "zebra_error": request.query_params.get("zebra_error", ""),
     }
     return HTMLResponse(content=template.render(context))
@@ -428,6 +527,9 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
 
 @router.get("/admin/metrics", response_class=HTMLResponse)
 async def admin_metrics(request: Request, _auth=Depends(require_auth), limit: int = 5000):
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
     from bloom_lims.tapdb_metrics import build_metrics_page_context
 
     user_data = request.session.get("user_data", {})
@@ -442,6 +544,9 @@ async def admin_metrics(request: Request, _auth=Depends(require_auth), limit: in
 
 @router.post("/admin")
 async def admin_update_preferences(request: Request, _auth=Depends(require_auth)):
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
     """Update admin preference form values and redirect back to admin page."""
     form = await request.form()
     editable_keys = ("print_lab", "printer_name", "label_zpl_style", "style_css")
@@ -468,56 +573,37 @@ async def admin_update_preferences(request: Request, _auth=Depends(require_auth)
 
 @router.post("/admin/zebra/start")
 async def admin_start_zebra_service(request: Request, _auth=Depends(require_auth)):
-    """Launch zebra_day service using zday_start."""
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
+    """Launch zebra_day service using non-blocking CLI commands."""
     accepts = request.headers.get("accept", "").lower()
+    status_before, _ = _zebra_command_status()
+    if status_before == "running":
+        if "application/json" in accepts:
+            return {
+                "status": "success",
+                "state": "already_running",
+                "message": "zebra_day service is already running",
+            }
+        return RedirectResponse(url="/admin?zebra_running=1", status_code=303)
 
-    if shutil.which("zday_start") is None:
+    start_state, details = _try_start_zebra_background()
+    if start_state in {"command_not_found", "launch_failed", "start_failed"}:
+        logging.error("Failed to start zebra_day service (%s): %s", start_state, details)
         if "application/json" in accepts:
             return JSONResponse(
-                status_code=503,
-                content={"status": "error", "detail": "zday_start command not found"},
+                status_code=503 if start_state == "command_not_found" else 500,
+                content={"status": "error", "detail": details, "error_code": start_state},
             )
-        return RedirectResponse(url="/admin?zebra_error=command_not_found", status_code=303)
-
-    try:
-        result = subprocess.run(
-            ["zday_start"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=30,
-        )
-    except Exception as exc:
-        logging.error("Failed to launch zday_start: %s", exc)
-        if "application/json" in accepts:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error",
-                    "detail": f"Failed to launch zday_start: {exc}",
-                },
-            )
-        return RedirectResponse(url="/admin?zebra_error=launch_failed", status_code=303)
-
-    if result.returncode != 0:
-        stderr_trimmed = (result.stderr or "").strip()
-        logging.error(
-            "zday_start returned non-zero (%s): %s", result.returncode, stderr_trimmed
-        )
-        if "application/json" in accepts:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "status": "error",
-                    "detail": "zday_start returned non-zero exit code",
-                    "stderr": stderr_trimmed,
-                },
-            )
-        return RedirectResponse(url="/admin?zebra_error=start_failed", status_code=303)
+        return RedirectResponse(url=f"/admin?zebra_error={start_state}", status_code=303)
 
     if "application/json" in accepts:
-        return {"status": "success", "message": "zday_start executed successfully"}
-
+        return {
+            "status": "success",
+            "state": "started",
+            "message": "zebra_day service start requested in background mode",
+        }
     return RedirectResponse(url="/admin?zebra_started=1", status_code=303)
 
 
@@ -590,9 +676,73 @@ async def generic_templates(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(grouped_templates)
 
 
+@router.post("/update_accordion_state")
+async def update_accordion_state(request: Request, _auth=Depends(require_auth)):
+    data = await request.json()
+    step_euid = data.get("step_euid") or data.get("euid")
+    state = data.get("state")
+    if not step_euid:
+        raise HTTPException(status_code=400, detail="Missing step_euid")
+    request.session[step_euid] = state
+    return {"status": "success"}
+
+
+@router.post("/update_obj_json_addl_properties", response_class=HTMLResponse)
+async def update_obj_json_addl_properties(
+    request: Request,
+    obj_euid: str = Form(None),
+    _auth=Depends(require_auth),
+):
+    referer = request.headers.get("Referer", "/")
+    form = await request.form()
+    properties = {key: value for key, value in form.items() if key != "obj_euid"}
+
+    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
+    obj = bobdb.get_by_euid(obj_euid) if obj_euid else None
+    if obj is None:
+        raise HTTPException(status_code=404, detail=f"Object not found: {obj_euid}")
+
+    payload = obj.json_addl if isinstance(obj.json_addl, dict) else {}
+    payload.setdefault("properties", {})
+    for key, values in properties.items():
+        target_key = key[:-2] if key.endswith("[]") else key
+        if isinstance(payload["properties"].get(target_key), list):
+            payload["properties"][target_key] = values if isinstance(values, list) else [values]
+        else:
+            payload["properties"][target_key] = values
+
+    obj.json_addl = payload
+    flag_modified(obj, "json_addl")
+    bobdb.session.flush()
+    bobdb.session.commit()
+    bobdb.session.refresh(obj)
+    return RedirectResponse(url=referer, status_code=303)
+
+
+@router.post("/ui/actions/execute")
+async def execute_ui_action(request: Request, _auth=Depends(require_auth)):
+    payload = await request.json()
+    user_data = request.session.get("user_data", {})
+    actor_email = str(user_data.get("email") or "bloomui-user")
+    actor_user_id = user_data.get("sub") or user_data.get("user_id")
+
+    try:
+        request_data = normalize_action_execute_payload(payload)
+        result = execute_action_for_instance(
+            request_data,
+            app_username=actor_email,
+            actor_email=actor_email,
+            actor_user_id=actor_user_id,
+            user_preferences=user_data,
+        )
+        return JSONResponse(content=result)
+    except ActionExecutionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.to_payload()) from exc
+
+
 @router.get("/workflows")
 async def workflows_redirect():
-    return RedirectResponse(url="/workflow_summary", status_code=307)
+    raise HTTPException(status_code=410, detail="Workflow pages are retired in queue-centric Bloom beta.")
 
 
 @router.get("/equipment")

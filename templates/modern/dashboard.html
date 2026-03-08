@@ -27,13 +27,13 @@
     </div>
   </a>
   
-  <a href="/workflow_summary" class="stat-card">
+  <a href="/search?record_types=instance" class="stat-card">
     <div class="card-icon highlight">
-      <i class="fas fa-project-diagram"></i>
+      <i class="fas fa-cubes"></i>
     </div>
     <div class="stat-content">
-      <div class="stat-value">{{ stats.workflows_active | default(0) }}</div>
-      <div class="stat-label">Active Workflows</div>
+      <div class="stat-value">{{ stats.objects_total | default(0) }}</div>
+      <div class="stat-label">Objects</div>
     </div>
   </a>
   
@@ -91,31 +91,31 @@
     </div>
   </div>
   
-  <!-- Recent Workflows -->
+  <!-- Recent Objects -->
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fas fa-project-diagram"></i> Active Workflows</h3>
-      <a href="/workflow_summary" class="btn btn-outline btn-sm">View All</a>
+      <h3 class="card-title"><i class="fas fa-cubes"></i> Recent Objects</h3>
+      <a href="/search?record_types=instance" class="btn btn-outline btn-sm">View All</a>
     </div>
     <div class="card-body">
-      {% if active_workflows %}
+      {% if recent_objects %}
         <div class="list-group">
-          {% for wf in active_workflows[:5] %}
-          <a href="/workflow_details?workflow_euid={{ wf.euid }}" class="list-item">
+          {% for item in recent_objects[:5] %}
+          <a href="/euid_details?euid={{ item.euid }}" class="list-item">
             <div class="list-item-content">
-              <span class="badge badge-euid">{{ wf.euid }}</span>
-              <span class="list-item-title">{{ wf.name | default(wf.subtype) }}</span>
+              <span class="badge badge-euid">{{ item.euid }}</span>
+              <span class="list-item-title">{{ item.name | default(item.subtype) }}</span>
             </div>
-            <span class="badge badge-{% if wf.status == 'complete' %}success{% elif wf.status == 'in_progress' %}warning{% else %}info{% endif %}">
-              {{ wf.status | default('queued') }}
+            <span class="badge badge-info">
+              {{ item.category | default('object') }}
             </span>
           </a>
           {% endfor %}
         </div>
       {% else %}
         <div class="empty-state">
-          <div class="empty-state-icon"><i class="fas fa-project-diagram"></i></div>
-          <p>No active workflows</p>
+          <div class="empty-state-icon"><i class="fas fa-cubes"></i></div>
+          <p>No recent objects</p>
         </div>
       {% endif %}
     </div>
@@ -130,13 +130,14 @@
   <div class="card-body">
     <div class="quick-actions">
       <a href="/assays" class="btn btn-outline"><i class="fas fa-flask"></i> Assays</a>
-      <a href="/workflow_summary" class="btn btn-outline"><i class="fas fa-project-diagram"></i> Workflows</a>
       <a href="/equipment_overview" class="btn btn-outline"><i class="fas fa-microscope"></i> Equipment</a>
       <a href="/reagent_overview" class="btn btn-outline"><i class="fas fa-vial"></i> Reagents</a>
       <a href="/dewey" class="btn btn-outline"><i class="fas fa-file-alt"></i> Files</a>
       <a href="/object_templates_summary" class="btn btn-outline"><i class="fas fa-cubes"></i> Templates</a>
       <a href="/database_statistics" class="btn btn-outline"><i class="fas fa-chart-bar"></i> Statistics</a>
+      {% if udat.role | default('user') | lower == 'admin' %}
       <a href="/admin" class="btn btn-outline"><i class="fas fa-cog"></i> Admin</a>
+      {% endif %}
     </div>
   </div>
 </div>

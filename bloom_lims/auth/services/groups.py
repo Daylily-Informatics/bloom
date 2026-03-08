@@ -6,7 +6,13 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from bloom_lims.auth.rbac import API_ACCESS_GROUP, Role, normalize_roles
+from bloom_lims.auth.rbac import (
+    API_ACCESS_GROUP,
+    ENABLE_ATLAS_API_GROUP,
+    ENABLE_URSA_API_GROUP,
+    Role,
+    normalize_roles,
+)
 from bloom_lims.auth.repositories.tapdb.groups import GroupMembershipRecord, GroupRecord, TapdbGroupRepository
 
 
@@ -15,6 +21,8 @@ SYSTEM_GROUP_CODES = [
     Role.INTERNAL_READ_WRITE.value,
     Role.ADMIN.value,
     API_ACCESS_GROUP,
+    ENABLE_ATLAS_API_GROUP,
+    ENABLE_URSA_API_GROUP,
 ]
 
 LEGACY_ROLE_TO_BLOOM_ROLE = {
@@ -99,4 +107,3 @@ class GroupService:
         role_groups = [group for group in groups if group in {role.value for role in Role}]
         roles = normalize_roles(role_groups or [fallback], fallback=fallback)
         return GroupResolution(roles=roles, groups=sorted(groups))
-

@@ -13,12 +13,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.core import action_execution as action_exec
 from bloom_lims.core.tapdb_action_dispatcher import (
     BloomTapDBActionDispatcher,
     _normalize_action_slug,
 )
-from bloom_lims.tapdb_adapter import action_instance, action_instance_lineage, generic_instance
+from bloom_lims.tapdb_adapter import (
+    action_instance,
+    action_instance_lineage,
+    generic_instance,
+)
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -37,6 +42,7 @@ def _external_rw_user() -> APIUser:
         email="beta-modern-actions@example.com",
         user_id=f"user-{token}",
         roles=["INTERNAL_READ_WRITE"],
+        groups=[ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",

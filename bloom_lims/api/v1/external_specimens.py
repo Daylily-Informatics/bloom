@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.api.v1.dependencies import APIUser, require_external_atlas_api_enabled
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.external_specimens import ExternalSpecimenService
@@ -85,7 +85,7 @@ def _track_specimen_interaction(
 @router.post("", response_model=ExternalSpecimenResponse)
 async def create_external_specimen(
     payload: ExternalSpecimenCreateRequest,
-    user: APIUser = Depends(require_external_token_auth),
+    user: APIUser = Depends(require_external_atlas_api_enabled),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ):
     service = ExternalSpecimenService(app_username=user.email)
@@ -131,7 +131,7 @@ async def find_external_specimens_by_reference(
     atlas_tenant_id: str | None = Query(None),
     atlas_trf_euid: str | None = Query(None),
     atlas_test_euid: str | None = Query(None),
-    user: APIUser = Depends(require_external_token_auth),
+    user: APIUser = Depends(require_external_atlas_api_enabled),
 ):
     refs = AtlasReferences(
         trf_euid=trf_euid,
@@ -156,7 +156,7 @@ async def find_external_specimens_by_reference(
 @router.get("/{specimen_euid}", response_model=ExternalSpecimenResponse)
 async def get_external_specimen(
     specimen_euid: str,
-    user: APIUser = Depends(require_external_token_auth),
+    user: APIUser = Depends(require_external_atlas_api_enabled),
 ):
     service = ExternalSpecimenService(app_username=user.email)
     try:
@@ -174,7 +174,7 @@ async def get_external_specimen(
 async def update_external_specimen(
     specimen_euid: str,
     payload: ExternalSpecimenUpdateRequest,
-    user: APIUser = Depends(require_external_token_auth),
+    user: APIUser = Depends(require_external_atlas_api_enabled),
 ):
     service = ExternalSpecimenService(app_username=user.email)
     previous_status: str | None = None

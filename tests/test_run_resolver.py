@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,6 +29,7 @@ def _external_rw_user() -> APIUser:
         email="beta-resolver@example.com",
         user_id=f"user-{token}",
         roles=["INTERNAL_READ_WRITE"],
+        groups=[ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",
@@ -43,6 +45,7 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
     atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
+        "atlas_patient_euid": _opaque("patient"),
         "process_items": [
             {
                 "atlas_test_euid": _opaque("test"),
@@ -56,10 +59,12 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         json={"specimen_name": "resolver-specimen", "atlas_context": atlas_context},
     )
     assert specimen.status_code == 200, specimen.text
-    specimen_euid = specimen.json()["specimen_euid"]
+    specimen_payload = specimen.json()
+    specimen_euid = specimen_payload["specimen_euid"]
+    container_euid = specimen_payload["container_euid"]
 
     queued = client.post(
-        f"/api/v1/external/atlas/beta/queues/extraction_rnd/items/{specimen_euid}",
+        f"/api/v1/external/atlas/beta/queues/extraction_rnd/items/{container_euid}",
         headers={"Idempotency-Key": _opaque("idem-queue")},
         json={"metadata": {"queue": "resolver"}},
     )

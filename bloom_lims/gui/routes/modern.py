@@ -65,12 +65,12 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
     user_data = request.session.get("user_data", {})
     stats = {
         "assays_total": 0,
-        "workflows_active": 0,
+        "objects_total": 0,
         "equipment_total": 0,
         "reagents_total": 0,
     }
     recent_assays = []
-    active_workflows = []
+    recent_objects = []
     db_unavailable = not _is_tapdb_reachable()
 
     if not db_unavailable:
@@ -80,7 +80,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
                 "assays_total": bobdb.session.query(bobdb.Base.classes.workflow_instance)
                 .filter_by(is_deleted=False, is_singleton=True)
                 .count(),
-                "workflows_active": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                "objects_total": bobdb.session.query(bobdb.Base.classes.generic_instance)
                 .filter_by(is_deleted=False)
                 .count(),
                 "equipment_total": bobdb.session.query(bobdb.Base.classes.equipment_instance)
@@ -100,10 +100,10 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
                 .limit(5)
                 .all()
             )
-            active_workflows = (
-                bobdb.session.query(bobdb.Base.classes.workflow_instance)
+            recent_objects = (
+                bobdb.session.query(bobdb.Base.classes.generic_instance)
                 .filter_by(is_deleted=False)
-                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
+                .order_by(bobdb.Base.classes.generic_instance.created_dt.desc())
                 .limit(5)
                 .all()
             )
@@ -116,7 +116,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
         "udat": user_data,
         "stats": stats,
         "recent_assays": recent_assays,
-        "active_workflows": active_workflows,
+        "recent_objects": recent_objects,
         "db_unavailable": db_unavailable,
     }
 
@@ -220,4 +220,3 @@ async def modern_bulk_create_containers(request: Request, _=Depends(require_auth
     template = templates.get_template("modern/bulk_create_containers.html")
     context = {"request": request, "udat": user_data}
     return HTMLResponse(content=template.render(context), status_code=200)
-

@@ -19,7 +19,7 @@
   </div>
   <div class="page-actions">
     {% if obj.category.endswith('_template') %}
-    <a href="/create_object_wizard?template_euid={{ obj.euid }}" class="btn btn-success btn-sm" title="Create an instance from this template">
+    <a href="/create_object?template_euid={{ obj.euid }}" class="btn btn-success btn-sm" title="Create an instance from this template">
       <i class="fas fa-plus-circle"></i> Create Instance
     </a>
     {% endif %}
@@ -77,9 +77,9 @@
         <div class="detail-item editable-field" data-field="name">
           <div class="detail-label">Name {% if is_admin %}<i class="fas fa-pencil-alt edit-icon" style="display:none;"></i>{% endif %}</div>
           <div class="detail-value">
-            <span class="display-value">{{ obj.json_addl.properties.name | default(obj.name) | default('-') }}</span>
+            <span class="display-value">{{ obj.json_addl.get('properties', {}).get('name') | default(obj.name) | default('-') }}</span>
             {% if is_admin %}
-            <input type="text" class="edit-input" value="{{ obj.json_addl.properties.name | default(obj.name) | default('') }}" style="display:none;">
+            <input type="text" class="edit-input" value="{{ obj.json_addl.get('properties', {}).get('name') | default(obj.name) | default('') }}" style="display:none;">
             {% endif %}
           </div>
         </div>
@@ -124,20 +124,20 @@
             {% endif %}
           </div>
         </div>
-        {% if obj.category == 'file' and obj.json_addl and obj.json_addl.properties and obj.json_addl.properties.current_s3_uri %}
+        {% if obj.category == 'file' and obj.json_addl and obj.json_addl.get('properties', {}).get('current_s3_uri') %}
         <div class="detail-item" style="grid-column: span 2;">
           <div class="detail-label">S3 URI</div>
           <div class="detail-value" style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;">
-            <a href="{{ obj.json_addl.properties.current_s3_uri }}" target="_blank" class="link-uri font-mono" style="word-break: break-all;">
-              {{ obj.json_addl.properties.current_s3_uri }}
+            <a href="{{ obj.json_addl.get('properties', {}).get('current_s3_uri') }}" target="_blank" class="link-uri font-mono" style="word-break: break-all;">
+              {{ obj.json_addl.get('properties', {}).get('current_s3_uri') }}
             </a>
-            {% if obj.json_addl.properties.current_s3_bucket_name and obj.json_addl.properties.current_s3_key %}
-            <a href="https://us-east-1.console.aws.amazon.com/s3/object/{{ obj.json_addl.properties.current_s3_bucket_name }}?region=us-east-1&prefix={{ obj.json_addl.properties.current_s3_key }}"
+            {% if obj.json_addl.get('properties', {}).get('current_s3_bucket_name') and obj.json_addl.get('properties', {}).get('current_s3_key') %}
+            <a href="https://us-east-1.console.aws.amazon.com/s3/object/{{ obj.json_addl.get('properties', {}).get('current_s3_bucket_name') }}?region=us-east-1&prefix={{ obj.json_addl.get('properties', {}).get('current_s3_key') }}"
                target="_blank" class="btn btn-outline btn-sm" title="Open in AWS S3 Console">
               <i class="fab fa-aws"></i> AWS Console
             </a>
             {% endif %}
-            <button class="btn btn-outline btn-sm" onclick="copyToClipboard('{{ obj.json_addl.properties.current_s3_uri }}')" title="Copy S3 URI">
+            <button class="btn btn-outline btn-sm" onclick="copyToClipboard('{{ obj.json_addl.get('properties', {}).get('current_s3_uri') }}')" title="Copy S3 URI">
               <i class="fas fa-copy"></i>
             </button>
           </div>
@@ -157,11 +157,6 @@
         <a href="/dindex2?start_euid={{ obj.euid }}" class="btn btn-primary btn-block">
           <i class="fas fa-project-diagram"></i> View Graph
         </a>
-        {% if obj.type == 'workflow' %}
-        <a href="/workflow_details?workflow_euid={{ obj.euid }}" class="btn btn-outline btn-block">
-          <i class="fas fa-stream"></i> View Workflow
-        </a>
-        {% endif %}
         <a href="/search?q={{ obj.euid }}" class="btn btn-outline btn-block">
           <i class="fas fa-search"></i> Related Objects
         </a>
@@ -693,7 +688,7 @@
 
 
 {% block extra_js %}
-<!-- Action Buttons (shared functions for workflow actions) -->
+<!-- Action Buttons -->
 <script src="/static/modern/js/action_buttons.js"></script>
 <!-- JSONEditor JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsoneditor/9.5.6/jsoneditor.min.js"></script>

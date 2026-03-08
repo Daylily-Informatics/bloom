@@ -117,9 +117,11 @@
         <a class="btn btn-outline" href="/user_audit_logs?username={{ user_data.get('email', '') }}">
           <i class="fas fa-clipboard-list"></i> View My Audit Logs
         </a>
+        {% if user_data.get('role', 'user') | lower == 'admin' %}
         <a class="btn btn-outline" href="/admin">
           <i class="fas fa-cog"></i> Open Admin
         </a>
+        {% endif %}
       </div>
     </div>
   </div>

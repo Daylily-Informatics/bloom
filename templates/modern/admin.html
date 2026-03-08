@@ -25,7 +25,16 @@
 <div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-success);">
   <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
     <i class="fas fa-check-circle" style="color: var(--color-success);"></i>
-    <span>zebra_day start command launched successfully.</span>
+    <span>zebra_day start command launched in background mode.</span>
+  </div>
+</div>
+{% endif %}
+
+{% if zebra_running %}
+<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-info);">
+  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+    <i class="fas fa-info-circle" style="color: var(--color-info);"></i>
+    <span>zebra_day service is already running.</span>
   </div>
 </div>
 {% endif %}
@@ -36,9 +45,9 @@
     <i class="fas fa-exclamation-triangle" style="color: var(--color-warning);"></i>
     <span>
       {% if zebra_error == "command_not_found" %}
-      Could not find <code>zday_start</code> on this host.
+      Could not find <code>zday</code> or <code>zday_start</code> on this host.
       {% elif zebra_error == "launch_failed" %}
-      Failed to launch zebra_day service.
+      Failed to launch zebra_day service in background mode.
       {% elif zebra_error == "start_failed" %}
       zebra_day service start command returned an error.
       {% else %}
@@ -163,6 +172,12 @@
     <div class="card-body">
       <form id="issue-token-form">
         <div class="form-group">
+          <label class="form-label">Token Owner (API user)</label>
+          <select id="issue-token-user-id" class="form-select" required>
+            <option value="">Select API user</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Token Name</label>
           <input type="text" id="issue-token-name" class="form-input" required placeholder="e.g. bloom-admin-cli">
         </div>
@@ -180,6 +195,98 @@
         <button type="submit" class="btn btn-primary btn-sm">Issue Token</button>
       </form>
       <div id="issue-token-result" class="text-sm text-muted" style="margin-top: var(--spacing-md);"></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: var(--spacing-md);">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-plug"></i> Enable Atlas API</h3>
+    </div>
+    <div class="card-body">
+      <form id="atlas-api-user-form" class="input-group" style="margin-bottom: var(--spacing-md);">
+        <input type="text" id="atlas-api-user-id" class="form-input" placeholder="User ID to grant ENABLE_ATLAS_API" style="flex: 1;">
+        <button type="submit" class="btn btn-primary btn-sm">Enable</button>
+      </form>
+      <div id="atlas-api-user-status" class="text-sm text-muted" style="margin-bottom: var(--spacing-sm);"></div>
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Active</th>
+            </tr>
+          </thead>
+          <tbody id="atlas-api-users-body">
+            <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-dna"></i> Enable Ursa API</h3>
+    </div>
+    <div class="card-body">
+      <form id="ursa-api-user-form" class="input-group" style="margin-bottom: var(--spacing-md);">
+        <input type="text" id="ursa-api-user-id" class="form-input" placeholder="User ID to grant ENABLE_URSA_API" style="flex: 1;">
+        <button type="submit" class="btn btn-primary btn-sm">Enable</button>
+      </form>
+      <div id="ursa-api-user-status" class="text-sm text-muted" style="margin-bottom: var(--spacing-sm);"></div>
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Active</th>
+            </tr>
+          </thead>
+          <tbody id="ursa-api-users-body">
+            <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: var(--spacing-md);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-users"></i> Group Membership Management</h3>
+  </div>
+  <div class="card-body">
+    <div class="grid grid-2" style="margin-bottom: var(--spacing-md);">
+      <div class="form-group">
+        <label class="form-label">Group</label>
+        <select id="group-management-select" class="form-select">
+          <option value="">Loading groups...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Add User To Selected Group</label>
+        <form id="group-management-add-form" class="input-group">
+          <input type="text" id="group-management-user-id" class="form-input" placeholder="User ID (email, subject, or service ID)" style="flex: 1;">
+          <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        </form>
+      </div>
+    </div>
+    <div id="group-management-status" class="text-sm text-muted" style="margin-bottom: var(--spacing-sm);"></div>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>User ID</th>
+            <th>Active</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="group-management-members-body">
+          <tr><td colspan="3" class="text-muted">Select a group to view members</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -345,6 +452,34 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- Atlas Webhook Secret -->
+  <div class="card integration-card">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-shield-alt"></i> Atlas Webhook Signature Secret
+        <span class="badge {% if atlas_webhook_secret_configured %}badge-success{% else %}badge-warning{% endif %}">
+          {% if atlas_webhook_secret_configured %}configured{% else %}unset{% endif %}
+        </span>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">Bloom value used to sign <code>X-Bloom-Signature</code> for Atlas webhook verification.</p>
+      <div class="secret-row">
+        <input
+          type="password"
+          id="atlas-webhook-secret-value"
+          class="form-input font-mono secret-input"
+          readonly
+          value="{{ atlas_webhook_secret }}"
+        >
+        <button type="button" class="btn btn-outline btn-sm" id="atlas-webhook-secret-view">View</button>
+        <button type="button" class="btn btn-outline btn-sm" id="atlas-webhook-secret-copy">Copy</button>
+        <button type="button" class="btn btn-outline btn-sm" id="atlas-webhook-secret-hide" style="display:none;">Hide</button>
+      </div>
+      <div id="atlas-webhook-secret-status" class="text-sm text-muted" style="margin-top: var(--spacing-xs);"></div>
+    </div>
+  </div>
 </div>
 
 <!-- System Info -->
@@ -470,8 +605,54 @@
   color: var(--color-gray-400);
 }
 
+.secret-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.secret-input {
+  flex: 1 1 260px;
+}
+
 .text-warning {
   color: var(--color-warning);
+}
+
+.issued-token-box {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-success) 10%, var(--color-gray-800));
+}
+
+.issued-token-title {
+  margin-bottom: var(--spacing-xs);
+}
+
+.issued-token-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.issued-token-value {
+  flex: 1 1 auto;
+  min-width: 240px;
+  display: inline-block;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-gray-500);
+  background: var(--color-gray-900);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 </style>
 {% endblock %}
@@ -502,11 +683,11 @@ function applyTheme(theme) {
   }
 }
 
-function renderApiAccessUsers(items) {
-  const body = document.getElementById('api-access-users-body');
+function renderGroupMembers(bodyId, items, emptyMessage) {
+  const body = document.getElementById(bodyId);
   if (!body) return;
   if (!Array.isArray(items) || items.length === 0) {
-    body.innerHTML = '<tr><td colspan="2" class="text-muted">No API_ACCESS users found</td></tr>';
+    body.innerHTML = '<tr><td colspan="2" class="text-muted">' + emptyMessage + '</td></tr>';
     return;
   }
   body.innerHTML = items.map((item) => (
@@ -515,6 +696,22 @@ function renderApiAccessUsers(items) {
       '<td>' + (item.is_active ? 'yes' : 'no') + '</td>' +
     '</tr>'
   )).join('');
+}
+
+function populateTokenOwnerOptions(items) {
+  const select = document.getElementById('issue-token-user-id');
+  if (!select) return;
+  const activeUsers = (items || []).filter((item) => item && item.is_active && item.user_id);
+  const current = select.value;
+  const options = ['<option value="">Select API user</option>'].concat(
+    activeUsers.map((item) => (
+      '<option value="' + item.user_id + '">' + item.user_id + '</option>'
+    ))
+  );
+  select.innerHTML = options.join('');
+  if (current && activeUsers.some((item) => item.user_id === current)) {
+    select.value = current;
+  }
 }
 
 function renderAdminTokens(items) {
@@ -536,13 +733,38 @@ function renderAdminTokens(items) {
   )).join('');
 }
 
-async function loadApiAccessUsers() {
-  const resp = await fetch('/api/v1/admin/groups/API_ACCESS/members');
+function renderManagedGroupMembers(items) {
+  const body = document.getElementById('group-management-members-body');
+  if (!body) return;
+  if (!Array.isArray(items) || items.length === 0) {
+    body.innerHTML = '<tr><td colspan="3" class="text-muted">No members found for selected group</td></tr>';
+    return;
+  }
+  body.innerHTML = items.map((item) => (
+    '<tr>' +
+      '<td class="text-mono">' + (item.user_id || '') + '</td>' +
+      '<td>' + (item.is_active ? 'yes' : 'no') + '</td>' +
+      '<td><button class="btn btn-sm btn-danger" data-remove-group-user-id="' + (item.user_id || '') + '">Remove</button></td>' +
+    '</tr>'
+  )).join('');
+}
+
+async function loadGroupMembers(groupCode) {
+  const resp = await fetch('/api/v1/admin/groups/' + encodeURIComponent(groupCode) + '/members');
   const payload = await resp.json();
   if (!resp.ok) {
-    throw new Error(payload.detail || 'Failed loading API_ACCESS members');
+    throw new Error(payload.detail || ('Failed loading members for ' + groupCode));
   }
-  renderApiAccessUsers(payload.items || []);
+  return payload.items || [];
+}
+
+async function loadGroups() {
+  const resp = await fetch('/api/v1/admin/groups');
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || 'Failed loading groups');
+  }
+  return payload.items || [];
 }
 
 async function loadAdminTokens() {
@@ -554,24 +776,37 @@ async function loadAdminTokens() {
   renderAdminTokens(payload.items || []);
 }
 
-async function addApiAccessUser(userId) {
-  const resp = await fetch('/api/v1/admin/groups/API_ACCESS/members', {
+async function addGroupMember(groupCode, userId) {
+  const resp = await fetch('/api/v1/admin/groups/' + encodeURIComponent(groupCode) + '/members', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId }),
   });
   const payload = await resp.json();
   if (!resp.ok) {
-    throw new Error(payload.detail || 'Failed adding API_ACCESS membership');
+    throw new Error(payload.detail || ('Failed adding membership for ' + groupCode));
   }
   return payload;
 }
 
-async function issueUserToken(tokenName, scope, expiresInDays) {
-  const resp = await fetch('/api/v1/user-tokens', {
+async function removeGroupMember(groupCode, userId) {
+  const resp = await fetch(
+    '/api/v1/admin/groups/' + encodeURIComponent(groupCode) + '/members/' + encodeURIComponent(userId),
+    { method: 'DELETE' }
+  );
+  const payload = await resp.json();
+  if (!resp.ok) {
+    throw new Error(payload.detail || ('Failed removing membership for ' + groupCode));
+  }
+  return payload;
+}
+
+async function issueAdminUserToken(userId, tokenName, scope, expiresInDays) {
+  const resp = await fetch('/api/v1/admin/user-tokens/issue', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      user_id: userId,
       token_name: tokenName,
       scope: scope,
       expires_in_days: expiresInDays,
@@ -582,6 +817,59 @@ async function issueUserToken(tokenName, scope, expiresInDays) {
     throw new Error(payload.detail || 'Failed issuing token');
   }
   return payload;
+}
+
+function renderIssuedTokenResult(container, userId, plaintextToken) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  const box = document.createElement('div');
+  box.className = 'issued-token-box';
+
+  const title = document.createElement('div');
+  title.className = 'issued-token-title';
+  title.innerHTML = 'Token issued for <code>' + userId + '</code>. Store this now.';
+  box.appendChild(title);
+
+  const row = document.createElement('div');
+  row.className = 'issued-token-row';
+
+  const token = document.createElement('span');
+  token.className = 'issued-token-value';
+  token.textContent = plaintextToken || '';
+  row.appendChild(token);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'btn btn-outline btn-sm';
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(token.textContent || '');
+      copyBtn.textContent = 'Copied';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+    } catch (err) {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(token);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      try {
+        document.execCommand('copy');
+        copyBtn.textContent = 'Copied';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      } catch (_copyErr) {
+        copyBtn.textContent = 'Copy failed';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+      } finally {
+        selection.removeAllRanges();
+      }
+    }
+  });
+  row.appendChild(copyBtn);
+
+  box.appendChild(row);
+  container.appendChild(box);
 }
 
 async function revokeAdminToken(tokenId) {
@@ -597,17 +885,120 @@ async function revokeAdminToken(tokenId) {
 
 document.addEventListener('DOMContentLoaded', function() {
   const userForm = document.getElementById('api-access-user-form');
-  const status = document.getElementById('api-access-user-status');
+  const apiStatus = document.getElementById('api-access-user-status');
+  const atlasForm = document.getElementById('atlas-api-user-form');
+  const atlasStatus = document.getElementById('atlas-api-user-status');
+  const ursaForm = document.getElementById('ursa-api-user-form');
+  const ursaStatus = document.getElementById('ursa-api-user-status');
   const tokenForm = document.getElementById('issue-token-form');
   const tokenResult = document.getElementById('issue-token-result');
   const tokenTable = document.getElementById('admin-tokens-body');
+  const groupSelect = document.getElementById('group-management-select');
+  const groupStatus = document.getElementById('group-management-status');
+  const groupAddForm = document.getElementById('group-management-add-form');
+  const groupMembersBody = document.getElementById('group-management-members-body');
+  const atlasWebhookSecretValue = document.getElementById('atlas-webhook-secret-value');
+  const atlasWebhookSecretView = document.getElementById('atlas-webhook-secret-view');
+  const atlasWebhookSecretCopy = document.getElementById('atlas-webhook-secret-copy');
+  const atlasWebhookSecretHide = document.getElementById('atlas-webhook-secret-hide');
+  const atlasWebhookSecretStatus = document.getElementById('atlas-webhook-secret-status');
 
-  loadApiAccessUsers().catch((err) => {
-    if (status) status.textContent = err.message;
-  });
+  function setAtlasWebhookSecretVisible(visible) {
+    if (!atlasWebhookSecretValue || !atlasWebhookSecretView || !atlasWebhookSecretHide) return;
+    atlasWebhookSecretValue.type = visible ? 'text' : 'password';
+    atlasWebhookSecretView.style.display = visible ? 'none' : 'inline-flex';
+    atlasWebhookSecretHide.style.display = visible ? 'inline-flex' : 'none';
+  }
+
+  if (atlasWebhookSecretValue && atlasWebhookSecretView && atlasWebhookSecretCopy && atlasWebhookSecretHide) {
+    if (!atlasWebhookSecretValue.value) {
+      atlasWebhookSecretView.disabled = true;
+      atlasWebhookSecretCopy.disabled = true;
+      atlasWebhookSecretHide.disabled = true;
+      if (atlasWebhookSecretStatus) {
+        atlasWebhookSecretStatus.textContent = 'No atlas.webhook_secret value is configured.';
+      }
+    }
+
+    atlasWebhookSecretView.addEventListener('click', function() {
+      setAtlasWebhookSecretVisible(true);
+      if (atlasWebhookSecretStatus) {
+        atlasWebhookSecretStatus.textContent = 'Secret is visible.';
+      }
+    });
+
+    atlasWebhookSecretHide.addEventListener('click', function() {
+      setAtlasWebhookSecretVisible(false);
+      if (atlasWebhookSecretStatus) {
+        atlasWebhookSecretStatus.textContent = 'Secret hidden.';
+      }
+    });
+
+    atlasWebhookSecretCopy.addEventListener('click', async function() {
+      if (!atlasWebhookSecretValue.value) return;
+      try {
+        await navigator.clipboard.writeText(atlasWebhookSecretValue.value);
+        if (atlasWebhookSecretStatus) {
+          atlasWebhookSecretStatus.textContent = 'Secret copied to clipboard.';
+        }
+      } catch (_err) {
+        if (atlasWebhookSecretStatus) {
+          atlasWebhookSecretStatus.textContent = 'Clipboard copy failed.';
+        }
+      }
+    });
+  }
+
+  loadGroupMembers('API_ACCESS')
+    .then((items) => {
+      renderGroupMembers('api-access-users-body', items, 'No API_ACCESS users found');
+      populateTokenOwnerOptions(items);
+    })
+    .catch((err) => {
+      if (apiStatus) apiStatus.textContent = err.message;
+    });
+
+  loadGroupMembers('ENABLE_ATLAS_API')
+    .then((items) => {
+      renderGroupMembers('atlas-api-users-body', items, 'No Atlas API users found');
+    })
+    .catch((err) => {
+      if (atlasStatus) atlasStatus.textContent = err.message;
+    });
+
+  loadGroupMembers('ENABLE_URSA_API')
+    .then((items) => {
+      renderGroupMembers('ursa-api-users-body', items, 'No Ursa API users found');
+    })
+    .catch((err) => {
+      if (ursaStatus) ursaStatus.textContent = err.message;
+    });
+
   loadAdminTokens().catch((err) => {
     if (tokenResult) tokenResult.textContent = err.message;
   });
+
+  loadGroups()
+    .then((groups) => {
+      if (!groupSelect) return;
+      const activeGroups = (groups || []).filter((group) => group && group.is_active && group.group_code);
+      if (activeGroups.length === 0) {
+        groupSelect.innerHTML = '<option value="">No groups found</option>';
+        return;
+      }
+      groupSelect.innerHTML = activeGroups.map((group) => (
+        '<option value="' + group.group_code + '">' + group.group_code + '</option>'
+      )).join('');
+      return loadGroupMembers(groupSelect.value);
+    })
+    .then((items) => {
+      if (items) {
+        renderManagedGroupMembers(items);
+      }
+    })
+    .catch((err) => {
+      if (groupStatus) groupStatus.textContent = err.message;
+    });
 
   if (userForm) {
     userForm.addEventListener('submit', function(event) {
@@ -615,17 +1006,69 @@ document.addEventListener('DOMContentLoaded', function() {
       const input = document.getElementById('api-access-user-id');
       const userId = input ? input.value.trim() : '';
       if (!userId) {
-        status.textContent = 'User ID is required';
+        apiStatus.textContent = 'User ID is required';
         return;
       }
-      addApiAccessUser(userId)
-        .then(() => {
-          status.textContent = 'API_ACCESS membership added';
+      addGroupMember('API_ACCESS', userId)
+        .then((payload) => {
+          apiStatus.textContent = payload.message || 'API_ACCESS membership updated';
           if (input) input.value = '';
-          return loadApiAccessUsers();
+          return loadGroupMembers('API_ACCESS');
+        })
+        .then((items) => {
+          renderGroupMembers('api-access-users-body', items, 'No API_ACCESS users found');
+          populateTokenOwnerOptions(items);
         })
         .catch((err) => {
-          status.textContent = err.message;
+          apiStatus.textContent = err.message;
+        });
+    });
+  }
+
+  if (atlasForm) {
+    atlasForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const input = document.getElementById('atlas-api-user-id');
+      const userId = input ? input.value.trim() : '';
+      if (!userId) {
+        atlasStatus.textContent = 'User ID is required';
+        return;
+      }
+      addGroupMember('ENABLE_ATLAS_API', userId)
+        .then((payload) => {
+          atlasStatus.textContent = payload.message || 'ENABLE_ATLAS_API membership updated';
+          if (input) input.value = '';
+          return loadGroupMembers('ENABLE_ATLAS_API');
+        })
+        .then((items) => {
+          renderGroupMembers('atlas-api-users-body', items, 'No Atlas API users found');
+        })
+        .catch((err) => {
+          atlasStatus.textContent = err.message;
+        });
+    });
+  }
+
+  if (ursaForm) {
+    ursaForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const input = document.getElementById('ursa-api-user-id');
+      const userId = input ? input.value.trim() : '';
+      if (!userId) {
+        ursaStatus.textContent = 'User ID is required';
+        return;
+      }
+      addGroupMember('ENABLE_URSA_API', userId)
+        .then((payload) => {
+          ursaStatus.textContent = payload.message || 'ENABLE_URSA_API membership updated';
+          if (input) input.value = '';
+          return loadGroupMembers('ENABLE_URSA_API');
+        })
+        .then((items) => {
+          renderGroupMembers('ursa-api-users-body', items, 'No Ursa API users found');
+        })
+        .catch((err) => {
+          ursaStatus.textContent = err.message;
         });
     });
   }
@@ -633,19 +1076,21 @@ document.addEventListener('DOMContentLoaded', function() {
   if (tokenForm) {
     tokenForm.addEventListener('submit', function(event) {
       event.preventDefault();
+      const userId = document.getElementById('issue-token-user-id').value.trim();
       const tokenName = document.getElementById('issue-token-name').value.trim();
       const scope = document.getElementById('issue-token-scope').value;
       const days = Number(document.getElementById('issue-token-days').value || '30');
+      if (!userId) {
+        tokenResult.textContent = 'Token owner is required';
+        return;
+      }
       if (!tokenName) {
         tokenResult.textContent = 'Token name is required';
         return;
       }
-      issueUserToken(tokenName, scope, days)
+      issueAdminUserToken(userId, tokenName, scope, days)
         .then((payload) => {
-          tokenResult.innerHTML =
-            'Token issued for current admin user. Plaintext token: <code>' +
-            payload.plaintext_token +
-            '</code>';
+          renderIssuedTokenResult(tokenResult, userId, payload.plaintext_token);
           tokenForm.reset();
           document.getElementById('issue-token-days').value = '30';
           return loadAdminTokens();
@@ -666,6 +1111,76 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(() => loadAdminTokens())
         .catch((err) => {
           tokenResult.textContent = err.message;
+        });
+    });
+  }
+
+  if (groupSelect) {
+    groupSelect.addEventListener('change', function() {
+      const groupCode = groupSelect.value;
+      if (!groupCode) {
+        renderManagedGroupMembers([]);
+        return;
+      }
+      loadGroupMembers(groupCode)
+        .then((items) => {
+          renderManagedGroupMembers(items);
+          if (groupStatus) groupStatus.textContent = '';
+        })
+        .catch((err) => {
+          if (groupStatus) groupStatus.textContent = err.message;
+        });
+    });
+  }
+
+  if (groupAddForm) {
+    groupAddForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const groupCode = groupSelect ? groupSelect.value : '';
+      const input = document.getElementById('group-management-user-id');
+      const userId = input ? input.value.trim() : '';
+      if (!groupCode) {
+        if (groupStatus) groupStatus.textContent = 'Select a group';
+        return;
+      }
+      if (!userId) {
+        if (groupStatus) groupStatus.textContent = 'User ID is required';
+        return;
+      }
+      addGroupMember(groupCode, userId)
+        .then((payload) => {
+          if (groupStatus) groupStatus.textContent = payload.message || 'Membership updated';
+          if (input) input.value = '';
+          return loadGroupMembers(groupCode);
+        })
+        .then((items) => {
+          renderManagedGroupMembers(items);
+        })
+        .catch((err) => {
+          if (groupStatus) groupStatus.textContent = err.message;
+        });
+    });
+  }
+
+  if (groupMembersBody) {
+    groupMembersBody.addEventListener('click', function(event) {
+      const target = event.target;
+      const groupCode = groupSelect ? groupSelect.value : '';
+      if (!target || !target.dataset || !target.dataset.removeGroupUserId) {
+        return;
+      }
+      if (!groupCode) {
+        if (groupStatus) groupStatus.textContent = 'Select a group';
+        return;
+      }
+      removeGroupMember(groupCode, target.dataset.removeGroupUserId)
+        .then(() => loadGroupMembers(groupCode))
+        .then((items) => {
+          renderManagedGroupMembers(items);
+          if (groupStatus) groupStatus.textContent = 'Membership removed';
+        })
+        .catch((err) => {
+          if (groupStatus) groupStatus.textContent = err.message;
         });
     });
   }

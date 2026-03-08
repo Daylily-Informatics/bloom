@@ -29,6 +29,61 @@ def _build_assay_selection_options(bobdb: BloomObj) -> list[dict]:
     return options
 
 
+def _normalize_action_slug(action_data: dict) -> str:
+    method_name = str(action_data.get("method_name") or "").strip()
+    if method_name.startswith("do_action_"):
+        return method_name.removeprefix("do_action_")
+    return ""
+
+
+def _default_ui_fields_for_action(action_data: dict) -> list[dict]:
+    slug = _normalize_action_slug(action_data).replace("-", "_")
+    if slug == "set_object_status":
+        return [
+            {
+                "name": "object_status",
+                "label": "New Status",
+                "type": "select",
+                "required": True,
+                "options": [
+                    {"value": "queued", "label": "queued"},
+                    {"value": "ready", "label": "ready"},
+                    {"value": "in_progress", "label": "in_progress"},
+                    {"value": "complete", "label": "complete"},
+                    {"value": "failed", "label": "failed"},
+                    {"value": "abandoned", "label": "abandoned"},
+                ],
+            }
+        ]
+    if slug == "add_relationships":
+        return [
+            {
+                "name": "lineage_type_to_create",
+                "label": "Create Relationship As",
+                "type": "select",
+                "required": True,
+                "options": [
+                    {"value": "parent", "label": "parent"},
+                    {"value": "child", "label": "child"},
+                ],
+            },
+            {
+                "name": "relationship_type",
+                "label": "Relationship Type",
+                "type": "text",
+                "required": True,
+            },
+            {
+                "name": "euids",
+                "label": "EUIDs (one per line)",
+                "type": "textarea",
+                "required": True,
+                "rows": 6,
+            },
+        ]
+    return []
+
+
 def _build_assay_selection_html(options: list[dict]) -> str:
     rendered_options = []
     for option in options:
@@ -64,6 +119,22 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
             if not isinstance(captured, dict):
                 captured = {}
                 action_data["captured_data"] = captured
+
+            ui_schema = action_data.get("ui_schema")
+            if not isinstance(ui_schema, dict):
+                ui_schema = {"title": str(action_data.get("action_name") or "Action"), "fields": []}
+                action_data["ui_schema"] = ui_schema
+            fields = ui_schema.get("fields")
+            if not isinstance(fields, list):
+                fields = []
+                ui_schema["fields"] = fields
+
+            if action_data.get("capture_data") == "yes" and not fields:
+                default_fields = _default_ui_fields_for_action(action_data)
+                if default_fields:
+                    ui_schema["fields"] = copy.deepcopy(default_fields)
+                    fields = ui_schema["fields"]
+
             if isinstance(captured, dict) and "___workflow/assay/" in captured:
                 if assay_selection_options is None:
                     assay_selection_options = _build_assay_selection_options(bobdb)
@@ -71,10 +142,6 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
                     assay_selection_html = _build_assay_selection_html(assay_selection_options)
                 captured["___workflow/assay/"] = assay_selection_html
 
-            ui_schema = action_data.get("ui_schema")
-            fields = ui_schema.get("fields") if isinstance(ui_schema, dict) else None
-            if not isinstance(fields, list):
-                continue
             for field in fields:
                 if not isinstance(field, dict):
                     continue
@@ -88,4 +155,3 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
                         captured.setdefault("___workflow/assay/", assay_selection_html)
 
     return hydrated
-

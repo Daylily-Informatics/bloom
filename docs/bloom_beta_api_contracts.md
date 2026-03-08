@@ -6,14 +6,18 @@ Bloom accepts Atlas-approved material only after Atlas records an `ACCEPTED` int
 
 Minimum request context:
 
-- `trf_euid`
-- `test_euids[]`
+- `atlas_context.atlas_trf_euid`
+- `atlas_context.atlas_patient_euid`
+- `atlas_context.process_items[].atlas_test_euid`
+- `atlas_context.process_items[].atlas_test_process_item_euid`
 - patient context
 - shipment or test kit context
 - queue intent
 - idempotency key
 
 Bloom persists Atlas linkage through graph-linked reference objects and returns EUID-only identifiers for created material plus `process_item_euids[]`.
+
+For accepted-material ingress, queue transitions are expected on `container_euid` (container-first lab movement).
 
 Implemented endpoint:
 

@@ -6,7 +6,11 @@ import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.api.v1.dependencies import (
+    APIUser,
+    require_external_atlas_api_enabled,
+    require_external_ursa_api_enabled,
+)
 from bloom_lims.auth.rbac import Permission
 from bloom_lims.domain.beta_lab import BetaLabService
 from bloom_lims.schemas.beta_lab import (
@@ -33,10 +37,18 @@ router = APIRouter(prefix="/external/atlas/beta", tags=["External Atlas Beta"])
 
 
 def require_external_write(
-    user: APIUser = Depends(require_external_token_auth),
+    user: APIUser = Depends(require_external_atlas_api_enabled),
 ) -> APIUser:
     if not user.has_permission(Permission.BLOOM_WRITE):
         raise HTTPException(status_code=403, detail="Write permission required")
+    return user
+
+
+def require_external_ursa_read(
+    user: APIUser = Depends(require_external_ursa_api_enabled),
+) -> APIUser:
+    if not user.has_permission(Permission.BLOOM_READ):
+        raise HTTPException(status_code=403, detail="Read permission required")
     return user
 
 
@@ -214,10 +226,9 @@ async def resolve_run_assignment(
     flowcell_id: str = Query(...),
     lane: str = Query(...),
     library_barcode: str = Query(...),
-    user: APIUser = Depends(require_external_token_auth),
+    user: APIUser = Depends(require_external_ursa_read),
 ):
-    _ = user
-    service = BetaLabService(app_username="atlas-beta-resolver")
+    service = BetaLabService(app_username=user.email)
     try:
         return service.resolve_run_assignment(
             run_euid=run_euid,

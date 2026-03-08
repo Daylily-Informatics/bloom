@@ -40,6 +40,18 @@ Token management endpoints:
 Recommended token scope for Atlas write flows:
 - `internal_rw` (or `admin`)
 
+Atlas integration config fields that must be set in Atlas:
+
+1. `bloom_base_url`
+2. `bloom_api_key_secret_ref`
+3. `bloom_webhook_secret_ref`
+
+Field meanings:
+
+1. `bloom_base_url`: Bloom API base URL Atlas calls.
+2. `bloom_api_key_secret_ref`: Atlas secret reference for the Bloom bearer token.
+3. `bloom_webhook_secret_ref`: Atlas secret reference used to verify Bloom webhook signatures.
+
 ## 2.1 Atlas Lookup Endpoints (Bloom Validation)
 
 Bloom should validate Atlas references using Atlas integration lookup routes first:

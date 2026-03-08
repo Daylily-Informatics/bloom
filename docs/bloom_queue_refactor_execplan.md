@@ -1,45 +1,60 @@
-# Bloom Queue Refactor Execution Summary
+# Bloom Queue Refactor Execution Plan (Finalization Pass)
 
-## Status
+## Scope
 
-This refactor is complete for the active beta path.
+This document tracks the final Bloom beta-completion pass for:
 
-Bloom is now the beta authority for material lineage and queue-driven wet-lab execution without depending on workflow/workflow-step runtime on the supported Atlas/Ursa path.
+- hard retirement of workflow/workset/test-requisition API+GUI surfaces
+- create-page exposure/sorting fixes for non-retired templates
+- modern TapDB action execution parity and reliability
+- admin token/group UX fixes
+- Atlas/Ursa external integration authorization gates
+- zebra service start reliability
 
-## Active Model
+## Change Groups
 
-- queue membership is represented by graph relationships
-- Atlas intent enters Bloom through explicit test-process-item reference objects
-- lineage is preserved from accepted material through extraction, library prep, pooling, run creation, and sequenced library assignment
-- the canonical resolver unit is `sequenced_library_assignment`
+1. **Legacy retirement and routing**
+   - unmount `/api/v1/workflows` and `/api/v1/worksets`
+   - remove workflow GUI router mounts and nav/dashboard links
+   - keep workflow artifacts on disk only as non-mounted retired code
 
-## Canonical Resolver
+2. **Create flow correctness**
+   - remove workflow/assay shortcut behavior
+   - filter retired categories at API source: `workflow`, `workflow_step`, `test_requisition`
+   - sort category/type/subtype/version options case-insensitively with stable ordering
 
-Bloom resolves:
+3. **Action execution parity**
+   - keep `/ui/actions/execute` as active endpoint independent of workflow module
+   - propagate dispatcher status and fail on dispatcher `error/failed` outcomes
+   - robust action-key lookup and action-template UID backfill for legacy instances
+   - inject required UI fields for core actions (`set_object_status`, `add_relationships`)
 
-- `run_euid`
-- `flowcell_id`
-- `lane`
-- `library_barcode`
+4. **Admin + RBAC integration**
+   - add system groups: `ENABLE_ATLAS_API`, `ENABLE_URSA_API`
+   - add admin issue-token-for-selected-user endpoint
+   - make add-user deterministic (`added`, `exists`, `reactivated`)
+   - add Atlas/Ursa enablement panels in admin GUI
+   - enforce Atlas/Ursa groups on external API routes
 
-Bloom returns:
+5. **Zebra service reliability**
+   - prefer `zday gui start --background`
+   - check running state deterministically (`already running`, `started`, `failed`)
+   - fallback to background `zday_start` only when needed
 
-- `sequenced_library_assignment_euid`
-- `atlas_tenant_id`
-- `atlas_trf_euid`
-- `atlas_test_euid`
-- `atlas_test_process_item_euid`
+## Beta Acceptance Checks
 
-## Legacy Isolation
+- Atlas external routes are token-authenticated, write-permitted, and `ENABLE_ATLAS_API` gated.
+- Resolver route remains full-key (`run_euid + flowcell_id + lane + library_barcode`) and `ENABLE_URSA_API` gated.
+- Create page does not offer retired object domains.
+- Action buttons execute through modern TapDB path with truthful success/error reporting.
+- Admin page can:
+  - add API users with deterministic feedback
+  - issue a token for a selected API user
+  - enable Atlas/Ursa API group access
+- Zebra start reports deterministic outcomes in both HTML redirect and JSON modes.
 
-Retired workflow and `do_action` surfaces are not part of the active beta route. If a path depends on workflow-step runtime, accession ownership, or legacy action execution, treat it as non-beta.
+## Breaking Changes
 
-## Validation
-
-Focused validation for the active beta path:
-
-```bash
-source bloom_activate.sh
-pytest --no-cov tests/test_api_atlas_bridge.py tests/test_atlas_lookup_resilience.py tests/test_queue_flow.py tests/test_run_resolver.py tests/test_beta_cross_repo_smoke.py
-ruff check bloom_lims tests
-```
+- `/api/v1/workflows/*` and `/api/v1/worksets/*` are retired (no active beta support).
+- GUI workflow pages are retired and no longer linked from navigation/dashboard.
+- External integration routes now require explicit Atlas/Ursa enablement groups in addition to token auth and permissions.

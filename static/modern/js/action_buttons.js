@@ -28,10 +28,10 @@ function normalizeOptions(options) {
 }
 
 async function fetchWorkflowAssayOptions() {
-  const response = await fetch("/api/v1/workflows/?workflow_type=assay&page_size=1000");
+  const response = await fetch("/api/v1/objects/?category=workflow&type=assay&page_size=1000");
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error((payload && payload.detail) || "Failed to fetch assay options");
+    return [];
   }
   const items = Array.isArray(payload.items) ? payload.items : [];
   return items

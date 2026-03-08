@@ -304,15 +304,12 @@ const superTypeIcons = {
     'container': 'fa-box',
     'content': 'fa-flask',
     'equipment': 'fa-microscope',
-    'workflow': 'fa-project-diagram',
-    'workflow_step': 'fa-tasks',
     'actor': 'fa-user',
     'action': 'fa-bolt',
     'subject': 'fa-user-tag',
     'file': 'fa-file',
     'file_set': 'fa-folder',
     'data': 'fa-database',
-    'test_requisition': 'fa-clipboard-list',
     'health_event': 'fa-heartbeat',
     'generic': 'fa-cube'
 };
@@ -327,15 +324,15 @@ async function loadSuperTypes() {
         const grid = document.getElementById('super-type-grid');
 
         if (data.categories && data.categories.length > 0) {
-            const assayShortcutCard = `
-                <div class="super-type-card" onclick="selectAssayShortcut()">
-                    <i class="fas ${superTypeIcons.assay}"></i>
-                    <div class="type-name">Assay</div>
-                    <div class="type-count">Shortcut: workflow / assay</div>
-                </div>
-            `;
+            const sortedCategories = [...data.categories].sort((a, b) =>
+                String(a.display_name || a.name || '').localeCompare(
+                    String(b.display_name || b.name || ''),
+                    undefined,
+                    { sensitivity: 'base' }
+                )
+            );
 
-            grid.innerHTML = assayShortcutCard + data.categories.map(st => `
+            grid.innerHTML = sortedCategories.map(st => `
                 <div class="super-type-card" onclick="selectSuperType('${st.name}', '${st.display_name}')">
                     <i class="fas ${superTypeIcons[st.name] || 'fa-cube'}"></i>
                     <div class="type-name">${st.display_name}</div>
@@ -351,21 +348,6 @@ async function loadSuperTypes() {
     }
 }
 
-async function selectAssayShortcut() {
-    state.superType = 'workflow';
-    state.type = 'assay';
-    state.subType = null;
-    state.version = null;
-    state.template = null;
-
-    document.getElementById('selected-super-type-badge').textContent = 'Workflow';
-    document.getElementById('selected-super-type-name').textContent = 'Workflow';
-    document.getElementById('selected-type-badge').textContent = 'Workflow / Assay';
-
-    goToStep(3);
-    await loadSubTypes();
-}
-
 async function selectSuperType(name, displayName) {
     state.superType = name;
     document.getElementById('selected-super-type-badge').textContent = displayName;
@@ -379,11 +361,18 @@ async function loadTypes() {
     grid.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
 
     try {
-        const resp = await fetch(`/api/v1/object-creation/types?category=${state.superType}`);
+        const resp = await fetch(`/api/v1/object-creation/types?category=${encodeURIComponent(state.superType)}`);
         const data = await resp.json();
 
         if (data.types && data.types.length > 0) {
-            grid.innerHTML = data.types.map(t => `
+            const sortedTypes = [...data.types].sort((a, b) =>
+                String(a.display_name || a.name || '').localeCompare(
+                    String(b.display_name || b.name || ''),
+                    undefined,
+                    { sensitivity: 'base' }
+                )
+            );
+            grid.innerHTML = sortedTypes.map(t => `
                 <div class="type-card" onclick="selectType('${t.name}', '${t.display_name}')">
                     <i class="fas fa-file-code"></i>
                     <div class="type-name">${t.display_name}</div>
@@ -411,18 +400,25 @@ async function loadSubTypes() {
     list.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
 
     try {
-        const resp = await fetch(`/api/v1/object-creation/subtypes?category=${state.superType}&type=${state.type}`);
+        const resp = await fetch(`/api/v1/object-creation/subtypes?category=${encodeURIComponent(state.superType)}&type=${encodeURIComponent(state.type)}`);
         const data = await resp.json();
 
         if (data.subtypes && data.subtypes.length > 0) {
-            list.innerHTML = data.subtypes.map(st => `
+            const sortedSubtypes = [...data.subtypes].sort((a, b) =>
+                String(a.display_name || a.name || '').localeCompare(
+                    String(b.display_name || b.name || ''),
+                    undefined,
+                    { sensitivity: 'base' }
+                )
+            );
+            list.innerHTML = sortedSubtypes.map(st => `
                 <div class="sub-type-item" onclick="selectSubType('${st.name}', '${st.versions[0] || '1.0'}')">
                     <div>
                         <div class="sub-type-name">${st.display_name}</div>
                         <div class="sub-type-desc">${st.description || st.name}</div>
                     </div>
                     <select class="version-select" onclick="event.stopPropagation()" onchange="selectSubType('${st.name}', this.value)">
-                        ${st.versions.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        ${[...st.versions].sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: 'base' })).map(v => `<option value="${v}">${v}</option>`).join('')}
                     </select>
                 </div>
             `).join('');
@@ -449,7 +445,7 @@ async function loadTemplate() {
     info.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading template...</div>';
 
     try {
-        const resp = await fetch(`/api/v1/object-creation/template?category=${state.superType}&type=${state.type}&subtype=${state.subType}&version=${state.version}`);
+        const resp = await fetch(`/api/v1/object-creation/template?category=${encodeURIComponent(state.superType)}&type=${encodeURIComponent(state.type)}&subtype=${encodeURIComponent(state.subType)}&version=${encodeURIComponent(state.version)}`);
         const data = await resp.json();
         state.template = data;
 

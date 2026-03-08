@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
 
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from .dependencies import require_api_auth, APIUser
@@ -23,6 +22,7 @@ router = APIRouter(prefix="/object-creation", tags=["Object Creation"])
 
 # Regex pattern for valid path components: lowercase letters, numbers, underscores, hyphens
 VALID_PATH_COMPONENT_PATTERN = re.compile(r"^[a-z0-9_-]+$")
+RETIRED_TEMPLATE_CATEGORIES = {"workflow", "workflow_step", "test_requisition"}
 
 
 def validate_path_component(value: str, param_name: str) -> None:
@@ -97,6 +97,23 @@ def _template_payload(template_row) -> Dict[str, Any]:
     return payload
 
 
+def _sort_key(value: str | None) -> tuple[str, str]:
+    text = str(value or "")
+    return text.casefold(), text
+
+
+def _is_template_visible(template_row) -> bool:
+    category = str(getattr(template_row, "category", "") or "").strip().lower()
+    if not category or category in RETIRED_TEMPLATE_CATEGORIES:
+        return False
+
+    payload = _template_payload(template_row)
+    for key in ("disabled", "is_disabled", "hidden", "is_hidden", "internal_only", "is_internal"):
+        if bool(payload.get(key)):
+            return False
+    return True
+
+
 @router.get("/categories")
 async def list_categories(user: APIUser = Depends(require_api_auth)):
     """
@@ -108,23 +125,30 @@ async def list_categories(user: APIUser = Depends(require_api_auth)):
         bdb = get_bdb(user.email)
         template = bdb.Base.classes.generic_template
         rows = (
-            bdb.session.query(
-                template.category,
-                func.count(func.distinct(template.type)).label("type_count"),
-            )
+            bdb.session.query(template.category, template.type, template.json_addl)
             .filter(template.is_deleted == False)  # noqa: E712
-            .group_by(template.category)
-            .order_by(template.category)
             .all()
         )
+        categories_to_types: dict[str, set[str]] = {}
+        for row in rows:
+            if not _is_template_visible(row):
+                continue
+            category_name = str(row.category or "").strip()
+            type_name = str(row.type or "").strip()
+            if not category_name:
+                continue
+            categories_to_types.setdefault(category_name, set())
+            if type_name:
+                categories_to_types[category_name].add(type_name)
+
+        ordered_categories = sorted(categories_to_types.keys(), key=_sort_key)
         categories = [
             {
-                "name": row.category,
-                "display_name": row.category.replace("_", " ").title(),
-                "type_count": int(row.type_count or 0),
+                "name": category_name,
+                "display_name": category_name.replace("_", " ").title(),
+                "type_count": len(categories_to_types.get(category_name, set())),
             }
-            for row in rows
-            if row.category
+            for category_name in ordered_categories
         ]
         return {"categories": categories}
     except Exception as e:
@@ -151,26 +175,37 @@ async def list_types(
         rows = (
             bdb.session.query(
                 template.type,
-                func.count(func.distinct(template.subtype)).label("subtype_count"),
+                template.subtype,
+                template.category,
+                template.json_addl,
             )
             .filter(
                 template.is_deleted == False,  # noqa: E712
                 template.category == category,
             )
-            .group_by(template.type)
-            .order_by(template.type)
             .all()
         )
-        if not rows:
+        visible_rows = [row for row in rows if _is_template_visible(row)]
+        if not visible_rows:
             raise HTTPException(status_code=404, detail=f"Category not found: {category}")
+
+        type_to_subtypes: dict[str, set[str]] = {}
+        for row in visible_rows:
+            type_name = str(row.type or "").strip()
+            subtype_name = str(row.subtype or "").strip()
+            if not type_name:
+                continue
+            type_to_subtypes.setdefault(type_name, set())
+            if subtype_name:
+                type_to_subtypes[type_name].add(subtype_name)
+
         types = [
             {
-                "name": row.type,
-                "display_name": row.type.replace("_", " ").replace("-", " ").title(),
-                "subtype_count": int(row.subtype_count or 0),
+                "name": type_name,
+                "display_name": type_name.replace("_", " ").replace("-", " ").title(),
+                "subtype_count": len(type_to_subtypes.get(type_name, set())),
             }
-            for row in rows
-            if row.type
+            for type_name in sorted(type_to_subtypes.keys(), key=_sort_key)
         ]
 
         return {"category": category, "types": types}
@@ -204,20 +239,21 @@ async def list_subtypes(
                 template.subtype,
                 template.version,
                 template.json_addl,
+                template.category,
             )
             .filter(
                 template.is_deleted == False,  # noqa: E712
                 template.category == category,
                 template.type == type,
             )
-            .order_by(template.subtype, template.version)
             .all()
         )
-        if not rows:
+        visible_rows = [row for row in rows if _is_template_visible(row)]
+        if not visible_rows:
             raise HTTPException(status_code=404, detail=f"Type not found: {category}/{type}")
 
         subtype_map: Dict[str, Dict[str, Any]] = {}
-        for row in rows:
+        for row in visible_rows:
             subtype_name = row.subtype
             if not subtype_name:
                 continue
@@ -237,9 +273,9 @@ async def list_subtypes(
                 entry["description"] = payload.get("description", "") or ""
 
         subtypes = []
-        for subtype_name in sorted(subtype_map.keys()):
+        for subtype_name in sorted(subtype_map.keys(), key=_sort_key):
             entry = subtype_map[subtype_name]
-            entry["versions"] = sorted(set(entry["versions"]))
+            entry["versions"] = sorted(set(entry["versions"]), key=_sort_key)
             subtypes.append(entry)
 
         return {"category": category, "type": type, "subtypes": subtypes}

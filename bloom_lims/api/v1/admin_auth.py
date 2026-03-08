@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from bloom_lims.api.v1.dependencies import APIUser, require_admin
 from bloom_lims.auth.services.groups import GroupService
-from bloom_lims.auth.services.user_api_tokens import UserAPITokenService
+from bloom_lims.auth.services.user_api_tokens import TokenCreateInput, UserAPITokenService
 from bloom_lims.db import BLOOMdb3
 
 router = APIRouter(prefix="/admin", tags=["Admin Auth"])
@@ -15,6 +15,14 @@ router = APIRouter(prefix="/admin", tags=["Admin Auth"])
 
 class GroupMemberAddRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
+
+
+class AdminIssueTokenRequest(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    token_name: str = Field(..., min_length=3, max_length=120)
+    scope: str = Field(default="internal_ro")
+    expires_in_days: int = Field(default=30, ge=1, le=3650)
+    note: str | None = None
 
 
 def _require_id(value: str | None, *, field_name: str) -> str:
@@ -88,17 +96,35 @@ async def add_group_member(
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = GroupService(bdb.session)
+        existing = {
+            str(member.user_id): member
+            for member in service.list_group_members(group_code=group_code)
+        }.get(member_user_id)
+
         member = service.add_user_to_group(
             group_code=group_code,
             user_id=member_user_id,
             added_by=actor_user_id,
         )
+
+        if existing is None:
+            result = "added"
+            message = f"Added {member_user_id} to {group_code}"
+        elif existing.is_active:
+            result = "exists"
+            message = f"{member_user_id} is already active in {group_code}"
+        else:
+            result = "reactivated"
+            message = f"Reactivated {member_user_id} membership in {group_code}"
+
         return {
             "id": str(member.id),
             "group_id": str(member.group_id),
             "group_code": member.group_code,
             "user_id": str(member.user_id),
             "is_active": member.is_active,
+            "result": result,
+            "message": message,
         }
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -164,6 +190,49 @@ async def list_admin_user_tokens(user: APIUser = Depends(require_admin)):
         bdb.close()
 
 
+@router.post("/user-tokens/issue")
+async def issue_admin_user_token(
+    payload: AdminIssueTokenRequest,
+    user: APIUser = Depends(require_admin),
+):
+    actor_user_id = _require_id(user.user_id, field_name="authenticated user_id")
+    owner_user_id = _require_id(payload.user_id, field_name="user_id")
+    bdb = BLOOMdb3(app_username=user.email)
+    try:
+        service = UserAPITokenService(bdb.session)
+        service.groups.ensure_system_groups()
+        created = service.create_token(
+            owner_user_id=owner_user_id,
+            actor_user_id=actor_user_id,
+            actor_roles=user.roles,
+            actor_groups=user.groups,
+            payload=TokenCreateInput(
+                token_name=payload.token_name,
+                scope=payload.scope,
+                expires_in_days=payload.expires_in_days,
+                note=payload.note,
+            ),
+        )
+        return {
+            "token": {
+                "token_id": str(created.token.id),
+                "user_id": str(created.token.user_id),
+                "token_name": created.token.token_name,
+                "token_prefix": created.token.token_prefix,
+                "scope": created.token.scope,
+                "status": created.revision.status,
+                "expires_at": created.revision.expires_at.isoformat(),
+                "created_at": created.token.created_at.isoformat() if created.token.created_at else None,
+            },
+            "plaintext_token": created.plaintext_token,
+            "message": "Store this token now; it will not be shown again.",
+        }
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    finally:
+        bdb.close()
+
+
 @router.delete("/user-tokens/{token_id}")
 async def revoke_admin_user_token(
     token_id: str,
@@ -224,4 +293,3 @@ async def get_admin_token_usage(
         }
     finally:
         bdb.close()
-

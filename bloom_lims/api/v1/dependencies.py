@@ -11,6 +11,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
+    ENABLE_ATLAS_API_GROUP,
+    ENABLE_URSA_API_GROUP,
     Permission,
     Role,
     effective_permissions,
@@ -273,7 +275,12 @@ async def get_api_user(
             email="api-dev@daylilyinformatics.com",
             user_id="dev-bypass-admin",
             roles=[Role.ADMIN.value],
-            groups=[Role.ADMIN.value, API_ACCESS_GROUP],
+            groups=[
+                Role.ADMIN.value,
+                API_ACCESS_GROUP,
+                ENABLE_ATLAS_API_GROUP,
+                ENABLE_URSA_API_GROUP,
+            ],
             permissions=sorted(permission.value for permission in Permission),
             role=Role.ADMIN.value,
             auth_source="dev_bypass",
@@ -359,6 +366,29 @@ async def require_external_token_auth(user: APIUser = Depends(get_api_user)) -> 
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def _require_group_membership(user: APIUser, group_code: str) -> APIUser:
+    normalized_required = str(group_code or "").strip().upper()
+    groups = {str(group or "").strip().upper() for group in user.groups}
+    if normalized_required not in groups:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Group membership required: {normalized_required}",
+        )
+    return user
+
+
+async def require_external_atlas_api_enabled(
+    user: APIUser = Depends(require_external_token_auth),
+) -> APIUser:
+    return _require_group_membership(user, ENABLE_ATLAS_API_GROUP)
+
+
+async def require_external_ursa_api_enabled(
+    user: APIUser = Depends(require_external_token_auth),
+) -> APIUser:
+    return _require_group_membership(user, ENABLE_URSA_API_GROUP)
 
 
 def require_permission(permission: Permission | str):

@@ -10,6 +10,8 @@ import secrets
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from bloom_lims.core.exceptions import BloomValidationError
 from bloom_lims.core.tapdb_action_dispatcher import BloomTapDBActionDispatcher
 from bloom_lims.db import BLOOMdb3
@@ -51,6 +53,18 @@ class ActionExecutionError(Exception):
         if self.error_id:
             payload["error_id"] = self.error_id
         return payload
+
+
+def _normalize_action_slug(action_key: str) -> str:
+    raw = str(action_key or "").strip().strip("/")
+    if not raw:
+        return ""
+    parts = [p for p in raw.split("/") if p]
+    if len(parts) >= 3:
+        raw = parts[2]
+    elif parts:
+        raw = parts[-1]
+    return raw.replace("-", "_")
 
 
 def normalize_action_execute_payload(payload: dict[str, Any]) -> ActionExecuteRequest:
@@ -167,7 +181,7 @@ def _resolve_action_definition(
     instance: Any,
     action_group: str,
     action_key: str,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], str]:
     action_groups = (instance.json_addl or {}).get("action_groups", {})
     if not isinstance(action_groups, dict):
         raise ActionExecutionError(
@@ -184,7 +198,33 @@ def _resolve_action_definition(
 
     actions = group_data.get("actions", {})
     normalized_key = action_key.strip("/")
-    action_data = actions.get(action_key) or actions.get(normalized_key)
+    action_data = None
+    matched_key = action_key
+
+    candidate_keys = [
+        action_key,
+        normalized_key,
+        f"/{normalized_key}",
+        f"/{normalized_key}/",
+        f"{normalized_key}/",
+    ]
+    for candidate in candidate_keys:
+        entry = actions.get(candidate)
+        if isinstance(entry, dict):
+            action_data = entry
+            matched_key = candidate
+            break
+
+    if action_data is None:
+        requested_slug = _normalize_action_slug(action_key)
+        for key, value in actions.items():
+            if not isinstance(value, dict):
+                continue
+            if _normalize_action_slug(str(key)) == requested_slug:
+                action_data = value
+                matched_key = str(key)
+                break
+
     if not isinstance(action_data, dict):
         raise ActionExecutionError(
             status_code=404,
@@ -194,15 +234,125 @@ def _resolve_action_definition(
     resolved = copy.deepcopy(action_data)
     if not isinstance(resolved.get("captured_data"), dict):
         resolved["captured_data"] = {}
-    if not resolved.get("action_template_uid"):
-        raise ActionExecutionError(
-            status_code=409,
-            detail=(
-                f"Action {action_key} is missing TapDB template metadata "
-                "(action_template_uid). Re-seed templates and recreate the object."
-            ),
+    return resolved, matched_key
+
+
+def _normalize_slug_value(value: str | None) -> str:
+    return str(value or "").strip().replace("-", "_").lower()
+
+
+def _resolve_action_template_uid(
+    query_obj: BloomObj,
+    action_definition: dict[str, Any],
+    action_key: str,
+) -> str | None:
+    template = query_obj.Base.classes.generic_template
+    parts = [part for part in str(action_key or "").strip("/").split("/") if part]
+
+    direct_type = None
+    direct_subtype = None
+    direct_version = None
+    if len(parts) == 4 and parts[0] == "action":
+        direct_type = parts[1]
+        direct_subtype = parts[2]
+        direct_version = parts[3]
+
+    if direct_type and direct_subtype and direct_version:
+        direct_match = (
+            query_obj.session.query(template)
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.category == "action",
+                template.type == direct_type,
+                template.subtype == direct_subtype,
+                template.version == direct_version,
+            )
+            .first()
         )
-    return resolved
+        if direct_match is not None:
+            return str(direct_match.uid)
+
+    slug_candidates = {
+        _normalize_action_slug(action_key),
+        _normalize_slug_value(action_definition.get("method_name", "")).removeprefix("do_action_"),
+        _normalize_slug_value(action_definition.get("action_name")),
+    }
+    slug_candidates.discard("")
+
+    if not slug_candidates:
+        return None
+
+    matches = (
+        query_obj.session.query(template)
+        .filter(
+            template.is_deleted == False,  # noqa: E712
+            template.category == "action",
+        )
+        .order_by(template.type.asc(), template.subtype.asc(), template.version.asc())
+        .all()
+    )
+    for row in matches:
+        subtype_slug = _normalize_slug_value(getattr(row, "subtype", ""))
+        if subtype_slug in slug_candidates:
+            return str(row.uid)
+
+    return None
+
+
+def _backfill_action_template_uid(
+    *,
+    instance: Any,
+    action_group: str,
+    matched_action_key: str,
+    action_template_uid: str,
+    query_obj: BloomObj,
+) -> None:
+    action_groups = (instance.json_addl or {}).get("action_groups", {})
+    if not isinstance(action_groups, dict):
+        return
+    group_data = action_groups.get(action_group)
+    if not isinstance(group_data, dict):
+        return
+    actions = group_data.get("actions", {})
+    if not isinstance(actions, dict):
+        return
+
+    entry = actions.get(matched_action_key)
+    if not isinstance(entry, dict):
+        requested_slug = _normalize_action_slug(matched_action_key)
+        for key, value in actions.items():
+            if not isinstance(value, dict):
+                continue
+            if _normalize_action_slug(str(key)) == requested_slug:
+                entry = value
+                break
+    if not isinstance(entry, dict):
+        return
+
+    if entry.get("action_template_uid"):
+        return
+
+    entry["action_template_uid"] = str(action_template_uid)
+    flag_modified(instance, "json_addl")
+    query_obj.session.flush()
+
+
+def _infer_required_fields(
+    action_definition: dict[str, Any],
+    action_key: str,
+) -> list[str]:
+    method_name = str(action_definition.get("method_name") or "").strip()
+    if method_name.startswith("do_action_"):
+        slug = method_name.removeprefix("do_action_")
+    else:
+        slug = _normalize_action_slug(action_key)
+    slug = slug.replace("-", "_")
+
+    inferred: dict[str, list[str]] = {
+        "set_object_status": ["object_status"],
+        "add_relationships": ["lineage_type_to_create", "relationship_type", "euids"],
+    }
+    return inferred.get(slug, [])
 
 
 def _build_action_ds(
@@ -309,10 +459,36 @@ def execute_action_for_instance(
             request_data.action_group,
             request_data.action_key,
         )
+        action_definition, matched_action_key = action_definition
+
+        if not action_definition.get("action_template_uid"):
+            recovered_uid = _resolve_action_template_uid(
+                query_obj,
+                action_definition,
+                request_data.action_key,
+            )
+            if not recovered_uid:
+                raise ActionExecutionError(
+                    status_code=409,
+                    detail=(
+                        f"Action {request_data.action_key} is missing TapDB template metadata "
+                        "(action_template_uid) and could not be auto-resolved."
+                    ),
+                )
+            action_definition["action_template_uid"] = recovered_uid
+            _backfill_action_template_uid(
+                instance=instance,
+                action_group=request_data.action_group,
+                matched_action_key=matched_action_key,
+                action_template_uid=recovered_uid,
+                query_obj=query_obj,
+            )
 
         required_fields = _extract_required_fields_from_ui_schema(action_definition)
         if not required_fields:
             required_fields = _extract_required_fields_from_legacy_markup(action_definition)
+        if not required_fields:
+            required_fields = _infer_required_fields(action_definition, request_data.action_key)
 
         missing_fields = _missing_required_fields(request_data.captured_data, required_fields)
         if missing_fields:
@@ -348,12 +524,22 @@ def execute_action_for_instance(
             user=actor_email,
         )
 
+        response_status = "success"
         message = f"{request_data.action_key} performed for EUID {request_data.euid}"
-        if isinstance(result, str) and result.strip():
+        if isinstance(result, dict):
+            result_status = str(result.get("status") or "").strip().lower()
+            if result_status in {"error", "failed", "failure"}:
+                detail = str(result.get("message") or "Action execution failed")
+                raise ActionExecutionError(status_code=400, detail=detail)
+            if result_status:
+                response_status = result_status
+            if result.get("message"):
+                message = str(result.get("message"))
+        elif isinstance(result, str) and result.strip():
             message = result.strip()
 
         return {
-            "status": "success",
+            "status": response_status,
             "message": message,
             "euid": request_data.euid,
             "action_group": request_data.action_group,
