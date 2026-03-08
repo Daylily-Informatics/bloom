@@ -3,7 +3,7 @@
 repos:
   # ── Ruff: lint + format ──────────────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.7
+    rev: v0.15.1
     hooks:
       - id: ruff
         name: ruff check
@@ -13,11 +13,11 @@ repos:
 
   # ── Security: bandit ─────────────────────────────────────────────────
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.3
+    rev: 1.9.4
     hooks:
       - id: bandit
         name: bandit security scan
-        args: ["-c", "pyproject.toml", "-r", "bloom_lims/", "main.py"]
+        args: ["-c", "pyproject.toml"]
         additional_dependencies: ["bandit[toml]"]
 
   # ── General file hygiene ─────────────────────────────────────────────
@@ -31,4 +31,3 @@ repos:
         args: ["--maxkb=500"]
       - id: check-merge-conflict
       - id: detect-private-key
-

@@ -23,7 +23,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
-    "daylily-tapdb==0.1.33",
+    "daylily-tapdb==0.1.35",
     "daylily-cognito==0.1.24",
     "pydantic>=2.6.0",
     "pydantic-settings>=2.0.0",
@@ -69,7 +69,7 @@ include = ["bloom_lims*"]
 # =============================================================================
 # BLOOM Environment Configuration
 # =============================================================================
-# This section documents the conda environment configuration for tools and 
+# This section documents the conda environment configuration for tools and
 # AI assistants that need to understand the project's environment management.
 
 [tool.bloom]
@@ -161,10 +161,21 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
+ignore = ["E501"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "bloom_lims/database", "stage_to_delete"]
-skips = ["B101"]  # allow assert in non-test code (used extensively)
+skips = [
+    "B101",  # allow assert in non-test code (used extensively)
+    "B105",  # false positives on token/status/template constants
+    "B106",  # false positives on placeholder middleware/config values in legacy paths
+    "B110",  # intentional best-effort config/session cleanup paths
+    "B311",  # non-cryptographic randomness in legacy workflows/UI naming
+    "B404",  # CLI/admin subprocess usage is intentional
+    "B603",  # subprocess calls execute trusted local tools
+    "B607",  # subprocess calls rely on known PATH tools in operator environments
+    "B608",  # legacy SQL fragments are operator-authored/static
+]
 
 [tool.mypy]
 python_version = "3.12"

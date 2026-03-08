@@ -8,7 +8,9 @@ Configuration precedence (highest to lowest):
 """
 
 import importlib.metadata
+import logging
 import os
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,10 +19,14 @@ from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+logger = logging.getLogger(__name__)
+
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
-TEMPLATE_CONFIG_FILE = Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
+TEMPLATE_CONFIG_FILE = (
+    Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
+)
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -48,22 +54,34 @@ def _load_yaml_config() -> Dict[str, Any]:
             with open(TEMPLATE_CONFIG_FILE, encoding="utf-8") as f:
                 template_config = yaml.safe_load(f) or {}
                 config = template_config
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to load template config %s: %s",
+                TEMPLATE_CONFIG_FILE,
+                exc,
+            )
 
     if not USER_CONFIG_DIR.exists():
         try:
             USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to create user config directory %s: %s",
+                USER_CONFIG_DIR,
+                exc,
+            )
 
     if USER_CONFIG_FILE.exists():
         try:
             with open(USER_CONFIG_FILE, encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
                 config = _deep_merge(config, user_config)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to load user config %s: %s",
+                USER_CONFIG_FILE,
+                exc,
+            )
 
     return config
 
@@ -71,7 +89,9 @@ def _load_yaml_config() -> Dict[str, Any]:
 class TapDBSettings(BaseModel):
     """TapDB runtime targeting configuration."""
 
-    env: str = Field(default="dev", description="TapDB target environment: dev/test/prod")
+    env: str = Field(
+        default="dev", description="TapDB target environment: dev/test/prod"
+    )
     client_id: str = Field(
         default="bloom",
         description="TapDB client namespace key (TAPDB_CLIENT_ID)",
@@ -92,7 +112,9 @@ class TapDBSettings(BaseModel):
         default=5566,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
-    min_version: str = Field(default="0.1.33", description="Minimum supported daylily-tapdb")
+    min_version: str = Field(
+        default="0.1.35", description="Minimum supported daylily-tapdb"
+    )
     max_version_exclusive: str = Field(
         default="0.2.0",
         description="Exclusive upper bound for daylily-tapdb",
@@ -145,8 +167,13 @@ class TapDBRuntimeContext(BaseModel):
 class StorageSettings(BaseModel):
     """File storage configuration."""
 
-    upload_dir: str = Field(default="/var/lib/bloom/uploads", description="Upload directory")
-    temp_dir: str = Field(default="/tmp/bloom", description="Temporary file directory")
+    upload_dir: str = Field(
+        default="/var/lib/bloom/uploads", description="Upload directory"
+    )
+    temp_dir: str = Field(
+        default_factory=lambda: str(Path(tempfile.gettempdir()) / "bloom"),
+        description="Temporary file directory",
+    )
     max_file_size_mb: int = Field(default=100, description="Max upload file size (MB)")
     allowed_extensions: List[str] = Field(
         default=["pdf", "csv", "xlsx", "txt", "json", "png", "jpg", "jpeg"],
@@ -176,7 +203,9 @@ class APISettings(BaseModel):
     """API configuration."""
 
     title: str = Field(default="BLOOM LIMS API", description="API title")
-    version: str = Field(default_factory=_get_default_api_version, description="API version")
+    version: str = Field(
+        default_factory=_get_default_api_version, description="API version"
+    )
     prefix: str = Field(default="/api/v1", description="API URL prefix")
 
     pagination_default_size: int = Field(default=50, description="Default page size")
@@ -187,7 +216,9 @@ class APISettings(BaseModel):
     rate_limit_window_seconds: int = Field(default=60, description="Rate limit window")
 
     request_timeout_seconds: int = Field(default=30, description="Request timeout")
-    long_running_timeout_seconds: int = Field(default=300, description="Long-running op timeout")
+    long_running_timeout_seconds: int = Field(
+        default=300, description="Long-running op timeout"
+    )
 
     cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
@@ -218,16 +249,22 @@ class AuthSettings(BaseModel):
 
     cognito_user_pool_id: str = Field(default="", description="Cognito user pool ID")
     cognito_client_id: str = Field(default="", description="Cognito app client ID")
-    cognito_client_secret: str = Field(default="", description="Cognito app client secret")
+    cognito_client_secret: str = Field(
+        default="", description="Cognito app client secret"
+    )
     cognito_region: str = Field(default="", description="AWS region for Cognito")
     cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
     cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
-    cognito_logout_redirect_uri: str = Field(default="", description="Cognito logout redirect URI")
+    cognito_logout_redirect_uri: str = Field(
+        default="", description="Cognito logout redirect URI"
+    )
     cognito_scopes: List[str] = Field(
         default_factory=lambda: ["openid", "email", "profile"],
         description="Cognito OAuth scopes",
     )
-    cognito_allowed_domains: List[str] = Field(default_factory=list, description="Allowed email domains")
+    cognito_allowed_domains: List[str] = Field(
+        default_factory=list, description="Allowed email domains"
+    )
 
     jwt_secret: str = Field(default="", description="JWT secret key")
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
@@ -243,7 +280,9 @@ class AtlasSettings(BaseModel):
     base_url: str = Field(default="", description="Atlas API base URL")
     token: str = Field(default="", description="Atlas API bearer token")
     timeout_seconds: int = Field(default=10, description="Atlas API timeout seconds")
-    cache_ttl_seconds: int = Field(default=300, description="Atlas response cache TTL in seconds")
+    cache_ttl_seconds: int = Field(
+        default=300, description="Atlas response cache TTL in seconds"
+    )
     verify_ssl: bool = Field(default=True, description="Verify Atlas TLS certificates")
     organization_id: str = Field(
         default="",
@@ -301,10 +340,18 @@ class FeatureFlags(BaseModel):
     """Feature flags for enabling/disabling features."""
 
     enable_audit_logging: bool = Field(default=True, description="Enable audit trail")
-    enable_workflow_notifications: bool = Field(default=True, description="Workflow notifications")
-    enable_file_versioning: bool = Field(default=True, description="Enable file versioning")
-    enable_advanced_search: bool = Field(default=True, description="Advanced search features")
-    enable_api_caching: bool = Field(default=False, description="Enable API response caching")
+    enable_workflow_notifications: bool = Field(
+        default=True, description="Workflow notifications"
+    )
+    enable_file_versioning: bool = Field(
+        default=True, description="Enable file versioning"
+    )
+    enable_advanced_search: bool = Field(
+        default=True, description="Advanced search features"
+    )
+    enable_api_caching: bool = Field(
+        default=False, description="Enable API response caching"
+    )
     maintenance_mode: bool = Field(default=False, description="Enable maintenance mode")
 
 
@@ -312,7 +359,9 @@ class CacheSettings(BaseModel):
     """Cache configuration for application caching layer."""
 
     enabled: bool = Field(default=True, description="Enable caching")
-    backend: str = Field(default="memory", description="Cache backend: memory, redis, memcached")
+    backend: str = Field(
+        default="memory", description="Cache backend: memory, redis, memcached"
+    )
     max_size: int = Field(default=5000, description="Maximum cache entries")
     default_ttl: int = Field(default=300, description="Default TTL in seconds")
 
@@ -321,8 +370,12 @@ class CacheSettings(BaseModel):
     lineage_ttl: int = Field(default=300, description="Lineage cache TTL")
     query_ttl: int = Field(default=60, description="Query result cache TTL")
 
-    template_prefix: str = Field(default="tmpl:", description="Template cache key prefix")
-    instance_prefix: str = Field(default="inst:", description="Instance cache key prefix")
+    template_prefix: str = Field(
+        default="tmpl:", description="Template cache key prefix"
+    )
+    instance_prefix: str = Field(
+        default="inst:", description="Instance cache key prefix"
+    )
     query_prefix: str = Field(default="qry:", description="Query cache key prefix")
 
     redis_host: str = Field(default="localhost", description="Redis server host")
@@ -345,19 +398,33 @@ class BusinessConstants(BaseModel):
     wildcard_version: str = Field(default="*", description="Wildcard version string")
 
     status_created: str = Field(default="created", description="Created status")
-    status_in_progress: str = Field(default="in_progress", description="In progress status")
+    status_in_progress: str = Field(
+        default="in_progress", description="In progress status"
+    )
     status_complete: str = Field(default="complete", description="Complete status")
     status_failed: str = Field(default="failed", description="Failed status")
     status_abandoned: str = Field(default="abandoned", description="Abandoned status")
     status_active: str = Field(default="active", description="Active status")
 
-    workflow_state_active: str = Field(default="active", description="Active workflow state")
-    workflow_state_paused: str = Field(default="paused", description="Paused workflow state")
-    workflow_state_completed: str = Field(default="completed", description="Completed workflow state")
+    workflow_state_active: str = Field(
+        default="active", description="Active workflow state"
+    )
+    workflow_state_paused: str = Field(
+        default="paused", description="Paused workflow state"
+    )
+    workflow_state_completed: str = Field(
+        default="completed", description="Completed workflow state"
+    )
 
-    template_suffix: str = Field(default="_template", description="Template table suffix")
-    instance_suffix: str = Field(default="_instance", description="Instance table suffix")
-    lineage_suffix: str = Field(default="_instance_lineage", description="Lineage table suffix")
+    template_suffix: str = Field(
+        default="_template", description="Template table suffix"
+    )
+    instance_suffix: str = Field(
+        default="_instance", description="Instance table suffix"
+    )
+    lineage_suffix: str = Field(
+        default="_instance_lineage", description="Lineage table suffix"
+    )
 
     singleton_true_values: List[str] = Field(
         default=["1", "true", "True", "yes", "Yes"],
@@ -368,17 +435,27 @@ class BusinessConstants(BaseModel):
         description="Values that indicate singleton=False",
     )
 
-    max_lineage_depth: int = Field(default=10, description="Max depth for lineage queries")
-    max_children_per_query: int = Field(default=10000, description="Max children in recursive queries")
+    max_lineage_depth: int = Field(
+        default=10, description="Max depth for lineage queries"
+    )
+    max_children_per_query: int = Field(
+        default=10000, description="Max children in recursive queries"
+    )
 
-    default_label_style: str = Field(default="tube_2inX1in", description="Default label style")
+    default_label_style: str = Field(
+        default="tube_2inX1in", description="Default label style"
+    )
     default_lab_code: str = Field(default="BLOOM", description="Default lab code")
 
     default_timezone: str = Field(default="US/Eastern", description="Default timezone")
 
-    config_base_path: str = Field(default="config", description="Base path for template configurations")
+    config_base_path: str = Field(
+        default="config", description="Base path for template configurations"
+    )
 
-    action_max_executions_unlimited: str = Field(default="-1", description="Unlimited action executions")
+    action_max_executions_unlimited: str = Field(
+        default="-1", description="Unlimited action executions"
+    )
     action_enabled_true: str = Field(default="1", description="Action enabled value")
     action_enabled_false: str = Field(default="0", description="Action disabled value")
 
@@ -494,7 +571,9 @@ def get_settings() -> BloomSettings:
     return BloomSettings()
 
 
-def get_tapdb_runtime_context(settings: Optional[BloomSettings] = None) -> TapDBRuntimeContext:
+def get_tapdb_runtime_context(
+    settings: Optional[BloomSettings] = None,
+) -> TapDBRuntimeContext:
     """Resolve active TapDB runtime context from env + config."""
     settings = settings or get_settings()
     raw_strict = os.environ.get("TAPDB_STRICT_NAMESPACE")
@@ -503,11 +582,19 @@ def get_tapdb_runtime_context(settings: Optional[BloomSettings] = None) -> TapDB
         strict_namespace = str(raw_strict).strip().lower() in {"1", "true", "yes", "on"}
     return TapDBRuntimeContext(
         env=(os.environ.get("TAPDB_ENV") or settings.tapdb.env).strip().lower(),
-        client_id=(os.environ.get("TAPDB_CLIENT_ID") or settings.tapdb.client_id).strip(),
-        database_name=(os.environ.get("TAPDB_DATABASE_NAME") or settings.tapdb.database_name).strip(),
+        client_id=(
+            os.environ.get("TAPDB_CLIENT_ID") or settings.tapdb.client_id
+        ).strip(),
+        database_name=(
+            os.environ.get("TAPDB_DATABASE_NAME") or settings.tapdb.database_name
+        ).strip(),
         strict_namespace=strict_namespace,
-        config_path=(os.environ.get("TAPDB_CONFIG_PATH") or settings.tapdb.config_path).strip(),
-        aws_profile=(os.environ.get("AWS_PROFILE") or settings.aws.profile or "lsmc").strip(),
+        config_path=(
+            os.environ.get("TAPDB_CONFIG_PATH") or settings.tapdb.config_path
+        ).strip(),
+        aws_profile=(
+            os.environ.get("AWS_PROFILE") or settings.aws.profile or "lsmc"
+        ).strip(),
         aws_region=(
             os.environ.get("AWS_REGION")
             or os.environ.get("AWS_DEFAULT_REGION")
@@ -517,7 +604,9 @@ def get_tapdb_runtime_context(settings: Optional[BloomSettings] = None) -> TapDB
     )
 
 
-def apply_runtime_environment(settings: Optional[BloomSettings] = None) -> TapDBRuntimeContext:
+def apply_runtime_environment(
+    settings: Optional[BloomSettings] = None,
+) -> TapDBRuntimeContext:
     """Apply normalized TAPDB/AWS runtime environment variables."""
     settings = settings or get_settings()
     ctx = get_tapdb_runtime_context(settings=settings)
@@ -525,7 +614,9 @@ def apply_runtime_environment(settings: Optional[BloomSettings] = None) -> TapDB
     os.environ.setdefault("TAPDB_ENV", ctx.env)
     os.environ.setdefault("TAPDB_CLIENT_ID", ctx.client_id)
     os.environ.setdefault("TAPDB_DATABASE_NAME", ctx.database_name)
-    os.environ.setdefault("TAPDB_STRICT_NAMESPACE", "1" if ctx.strict_namespace else "0")
+    os.environ.setdefault(
+        "TAPDB_STRICT_NAMESPACE", "1" if ctx.strict_namespace else "0"
+    )
     if ctx.config_path:
         os.environ.setdefault("TAPDB_CONFIG_PATH", ctx.config_path)
 
@@ -609,7 +700,9 @@ def validate_settings() -> List[str]:
 
     upload_path = Path(settings.storage.upload_dir)
     if not upload_path.exists():
-        warnings.append(f"Upload directory does not exist: {settings.storage.upload_dir}")
+        warnings.append(
+            f"Upload directory does not exist: {settings.storage.upload_dir}"
+        )
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
