@@ -15,6 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
 from bloom_lims.gui.errors import register_exception_handlers
+from bloom_lims.health import health_router, probe_router
 from bloom_lims.tapdb_metrics import request_method_var, request_path_var, stop_all_writers
 
 
@@ -57,6 +58,8 @@ def create_app() -> FastAPI:
         app.add_middleware(RateLimitMiddleware)
 
     # Include routers
+    app.include_router(health_router)
+    app.include_router(probe_router)
     app.include_router(api_v1_router)
     try:
         from bloom_lims.gui.router import router as gui_router
