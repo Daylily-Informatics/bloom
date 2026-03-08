@@ -60,9 +60,9 @@ class AtlasService:
             self.status_events_backoff_base_seconds * 8.0,
         )
 
-    def get_order(self, order_number: str) -> AtlasLookupResult:
-        key = f"order:{order_number}"
-        return self._cached_lookup(key, lambda: self.client.get_order(order_number))
+    def get_trf(self, trf_euid: str) -> AtlasLookupResult:
+        key = f"trf:{trf_euid}"
+        return self._cached_lookup(key, lambda: self.client.get_trf(trf_euid))
 
     def get_patient(self, patient_id: str) -> AtlasLookupResult:
         key = f"patient:{patient_id}"
@@ -99,17 +99,17 @@ class AtlasService:
     def make_status_event_idempotency_key(
         *,
         tenant_id: str,
-        test_order_id: str,
+        test_euid: str,
         event_id: str,
         status: str,
     ) -> str:
-        seed = f"{tenant_id}:{test_order_id}:{event_id}:{status}"
+        seed = f"{tenant_id}:{test_euid}:{event_id}:{status}"
         return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
-    def push_test_order_status_event(
+    def push_test_status_event(
         self,
         *,
-        test_order_id: str,
+        test_euid: str,
         payload: dict[str, Any],
         idempotency_key: str | None = None,
         tenant_id: str | None = None,
@@ -126,7 +126,7 @@ class AtlasService:
         if not resolved_idempotency:
             resolved_idempotency = self.make_status_event_idempotency_key(
                 tenant_id=resolved_tenant,
-                test_order_id=str(test_order_id).strip(),
+                test_euid=str(test_euid).strip(),
                 event_id=event_id,
                 status=status,
             )
@@ -134,8 +134,8 @@ class AtlasService:
         retryable_status_codes = {429, 500, 502, 503, 504}
         for attempt in range(self.status_events_max_retries + 1):
             try:
-                response_payload = self.client.push_test_order_status_event(
-                    test_order_id=str(test_order_id).strip(),
+                response_payload = self.client.push_test_status_event(
+                    test_euid=str(test_euid).strip(),
                     tenant_id=resolved_tenant,
                     idempotency_key=resolved_idempotency,
                     payload=payload,
@@ -143,7 +143,7 @@ class AtlasService:
                 )
                 return AtlasStatusEventPushResult(
                     tenant_id=resolved_tenant,
-                    test_order_id=str(test_order_id).strip(),
+                    test_euid=str(test_euid).strip(),
                     idempotency_key=resolved_idempotency,
                     payload=response_payload,
                 )

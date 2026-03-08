@@ -25,13 +25,13 @@ class ExternalSpecimenService:
     EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
     EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
     _ATLAS_REFERENCE_FIELDS = (
-        "order_number",
+        "trf_euid",
         "patient_id",
         "shipment_number",
         "kit_barcode",
         "atlas_tenant_id",
-        "atlas_order_euid",
-        "atlas_test_order_euid",
+        "atlas_trf_euid",
+        "atlas_test_euid",
     )
 
     def __init__(self, *, app_username: str):
@@ -265,13 +265,13 @@ class ExternalSpecimenService:
         container_euid: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         payload = {
-            "order_number": refs.order_number,
+            "trf_euid": refs.trf_euid,
             "patient_id": refs.patient_id,
             "shipment_number": refs.shipment_number,
             "kit_barcode": refs.kit_barcode,
             "atlas_tenant_id": refs.atlas_tenant_id,
-            "atlas_order_euid": refs.atlas_order_euid,
-            "atlas_test_order_euid": refs.atlas_test_order_euid,
+            "atlas_trf_euid": refs.atlas_trf_euid,
+            "atlas_test_euid": refs.atlas_test_euid,
         }
         normalized = {
             key: str(value).strip()
@@ -286,7 +286,7 @@ class ExternalSpecimenService:
             if container_euid and any(
                 key in normalized
                 for key in (
-                    "order_number",
+                    "trf_euid",
                     "patient_id",
                     "shipment_number",
                     "kit_barcode",
@@ -311,9 +311,9 @@ class ExternalSpecimenService:
                     ),
                 }
 
-            if "order_number" in normalized:
-                result = self.atlas.get_order(normalized["order_number"])
-                validation_meta["order"] = {
+            if "trf_euid" in normalized:
+                result = self.atlas.get_trf(normalized["trf_euid"])
+                validation_meta["trf"] = {
                     "from_cache": result.from_cache,
                     "stale": result.stale,
                     "fetched_at": result.fetched_at.isoformat(),
@@ -350,14 +350,14 @@ class ExternalSpecimenService:
         refs: dict[str, str],
         context: dict[str, Any],
     ) -> None:
-        order = context.get("order") if isinstance(context.get("order"), dict) else {}
+        trf = context.get("trf") if isinstance(context.get("trf"), dict) else {}
         patient = (
             context.get("patient") if isinstance(context.get("patient"), dict) else {}
         )
         links = context.get("links") if isinstance(context.get("links"), dict) else {}
 
         context_values = {
-            "order_number": str(order.get("order_number") or "").strip(),
+            "trf_euid": str(trf.get("trf_euid") or "").strip(),
             "patient_id": str(patient.get("patient_id") or "").strip(),
             "shipment_number": str(links.get("shipment_number") or "").strip(),
             "kit_barcode": str(links.get("testkit_barcode") or "").strip(),
@@ -379,32 +379,28 @@ class ExternalSpecimenService:
     def _build_container_context_summary(
         self, context: dict[str, Any]
     ) -> dict[str, Any]:
-        order = context.get("order") if isinstance(context.get("order"), dict) else {}
+        trf = context.get("trf") if isinstance(context.get("trf"), dict) else {}
         patient = (
             context.get("patient") if isinstance(context.get("patient"), dict) else {}
         )
         links = context.get("links") if isinstance(context.get("links"), dict) else {}
-        test_orders = (
-            context.get("test_orders")
-            if isinstance(context.get("test_orders"), list)
-            else []
-        )
-        test_order_ids = []
-        for entry in test_orders:
+        tests = context.get("tests") if isinstance(context.get("tests"), list) else []
+        test_euids = []
+        for entry in tests:
             if not isinstance(entry, dict):
                 continue
-            test_order_id = str(entry.get("test_order_id") or "").strip()
-            if test_order_id:
-                test_order_ids.append(test_order_id)
+            test_euid = str(entry.get("test_euid") or "").strip()
+            if test_euid:
+                test_euids.append(test_euid)
 
         return {
             "tenant_id": context.get("tenant_id"),
-            "order_number": order.get("order_number"),
+            "trf_euid": trf.get("trf_euid"),
             "patient_id": patient.get("patient_id"),
             "testkit_barcode": links.get("testkit_barcode"),
             "shipment_number": links.get("shipment_number"),
-            "test_order_count": len(test_order_ids),
-            "test_order_ids": test_order_ids,
+            "test_count": len(test_euids),
+            "test_euids": test_euids,
         }
 
     def _to_response(self, specimen, *, created: bool) -> ExternalSpecimenResponse:

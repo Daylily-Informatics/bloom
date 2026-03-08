@@ -38,7 +38,7 @@ def test_specimen_crud_contract(client, container_euid):
     create_payload = {
         "specimen_template_code": "content/specimen/blood-whole/1.0",
         "container_euid": container_euid,
-        "atlas_refs": {"order_number": "ORD-1", "patient_id": "PAT-1", "kit_barcode": "KIT-1"},
+        "atlas_refs": {"trf_euid": "TRF-1", "patient_id": "PAT-1", "kit_barcode": "KIT-1"},
         "properties": {"source": "atlas"},
     }
     created = client.post(
@@ -64,7 +64,7 @@ def test_specimen_crud_contract(client, container_euid):
 
 ```python
 def test_lookup_by_reference_contract(client):
-    resp = client.get("/api/v1/external/specimens/by-reference", params={"order_number": "ORD-1"})
+    resp = client.get("/api/v1/external/specimens/by-reference", params={"trf_euid": "TRF-1"})
     assert resp.status_code == 200
     assert "items" in resp.json()
 ```

@@ -8,7 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-class AtlasTestOrderStatusEventRequest(BaseModel):
+class AtlasTestStatusEventRequest(BaseModel):
     event_id: str = Field(..., min_length=1, max_length=200)
     status: Literal[
         "IN_PROGRESS",
@@ -25,13 +25,12 @@ class AtlasTestOrderStatusEventRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class AtlasTestOrderStatusEventResponse(BaseModel):
+class AtlasTestStatusEventResponse(BaseModel):
     applied: bool
     idempotent_replay: bool
-    test_order_id: str
-    test_order_status: str
-    order_id: str
-    order_number: str
-    order_status: str
+    test_euid: str
+    test_status: str
+    trf_euid: str
+    trf_status: str
     status_event_id: str | None = None
-    order_status_event_id: str | None = None
+    trf_status_event_id: str | None = None

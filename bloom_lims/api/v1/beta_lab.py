@@ -209,15 +209,22 @@ async def create_run(
 
 
 @router.get("/runs/{run_euid}/resolve", response_model=BetaRunResolutionResponse)
-async def resolve_run_index(
+async def resolve_run_assignment(
     run_euid: str,
-    index_string: str = Query(...),
+    flowcell_id: str = Query(...),
+    lane: str = Query(...),
+    library_barcode: str = Query(...),
     user: APIUser = Depends(require_external_token_auth),
 ):
     _ = user
     service = BetaLabService(app_username="atlas-beta-resolver")
     try:
-        return service.resolve_run_index(run_euid=run_euid, index_string=index_string)
+        return service.resolve_run_assignment(
+            run_euid=run_euid,
+            flowcell_id=flowcell_id,
+            lane=lane,
+            library_barcode=library_barcode,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=_status_for_value_error(exc), detail=str(exc)

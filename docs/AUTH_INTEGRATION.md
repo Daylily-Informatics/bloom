@@ -83,11 +83,10 @@ Bloom reads Atlas references via configured service credentials:
 - `BLOOM_ATLAS__VERIFY_SSL` (default `true`)
 
 Lookups:
-- preferred order: `/api/integrations/bloom/v1/lookups/orders/{order_number}`
+- preferred TRF: `/api/integrations/bloom/v1/lookups/trfs/{trf_euid}`
 - preferred patient: `/api/integrations/bloom/v1/lookups/patients/{patient_id}`
 - preferred shipment/package: `/api/integrations/bloom/v1/lookups/shipments/{shipment_number}`
 - preferred testkit barcode: `/api/integrations/bloom/v1/lookups/testkits/{barcode}`
-- legacy fallbacks (with warning logs): `/api/orders/*`, `/api/patients/*`, `/api/shipments/*`, `/api/testkits/*`, then `/api/search/v2/query` for testkit fallback
 
 Cache behavior:
 - successful lookups are TTL-cached
@@ -125,17 +124,17 @@ Required config:
 
 Bloom outbound endpoints used:
 - `GET /api/integrations/bloom/v1/lookups/containers/{container_euid}/trf-context`
-- `POST /api/integrations/bloom/v1/test-orders/{test_order_id}/status-events`
+- `POST /api/integrations/bloom/v1/tests/{test_euid}/status-events`
 
 Bloom manual bridge endpoint:
-- `POST /api/v1/external/atlas/test-orders/{test_order_id}/status-events`
+- `POST /api/v1/external/atlas/tests/{test_euid}/status-events`
 
 Manual bridge behavior:
 - requires Bloom token auth and write permission
 - accepts Atlas status-event payload contract
 - accepts optional `Idempotency-Key`
 - computes deterministic idempotency key when header is omitted:
-  - `sha256("{tenant_id}:{test_order_id}:{event_id}:{status}")`
+  - `sha256("{tenant_id}:{test_euid}:{event_id}:{status}")`
 
 Retry behavior for status pushes:
 - retry: `429`, `500`, `502`, `503`, `504`

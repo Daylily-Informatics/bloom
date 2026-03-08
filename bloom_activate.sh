@@ -9,13 +9,27 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     exit 1
 fi
 
-BLOOM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_bloom_script_path() {
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        printf '%s\n' "${(%):-%x}"
+    elif [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+        printf '%s\n' "${BASH_SOURCE[0]}"
+    else
+        printf '%s\n' "$0"
+    fi
+}
+
+_BLOOM_SCRIPT_PATH="$(_bloom_script_path)"
+BLOOM_ROOT="$(cd "$(dirname "${_BLOOM_SCRIPT_PATH}")" && pwd)"
+unset -f _bloom_script_path
+unset _BLOOM_SCRIPT_PATH
 
 _GREEN='\033[0;32m'
 _YELLOW='\033[1;33m'
 _BLUE='\033[0;34m'
 _CYAN='\033[0;36m'
 _NC='\033[0m'
+_BLOOM_PYTHON=""
 
 echo -e "${_BLUE}Activating BLOOM LIMS environment...${_NC}"
 
@@ -31,7 +45,7 @@ if command -v conda &> /dev/null; then
     if conda info --envs | grep -q "^BLOOM "; then
         echo -e "  ${_GREEN}✓${_NC} Activating conda environment: BLOOM"
         conda activate BLOOM
-        if [[ -n "$CONDA_PREFIX" ]] && [[ ":$PATH:" != *":$CONDA_PREFIX/bin:"* ]]; then
+        if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
             export PATH="$CONDA_PREFIX/bin:$PATH"
         fi
     else
@@ -41,6 +55,9 @@ if command -v conda &> /dev/null; then
             if conda env create -f "$BLOOM_ROOT/bloom_env.yaml"; then
                 echo -e "  ${_GREEN}✓${_NC} Conda environment created successfully"
                 conda activate BLOOM
+                if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
+                    export PATH="$CONDA_PREFIX/bin:$PATH"
+                fi
             else
                 echo -e "  ${_YELLOW}⚠${_NC} Failed to create conda environment."
             fi
@@ -52,9 +69,20 @@ else
     echo -e "  ${_YELLOW}⚠${_NC} Conda not found."
 fi
 
-if ! command -v bloom &> /dev/null || ! pip show bloom_lims &> /dev/null 2>&1; then
+if [[ -n "${CONDA_PREFIX:-}" ]] && [[ -x "${CONDA_PREFIX}/bin/python" ]]; then
+    _BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
+elif command -v python &> /dev/null; then
+    _BLOOM_PYTHON="$(command -v python)"
+fi
+
+if [[ -n "${_BLOOM_PYTHON}" ]]; then
+    _BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
+    export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
+fi
+
+if ! command -v bloom &> /dev/null || ! "${_BLOOM_PYTHON:-python}" -m pip show bloom_lims &> /dev/null 2>&1; then
     echo -e "  ${_CYAN}→${_NC} Installing bloom CLI..."
-    pip install -e "$BLOOM_ROOT" -q
+    "${_BLOOM_PYTHON:-python}" -m pip install -e "$BLOOM_ROOT" -q
     echo -e "  ${_GREEN}✓${_NC} Installed 'bloom' CLI command"
 else
     echo -e "  ${_GREEN}✓${_NC} 'bloom' CLI already installed"
@@ -98,7 +126,12 @@ echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
 # Validate daylily-tapdb version policy
 python - <<'PY'
 import importlib.metadata
-from packaging.version import Version
+
+try:
+    from packaging.version import Version
+except Exception:
+    print("  \033[1;33m⚠\033[0m packaging not installed; skipping daylily-tapdb version range check")
+    raise SystemExit(0)
 
 try:
     v = Version(importlib.metadata.version("daylily-tapdb"))

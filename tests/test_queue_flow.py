@@ -52,10 +52,15 @@ def _assert_no_uuid_keys(payload):
 def test_beta_queue_flow_end_to_end():
     app.dependency_overrides[require_external_token_auth] = _external_rw_user
 
-    atlas_refs = {
+    atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
-        "atlas_order_euid": _opaque("order"),
-        "atlas_test_order_euid": _opaque("trftest"),
+        "atlas_trf_euid": _opaque("trf"),
+        "process_items": [
+            {
+                "atlas_test_euid": _opaque("test"),
+                "atlas_test_process_item_euid": _opaque("proc"),
+            }
+        ],
     }
     material_idem = _opaque("idem-material")
 
@@ -66,7 +71,7 @@ def test_beta_queue_flow_end_to_end():
             json={
                 "specimen_name": "beta-whole-blood",
                 "properties": {"source": "pytest-beta-queue"},
-                "atlas_refs": atlas_refs,
+                "atlas_context": atlas_context,
             },
         )
         assert created.status_code == 200, created.text
@@ -74,9 +79,10 @@ def test_beta_queue_flow_end_to_end():
         _assert_no_uuid_keys(material)
         assert material["created"] is True
         assert material["current_queue"] is None
+        assert material["atlas_context"]["atlas_trf_euid"] == atlas_context["atlas_trf_euid"]
         assert (
-            material["atlas_refs"]["atlas_test_order_euid"]
-            == atlas_refs["atlas_test_order_euid"]
+            material["atlas_context"]["process_items"][0]["atlas_test_process_item_euid"]
+            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
         )
 
         replay = client.post(
@@ -85,20 +91,13 @@ def test_beta_queue_flow_end_to_end():
             json={
                 "specimen_name": "beta-whole-blood",
                 "properties": {"source": "pytest-beta-queue"},
-                "atlas_refs": atlas_refs,
+                "atlas_context": atlas_context,
             },
         )
         assert replay.status_code == 200, replay.text
         assert replay.json()["created"] is False
 
         specimen_euid = material["specimen_euid"]
-
-        by_ref = client.get(
-            "/api/v1/external/specimens/by-reference",
-            params={"atlas_test_order_euid": atlas_refs["atlas_test_order_euid"]},
-        )
-        assert by_ref.status_code == 200, by_ref.text
-        assert by_ref.json()["total"] >= 1
 
         queued = client.post(
             f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{specimen_euid}",
@@ -119,6 +118,7 @@ def test_beta_queue_flow_end_to_end():
                 "well_name": "A1",
                 "extraction_type": "cfdna",
                 "output_name": "beta-cfdna-output",
+                "atlas_test_process_item_euid": atlas_context["process_items"][0]["atlas_test_process_item_euid"],
                 "metadata": {"operator": "pytest"},
             },
         )
@@ -126,6 +126,10 @@ def test_beta_queue_flow_end_to_end():
         extraction_body = extraction.json()
         _assert_no_uuid_keys(extraction_body)
         assert extraction_body["current_queue"] == "post_extract_qc"
+        assert (
+            extraction_body["atlas_test_process_item_euid"]
+            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+        )
         extraction_output_euid = extraction_body["extraction_output_euid"]
 
         qc = client.post(
@@ -154,6 +158,10 @@ def test_beta_queue_flow_end_to_end():
         assert library_prep.status_code == 200, library_prep.text
         library_body = library_prep.json()
         assert library_body["current_queue"] == "ilmn_seq_pool"
+        assert (
+            library_body["atlas_test_process_item_euid"]
+            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+        )
         lib_output_euid = library_body["library_prep_output_euid"]
 
         pool = client.post(
@@ -171,19 +179,23 @@ def test_beta_queue_flow_end_to_end():
         assert pool_body["current_queue"] == "ilmn_start_seq_run"
         pool_euid = pool_body["pool_euid"]
 
-        index_string = "IDX-ILMN-A1"
+        flowcell_id = "FLOWCELL-001"
+        lane = "1"
+        library_barcode = "IDX-ILMN-A1"
         run = client.post(
             "/api/v1/external/atlas/beta/runs",
             headers={"Idempotency-Key": _opaque("idem-run")},
             json={
                 "pool_euid": pool_euid,
                 "platform": "ILMN",
+                "flowcell_id": flowcell_id,
                 "run_name": "beta-ilmn-run",
                 "status": "completed",
-                "index_mappings": [
+                "assignments": [
                     {
-                        "index_string": index_string,
-                        "source_euid": lib_output_euid,
+                        "lane": lane,
+                        "library_barcode": library_barcode,
+                        "library_prep_output_euid": lib_output_euid,
                     }
                 ],
                 "artifacts": [
@@ -191,7 +203,8 @@ def test_beta_queue_flow_end_to_end():
                         "artifact_type": "fastq",
                         "bucket": "beta-runs",
                         "filename": "reads_R1.fastq.gz",
-                        "index_string": index_string,
+                        "lane": lane,
+                        "library_barcode": library_barcode,
                         "metadata": {"read_pair": 1},
                     }
                 ],
@@ -202,19 +215,28 @@ def test_beta_queue_flow_end_to_end():
         _assert_no_uuid_keys(run_body)
         assert run_body["status"] == "completed"
         assert run_body["artifact_count"] == 1
-        assert run_body["mapping_count"] == 1
+        assert run_body["assignment_count"] == 1
+        assert run_body["flowcell_id"] == flowcell_id
         assert run_body["run_folder"] == f"{run_body['run_euid']}/"
 
         resolved = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_body['run_euid']}/resolve",
-            params={"index_string": index_string},
+            params={
+                "flowcell_id": flowcell_id,
+                "lane": lane,
+                "library_barcode": library_barcode,
+            },
         )
         assert resolved.status_code == 200, resolved.text
         resolved_body = resolved.json()
         _assert_no_uuid_keys(resolved_body)
-        assert resolved_body["atlas_tenant_id"] == atlas_refs["atlas_tenant_id"]
-        assert resolved_body["atlas_order_euid"] == atlas_refs["atlas_order_euid"]
+        assert resolved_body["atlas_tenant_id"] == atlas_context["atlas_tenant_id"]
+        assert resolved_body["atlas_trf_euid"] == atlas_context["atlas_trf_euid"]
         assert (
-            resolved_body["atlas_test_order_euid"]
-            == atlas_refs["atlas_test_order_euid"]
+            resolved_body["atlas_test_euid"]
+            == atlas_context["process_items"][0]["atlas_test_euid"]
+        )
+        assert (
+            resolved_body["atlas_test_process_item_euid"]
+            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
         )

@@ -124,23 +124,23 @@ async def create_external_specimen(
 
 @router.get("/by-reference", response_model=ExternalSpecimenLookupResponse)
 async def find_external_specimens_by_reference(
-    order_number: str | None = Query(None),
+    trf_euid: str | None = Query(None),
     patient_id: str | None = Query(None),
     shipment_number: str | None = Query(None),
     kit_barcode: str | None = Query(None),
     atlas_tenant_id: str | None = Query(None),
-    atlas_order_euid: str | None = Query(None),
-    atlas_test_order_euid: str | None = Query(None),
+    atlas_trf_euid: str | None = Query(None),
+    atlas_test_euid: str | None = Query(None),
     user: APIUser = Depends(require_external_token_auth),
 ):
     refs = AtlasReferences(
-        order_number=order_number,
+        trf_euid=trf_euid,
         patient_id=patient_id,
         shipment_number=shipment_number,
         kit_barcode=kit_barcode,
         atlas_tenant_id=atlas_tenant_id,
-        atlas_order_euid=atlas_order_euid,
-        atlas_test_order_euid=atlas_test_order_euid,
+        atlas_trf_euid=atlas_trf_euid,
+        atlas_test_euid=atlas_test_euid,
     )
     service = ExternalSpecimenService(app_username=user.email)
     try:

@@ -60,6 +60,38 @@ class TestMainCommands:
         result = runner.invoke(cli, ["logs", "--help"])
         assert result.exit_code == 0
 
+    def test_server_group_help(self, runner):
+        """Test bloom server --help."""
+        result = runner.invoke(cli, ["server", "--help"])
+        assert result.exit_code == 0
+        assert "start" in result.output
+        assert "stop" in result.output
+
+    def test_test_group_help(self, runner):
+        """Test bloom test --help."""
+        result = runner.invoke(cli, ["test", "--help"])
+        assert result.exit_code == 0
+        assert "run" in result.output
+
+    def test_quality_group_help(self, runner):
+        """Test bloom quality --help."""
+        result = runner.invoke(cli, ["quality", "--help"])
+        assert result.exit_code == 0
+        assert "check" in result.output
+
+    def test_users_group_help(self, runner):
+        """Test bloom users --help."""
+        result = runner.invoke(cli, ["users", "--help"])
+        assert result.exit_code == 0
+        assert "add" in result.output
+        assert "list" in result.output
+
+    def test_integrations_group_help(self, runner):
+        """Test bloom integrations --help."""
+        result = runner.invoke(cli, ["integrations", "--help"])
+        assert result.exit_code == 0
+        assert "atlas" in result.output
+
     def test_shell_command_help(self, runner):
         """Test bloom shell --help."""
         result = runner.invoke(cli, ["shell", "--help"])

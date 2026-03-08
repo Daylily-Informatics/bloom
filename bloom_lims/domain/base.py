@@ -608,8 +608,8 @@ class BloomObj:
                     if isinstance(r.json_addl, dict):
                         action_payload = r.json_addl.get("action_definition")
                     if action_payload is None:
-                        self.logger.warning(
-                            "Skipping action import %s: missing action_definition",
+                        self.logger.debug(
+                            "Ignoring retired action import without action_definition: %s",
                             action_key,
                         )
                         continue

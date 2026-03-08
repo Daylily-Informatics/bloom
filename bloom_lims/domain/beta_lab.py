@@ -11,7 +11,6 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
-from bloom_lims.domain.external_specimens import ExternalSpecimenService
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaExtractionCreateRequest,
@@ -35,6 +34,7 @@ class BetaLabService:
 
     EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
     EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
+    PROCESS_ITEM_REFERENCE_TYPE = "atlas_test_process_item"
     GENERIC_DATA_TEMPLATE_CODE = "generic/generic/generic/1.0"
     POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
@@ -79,26 +79,42 @@ class BetaLabService:
         payload: BetaAcceptedMaterialCreateRequest,
         idempotency_key: str | None,
     ) -> BetaMaterialResponse:
-        ext = ExternalSpecimenService(app_username=self.bdb.app_username)
-        try:
-            created = ext.create_specimen(
-                payload=payload.to_external_specimen_request(),
+        if idempotency_key:
+            existing = self._find_content_record(
+                beta_kind="accepted_material",
                 idempotency_key=idempotency_key,
             )
-        finally:
-            ext.close()
+            if existing is not None:
+                return self._material_response(existing, created=False)
 
-        specimen = self._require_instance(created.specimen_euid)
-        return BetaMaterialResponse(
-            specimen_euid=created.specimen_euid,
-            container_euid=created.container_euid,
-            status=created.status,
-            atlas_refs=created.atlas_refs,
-            properties=created.properties,
-            idempotency_key=created.idempotency_key,
-            current_queue=self._current_queue_for_instance(specimen),
-            created=created.created,
+        specimen = self.bobj.create_instance_by_code(
+            payload.specimen_template_code,
+            {"json_addl": {"properties": payload.properties or {}}},
         )
+        specimen.bstatus = payload.status or specimen.bstatus
+        specimen_props = self._props(specimen)
+        specimen_props["beta_kind"] = "accepted_material"
+        if payload.specimen_name:
+            specimen.name = payload.specimen_name
+            specimen_props["name"] = payload.specimen_name
+        if idempotency_key:
+            specimen_props["idempotency_key"] = idempotency_key
+        self._write_props(specimen, specimen_props)
+
+        container = self._resolve_or_create_container(
+            container_euid=payload.container_euid,
+            container_template_code=payload.container_template_code,
+            specimen_name=payload.specimen_name or specimen.name,
+        )
+        if container is not None:
+            self._ensure_container_link(container.euid, specimen.euid)
+
+        self._replace_process_item_references(
+            specimen,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self.bdb.session.commit()
+        return self._material_response(specimen, created=True)
 
     def move_material_to_queue(
         self,
@@ -151,7 +167,10 @@ class BetaLabService:
                 f"(current_queue={current_queue!r})"
             )
 
-        atlas_refs = self._resolve_atlas_identity(source)
+        process_item_context = self._resolve_process_item_context(
+            source,
+            target_process_item_euid=payload.atlas_test_process_item_euid,
+        )
         plate = self._resolve_or_create_plate(
             plate_euid=payload.plate_euid,
             plate_template_code=payload.plate_template_code,
@@ -166,10 +185,6 @@ class BetaLabService:
                     "properties": {
                         "beta_kind": "extraction_output",
                         "extraction_type": payload.extraction_type,
-                        "source_specimen_euid": source.euid,
-                        "plate_euid": plate.euid,
-                        "well_euid": well.euid,
-                        "well_name": payload.well_name,
                         "idempotency_key": idempotency_key or "",
                         "metadata": payload.metadata or {},
                     }
@@ -191,15 +206,11 @@ class BetaLabService:
             output.euid,
             relationship_type="contains",
         )
-        self._replace_external_references(output, atlas_refs=atlas_refs)
+        self._replace_process_item_references(output, atlas_context=process_item_context)
         response = self._transition_material(
             material=output,
             queue_name="post_extract_qc",
-            metadata={
-                "source_specimen_euid": source.euid,
-                "plate_euid": plate.euid,
-                "well_name": payload.well_name,
-            },
+            metadata={"stage": "extraction", "well_name": payload.well_name},
             idempotency_key=f"{idempotency_key}:post_extract_qc"
             if idempotency_key
             else None,
@@ -211,6 +222,9 @@ class BetaLabService:
             well_euid=well.euid,
             well_name=payload.well_name,
             extraction_output_euid=output.euid,
+            atlas_test_process_item_euid=process_item_context[
+                "atlas_test_process_item_euid"
+            ],
             current_queue=response.current_queue,
             idempotent_replay=False,
         )
@@ -249,7 +263,6 @@ class BetaLabService:
                 "passed": bool(payload.passed),
                 "next_queue": payload.next_queue or "",
                 "metrics": payload.metrics or {},
-                "extraction_output_euid": output.euid,
                 "idempotency_key": idempotency_key or "",
                 "occurred_at": self._timestamp(),
             },
@@ -297,11 +310,14 @@ class BetaLabService:
                 idempotency_key=idempotency_key,
             )
             if existing is not None:
+                source = self._first_parent(existing, "beta_library_prep_output")
+                process_item_context = self._resolve_process_item_context(existing)
                 return BetaLibraryPrepResponse(
-                    source_extraction_output_euid=str(
-                        self._props(existing).get("source_extraction_output_euid") or ""
-                    ),
+                    source_extraction_output_euid=source.euid if source is not None else "",
                     library_prep_output_euid=existing.euid,
+                    atlas_test_process_item_euid=process_item_context[
+                        "atlas_test_process_item_euid"
+                    ],
                     current_queue=self._current_queue_for_instance(existing) or "",
                     idempotent_replay=True,
                 )
@@ -315,14 +331,13 @@ class BetaLabService:
                 f"(expected={expected_queue!r} current_queue={current_queue!r})"
             )
 
-        atlas_refs = self._resolve_atlas_identity(source)
+        process_item_context = self._resolve_process_item_context(source)
         lib_output = self._create_data_record(
             beta_kind="library_prep_output",
             name=payload.output_name
             or f"{payload.platform.lower()}-lib-prep:{source.euid}",
             properties={
                 "platform": payload.platform,
-                "source_extraction_output_euid": source.euid,
                 "idempotency_key": idempotency_key or "",
                 "metadata": payload.metadata or {},
             },
@@ -332,17 +347,23 @@ class BetaLabService:
             lib_output.euid,
             relationship_type="beta_library_prep_output",
         )
-        self._replace_external_references(lib_output, atlas_refs=atlas_refs)
+        self._replace_process_item_references(
+            lib_output,
+            atlas_context=process_item_context,
+        )
         transition = self._transition_material(
             material=lib_output,
             queue_name=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
-            metadata={"source_extraction_output_euid": source.euid},
+            metadata={"stage": "library_prep"},
             idempotency_key=f"{idempotency_key}:queue" if idempotency_key else None,
         )
         self.bdb.session.commit()
         return BetaLibraryPrepResponse(
             source_extraction_output_euid=source.euid,
             library_prep_output_euid=lib_output.euid,
+            atlas_test_process_item_euid=process_item_context[
+                "atlas_test_process_item_euid"
+            ],
             current_queue=transition.current_queue,
             idempotent_replay=False,
         )
@@ -443,13 +464,16 @@ class BetaLabService:
                 existing_props = self._props(existing)
                 return BetaRunResponse(
                     run_euid=existing.euid,
-                    pool_euid=str(existing_props.get("pool_euid") or ""),
+                    pool_euid=self._pool_euid_for_run(existing) or "",
+                    flowcell_id=str(existing_props.get("flowcell_id") or ""),
                     run_folder=str(
                         existing_props.get("run_folder") or f"{existing.euid}/"
                     ),
                     status=str(existing_props.get("status") or ""),
                     artifact_count=self._count_children(existing, "beta_run_artifact"),
-                    mapping_count=self._count_children(existing, "beta_run_index_map"),
+                    assignment_count=self._count_children(
+                        existing, "beta_sequenced_library_assignment"
+                    ),
                     idempotent_replay=True,
                 )
 
@@ -467,7 +491,7 @@ class BetaLabService:
             name=payload.run_name or f"{payload.platform.lower()}-run",
             properties={
                 "platform": payload.platform,
-                "pool_euid": pool.euid,
+                "flowcell_id": payload.flowcell_id,
                 "status": payload.status,
                 "idempotency_key": idempotency_key or "",
             },
@@ -482,30 +506,31 @@ class BetaLabService:
             relationship_type="beta_sequencing_run",
         )
 
-        for mapping in payload.index_mappings:
-            source = self._require_instance(mapping.source_euid)
-            atlas_refs = self._resolve_atlas_identity(source)
-            mapping_record = self._create_data_record(
-                beta_kind="run_index_mapping",
-                name=f"{run.euid}:{mapping.index_string}",
+        for assignment in payload.assignments:
+            source = self._require_instance(assignment.library_prep_output_euid)
+            process_item_context = self._resolve_process_item_context(source)
+            assignment_record = self._create_data_record(
+                beta_kind="sequenced_library_assignment",
+                name=f"{run.euid}:{assignment.lane}:{assignment.library_barcode}",
                 properties={
-                    "run_euid": run.euid,
-                    "index_string": mapping.index_string,
-                    "source_euid": source.euid,
-                    "atlas_tenant_id": atlas_refs["atlas_tenant_id"],
-                    "atlas_order_euid": atlas_refs["atlas_order_euid"],
-                    "atlas_test_order_euid": atlas_refs["atlas_test_order_euid"],
+                    "flowcell_id": payload.flowcell_id,
+                    "lane": assignment.lane,
+                    "library_barcode": assignment.library_barcode,
                 },
             )
             self.bobj.create_generic_instance_lineage_by_euids(
                 run.euid,
-                mapping_record.euid,
-                relationship_type="beta_run_index_map",
+                assignment_record.euid,
+                relationship_type="beta_sequenced_library_assignment",
             )
             self.bobj.create_generic_instance_lineage_by_euids(
                 source.euid,
-                mapping_record.euid,
-                relationship_type="beta_run_source_map",
+                assignment_record.euid,
+                relationship_type="beta_assignment_source",
+            )
+            self._replace_process_item_references(
+                assignment_record,
+                atlas_context=process_item_context,
             )
 
         for artifact in payload.artifacts:
@@ -513,11 +538,11 @@ class BetaLabService:
                 beta_kind="run_artifact",
                 name=f"{run.euid}:{artifact.artifact_type}:{artifact.filename}",
                 properties={
-                    "run_euid": run.euid,
                     "artifact_type": artifact.artifact_type,
                     "bucket": artifact.bucket,
                     "filename": artifact.filename,
-                    "index_string": artifact.index_string or "",
+                    "lane": artifact.lane or "",
+                    "library_barcode": artifact.library_barcode or "",
                     "metadata": artifact.metadata or {},
                     "s3_key": f"{run.euid}/{artifact.filename}",
                     "s3_uri": f"s3://{artifact.bucket}/{run.euid}/{artifact.filename}",
@@ -533,42 +558,71 @@ class BetaLabService:
         return BetaRunResponse(
             run_euid=run.euid,
             pool_euid=pool.euid,
+            flowcell_id=payload.flowcell_id,
             run_folder=str(run_props["run_folder"]),
             status=payload.status,
             artifact_count=len(payload.artifacts),
-            mapping_count=len(payload.index_mappings),
+            assignment_count=len(payload.assignments),
             idempotent_replay=False,
         )
 
-    def resolve_run_index(
-        self, *, run_euid: str, index_string: str
+    def resolve_run_assignment(
+        self,
+        *,
+        run_euid: str,
+        flowcell_id: str,
+        lane: str,
+        library_barcode: str,
     ) -> BetaRunResolutionResponse:
         run = self._require_instance(run_euid)
-        normalized_index = str(index_string or "").strip()
-        if not normalized_index:
-            raise ValueError("index_string is required")
+        normalized_flowcell_id = str(flowcell_id or "").strip()
+        normalized_lane = str(lane or "").strip()
+        normalized_library_barcode = str(library_barcode or "").strip()
+        if not normalized_flowcell_id:
+            raise ValueError("flowcell_id is required")
+        if not normalized_lane:
+            raise ValueError("lane is required")
+        if not normalized_library_barcode:
+            raise ValueError("library_barcode is required")
 
         for lineage in get_parent_lineages(run):
-            if lineage.is_deleted or lineage.relationship_type != "beta_run_index_map":
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != "beta_sequenced_library_assignment"
+            ):
                 continue
-            child = lineage.child_instance
-            if child is None or child.is_deleted:
+            assignment = lineage.child_instance
+            if assignment is None or assignment.is_deleted:
                 continue
-            props = self._props(child)
-            if str(props.get("index_string") or "").strip() != normalized_index:
+            props = self._props(assignment)
+            if str(props.get("flowcell_id") or "").strip() != normalized_flowcell_id:
                 continue
+            if str(props.get("lane") or "").strip() != normalized_lane:
+                continue
+            if (
+                str(props.get("library_barcode") or "").strip()
+                != normalized_library_barcode
+            ):
+                continue
+            process_item_context = self._resolve_process_item_context(assignment)
             return BetaRunResolutionResponse(
                 run_euid=run.euid,
-                index_string=normalized_index,
-                atlas_tenant_id=str(props.get("atlas_tenant_id") or ""),
-                atlas_order_euid=str(props.get("atlas_order_euid") or ""),
-                atlas_test_order_euid=str(props.get("atlas_test_order_euid") or ""),
-                source_euid=str(props.get("source_euid") or ""),
+                flowcell_id=normalized_flowcell_id,
+                lane=normalized_lane,
+                library_barcode=normalized_library_barcode,
+                sequenced_library_assignment_euid=assignment.euid,
+                atlas_tenant_id=process_item_context["atlas_tenant_id"],
+                atlas_trf_euid=process_item_context["atlas_trf_euid"],
+                atlas_test_euid=process_item_context["atlas_test_euid"],
+                atlas_test_process_item_euid=process_item_context[
+                    "atlas_test_process_item_euid"
+                ],
             )
 
         raise ValueError(
-            "Run/index mapping not found for "
-            f"run_euid={run_euid} index_string={normalized_index}"
+            "Sequenced library assignment not found for "
+            f"run_euid={run_euid} flowcell_id={normalized_flowcell_id} "
+            f"lane={normalized_lane} library_barcode={normalized_library_barcode}"
         )
 
     def _transition_material(
@@ -602,8 +656,6 @@ class BetaLabService:
             beta_kind="queue_event",
             name=f"{normalized_queue}:{material.euid}",
             properties={
-                "material_euid": material.euid,
-                "queue_euid": queue_def.euid,
                 "queue_name": normalized_queue,
                 "previous_queue": previous_queue or "",
                 "idempotency_key": idempotency_key or "",
@@ -615,6 +667,11 @@ class BetaLabService:
             material.euid,
             queue_event.euid,
             relationship_type="beta_queue_event",
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            queue_def.euid,
+            queue_event.euid,
+            relationship_type="beta_queue_event_queue",
         )
         self.bdb.session.flush()
         return BetaQueueTransitionResponse(
@@ -633,9 +690,11 @@ class BetaLabService:
         replay: bool,
     ) -> BetaQueueTransitionResponse:
         props = self._props(event)
+        material = self._first_parent(event, "beta_queue_event")
+        queue = self._first_parent(event, "beta_queue_event_queue")
         return BetaQueueTransitionResponse(
-            material_euid=str(props.get("material_euid") or ""),
-            queue_euid=str(props.get("queue_euid") or ""),
+            material_euid=material.euid if material is not None else "",
+            queue_euid=queue.euid if queue is not None else "",
             queue_name=str(props.get("queue_name") or ""),
             previous_queue=str(props.get("previous_queue") or "") or None,
             current_queue=str(props.get("queue_name") or ""),
@@ -645,13 +704,19 @@ class BetaLabService:
     def _extraction_response(
         self, extraction_output, *, replay: bool
     ) -> BetaExtractionResponse:
-        props = self._props(extraction_output)
+        source = self._first_parent(extraction_output, "beta_extraction_output")
+        well = self._first_parent(extraction_output, "contains")
+        plate = self._first_parent(well, "contains") if well is not None else None
+        process_item_context = self._resolve_process_item_context(extraction_output)
         return BetaExtractionResponse(
-            source_specimen_euid=str(props.get("source_specimen_euid") or ""),
-            plate_euid=str(props.get("plate_euid") or ""),
-            well_euid=str(props.get("well_euid") or ""),
-            well_name=str(props.get("well_name") or ""),
+            source_specimen_euid=source.euid if source is not None else "",
+            plate_euid=plate.euid if plate is not None else "",
+            well_euid=well.euid if well is not None else "",
+            well_name=self._well_name(well),
             extraction_output_euid=extraction_output.euid,
+            atlas_test_process_item_euid=process_item_context[
+                "atlas_test_process_item_euid"
+            ],
             current_queue=self._current_queue_for_instance(extraction_output) or "",
             idempotent_replay=replay,
         )
@@ -679,6 +744,44 @@ class BetaLabService:
             props["name"] = str(resolved_name)
             self._write_props(plate, props)
         return plate
+
+    def _resolve_or_create_container(
+        self,
+        *,
+        container_euid: str | None,
+        container_template_code: str,
+        specimen_name: str,
+    ):
+        if container_euid:
+            container = self._require_instance(container_euid)
+            if container.category != "container":
+                raise ValueError(f"EUID is not a container: {container_euid}")
+            return container
+
+        container = self.bobj.create_instance_by_code(
+            container_template_code,
+            {"json_addl": {"properties": {"name": f"{specimen_name} container"}}},
+        )
+        if container is None:
+            raise ValueError("Failed to create container for specimen")
+        return container
+
+    def _ensure_container_link(self, container_euid: str, specimen_euid: str) -> None:
+        container = self._require_instance(container_euid)
+        specimen = self._require_instance(specimen_euid)
+        for lineage in get_parent_lineages(container):
+            if lineage.is_deleted:
+                continue
+            child = lineage.child_instance
+            if child is None or child.is_deleted:
+                continue
+            if child.uid == specimen.uid and lineage.relationship_type == "contains":
+                return
+        self.bobj.create_generic_instance_lineage_by_euids(
+            container_euid,
+            specimen_euid,
+            relationship_type="contains",
+        )
 
     def _require_plate_well(self, plate, well_name: str):
         expected = str(well_name or "").strip().upper()
@@ -744,9 +847,16 @@ class BetaLabService:
                 return queue_name
         return None
 
-    def _resolve_atlas_identity(self, instance) -> dict[str, str]:
+    def _resolve_process_item_context(
+        self,
+        instance,
+        *,
+        target_process_item_euid: str | None = None,
+    ) -> dict[str, str]:
         visited: set[int] = set()
         to_visit = [instance]
+        matches: dict[str, dict[str, str]] = {}
+        target = str(target_process_item_euid or "").strip()
         while to_visit:
             current = to_visit.pop(0)
             current_uid = getattr(current, "uid", None)
@@ -754,17 +864,13 @@ class BetaLabService:
                 continue
             visited.add(current_uid)
 
-            refs = self._atlas_refs_for_instance(current)
-            if {
-                "atlas_tenant_id",
-                "atlas_order_euid",
-                "atlas_test_order_euid",
-            }.issubset(refs):
-                return {
-                    "atlas_tenant_id": refs["atlas_tenant_id"],
-                    "atlas_order_euid": refs["atlas_order_euid"],
-                    "atlas_test_order_euid": refs["atlas_test_order_euid"],
-                }
+            for ref in self._process_item_refs_for_instance(current):
+                process_item_euid = ref["atlas_test_process_item_euid"]
+                if target and process_item_euid != target:
+                    continue
+                matches[process_item_euid] = ref
+                if target:
+                    return ref
 
             for lineage in get_child_lineages(current):
                 if lineage.is_deleted:
@@ -774,13 +880,25 @@ class BetaLabService:
                     continue
                 to_visit.append(parent)
 
+        if target:
+            raise ValueError(
+                "No Atlas test process item could be resolved from "
+                f"Bloom lineage for {instance.euid}: {target}"
+            )
+        if len(matches) == 1:
+            return next(iter(matches.values()))
+        if len(matches) > 1:
+            raise ValueError(
+                "Multiple Atlas test process items are reachable from "
+                f"{instance.euid}; choose one explicitly before sequencing"
+            )
         raise ValueError(
-            "No Atlas TRF/test identity could be resolved from "
+            "No Atlas test process item could be resolved from "
             f"Bloom lineage for {instance.euid}"
         )
 
-    def _atlas_refs_for_instance(self, instance) -> dict[str, str]:
-        refs: dict[str, str] = {}
+    def _process_item_refs_for_instance(self, instance) -> list[dict[str, str]]:
+        refs: dict[str, dict[str, str]] = {}
         for lineage in get_parent_lineages(instance):
             if (
                 lineage.is_deleted
@@ -800,14 +918,28 @@ class BetaLabService:
             if str(payload.get("provider") or "").strip() != "atlas":
                 continue
             ref_type = str(payload.get("reference_type") or "").strip()
-            ref_value = str(payload.get("reference_value") or "").strip()
-            if ref_type and ref_value:
-                refs[ref_type] = ref_value
-        return refs
+            if ref_type != self.PROCESS_ITEM_REFERENCE_TYPE:
+                continue
+            process_item_euid = str(payload.get("atlas_test_process_item_euid") or "").strip()
+            atlas_test_euid = str(payload.get("atlas_test_euid") or "").strip()
+            atlas_tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
+            atlas_trf_euid = str(payload.get("atlas_trf_euid") or "").strip()
+            if not (
+                process_item_euid
+                and atlas_test_euid
+                and atlas_tenant_id
+                and atlas_trf_euid
+            ):
+                continue
+            refs[process_item_euid] = {
+                "atlas_tenant_id": atlas_tenant_id,
+                "atlas_trf_euid": atlas_trf_euid,
+                "atlas_test_euid": atlas_test_euid,
+                "atlas_test_process_item_euid": process_item_euid,
+            }
+        return list(refs.values())
 
-    def _replace_external_references(
-        self, instance, *, atlas_refs: dict[str, str]
-    ) -> None:
+    def _replace_process_item_references(self, instance, *, atlas_context: dict[str, Any]) -> None:
         existing_refs = []
         for lineage in get_parent_lineages(instance):
             if (
@@ -821,12 +953,27 @@ class BetaLabService:
             existing_refs.append((lineage, child))
 
         for lineage, child in existing_refs:
+            payload = self._props(child)
+            if str(payload.get("reference_type") or "").strip() != self.PROCESS_ITEM_REFERENCE_TYPE:
+                continue
             lineage.is_deleted = True
             child.is_deleted = True
 
-        for reference_type, reference_value in sorted(atlas_refs.items()):
-            clean_value = str(reference_value or "").strip()
-            if not clean_value:
+        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
+        process_items = list(atlas_context.get("process_items") or [])
+
+        for process_item in process_items:
+            atlas_test_euid = str(process_item.get("atlas_test_euid") or "").strip()
+            atlas_test_process_item_euid = str(
+                process_item.get("atlas_test_process_item_euid") or ""
+            ).strip()
+            if not (
+                atlas_tenant_id
+                and atlas_trf_euid
+                and atlas_test_euid
+                and atlas_test_process_item_euid
+            ):
                 continue
             ref_obj = self.bobj.create_instance_by_code(
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
@@ -834,9 +981,13 @@ class BetaLabService:
                     "json_addl": {
                         "properties": {
                             "provider": "atlas",
-                            "reference_type": reference_type,
-                            "reference_value": clean_value,
-                            "foreign_reference": clean_value,
+                            "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
+                            "reference_value": atlas_test_process_item_euid,
+                            "foreign_reference": atlas_test_process_item_euid,
+                            "atlas_tenant_id": atlas_tenant_id,
+                            "atlas_trf_euid": atlas_trf_euid,
+                            "atlas_test_euid": atlas_test_euid,
+                            "atlas_test_process_item_euid": atlas_test_process_item_euid,
                             "validation": {},
                         }
                     }
@@ -937,6 +1088,61 @@ class BetaLabService:
                 continue
             return parent.euid
         return None
+
+    def _material_response(self, specimen, *, created: bool) -> BetaMaterialResponse:
+        return BetaMaterialResponse(
+            specimen_euid=specimen.euid,
+            container_euid=self._linked_container_euid(specimen),
+            status=specimen.bstatus,
+            atlas_context=self._atlas_context_for_instance(specimen),
+            properties=self._props(specimen),
+            idempotency_key=str(self._props(specimen).get("idempotency_key") or "") or None,
+            current_queue=self._current_queue_for_instance(specimen),
+            created=created,
+        )
+
+    def _atlas_context_for_instance(self, instance) -> dict[str, Any]:
+        process_items = self._process_item_refs_for_instance(instance)
+        if not process_items:
+            return {"atlas_tenant_id": "", "atlas_trf_euid": "", "process_items": []}
+        first = process_items[0]
+        return {
+            "atlas_tenant_id": first["atlas_tenant_id"],
+            "atlas_trf_euid": first["atlas_trf_euid"],
+            "process_items": [
+                {
+                    "atlas_test_euid": item["atlas_test_euid"],
+                    "atlas_test_process_item_euid": item["atlas_test_process_item_euid"],
+                }
+                for item in sorted(
+                    process_items,
+                    key=lambda item: item["atlas_test_process_item_euid"],
+                )
+            ],
+        }
+
+    def _first_parent(self, instance, relationship_type: str):
+        for lineage in get_child_lineages(instance):
+            if lineage.is_deleted or lineage.relationship_type != relationship_type:
+                continue
+            parent = lineage.parent_instance
+            if parent is None or parent.is_deleted:
+                continue
+            return parent
+        return None
+
+    def _pool_euid_for_run(self, run) -> str | None:
+        pool = self._first_parent(run, "beta_sequencing_run")
+        return pool.euid if pool is not None else None
+
+    def _well_name(self, well) -> str:
+        if well is None:
+            return ""
+        address = well.json_addl.get("cont_address") if isinstance(well.json_addl, dict) else {}
+        name = str((address or {}).get("name") or "").strip()
+        if name:
+            return name
+        return str(self._props(well).get("name") or "").strip()
 
     def _member_euids_for_pool(self, pool) -> list[str]:
         member_euids: list[str] = []

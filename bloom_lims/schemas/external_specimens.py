@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class AtlasReferences(BaseModel):
-    order_number: str | None = None
+    trf_euid: str | None = None
     patient_id: str | None = None
     shipment_number: str | None = None
     kit_barcode: str | None = None
     atlas_tenant_id: str | None = None
-    atlas_order_euid: str | None = None
-    atlas_test_order_euid: str | None = None
+    atlas_trf_euid: str | None = None
+    atlas_test_euid: str | None = None
 
 
 class ExternalSpecimenCreateRequest(BaseModel):
@@ -36,8 +36,9 @@ class ExternalSpecimenCreateRequest(BaseModel):
                 refs.shipment_number,
                 refs.kit_barcode,
                 refs.atlas_tenant_id,
-                refs.atlas_order_euid,
-                refs.atlas_test_order_euid,
+                refs.trf_euid,
+                refs.atlas_trf_euid,
+                refs.atlas_test_euid,
             ]
         ):
             raise ValueError("At least one Atlas reference is required")

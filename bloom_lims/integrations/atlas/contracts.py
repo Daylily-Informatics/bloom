@@ -19,6 +19,6 @@ class AtlasLookupResult:
 @dataclass(frozen=True)
 class AtlasStatusEventPushResult:
     tenant_id: str
-    test_order_id: str
+    test_euid: str
     idempotency_key: str
     payload: dict[str, Any]

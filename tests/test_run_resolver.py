@@ -40,15 +40,20 @@ def _opaque(prefix: str) -> str:
 
 
 def _seed_beta_run(client: TestClient) -> tuple[str, str]:
-    atlas_refs = {
+    atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
-        "atlas_order_euid": _opaque("order"),
-        "atlas_test_order_euid": _opaque("trftest"),
+        "atlas_trf_euid": _opaque("trf"),
+        "process_items": [
+            {
+                "atlas_test_euid": _opaque("test"),
+                "atlas_test_process_item_euid": _opaque("proc"),
+            }
+        ],
     }
     specimen = client.post(
         "/api/v1/external/atlas/beta/materials",
         headers={"Idempotency-Key": _opaque("idem-material")},
-        json={"specimen_name": "resolver-specimen", "atlas_refs": atlas_refs},
+        json={"specimen_name": "resolver-specimen", "atlas_context": atlas_context},
     )
     assert specimen.status_code == 200, specimen.text
     specimen_euid = specimen.json()["specimen_euid"]
@@ -67,6 +72,7 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
             "source_specimen_euid": specimen_euid,
             "well_name": "A1",
             "extraction_type": "gdna",
+            "atlas_test_process_item_euid": atlas_context["process_items"][0]["atlas_test_process_item_euid"],
         },
     )
     assert extraction.status_code == 200, extraction.text
@@ -111,34 +117,44 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         json={
             "pool_euid": pool_euid,
             "platform": "ONT",
+            "flowcell_id": "FLOW-ONT-01",
             "status": "started",
-            "index_mappings": [
+            "assignments": [
                 {
-                    "index_string": "ONT-IDX-01",
-                    "source_euid": lib_output_euid,
+                    "lane": "2",
+                    "library_barcode": "ONT-IDX-01",
+                    "library_prep_output_euid": lib_output_euid,
                 }
             ],
         },
     )
     assert run.status_code == 200, run.text
-    return run.json()["run_euid"], atlas_refs["atlas_test_order_euid"]
+    return run.json()["run_euid"], atlas_context["process_items"][0]["atlas_test_process_item_euid"]
 
 
 def test_run_resolver_returns_404_for_unknown_index():
     app.dependency_overrides[require_external_token_auth] = _external_rw_user
 
     with TestClient(app) as client:
-        run_euid, expected_test_order = _seed_beta_run(client)
+        run_euid, expected_process_item = _seed_beta_run(client)
 
         missing = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_euid}/resolve",
-            params={"index_string": "DOES-NOT-EXIST"},
+            params={
+                "flowcell_id": "FLOW-ONT-01",
+                "lane": "2",
+                "library_barcode": "DOES-NOT-EXIST",
+            },
         )
         assert missing.status_code == 404, missing.text
 
         resolved = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_euid}/resolve",
-            params={"index_string": "ONT-IDX-01"},
+            params={
+                "flowcell_id": "FLOW-ONT-01",
+                "lane": "2",
+                "library_barcode": "ONT-IDX-01",
+            },
         )
         assert resolved.status_code == 200, resolved.text
-        assert resolved.json()["atlas_test_order_euid"] == expected_test_order
+        assert resolved.json()["atlas_test_process_item_euid"] == expected_process_item

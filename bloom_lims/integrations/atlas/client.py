@@ -1,4 +1,4 @@
-"""HTTP client for Atlas API lookups."""
+"""HTTP client for Atlas API lookups and test status pushes."""
 
 from __future__ import annotations
 
@@ -46,8 +46,8 @@ class AtlasClient:
     def is_configured(self) -> bool:
         return bool(self.base_url and self.token)
 
-    def get_order(self, order_number: str) -> dict[str, Any]:
-        return self._get_json(f"/api/integrations/bloom/v1/lookups/orders/{order_number}")
+    def get_trf(self, trf_euid: str) -> dict[str, Any]:
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/trfs/{trf_euid}")
 
     def get_patient(self, patient_id: str) -> dict[str, Any]:
         return self._get_json(f"/api/integrations/bloom/v1/lookups/patients/{patient_id}")
@@ -68,16 +68,16 @@ class AtlasClient:
             extra_headers={"X-Atlas-Tenant-Id": clean_tenant},
         )
 
-    def push_test_order_status_event(
+    def push_test_status_event(
         self,
         *,
-        test_order_id: str,
+        test_euid: str,
         tenant_id: str,
         idempotency_key: str,
         payload: dict[str, Any],
         timeout_seconds: int | None = None,
     ) -> dict[str, Any]:
-        path = f"/api/integrations/bloom/v1/test-orders/{test_order_id}/status-events"
+        path = f"/api/integrations/bloom/v1/tests/{test_euid}/status-events"
         clean_tenant = str(tenant_id or "").strip()
         clean_idempotency = str(idempotency_key or "").strip()
         if not clean_tenant:

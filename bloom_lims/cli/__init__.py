@@ -10,25 +10,23 @@ Usage:
     bloom config              Show current configuration
 """
 
-import os
 import sys
-from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.table import Table
 
-# Import subcommand groups
+from bloom_lims.cli.config_cmd import config
 from bloom_lims.cli.db import db
 from bloom_lims.cli.gui import gui, stop
-from bloom_lims.cli.info import info, status, doctor, version
-from bloom_lims.cli.config_cmd import config
-from bloom_lims.cli.utils import shell, logs
+from bloom_lims.cli.info import doctor, info, status, version
+from bloom_lims.cli.integrations import integrations
+from bloom_lims.cli.quality import quality
+from bloom_lims.cli.server import server
+from bloom_lims.cli.test import test
+from bloom_lims.cli.users import users
+from bloom_lims.cli.utils import logs, shell
 
 console = Console()
-
-# Get project root directory
-PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
 def _get_version() -> str:
@@ -48,11 +46,11 @@ def cli(ctx, verbose, show_version):
     """BLOOM LIMS - Laboratory Information Management System CLI."""
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
-    
+
     if show_version:
         console.print(f"bloom [cyan]{_get_version()}[/cyan]")
         ctx.exit(0)
-    
+
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -66,6 +64,11 @@ cli.add_command(status)
 cli.add_command(doctor)
 cli.add_command(version)
 cli.add_command(config)
+cli.add_command(server)
+cli.add_command(test)
+cli.add_command(quality)
+cli.add_command(users)
+cli.add_command(integrations)
 cli.add_command(shell)
 cli.add_command(logs)
 
@@ -77,4 +80,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

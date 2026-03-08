@@ -13,7 +13,6 @@ from typing import Any
 from bloom_lims.core.exceptions import BloomValidationError
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
-from bloom_lims.domain.workflows import BloomWorkflow, BloomWorkflowStep
 
 logger = logging.getLogger(__name__)
 
@@ -228,8 +227,12 @@ def _build_action_ds(
 
 def _resolve_executor(instance: Any, bdb: BLOOMdb3):
     if instance.category == "workflow":
+        from bloom_lims.domain.workflows import BloomWorkflow
+
         return BloomWorkflow(bdb)
     if instance.category == "workflow_step":
+        from bloom_lims.domain.workflows import BloomWorkflowStep
+
         return BloomWorkflowStep(bdb)
     return BloomObj(bdb)
 
