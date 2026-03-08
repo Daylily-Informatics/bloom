@@ -38,6 +38,7 @@ Canonical queues:
 - `ont_start_seq_run`
 
 Atlas records intake outcomes first. Bloom accepts only Atlas-approved material, links that material to Atlas TRF/Test/process-item context through explicit graph-linked reference objects, and preserves lineage from specimen/container through plate and well placement, library prep, pooling, sequencing run creation, and sequenced library assignment.
+Accepted-material ingress queue membership is applied to the physical container (`container_euid`), with specimen queue reads falling back to containing-container queue state when needed.
 
 Ursa resolves the canonical sequencing unit through Bloom with:
 
@@ -63,6 +64,17 @@ Atlas and Ursa integration paths live under:
 - `/api/v1/external/atlas`
 - `/api/v1/external/atlas/beta`
 
+### Atlas Configuration Values Required For Bloom API Access
+
+When configuring Atlas to call Bloom, set all three fields below in Atlas Bloom integration settings:
+
+- `bloom_base_url`
+  - Bloom API base URL Atlas calls (example: `https://bloom.example.org`).
+- `bloom_api_key_secret_ref`
+  - Secret reference Atlas resolves to the Bloom bearer token (for example `env:MY_BLOOM_API_KEY`).
+- `bloom_webhook_secret_ref`
+  - Secret reference Atlas uses to verify Bloom webhook signatures for inbound events.
+
 The queue-driven beta endpoints are:
 
 - `POST /api/v1/external/atlas/beta/materials`
@@ -75,9 +87,29 @@ The queue-driven beta endpoints are:
 - `GET /api/v1/external/atlas/beta/runs/{run_euid}/resolve?flowcell_id=...&lane=...&library_barcode=...`
 - `POST /api/v1/external/atlas/tests/{test_euid}/status-events`
 
+## Embedded TapDB Admin Mount
+
+Bloom mounts the TapDB admin FastAPI surface inside the same Bloom server process at:
+
+- `/admin/tapdb`
+
+Mounted-mode behavior:
+
+- Bloom session auth is the only gate.
+- Access is admin-only (`role=admin`).
+- Unauthenticated browser requests are redirected to `/login`.
+- Authenticated non-admin browser requests are redirected to `/user_home?admin_required=1`.
+- JSON/XHR-style denied requests receive `401` (unauthenticated) or `403` (non-admin).
+- TapDB local login/auth flow is disabled for mounted mode.
+
+Runtime flags:
+
+- `BLOOM_TAPDB_MOUNT_ENABLED` (default `1`)
+- `BLOOM_TAPDB_MOUNT_PATH` (default `/admin/tapdb`)
+
 ## Legacy Isolation
 
-Legacy workflow and `do_action` code may still exist on disk for retired surfaces, but it is not part of the active beta integration path. If a codepath depends on workflow-step runtime, accession ownership, or UUID-based external contracts, it is not part of the supported beta system.
+Workflow/workset runtime surfaces are retired from active API/GUI mounts for the beta path. Any codepath that depends on workflow-step runtime, accession ownership, or UUID-based external contracts is not part of the supported beta system.
 
 ## Development
 

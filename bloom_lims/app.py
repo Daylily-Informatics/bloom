@@ -15,7 +15,12 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
 from bloom_lims.gui.errors import register_exception_handlers
-from bloom_lims.tapdb_metrics import request_method_var, request_path_var, stop_all_writers
+from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
+from bloom_lims.tapdb_metrics import (
+    request_method_var,
+    request_path_var,
+    stop_all_writers,
+)
 
 
 def create_app() -> FastAPI:
@@ -51,6 +56,8 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
+
+    mount_tapdb_admin_subapp(app)
 
     # Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
     if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":

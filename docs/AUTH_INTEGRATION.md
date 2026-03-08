@@ -24,6 +24,26 @@ System groups:
 
 `API_ACCESS` gates personal API token self-service. Admin users can always manage tokens.
 
+## Embedded TapDB Admin Auth Boundary
+
+Bloom can mount TapDB admin in-process at `/admin/tapdb`.
+
+Mounted mode defaults:
+- enabled unless `BLOOM_TAPDB_MOUNT_ENABLED=0`
+- mount path defaults to `BLOOM_TAPDB_MOUNT_PATH=/admin/tapdb`
+
+Auth behavior for mounted path:
+- Bloom session/user model is the only gate
+- admin-only access (`user_data.role == "admin"` or role set contains `ADMIN`)
+- browser unauthenticated -> redirect `/login`
+- browser non-admin -> redirect `/user_home?admin_required=1`
+- API/XHR-style denied access -> JSON `401`/`403`
+
+TapDB-local auth in mounted mode:
+- Bloom sets `TAPDB_ADMIN_DISABLE_AUTH=1` before loading TapDB admin app
+- TapDB login flow is bypassed for mounted requests
+- standalone TapDB usage remains unchanged outside Bloom
+
 ## API Tokens
 
 Bloom personal API tokens:
