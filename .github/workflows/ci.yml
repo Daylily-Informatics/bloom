@@ -169,8 +169,8 @@ jobs:
         shell: bash -el {0}
         run: |
           pytest --no-cov \
+            tests/test_config_runtime.py \
             tests/test_api_atlas_bridge.py \
             tests/test_atlas_lookup_resilience.py \
             tests/test_queue_flow.py \
-            tests/test_run_resolver.py \
-            tests/test_beta_cross_repo_smoke.py
+            tests/test_run_resolver.py
