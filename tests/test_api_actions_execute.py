@@ -68,10 +68,101 @@ def _iter_instance_actions(limit: int = 2000):
         bdb.close()
 
 
+def _find_instance_euid(*, allow_terminal: bool = True) -> str | None:
+    bdb = BLOOMdb3(app_username="pytest-actions")
+    try:
+        query = (
+            bdb.session.query(bdb.Base.classes.generic_instance)
+            .filter(bdb.Base.classes.generic_instance.is_deleted == False)
+            .limit(4000)
+        )
+        for instance in query:
+            status = str(getattr(instance, "bstatus", "") or "")
+            if not allow_terminal and status in TERMINAL_STATUSES:
+                continue
+            return instance.euid
+    finally:
+        bdb.close()
+    return None
+
+
+def _inject_set_status_test_action(euid: str) -> tuple[str, str]:
+    action_group = "pytest_core"
+    action_key = "action/core/set_object_status/1.0"
+
+    bdb = BLOOMdb3(app_username="pytest-actions")
+    try:
+        bobj = BloomObj(bdb)
+        instance = bobj.get_by_euid(euid)
+        json_addl = instance.json_addl if isinstance(instance.json_addl, dict) else {}
+        if not isinstance(json_addl.get("properties"), dict):
+            json_addl["properties"] = {}
+
+        action_groups = json_addl.get("action_groups")
+        if not isinstance(action_groups, dict):
+            action_groups = {}
+            json_addl["action_groups"] = action_groups
+
+        group_data = action_groups.get(action_group)
+        if not isinstance(group_data, dict):
+            group_data = {
+                "group_name": "Pytest Core",
+                "group_order": "998",
+                "actions": {},
+            }
+            action_groups[action_group] = group_data
+
+        actions = group_data.get("actions")
+        if not isinstance(actions, dict):
+            actions = {}
+            group_data["actions"] = actions
+
+        actions[action_key] = {
+            "action_name": "Set Object Status",
+            "method_name": "do_action_set_object_status",
+            "action_executed": "0",
+            "max_executions": "-1",
+            "action_enabled": "1",
+            "capture_data": "yes",
+            "captured_data": {},
+            "deactivate_actions_when_executed": [],
+            "executed_datetime": [],
+            "action_order": "0",
+            "action_simple_value": "",
+            "action_user": [],
+            "curr_user": "",
+            "ui_schema": {
+                "title": "Set Object Status",
+                "fields": [
+                    {
+                        "name": "object_status",
+                        "label": "Object Status",
+                        "type": "text",
+                        "required": True,
+                    }
+                ],
+            },
+        }
+
+        instance.json_addl = json_addl
+        flag_modified(instance, "json_addl")
+        bdb.session.commit()
+    finally:
+        bdb.close()
+
+    return action_group, action_key
+
+
 def _find_any_action_target() -> tuple[str, str, str]:
     for instance, group_name, action_key, _action_ds in _iter_instance_actions():
         return instance.euid, group_name, action_key
-    raise RuntimeError("No action-bearing instance found in seeded test DB")
+
+    fallback_euid = _find_instance_euid()
+    if fallback_euid is None:
+        raise RuntimeError("No instance found in seeded test DB")
+
+    action_group, action_key = _inject_set_status_test_action(fallback_euid)
+    return fallback_euid, action_group, action_key
 
 
 def _inject_required_test_action(euid: str) -> tuple[str, str, str]:
@@ -135,7 +226,15 @@ def _find_set_status_target() -> tuple[str, str, str, str]:
             continue
         next_status = "complete" if current_status == "in_progress" else "in_progress"
         return instance.euid, group_name, action_key, next_status
-    raise RuntimeError("No suitable do_action_set_object_status target found")
+
+    fallback_euid = _find_instance_euid(allow_terminal=False)
+    if fallback_euid is None:
+        raise RuntimeError("No non-terminal instance found in seeded test DB")
+
+    action_group, action_key = _inject_set_status_test_action(fallback_euid)
+    current_status = _get_status(fallback_euid)
+    next_status = "complete" if current_status == "in_progress" else "in_progress"
+    return fallback_euid, action_group, action_key, next_status
 
 
 def _get_status(euid: str) -> str:
