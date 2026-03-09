@@ -21,8 +21,6 @@ from .containers import router as containers_router
 from .content import router as content_router
 from .equipment import router as equipment_router
 from .external_specimens import router as external_specimens_router
-from .file_sets import router as file_sets_router
-from .files import router as files_router
 from .lineages import router as lineages_router
 from .object_creation import router as object_creation_router
 from .objects import router as objects_router
@@ -42,14 +40,12 @@ router.include_router(objects_router)
 router.include_router(auth_router)
 router.include_router(containers_router)
 router.include_router(content_router)
-router.include_router(files_router)
 router.include_router(equipment_router)
 router.include_router(batch_router)
 router.include_router(async_tasks_router)
 router.include_router(templates_router)
 router.include_router(subjects_router)
 router.include_router(lineages_router)
-router.include_router(file_sets_router)
 router.include_router(stats_router)
 router.include_router(search_router)
 router.include_router(search_v2_router)
@@ -74,14 +70,12 @@ async def api_v1_info():
             "auth": "/api/v1/auth",
             "containers": "/api/v1/containers",
             "content": "/api/v1/content",
-            "files": "/api/v1/files",
             "equipment": "/api/v1/equipment",
             "batch": "/api/v1/batch",
             "tasks": "/api/v1/tasks",
             "templates": "/api/v1/templates",
             "subjects": "/api/v1/subjects",
             "lineages": "/api/v1/lineages",
-            "file_sets": "/api/v1/file-sets",
             "stats": "/api/v1/stats",
             "search": "/api/v1/search",
             "search_v2": "/api/v1/search/v2",

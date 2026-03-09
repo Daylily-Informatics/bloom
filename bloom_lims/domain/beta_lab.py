@@ -10,8 +10,10 @@ from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
+from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.domain.beta_actions import BloomBetaActionRecorder
+from bloom_lims.integrations.dewey.client import DeweyArtifactClient, DeweyClientError
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaClaimResponse,
@@ -93,13 +95,31 @@ class BetaLabService:
         "ont_start_seq_run",
     )
 
-    def __init__(self, *, app_username: str):
+    def __init__(
+        self,
+        *,
+        app_username: str,
+        dewey_client: DeweyArtifactClient | None = None,
+    ):
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
         self.action_recorder = BloomBetaActionRecorder(self.bdb.session)
+        self.dewey_client = dewey_client if dewey_client is not None else self._build_dewey_client()
 
     def close(self) -> None:
         self.bdb.close()
+
+    @staticmethod
+    def _build_dewey_client() -> DeweyArtifactClient | None:
+        settings = get_settings()
+        if not settings.dewey.enabled:
+            return None
+        return DeweyArtifactClient(
+            base_url=settings.dewey.base_url,
+            token=settings.dewey.token,
+            timeout_seconds=settings.dewey.timeout_seconds,
+            verify_ssl=settings.dewey.verify_ssl,
+        )
 
     def register_accepted_material(
         self,
@@ -1118,6 +1138,35 @@ class BetaLabService:
             idempotent_replay=False,
         )
 
+    def _register_run_artifact_in_dewey(
+        self,
+        *,
+        run_euid: str,
+        artifact_type: str,
+        storage_uri: str,
+        lane: str | None,
+        library_barcode: str | None,
+        metadata: dict[str, Any],
+    ) -> str | None:
+        if self.dewey_client is None:
+            return None
+        dewey_metadata = {
+            "producer_system": "bloom",
+            "producer_object_euid": run_euid,
+            "lane": str(lane or "").strip(),
+            "library_barcode": str(library_barcode or "").strip(),
+            **dict(metadata or {}),
+        }
+        try:
+            return self.dewey_client.register_artifact(
+                artifact_type=artifact_type,
+                storage_uri=storage_uri,
+                metadata=dewey_metadata,
+                idempotency_key=f"{run_euid}:{artifact_type}:{storage_uri}",
+            )
+        except DeweyClientError as exc:
+            raise ValueError(f"Failed registering run artifact in Dewey: {exc}") from exc
+
     def create_run(
         self,
         *,
@@ -1214,6 +1263,16 @@ class BetaLabService:
 
         for artifact in payload.artifacts:
             artifact_metadata = self.normalize_execution_metadata(artifact.metadata or {})
+            s3_key = f"{run.euid}/{artifact.filename}"
+            s3_uri = f"s3://{artifact.bucket}/{s3_key}"
+            dewey_artifact_euid = self._register_run_artifact_in_dewey(
+                run_euid=run.euid,
+                artifact_type=artifact.artifact_type,
+                storage_uri=s3_uri,
+                lane=artifact.lane,
+                library_barcode=artifact.library_barcode,
+                metadata=artifact_metadata,
+            )
             artifact_record = self._create_data_record(
                 beta_kind="run_artifact",
                 name=f"{run.euid}:{artifact.artifact_type}:{artifact.filename}",
@@ -1224,8 +1283,9 @@ class BetaLabService:
                     "lane": artifact.lane or "",
                     "library_barcode": artifact.library_barcode or "",
                     "metadata": artifact_metadata,
-                    "s3_key": f"{run.euid}/{artifact.filename}",
-                    "s3_uri": f"s3://{artifact.bucket}/{run.euid}/{artifact.filename}",
+                    "s3_key": s3_key,
+                    "s3_uri": s3_uri,
+                    "dewey_artifact_euid": dewey_artifact_euid or "",
                 },
             )
             self.bobj.create_generic_instance_lineage_by_euids(

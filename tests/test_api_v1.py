@@ -563,27 +563,17 @@ class TestEquipmentAPI:
 
 
 class TestFilesAPI:
-    """Tests for files API endpoints."""
+    """Tests for retired files API endpoints."""
 
     def test_list_files(self, client):
-        """Test listing files."""
+        """Legacy files endpoint is removed."""
         response = client.get("/api/v1/files/")
-        assert response.status_code == 200
-        data = response.json()
-        # API returns paginated response
-        assert "items" in data
-        assert "total" in data
-        _assert_items_do_not_expose_uuid(data)
+        assert response.status_code == 404
 
     def test_list_file_sets(self, client):
-        """Test listing file sets."""
+        """Legacy file-sets endpoint is removed."""
         response = client.get("/api/v1/file-sets/")
-        assert response.status_code == 200
-        data = response.json()
-        # API returns paginated response
-        assert "items" in data
-        assert "total" in data
-        _assert_items_do_not_expose_uuid(data)
+        assert response.status_code == 404
 
 
 class TestActionsAPI:
@@ -889,20 +879,17 @@ class TestSearchAPIExtended:
 
 
 class TestFileSetsAPIExtended:
-    """Extended tests for file sets API endpoints."""
+    """Extended tests for retired file sets API endpoints."""
 
     def test_list_file_sets_with_pagination(self, client):
-        """Test listing file sets with pagination."""
+        """Legacy file-sets endpoint is removed."""
         response = client.get("/api/v1/file-sets/?page=1&page_size=10")
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
+        assert response.status_code == 404
 
     def test_get_file_set_not_found(self, client):
-        """Test getting non-existent file set."""
+        """Legacy file-sets endpoint is removed."""
         response = client.get("/api/v1/file-sets/00000000-0000-0000-0000-000000000000")
-        assert response.status_code in [404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestObjectsAPIExtended:
@@ -1316,7 +1303,7 @@ class TestFileLinking:
     def test_file_link(self, client):
         """Test file linking endpoint."""
         response = client.post("/api/v1/files/DAT1/link/CX1")
-        assert response.status_code in [200, 400, 404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestSubjectSpecimens:

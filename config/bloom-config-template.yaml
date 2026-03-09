@@ -142,6 +142,16 @@ atlas:
   events_max_retries: 2
 
 # -----------------------------------------------------------------------------
+# Dewey Integration
+# -----------------------------------------------------------------------------
+dewey:
+  enabled: false
+  base_url: ""                  # e.g., https://dewey.example.org
+  token: ""                     # Bearer token used for Dewey artifact registration APIs
+  timeout_seconds: 10
+  verify_ssl: true
+
+# -----------------------------------------------------------------------------
 # Logging Configuration
 # -----------------------------------------------------------------------------
 logging:

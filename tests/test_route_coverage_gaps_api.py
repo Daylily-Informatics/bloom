@@ -7,10 +7,8 @@ executes the handler body (not just FastAPI validation).
 
 from __future__ import annotations
 
-import json
 import os
 import sys
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -369,20 +367,10 @@ def test_equipment_create_and_maintenance(client: TestClient, bdb) -> None:
 
 def test_file_sets_and_files_create_endpoints(client: TestClient) -> None:
     file_set = client.post("/api/v1/file-sets/", json={"name": "fs-coverage", "file_type": "generic"})
-    assert file_set.status_code == 200, file_set.text
-    assert "uuid" not in file_set.json()
+    assert file_set.status_code == 404, file_set.text
 
-    def _fake_file(*_args, **_kwargs):
-        return SimpleNamespace(
-            euid="FX-TEST",
-            uuid="00000000-0000-0000-0000-000000000000",
-            json_addl={"properties": {"s3_uri": "s3://bucket/key", "current_s3_uri": "s3://bucket/key"}},
-        )
-
-    with patch("bloom_lims.bobjs.BloomFile.create_file", side_effect=_fake_file):
-        resp = client.post(
-            "/api/v1/files/",
-            data={"file_metadata": json.dumps({"name": "file-coverage"})},
-        )
-        assert resp.status_code == 200, resp.text
-        assert "uuid" not in resp.json()
+    resp = client.post(
+        "/api/v1/files/",
+        data={"file_metadata": "{\"name\": \"file-coverage\"}"},
+    )
+    assert resp.status_code == 404, resp.text

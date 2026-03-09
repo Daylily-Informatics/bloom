@@ -10,9 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -196,12 +194,9 @@ def test_create_instance_form_renders(client: TestClient, bdb) -> None:
 
 def test_file_set_urls_and_admin_template_pages(client: TestClient, bdb) -> None:
     _warm_session(client)
-    # Create a file set instance via API v1 endpoint.
-    fs = client.post("/api/v1/file-sets/", json={"name": "gui-fs", "file_type": "generic"}).json()
-
-    resp = client.get("/file_set_urls", params={"fs_euid": fs["euid"]})
-    assert resp.status_code == 200
-    assert "application/json" in resp.headers.get("content-type", "")
+    # Legacy file set GUI routes are removed in Dewey hard-cut mode.
+    resp = client.get("/file_set_urls", params={"fs_euid": "FS-NOT-REAL"})
+    assert resp.status_code == 404
 
     template_euid = _get_any_template_euid(bdb)
     # Admin template editor was retired.
@@ -209,58 +204,33 @@ def test_file_set_urls_and_admin_template_pages(client: TestClient, bdb) -> None
     assert resp.status_code == 410
 
 
-def test_query_by_euids_create_and_download_file_flows(client: TestClient, tmp_path: Path) -> None:
+def test_query_by_euids_create_and_download_file_flows(client: TestClient) -> None:
     _warm_session(client)
+    # Legacy file GUI handlers are removed in Dewey hard-cut mode.
+    resp = client.post("/query_by_euids", data={"file_euids": "FX-1"})
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers.get("content-type", "")
 
-    # query_by_euids expects real file objects; patch BloomFile.get_by_euid to return a stub.
-    fake_file = SimpleNamespace(
-        euid="FX-1",
-        created_dt=datetime.now(timezone.utc),
-        bstatus="created",
-        json_addl={"properties": {"name": "file-1", "lab_code": "X"}},
+    resp = client.post(
+        "/create_file",
+        data={"name": "upload-1"},
+        files=[
+            ("file_data", ("upload.txt", b"hello", "text/plain")),
+            ("directory", (".ignored", b"", "application/octet-stream")),
+        ],
     )
-    with patch("bloom_lims.gui.routes.operations.BloomFile.get_by_euid", return_value=fake_file):
-        resp = client.post("/query_by_euids", data={"file_euids": "FX-1"})
-        assert resp.status_code == 200
-        assert "text/html" in resp.headers.get("content-type", "")
+    assert resp.status_code == 404
 
-    # create_file (GUI): patch file creation to avoid S3 and to keep deterministic.
-    fake_created = SimpleNamespace(
-        euid="FX-TEST",
-        json_addl={"properties": {"current_s3_uri": "s3://bucket/key"}},
+    resp = client.post(
+        "/download_file",
+        data={
+            "euid": "FX-1",
+            "download_type": "flat",
+            "create_metadata_file": "no",
+            "ret_json": "1",
+        },
     )
-    with patch("bloom_lims.gui.routes.files.BloomFile.create_file", return_value=fake_created), patch(
-        "bloom_lims.gui.routes.files.BloomFileSet.add_files_to_file_set", return_value=None
-    ):
-        resp = client.post(
-            "/create_file",
-            data={"name": "upload-1"},
-            files=[
-                ("file_data", ("upload.txt", b"hello", "text/plain")),
-                ("directory", (".ignored", b"", "application/octet-stream")),
-            ],
-        )
-        assert resp.status_code == 200
+    assert resp.status_code == 404
 
-    # download_file (GUI): create a fake file under ./tmp and return it from patched download_file.
-    tmp_dir = Path(__file__).resolve().parents[1] / "tmp"
-    tmp_dir.mkdir(exist_ok=True)
-    downloaded = tmp_dir / "downloaded.txt"
-    downloaded.write_text("ok", encoding="utf-8")
-
-    with patch("bloom_lims.gui.routes.files.BloomFile.download_file", return_value=str(downloaded)):
-        resp = client.post(
-            "/download_file",
-            data={
-                "euid": "FX-1",
-                "download_type": "flat",
-                "create_metadata_file": "no",
-                "ret_json": "1",
-            },
-        )
-        assert resp.status_code == 200
-        assert resp.json()["file_download_path"].endswith("downloaded.txt")
-
-    # delete_temp_file: ensure handler runs and redirects.
     resp = client.get("/delete_temp_file", params={"filename": "downloaded.txt"}, follow_redirects=False)
-    assert resp.status_code == 303
+    assert resp.status_code == 404

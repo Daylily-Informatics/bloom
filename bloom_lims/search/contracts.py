@@ -21,8 +21,6 @@ ALL_SEARCHABLE_CATEGORIES: List[str] = [
     "content",
     "workflow",
     "equipment",
-    "file",
-    "file_set",
     "subject",
     "data",
 ]
