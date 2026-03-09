@@ -195,3 +195,134 @@ def test_material_registration_links_process_items_on_container_and_patient_on_s
     finally:
         client.close()
         app.dependency_overrides.pop(require_external_token_auth, None)
+
+
+def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bdb):
+    def _atlas_rw_user() -> APIUser:
+        token = secrets.token_hex(8)
+        return APIUser(
+            email="atlas-beta@example.com",
+            user_id=f"atlas-user-{token}",
+            roles=["INTERNAL_READ_WRITE"],
+            groups=[ENABLE_ATLAS_API_GROUP],
+            auth_source="token",
+            is_service_account=True,
+            token_scope="internal_rw",
+            token_id=f"token-{token}",
+        )
+
+    def _atlas_refs(instance):
+        refs: list[dict] = []
+        for lineage in get_parent_lineages(instance):
+            if lineage.is_deleted or lineage.relationship_type != "has_external_reference":
+                continue
+            child = lineage.child_instance
+            if child is None or child.is_deleted:
+                continue
+            payload = child.json_addl or {}
+            props = payload.get("properties") if isinstance(payload, dict) else {}
+            if not isinstance(props, dict):
+                continue
+            if str(props.get("provider") or "").strip() != "atlas":
+                continue
+            refs.append(props)
+        return refs
+
+    app.dependency_overrides[require_external_token_auth] = _atlas_rw_user
+    client = TestClient(app)
+    try:
+        tenant_id = f"tenant-{secrets.token_hex(8)}"
+        shipment_euid = f"shipment-{secrets.token_hex(8)}"
+        testkit_euid = f"kit-{secrets.token_hex(8)}"
+        site_euid = f"site-{secrets.token_hex(8)}"
+        create_tube = client.post(
+            "/api/v1/external/atlas/beta/tubes",
+            headers={"Idempotency-Key": f"idem-tube-{secrets.token_hex(8)}"},
+            json={
+                "atlas_context": {
+                    "atlas_tenant_id": tenant_id,
+                    "atlas_shipment_euid": shipment_euid,
+                    "atlas_testkit_euid": testkit_euid,
+                    "atlas_organization_site_euid": site_euid,
+                }
+            },
+        )
+        assert create_tube.status_code == 200, create_tube.text
+        tube_body = create_tube.json()
+        container_euid = tube_body["container_euid"]
+
+        collection_event_euid = f"cev-{secrets.token_hex(8)}"
+        specimen_resp = client.post(
+            "/api/v1/external/atlas/beta/materials",
+            headers={"Idempotency-Key": f"idem-specimen-{secrets.token_hex(8)}"},
+            json={
+                "container_euid": container_euid,
+                "atlas_context": {
+                    "atlas_tenant_id": tenant_id,
+                    "atlas_shipment_euid": shipment_euid,
+                    "atlas_testkit_euid": testkit_euid,
+                    "atlas_organization_site_euid": site_euid,
+                    "atlas_collection_event_euid": collection_event_euid,
+                    "collection_event_snapshot": {
+                        "collection_event_euid": collection_event_euid,
+                        "collection_type": "venipuncture",
+                    },
+                },
+            },
+        )
+        assert specimen_resp.status_code == 200, specimen_resp.text
+        specimen_body = specimen_resp.json()
+
+        bobj = BloomObj(bdb)
+        container = bobj.get_by_euid(container_euid)
+        specimen = bobj.get_by_euid(specimen_body["specimen_euid"])
+
+        container_refs = _atlas_refs(container)
+        specimen_refs = _atlas_refs(specimen)
+        assert any(
+            str(ref.get("reference_type")) == "atlas_shipment"
+            and str(ref.get("atlas_shipment_euid")) == shipment_euid
+            for ref in container_refs
+        )
+        assert any(
+            str(ref.get("reference_type")) == "atlas_testkit"
+            and str(ref.get("atlas_testkit_euid")) == testkit_euid
+            for ref in container_refs
+        )
+        assert any(
+            str(ref.get("reference_type")) == "atlas_collection_event"
+            and str(ref.get("atlas_collection_event_euid")) == collection_event_euid
+            and str(ref.get("collection_event_snapshot", {}).get("collection_type")) == "venipuncture"
+            for ref in specimen_refs
+        )
+        assert not any(str(ref.get("reference_type")) == "atlas_patient" for ref in specimen_refs)
+
+        patched = client.patch(
+            f"/api/v1/external/atlas/beta/specimens/{specimen_body['specimen_euid']}",
+            json={
+                "atlas_context": {
+                    "atlas_tenant_id": tenant_id,
+                    "atlas_collection_event_euid": collection_event_euid,
+                    "collection_event_snapshot": {
+                        "collection_event_euid": collection_event_euid,
+                        "collection_type": "fingerstick",
+                        "expected_name": "Pat Ient",
+                    },
+                }
+            },
+        )
+        assert patched.status_code == 200, patched.text
+
+        updated_specimen_refs = _atlas_refs(bobj.get_by_euid(specimen_body["specimen_euid"]))
+        assert any(
+            str(ref.get("reference_type")) == "atlas_collection_event"
+            and str(ref.get("collection_event_snapshot", {}).get("collection_type")) == "fingerstick"
+            and str(ref.get("collection_event_snapshot", {}).get("expected_name")) == "Pat Ient"
+            for ref in updated_specimen_refs
+        )
+        assert not any(
+            str(ref.get("reference_type")) == "atlas_patient" for ref in updated_specimen_refs
+        )
+    finally:
+        client.close()
+        app.dependency_overrides.pop(require_external_token_auth, None)

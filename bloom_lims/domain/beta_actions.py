@@ -23,6 +23,18 @@ _ACTION_TEMPLATE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Register Accepted Material",
         "description": "Creates accepted Bloom beta material and links Atlas process-item references.",
     },
+    "create_empty_tube": {
+        "name": "Create Empty Tube",
+        "description": "Creates a Bloom beta tube/container with Atlas linkage references.",
+    },
+    "update_tube": {
+        "name": "Update Tube",
+        "description": "Updates a Bloom beta tube/container status and Atlas linkage references.",
+    },
+    "update_specimen": {
+        "name": "Update Specimen",
+        "description": "Updates Bloom beta specimen Atlas collection-event reference metadata.",
+    },
     "move_material_to_queue": {
         "name": "Move Material To Queue",
         "description": "Moves Bloom beta material into a canonical beta queue.",

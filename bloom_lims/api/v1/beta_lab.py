@@ -29,6 +29,10 @@ from bloom_lims.schemas.beta_lab import (
     BetaRunCreateRequest,
     BetaRunResolutionResponse,
     BetaRunResponse,
+    BetaTubeCreateRequest,
+    BetaTubeResponse,
+    BetaSpecimenUpdateRequest,
+    BetaTubeUpdateRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,6 +81,75 @@ async def register_accepted_material(
         ) from exc
     except Exception as exc:
         logger.exception("Failed registering accepted material")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.post("/tubes", response_model=BetaTubeResponse)
+async def create_empty_tube(
+    payload: BetaTubeCreateRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.create_empty_tube(
+            payload=payload,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed creating empty Bloom tube")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.patch("/tubes/{container_euid}", response_model=BetaTubeResponse)
+async def update_tube(
+    container_euid: str,
+    payload: BetaTubeUpdateRequest,
+    user: APIUser = Depends(require_external_write),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.update_tube(
+            container_euid=container_euid,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed updating Bloom tube")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.patch("/specimens/{specimen_euid}", response_model=BetaMaterialResponse)
+async def update_specimen(
+    specimen_euid: str,
+    payload: BetaSpecimenUpdateRequest,
+    user: APIUser = Depends(require_external_write),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.update_specimen(
+            specimen_euid=specimen_euid,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed updating Bloom specimen")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         service.close()

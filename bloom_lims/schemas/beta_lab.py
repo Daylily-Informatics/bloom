@@ -24,21 +24,38 @@ class AtlasProcessItemReference(BaseModel):
     atlas_test_process_item_euid: str
 
 
+class AtlasCollectionEventSnapshot(BaseModel):
+    collection_event_euid: str
+    collected_at: str | None = None
+    site_euid: str | None = None
+    collection_type: str | None = None
+    collected_by: str | None = None
+    expected_mrn: str | None = None
+    expected_dob: str | None = None
+    expected_name: str | None = None
+    expected_label_text: str | None = None
+
+
 class AtlasProcessContext(BaseModel):
     atlas_tenant_id: str
-    atlas_trf_euid: str
+    atlas_trf_euid: str | None = None
+    atlas_test_euid: str | None = None
     atlas_patient_euid: str | None = None
     atlas_testkit_euid: str | None = None
     atlas_shipment_euid: str | None = None
     atlas_organization_site_euid: str | None = None
-    process_items: list[AtlasProcessItemReference]
+    atlas_collection_event_euid: str | None = None
+    collection_event_snapshot: AtlasCollectionEventSnapshot | None = None
+    process_items: list[AtlasProcessItemReference] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_context(self) -> "AtlasProcessContext":
         if not self.atlas_tenant_id.strip():
             raise ValueError("atlas_tenant_id is required")
-        if not self.atlas_trf_euid.strip():
-            raise ValueError("atlas_trf_euid is required")
+        if self.atlas_trf_euid is not None and not self.atlas_trf_euid.strip():
+            raise ValueError("atlas_trf_euid must not be empty when provided")
+        if self.atlas_test_euid is not None and not self.atlas_test_euid.strip():
+            raise ValueError("atlas_test_euid must not be empty when provided")
         if self.atlas_patient_euid is not None and not self.atlas_patient_euid.strip():
             raise ValueError("atlas_patient_euid must not be empty when provided")
         if self.atlas_testkit_euid is not None and not self.atlas_testkit_euid.strip():
@@ -50,8 +67,28 @@ class AtlasProcessContext(BaseModel):
             and not self.atlas_organization_site_euid.strip()
         ):
             raise ValueError("atlas_organization_site_euid must not be empty when provided")
-        if not self.process_items:
-            raise ValueError("process_items must not be empty")
+        if (
+            self.atlas_collection_event_euid is not None
+            and not self.atlas_collection_event_euid.strip()
+        ):
+            raise ValueError("atlas_collection_event_euid must not be empty when provided")
+        if self.collection_event_snapshot is not None:
+            if not self.collection_event_snapshot.collection_event_euid.strip():
+                raise ValueError("collection_event_snapshot.collection_event_euid is required")
+            if (
+                self.atlas_collection_event_euid is not None
+                and self.collection_event_snapshot.collection_event_euid.strip()
+                != self.atlas_collection_event_euid.strip()
+            ):
+                raise ValueError(
+                    "collection_event_snapshot.collection_event_euid must match "
+                    "atlas_collection_event_euid"
+                )
+        if self.process_items:
+            if not (self.atlas_trf_euid and self.atlas_trf_euid.strip()):
+                raise ValueError("atlas_trf_euid is required when process_items are provided")
+        elif self.atlas_test_euid is not None and not self.atlas_trf_euid:
+            raise ValueError("atlas_trf_euid is required when atlas_test_euid is provided")
         return self
 
 
@@ -65,9 +102,38 @@ class BetaAcceptedMaterialCreateRequest(BaseModel):
     atlas_context: AtlasProcessContext
 
 
+class BetaTubeCreateRequest(BaseModel):
+    container_template_code: str = Field(default="container/tube/tube-generic-10ml/1.0")
+    status: str = Field(default="active")
+    properties: dict[str, Any] = Field(default_factory=dict)
+    atlas_context: AtlasProcessContext
+
+
+class BetaTubeUpdateRequest(BaseModel):
+    status: str | None = None
+    properties: dict[str, Any] | None = None
+    atlas_context: AtlasProcessContext | None = None
+
+
+class BetaSpecimenUpdateRequest(BaseModel):
+    status: str | None = None
+    properties: dict[str, Any] | None = None
+    atlas_context: AtlasProcessContext | None = None
+
+
 class BetaMaterialResponse(BaseModel):
     specimen_euid: str
     container_euid: str | None
+    status: str
+    atlas_context: dict[str, Any]
+    properties: dict[str, Any]
+    idempotency_key: str | None = None
+    current_queue: str | None = None
+    created: bool = True
+
+
+class BetaTubeResponse(BaseModel):
+    container_euid: str
     status: str
     atlas_context: dict[str, Any]
     properties: dict[str, Any]

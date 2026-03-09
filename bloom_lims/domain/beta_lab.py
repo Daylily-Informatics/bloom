@@ -38,9 +38,11 @@ class BetaLabService:
     PROCESS_ITEM_REFERENCE_TYPE = "atlas_test_process_item"
     PATIENT_REFERENCE_TYPE = "atlas_patient"
     TRF_REFERENCE_TYPE = "atlas_trf"
+    TEST_REFERENCE_TYPE = "atlas_test"
     TESTKIT_REFERENCE_TYPE = "atlas_testkit"
     SHIPMENT_REFERENCE_TYPE = "atlas_shipment"
     ORGANIZATION_SITE_REFERENCE_TYPE = "atlas_organization_site"
+    COLLECTION_EVENT_REFERENCE_TYPE = "atlas_collection_event"
     GENERIC_DATA_TEMPLATE_CODE = "generic/generic/generic/1.0"
     POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
@@ -122,10 +124,20 @@ class BetaLabService:
             container,
             atlas_context=payload.atlas_context.model_dump(),
         )
-        self._replace_patient_reference(
+        self._replace_collection_event_reference(
             specimen,
             atlas_context=payload.atlas_context.model_dump(),
         )
+        if self._has_collection_event_context(payload.atlas_context.model_dump()):
+            self._delete_reference_type(
+                specimen,
+                reference_type=self.PATIENT_REFERENCE_TYPE,
+            )
+        else:
+            self._replace_patient_reference(
+                specimen,
+                atlas_context=payload.atlas_context.model_dump(),
+            )
         self._record_action(
             target_instance=specimen,
             action_key="register_accepted_material",
@@ -142,6 +154,144 @@ class BetaLabService:
                 "status": "success",
                 "specimen_euid": specimen.euid,
                 "container_euid": container.euid if container is not None else None,
+            },
+        )
+        self.bdb.session.commit()
+        return self._material_response(specimen, created=True)
+
+    def create_empty_tube(
+        self,
+        *,
+        payload,
+        idempotency_key: str | None,
+    ):
+        if idempotency_key:
+            existing = self._find_container_record(
+                beta_kind="atlas_tube",
+                idempotency_key=idempotency_key,
+            )
+            if existing is not None:
+                return self._tube_response(existing, created=False)
+
+        container = self._resolve_or_create_container(
+            container_euid=None,
+            container_template_code=payload.container_template_code,
+            specimen_name="atlas-tube",
+        )
+        container.bstatus = payload.status or container.bstatus
+        props = self._props(container)
+        props["beta_kind"] = "atlas_tube"
+        if idempotency_key:
+            props["idempotency_key"] = idempotency_key
+        if payload.properties:
+            props.update(payload.properties)
+        self._write_props(container, props)
+        self._replace_container_entity_references(
+            container,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self._replace_process_item_references(
+            container,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self._record_action(
+            target_instance=container,
+            action_key="create_empty_tube",
+            captured_data={
+                "container_template_code": payload.container_template_code,
+                "status": payload.status,
+                "properties": payload.properties or {},
+                "atlas_context": payload.atlas_context.model_dump(),
+                "idempotency_key": idempotency_key or "",
+            },
+            result={"status": "success", "container_euid": container.euid},
+        )
+        self.bdb.session.commit()
+        return self._tube_response(container, created=True)
+
+    def update_tube(
+        self,
+        *,
+        container_euid: str,
+        payload,
+    ):
+        container = self._require_instance(container_euid)
+        if container.category != "container":
+            raise ValueError(f"EUID is not a container: {container_euid}")
+
+        if payload.status is not None:
+            container.bstatus = payload.status
+        props = self._props(container)
+        if payload.properties:
+            props.update(payload.properties)
+            self._write_props(container, props)
+        if payload.atlas_context is not None:
+            atlas_context = payload.atlas_context.model_dump()
+            self._replace_container_entity_references(container, atlas_context=atlas_context)
+            self._replace_process_item_references(container, atlas_context=atlas_context)
+
+        self._record_action(
+            target_instance=container,
+            action_key="update_tube",
+            captured_data={
+                "container_euid": container_euid,
+                "status": payload.status,
+                "properties": payload.properties or {},
+                "atlas_context": (
+                    payload.atlas_context.model_dump() if payload.atlas_context is not None else None
+                ),
+            },
+            result={
+                "status": "success",
+                "container_euid": container.euid,
+                "current_status": container.bstatus,
+            },
+        )
+        self.bdb.session.commit()
+        return self._tube_response(container, created=True)
+
+    def update_specimen(
+        self,
+        *,
+        specimen_euid: str,
+        payload,
+    ):
+        specimen = self._require_instance(specimen_euid)
+        if specimen.category != "content":
+            raise ValueError(f"EUID is not a specimen/content object: {specimen_euid}")
+
+        if payload.status is not None:
+            specimen.bstatus = payload.status
+        props = self._props(specimen)
+        if payload.properties:
+            props.update(payload.properties)
+            self._write_props(specimen, props)
+        if payload.atlas_context is not None:
+            atlas_context = payload.atlas_context.model_dump()
+            self._replace_collection_event_reference(specimen, atlas_context=atlas_context)
+            if self._has_collection_event_context(atlas_context):
+                self._delete_reference_type(
+                    specimen,
+                    reference_type=self.PATIENT_REFERENCE_TYPE,
+                )
+            else:
+                self._replace_patient_reference(specimen, atlas_context=atlas_context)
+
+        self._record_action(
+            target_instance=specimen,
+            action_key="update_specimen",
+            captured_data={
+                "specimen_euid": specimen_euid,
+                "status": payload.status,
+                "properties": payload.properties or {},
+                "atlas_context": (
+                    payload.atlas_context.model_dump() if payload.atlas_context is not None else None
+                ),
+            },
+            result={
+                "status": "success",
+                "specimen_euid": specimen.euid,
+                "current_status": specimen.bstatus,
             },
         )
         self.bdb.session.commit()
@@ -1121,6 +1271,36 @@ class BetaLabService:
             }
         return None
 
+    def _collection_event_ref_for_instance(self, instance) -> dict[str, Any] | None:
+        for payload in self._atlas_reference_payloads_for_instance(instance):
+            ref_type = str(payload.get("reference_type") or "").strip()
+            if ref_type != self.COLLECTION_EVENT_REFERENCE_TYPE:
+                continue
+            collection_event_euid = str(
+                payload.get("atlas_collection_event_euid") or payload.get("reference_value") or ""
+            ).strip()
+            atlas_tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
+            if not (collection_event_euid and atlas_tenant_id):
+                continue
+            snapshot = payload.get("collection_event_snapshot")
+            return {
+                "atlas_tenant_id": atlas_tenant_id,
+                "atlas_collection_event_euid": collection_event_euid,
+                "collection_event_snapshot": snapshot if isinstance(snapshot, dict) else {},
+            }
+        return None
+
+    @staticmethod
+    def _has_collection_event_context(atlas_context: dict[str, Any]) -> bool:
+        collection_event_euid = str(atlas_context.get("atlas_collection_event_euid") or "").strip()
+        if collection_event_euid:
+            return True
+        snapshot = atlas_context.get("collection_event_snapshot")
+        return bool(
+            isinstance(snapshot, dict)
+            and str(snapshot.get("collection_event_euid") or "").strip()
+        )
+
     def _replace_process_item_references(self, instance, *, atlas_context: dict[str, Any]) -> None:
         self._delete_reference_type(
             instance,
@@ -1175,8 +1355,14 @@ class BetaLabService:
     ) -> None:
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
+        atlas_test_euid = str(atlas_context.get("atlas_test_euid") or "").strip()
+        if not atlas_test_euid:
+            process_items = list(atlas_context.get("process_items") or [])
+            if process_items:
+                atlas_test_euid = str(process_items[0].get("atlas_test_euid") or "").strip()
         reference_fields = (
             (self.TRF_REFERENCE_TYPE, "atlas_trf_euid"),
+            (self.TEST_REFERENCE_TYPE, "atlas_test_euid"),
             (self.TESTKIT_REFERENCE_TYPE, "atlas_testkit_euid"),
             (self.SHIPMENT_REFERENCE_TYPE, "atlas_shipment_euid"),
             (self.ORGANIZATION_SITE_REFERENCE_TYPE, "atlas_organization_site_euid"),
@@ -1185,7 +1371,9 @@ class BetaLabService:
             self._delete_reference_type(instance, reference_type=reference_type)
             if not atlas_tenant_id:
                 continue
-            reference_value = str(atlas_context.get(field_name) or "").strip()
+            reference_value = atlas_test_euid if field_name == "atlas_test_euid" else str(
+                atlas_context.get(field_name) or ""
+            ).strip()
             if not reference_value:
                 continue
             properties = {
@@ -1208,6 +1396,46 @@ class BetaLabService:
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
+
+    def _replace_collection_event_reference(self, instance, *, atlas_context: dict[str, Any]) -> None:
+        self._delete_reference_type(
+            instance,
+            reference_type=self.COLLECTION_EVENT_REFERENCE_TYPE,
+        )
+        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        collection_event_euid = str(atlas_context.get("atlas_collection_event_euid") or "").strip()
+        if not collection_event_euid:
+            snapshot = atlas_context.get("collection_event_snapshot")
+            if isinstance(snapshot, dict):
+                collection_event_euid = str(snapshot.get("collection_event_euid") or "").strip()
+        if not (atlas_tenant_id and collection_event_euid):
+            return
+        snapshot_payload = atlas_context.get("collection_event_snapshot")
+        if not isinstance(snapshot_payload, dict):
+            snapshot_payload = {}
+        ref_obj = self.bobj.create_instance_by_code(
+            self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
+            {
+                "json_addl": {
+                    "properties": {
+                        "provider": "atlas",
+                        "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
+                        "reference_value": collection_event_euid,
+                        "foreign_reference": collection_event_euid,
+                        "atlas_tenant_id": atlas_tenant_id,
+                        "atlas_collection_event_euid": collection_event_euid,
+                        "atlas_trf_euid": str(atlas_context.get("atlas_trf_euid") or "").strip(),
+                        "collection_event_snapshot": snapshot_payload,
+                        "validation": {},
+                    }
+                }
+            },
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            instance.euid,
+            ref_obj.euid,
+            relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+        )
 
     def _replace_patient_reference(self, instance, *, atlas_context: dict[str, Any]) -> None:
         self._delete_reference_type(
@@ -1281,6 +1509,26 @@ class BetaLabService:
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
                 self.bdb.Base.classes.generic_instance.category == "content",
+                self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
+                func.jsonb_extract_path_text(
+                    self.bdb.Base.classes.generic_instance.json_addl["properties"],
+                    "beta_kind",
+                )
+                == beta_kind,
+                func.jsonb_extract_path_text(
+                    self.bdb.Base.classes.generic_instance.json_addl["properties"],
+                    "idempotency_key",
+                )
+                == str(idempotency_key).strip(),
+            )
+            .first()
+        )
+
+    def _find_container_record(self, *, beta_kind: str, idempotency_key: str):
+        return (
+            self.bdb.session.query(self.bdb.Base.classes.generic_instance)
+            .filter(
+                self.bdb.Base.classes.generic_instance.category == "container",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
                 func.jsonb_extract_path_text(
                     self.bdb.Base.classes.generic_instance.json_addl["properties"],
@@ -1380,13 +1628,30 @@ class BetaLabService:
             created=created,
         )
 
+    def _tube_response(self, container, *, created: bool):
+        return {
+            "container_euid": container.euid,
+            "status": container.bstatus,
+            "atlas_context": self._atlas_context_for_instance(container),
+            "properties": self._props(container),
+            "idempotency_key": str(self._props(container).get("idempotency_key") or "") or None,
+            "current_queue": self._current_queue_for_instance(container),
+            "created": created,
+        }
+
     def _atlas_context_for_instance(self, instance) -> dict[str, Any]:
         process_items = self._reachable_process_item_refs(instance)
         patient_ref = self._patient_ref_for_instance(instance)
+        collection_event_ref = self._collection_event_ref_for_instance(instance)
         atlas_trf_euid = self._first_reachable_reference_value(
             instance,
             reference_type=self.TRF_REFERENCE_TYPE,
             value_field="atlas_trf_euid",
+        )
+        atlas_test_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type=self.TEST_REFERENCE_TYPE,
+            value_field="atlas_test_euid",
         )
         atlas_testkit_euid = self._first_reachable_reference_value(
             instance,
@@ -1403,13 +1668,49 @@ class BetaLabService:
             reference_type=self.ORGANIZATION_SITE_REFERENCE_TYPE,
             value_field="atlas_organization_site_euid",
         )
+        fallback_tenant_id = self._first_reachable_reference_value(
+            instance,
+            reference_type=self.TRF_REFERENCE_TYPE,
+            value_field="atlas_tenant_id",
+        ) or self._first_reachable_reference_value(
+            instance,
+            reference_type=self.TEST_REFERENCE_TYPE,
+            value_field="atlas_tenant_id",
+        ) or self._first_reachable_reference_value(
+            instance,
+            reference_type=self.TESTKIT_REFERENCE_TYPE,
+            value_field="atlas_tenant_id",
+        ) or self._first_reachable_reference_value(
+            instance,
+            reference_type=self.SHIPMENT_REFERENCE_TYPE,
+            value_field="atlas_tenant_id",
+        ) or self._first_reachable_reference_value(
+            instance,
+            reference_type=self.ORGANIZATION_SITE_REFERENCE_TYPE,
+            value_field="atlas_tenant_id",
+        ) or (
+            patient_ref["atlas_tenant_id"] if patient_ref is not None else ""
+        ) or (
+            collection_event_ref["atlas_tenant_id"] if collection_event_ref is not None else ""
+        )
         if not process_items:
             return {
-                "atlas_tenant_id": "",
+                "atlas_tenant_id": fallback_tenant_id,
                 "atlas_trf_euid": atlas_trf_euid,
+                "atlas_test_euid": atlas_test_euid,
                 "atlas_testkit_euid": atlas_testkit_euid,
                 "atlas_shipment_euid": atlas_shipment_euid,
                 "atlas_organization_site_euid": atlas_organization_site_euid,
+                "atlas_collection_event_euid": (
+                    collection_event_ref["atlas_collection_event_euid"]
+                    if collection_event_ref is not None
+                    else ""
+                ),
+                "collection_event_snapshot": (
+                    collection_event_ref["collection_event_snapshot"]
+                    if collection_event_ref is not None
+                    else {}
+                ),
                 "atlas_patient_euid": (
                     patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
                 ),
@@ -1419,9 +1720,20 @@ class BetaLabService:
         return {
             "atlas_tenant_id": first["atlas_tenant_id"],
             "atlas_trf_euid": first["atlas_trf_euid"] or atlas_trf_euid,
+            "atlas_test_euid": atlas_test_euid or first["atlas_test_euid"],
             "atlas_testkit_euid": atlas_testkit_euid,
             "atlas_shipment_euid": atlas_shipment_euid,
             "atlas_organization_site_euid": atlas_organization_site_euid,
+            "atlas_collection_event_euid": (
+                collection_event_ref["atlas_collection_event_euid"]
+                if collection_event_ref is not None
+                else ""
+            ),
+            "collection_event_snapshot": (
+                collection_event_ref["collection_event_snapshot"]
+                if collection_event_ref is not None
+                else {}
+            ),
             "atlas_patient_euid": (
                 patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
             ),
