@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -45,7 +45,7 @@ async def workflow_summary(request: Request, _auth=Depends(require_auth)):
         wf_status = wf.bstatus or "queued"
         if isinstance(wf.json_addl, dict):
             wf_status = wf.json_addl.get("status", wf_status) or wf_status
-        wf_created_dt = wf.created_dt.date() if wf.created_dt else datetime.utcnow().date()
+        wf_created_dt = wf.created_dt.date() if wf.created_dt else datetime.now(UTC).date()
 
         stats = workflow_statistics[wf_type]
         stats["status_counts"][wf_status] += 1

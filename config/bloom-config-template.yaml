@@ -212,7 +212,7 @@ constants:
   # Default printer/lab settings
   default_label_style: "tube_2inX1in"
   default_lab_code: "BLOOM"
-  default_timezone: "US/Eastern"
+  default_timezone: "UTC"
 
   # Template config paths (relative to bloom_lims)
   config_base_path: "config"

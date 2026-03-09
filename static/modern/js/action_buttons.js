@@ -193,7 +193,7 @@ async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName
   const actionData = actionDataJson || {};
   const schema = actionData.ui_schema && typeof actionData.ui_schema === "object" ? actionData.ui_schema : {};
   const fields = Array.isArray(schema.fields)
-    ? schema.filter((field) => field && typeof field === "object" && String(field.name || "").trim())
+    ? schema.fields.filter((field) => field && typeof field === "object" && String(field.name || "").trim())
     : [];
   const captureMode = String(actionData.capture_data || "").toLowerCase();
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -22,7 +22,7 @@ DAGS_DIRECTORY = "dags"
 
 
 def _build_dag_filename(timestamp: datetime | None = None) -> str:
-    dag_timestamp = (timestamp or datetime.now()).strftime("%Y%m%d%H%M%S")
+    dag_timestamp = (timestamp or datetime.now(UTC)).strftime("%Y%m%d%H%M%S")
     return os.path.join(DAGS_DIRECTORY, f"dag_{dag_timestamp}.json")
 
 

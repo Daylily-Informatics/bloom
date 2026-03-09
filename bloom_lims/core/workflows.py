@@ -7,7 +7,7 @@ Workflows manage the processing pipeline for samples and other lab objects.
 
 import logging
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -365,7 +365,7 @@ def advance_workflow(
     steps = get_workflow_steps(session, base, workflow.euid, status='pending')
     if not steps:
         workflow.bstatus = 'complete'
-        workflow.json_addl['completed_at'] = datetime.utcnow().isoformat()
+        workflow.json_addl['completed_at'] = datetime.now(UTC).isoformat()
         session.flush()
         return workflow
 
@@ -374,7 +374,7 @@ def advance_workflow(
     current_step.bstatus = 'completed'
     if not isinstance(current_step.json_addl, dict):
         current_step.json_addl = {}
-    current_step.json_addl['completed_at'] = datetime.utcnow().isoformat()
+    current_step.json_addl['completed_at'] = datetime.now(UTC).isoformat()
     if completed_by:
         current_step.json_addl['completed_by'] = completed_by
     if step_result:
@@ -384,7 +384,7 @@ def advance_workflow(
     remaining_steps = get_workflow_steps(session, base, workflow.euid, status='pending')
     if not remaining_steps:
         workflow.bstatus = 'complete'
-        workflow.json_addl['completed_at'] = datetime.utcnow().isoformat()
+        workflow.json_addl['completed_at'] = datetime.now(UTC).isoformat()
     else:
         workflow.bstatus = 'in_progress'
         workflow.json_addl['current_step'] = _workflow_step_number(remaining_steps[0]) or 1
@@ -401,4 +401,3 @@ try:
 except ImportError:
     BloomWorkflow = None
     BloomWorkflowStep = None
-

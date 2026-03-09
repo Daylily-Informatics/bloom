@@ -13,7 +13,7 @@ import logging
 import subprocess
 import socket
 import hashlib
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import urllib.parse
 
@@ -848,7 +848,7 @@ class BloomFile(BloomObj):
                     Key=s3_key,
                     Retention={
                         'Mode': 'GOVERNANCE',
-                        'RetainUntilDate': (datetime.now() + timedelta(days=36500)).isoformat()
+                        'RetainUntilDate': (datetime.now(UTC) + timedelta(days=36500)).isoformat()
                     }
                 )
 

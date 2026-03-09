@@ -86,9 +86,9 @@
         <div class="detail-item editable-field" data-field="created_dt">
           <div class="detail-label">Created {% if is_admin %}<i class="fas fa-pencil-alt edit-icon" style="display:none;"></i>{% endif %}</div>
           <div class="detail-value">
-            <span class="display-value">{{ obj.created_dt.strftime('%Y-%m-%d %H:%M:%S') if obj.created_dt else '-' }}</span>
+            <span class="display-value">{{ obj.created_dt | format_dt('standard') if obj.created_dt else '-' }}</span>
             {% if is_admin %}
-            <input type="datetime-local" class="edit-input" value="{{ obj.created_dt.strftime('%Y-%m-%dT%H:%M:%S') if obj.created_dt else '' }}" style="display:none;">
+            <input type="datetime-local" class="edit-input" value="{{ obj.created_dt | dt_local_input if obj.created_dt else '' }}" style="display:none;">
             {% endif %}
           </div>
         </div>

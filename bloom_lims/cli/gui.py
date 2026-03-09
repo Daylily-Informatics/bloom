@@ -6,7 +6,7 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -31,7 +31,7 @@ def _ensure_dir():
 
 def _get_log_file() -> Path:
     """Get timestamped log file path."""
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     return LOG_DIR / f"server_{ts}.log"
 
 

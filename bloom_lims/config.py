@@ -447,7 +447,7 @@ class BusinessConstants(BaseModel):
     )
     default_lab_code: str = Field(default="BLOOM", description="Default lab code")
 
-    default_timezone: str = Field(default="US/Eastern", description="Default timezone")
+    default_timezone: str = Field(default="UTC", description="Default timezone")
 
     config_base_path: str = Field(
         default="config", description="Base path for template configurations"

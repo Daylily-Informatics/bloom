@@ -88,7 +88,7 @@
                 {{ wf_status }}
               </span>
             </td>
-            <td class="text-muted text-sm">{{ wf.created_dt.strftime('%Y-%m-%d %H:%M') if wf.created_dt else '-' }}</td>
+            <td class="text-muted text-sm">{{ wf.created_dt | format_dt('standard') if wf.created_dt else '-' }}</td>
             <td>
               <a href="/workflow_details?workflow_euid={{ wf.euid }}" class="btn btn-outline btn-sm" title="View details">
                 <i class="fas fa-eye"></i>

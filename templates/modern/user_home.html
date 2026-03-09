@@ -75,6 +75,15 @@
           {% endfor %}
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label" for="display_timezone">Display Timezone</label>
+        <select id="display_timezone" class="form-select" onchange="updatePreferenceAndReload('display_timezone', this.value)">
+          {% set current_tz = user_data.get('display_timezone', 'UTC') %}
+          {% for option in timezone_options %}
+          <option value="{{ option }}" {% if current_tz == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
   </div>
 

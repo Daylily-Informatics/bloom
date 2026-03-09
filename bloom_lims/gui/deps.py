@@ -4,8 +4,10 @@ import os
 import socket
 import logging
 from typing import Dict, List
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, Request, status
+from sqlalchemy import text
 
 from auth.cognito.client import (
     CognitoAuth,
@@ -15,17 +17,114 @@ from auth.cognito.client import (
 
 from bloom_lims.gui.errors import AuthenticationRequiredException, MissingCognitoEnvVarsException
 
+DEFAULT_DISPLAY_TIMEZONE = "UTC"
 
 DEFAULT_USER_PREFERENCES = {
     "style_css": "/static/modern/css/bloom_modern.css",
+    "display_timezone": DEFAULT_DISPLAY_TIMEZONE,
 }
 
 
+def normalize_display_timezone(value: str | None) -> str:
+    candidate = str(value or "").strip()
+    if not candidate:
+        return DEFAULT_DISPLAY_TIMEZONE
+    if candidate.upper() in {"UTC", "GMT", "GMT+00:00", "Z"}:
+        return DEFAULT_DISPLAY_TIMEZONE
+    try:
+        return ZoneInfo(candidate).key
+    except Exception:
+        return DEFAULT_DISPLAY_TIMEZONE
+
+
+def _load_shared_display_timezone(email: str) -> str:
+    normalized_email = str(email or "").strip().lower()
+    if not normalized_email:
+        return DEFAULT_DISPLAY_TIMEZONE
+    try:
+        from bloom_lims.db import BLOOMdb3
+
+        bdb = BLOOMdb3(app_username=normalized_email)
+        try:
+            row = bdb.session.execute(
+                text(
+                    """
+                    SELECT gi.json_addl->'preferences'->>'display_timezone' AS display_timezone
+                    FROM generic_instance gi
+                    WHERE gi.is_deleted = FALSE
+                      AND gi.polymorphic_discriminator = 'actor_instance'
+                      AND gi.category = 'generic'
+                      AND gi.type = 'actor'
+                      AND gi.subtype = 'system_user'
+                      AND (
+                            lower(COALESCE(gi.json_addl->>'login_identifier', '')) = :identifier
+                         OR lower(COALESCE(gi.json_addl->>'email', '')) = :identifier
+                      )
+                    LIMIT 1
+                    """
+                ),
+                {"identifier": normalized_email},
+            ).mappings().first()
+            return normalize_display_timezone((row or {}).get("display_timezone"))
+        finally:
+            bdb.close()
+    except Exception:
+        return DEFAULT_DISPLAY_TIMEZONE
+
+
+def persist_display_timezone(email: str, display_timezone: str | None) -> bool:
+    normalized_email = str(email or "").strip().lower()
+    if not normalized_email:
+        return False
+    normalized_timezone = normalize_display_timezone(display_timezone)
+    try:
+        from bloom_lims.db import BLOOMdb3
+
+        bdb = BLOOMdb3(app_username=normalized_email)
+        try:
+            row = bdb.session.execute(
+                text(
+                    """
+                    UPDATE generic_instance gi
+                    SET json_addl = jsonb_set(
+                            COALESCE(gi.json_addl, '{}'::jsonb),
+                            '{preferences,display_timezone}',
+                            to_jsonb(CAST(:display_timezone AS text)),
+                            TRUE
+                        ),
+                        modified_dt = NOW()
+                    WHERE gi.is_deleted = FALSE
+                      AND gi.polymorphic_discriminator = 'actor_instance'
+                      AND gi.category = 'generic'
+                      AND gi.type = 'actor'
+                      AND gi.subtype = 'system_user'
+                      AND (
+                            lower(COALESCE(gi.json_addl->>'login_identifier', '')) = :identifier
+                         OR lower(COALESCE(gi.json_addl->>'email', '')) = :identifier
+                      )
+                    RETURNING gi.uid
+                    """
+                ),
+                {"identifier": normalized_email, "display_timezone": normalized_timezone},
+            ).fetchone()
+            if row:
+                bdb.session.commit()
+                return True
+            bdb.session.rollback()
+            return False
+        finally:
+            bdb.close()
+    except Exception:
+        return False
+
+
 def get_user_preferences(email: str) -> dict:
-    """Get user preferences with defaults. Preferences are stored in session only."""
+    """Get user preferences with defaults and shared timezone preference."""
+    display_timezone = _load_shared_display_timezone(email)
     return {
         "email": email,
         **DEFAULT_USER_PREFERENCES,
+        "display_timezone": display_timezone,
     }
 
 
@@ -97,6 +196,7 @@ async def require_auth(request: Request):
             "email": "john@daylilyinformatics.com",
             "dag_fnv2": "",
             "role": "admin",
+            "display_timezone": DEFAULT_DISPLAY_TIMEZONE,
         }
         return request
 

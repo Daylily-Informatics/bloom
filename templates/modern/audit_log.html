@@ -75,7 +75,7 @@
           {% if entries %}
           {% for entry in entries %}
           <tr>
-            <td class="text-sm font-mono">{{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') if entry.timestamp else '-' }}</td>
+            <td class="text-sm font-mono">{{ entry.timestamp | format_dt('standard') if entry.timestamp else '-' }}</td>
             <td>{{ entry.user | default('system') }}</td>
             <td>
               <span class="badge badge-{% if entry.action == 'create' %}success{% elif entry.action == 'delete' %}error{% elif entry.action == 'update' %}warning{% else %}info{% endif %}">
@@ -143,4 +143,3 @@ function exportAuditLog() {
 }
 </script>
 {% endblock %}
-

@@ -14,7 +14,7 @@ import os
 import random
 import shutil
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Dict, List
 
@@ -985,7 +985,7 @@ async def bulk_create_files_from_tsv(request: Request, file: UploadFile = File(.
                 "num_success": num_success,
                 "num_failed": num_failed,
                 "create_message": "; ".join(messages),
-                "datetime_finished": datetime.now().isoformat(),
+                "datetime_finished": datetime.now(UTC).isoformat(),
             }
         )
 

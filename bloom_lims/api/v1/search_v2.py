@@ -6,7 +6,7 @@ import csv
 import io
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -72,7 +72,7 @@ async def search_v2_export(
             for item in items:
                 item.pop("metadata", None)
 
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         query_part = (first_page.query or "search").strip().replace(" ", "_")[:40]
         if not query_part:
             query_part = "search"

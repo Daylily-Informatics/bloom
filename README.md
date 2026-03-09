@@ -21,6 +21,15 @@ Bloom does not own:
 - customer, TRF, Test, patient, provider, shipment, or kit truth
 - workflow or workflow-step orchestration for the beta path
 
+## Timezone Policy
+
+- Bloom persists/runtime-writes timestamps in UTC (`GMT+00:00`).
+- UI display timezone is user-configurable via shared TapDB `system_user` preferences:
+  - key: `display_timezone`
+  - format: IANA timezone name
+  - default: `UTC`
+- Server-rendered templates and client-side timestamp formatting use the user preference.
+
 ## Beta Architecture
 
 The active beta path is queue-driven and graph-native.

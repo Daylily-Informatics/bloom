@@ -142,6 +142,7 @@
     </div>
     
     <!-- BLOOM Modern JS -->
+    <script src="/static/modern/js/timezone.js"></script>
     <script src="/static/modern/js/bloom_modern.js"></script>
 
     <!-- Global configuration -->
@@ -151,6 +152,12 @@
             user: {{ udat | tojson | safe if udat else 'null' }},
             version: '{{ version | default("dev") }}'
         };
+        if (!window.BloomConfig.user) {
+            window.BloomConfig.user = {};
+        }
+        if (!window.BloomConfig.user.display_timezone) {
+            window.BloomConfig.user.display_timezone = 'UTC';
+        }
 
         // Apply theme from localStorage
         (function() {

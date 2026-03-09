@@ -34,7 +34,7 @@ import secrets
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
@@ -364,7 +364,7 @@ class BackgroundTaskManager:
             if task_id in self._tasks:
                 self._tasks[task_id].status = status
                 if status == TaskStatus.RUNNING:
-                    self._tasks[task_id].started_at = datetime.utcnow()
+                    self._tasks[task_id].started_at = datetime.now(UTC)
 
     async def _complete_task(self, task_id: str, result: Any):
         """Mark task as completed."""
@@ -372,7 +372,7 @@ class BackgroundTaskManager:
             if task_id in self._tasks:
                 self._tasks[task_id].status = TaskStatus.COMPLETED
                 self._tasks[task_id].result = result
-                self._tasks[task_id].completed_at = datetime.utcnow()
+                self._tasks[task_id].completed_at = datetime.now(UTC)
             if task_id in self._pending_futures:
                 del self._pending_futures[task_id]
 
@@ -382,7 +382,7 @@ class BackgroundTaskManager:
             if task_id in self._tasks:
                 self._tasks[task_id].status = TaskStatus.FAILED
                 self._tasks[task_id].error = error
-                self._tasks[task_id].completed_at = datetime.utcnow()
+                self._tasks[task_id].completed_at = datetime.now(UTC)
             if task_id in self._pending_futures:
                 del self._pending_futures[task_id]
 
@@ -394,7 +394,9 @@ class BackgroundTaskManager:
                 (tid, t) for tid, t in self._tasks.items()
                 if t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
             ]
-            completed.sort(key=lambda x: x[1].completed_at or datetime.min)
+            completed.sort(
+                key=lambda x: x[1].completed_at or datetime.min.replace(tzinfo=UTC)
+            )
 
             to_remove = len(self._tasks) - self.max_tasks + 100
             for tid, _ in completed[:to_remove]:

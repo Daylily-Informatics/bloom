@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 
 
 def get_clean_timestamp() -> str:
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
 
 
 def setup_logging() -> None:

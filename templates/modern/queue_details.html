@@ -94,7 +94,7 @@
                 {{ item.status | default('pending') }}
               </span>
             </td>
-            <td class="text-muted text-sm">{{ item.added_dt.strftime('%Y-%m-%d %H:%M') if item.added_dt else '-' }}</td>
+            <td class="text-muted text-sm">{{ item.added_dt | format_dt('standard') if item.added_dt else '-' }}</td>
             <td>
               <button class="btn btn-outline btn-sm" onclick="removeFromQueue('{{ item.euid }}')" title="Remove">
                 <i class="fas fa-times"></i>
@@ -141,4 +141,3 @@ function removeFromQueue(euid) {
 }
 </script>
 {% endblock %}
-

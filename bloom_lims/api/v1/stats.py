@@ -5,7 +5,7 @@ Dashboard statistics, aggregations, and recent activity for the modern UI.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -140,10 +140,9 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
         return DashboardResponseSchema(
             stats=stats,
             recent_activity=recent_activity,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(UTC),
         )
 
     except Exception as e:
         logger.error(f"Error getting dashboard stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

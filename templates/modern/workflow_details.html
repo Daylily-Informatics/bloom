@@ -479,7 +479,7 @@
                 <i class="fas fa-tag"></i> {{ workflow.type }} :: {{ workflow.subtype }} :: {{ workflow.version }}
             </span>
             <span class="badge bg-secondary">
-                <i class="fas fa-clock"></i> {{ workflow.created_dt.strftime("%Y-%m-%d %H:%M:%S") if workflow.created_dt else 'N/A' }}
+                <i class="fas fa-clock"></i> {{ workflow.created_dt | format_dt('standard') if workflow.created_dt else 'N/A' }}
             </span>
         </div>
     </div>
@@ -625,7 +625,7 @@
                     <span class="step-type-badge">{{ step_type }}</span>
                     <strong>{{ step.json_addl.get('properties', {}).get('name', 'NONAME') }}</strong>
                     <span class="badge bg-{{ 'success' if step.bstatus == 'active' else 'secondary' }} ms-2">{{ step.bstatus }}</span>
-                    <span class="text-muted ms-2" style="font-size: 0.75rem;">{{ step.created_dt.strftime("%Y-%m-%d %H:%M:%S") if step.created_dt else '' }}</span>
+                    <span class="text-muted ms-2" style="font-size: 0.75rem;">{{ step.created_dt | format_dt('standard') if step.created_dt else '' }}</span>
 
                     {% if step_type == 'package' %}
                     {% set fedex_data = step.json_addl.get('properties', {}).get('fedex_tracking_data', []) %}

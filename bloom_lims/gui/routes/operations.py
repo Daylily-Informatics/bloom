@@ -41,6 +41,8 @@ from bloom_lims.gui.deps import (
     _get_request_cognito_auth,
     get_allowed_domains,
     get_user_preferences,
+    normalize_display_timezone,
+    persist_display_timezone,
     require_auth,
 )
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
@@ -427,7 +429,7 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         zebra_version = importlib.metadata.version("zebra_day")
         dependency_info["zebra_day"] = {
             "version": zebra_version,
-            "admin_url": "http://localhost:8118",
+            "admin_url": "https://localhost:8118/",
             "description": "Zebra printer fleet management and ZPL label printing",
             "status": "available",
         }
@@ -609,7 +611,13 @@ async def admin_start_zebra_service(request: Request, _auth=Depends(require_auth
 
 @router.post("/update_preference")
 async def update_preference(request: Request, auth: dict = Depends(require_auth)):
-    if not auth or "email" not in auth:
+    auth_email = ""
+    if isinstance(auth, dict):
+        auth_email = str(auth.get("email") or "")
+    if not auth_email:
+        auth_email = str(request.session.get("user_data", {}).get("email") or "")
+
+    if not auth_email:
         return {"status": "error", "message": "Authentication failed or user data missing"}
 
     data = await request.json()
@@ -620,9 +628,14 @@ async def update_preference(request: Request, auth: dict = Depends(require_auth)
         return {"status": "error", "message": "Missing 'key' in request"}
 
     if "user_data" not in request.session:
-        request.session["user_data"] = get_user_preferences(auth.get("email", ""))
+        request.session["user_data"] = get_user_preferences(auth_email)
 
-    request.session["user_data"][key] = value
+    if key == "display_timezone":
+        normalized_tz = normalize_display_timezone(str(value or ""))
+        persist_display_timezone(auth_email, normalized_tz)
+        request.session["user_data"]["display_timezone"] = normalized_tz
+    else:
+        request.session["user_data"][key] = value
     return {"status": "success", "message": "User preference updated"}
 
 
@@ -957,7 +970,7 @@ async def database_statistics(request: Request, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
 
     def get_stats(days):
-        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         return (
             bobdb.session.query(
                 bobdb.Base.classes.generic_instance.subtype,
@@ -1201,6 +1214,9 @@ async def user_home(request: Request):
 
     user_data = request.session.get("user_data", {})
     session_data = request.session.get("session_data", {})
+    user_data["display_timezone"] = normalize_display_timezone(
+        user_data.get("display_timezone"),
+    )
 
     if not user_data:
         return RedirectResponse(url="/login")
@@ -1263,6 +1279,17 @@ async def user_home(request: Request):
             raise MissingCognitoEnvVarsException(str(exc)) from exc
 
     template = templates.get_template("modern/user_home.html")
+    timezone_options = [
+        "UTC",
+        "America/Los_Angeles",
+        "America/Denver",
+        "America/Chicago",
+        "America/New_York",
+        "Europe/London",
+        "Europe/Berlin",
+        "Asia/Tokyo",
+        "Australia/Sydney",
+    ]
     context = {
         "request": request,
         "user_data": user_data,
@@ -1276,6 +1303,7 @@ async def user_home(request: Request):
         "bloom_version": bloom_version,
         "fedex_version": fedex_version,
         "zebra_printer_version": zebra_printer_version,
+        "timezone_options": timezone_options,
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(context))
