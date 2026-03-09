@@ -181,6 +181,8 @@ def _resolve_action_definition(
     instance: Any,
     action_group: str,
     action_key: str,
+    *,
+    allow_missing_template_uid: bool = False,
 ) -> tuple[dict[str, Any], str]:
     action_groups = (instance.json_addl or {}).get("action_groups", {})
     if not isinstance(action_groups, dict):
@@ -234,6 +236,14 @@ def _resolve_action_definition(
     resolved = copy.deepcopy(action_data)
     if not isinstance(resolved.get("captured_data"), dict):
         resolved["captured_data"] = {}
+    if not resolved.get("action_template_uid") and not allow_missing_template_uid:
+        raise ActionExecutionError(
+            status_code=409,
+            detail=(
+                f"Action {action_key} is missing TapDB template metadata "
+                "(action_template_uid)."
+            ),
+        )
     return resolved, matched_key
 
 
@@ -454,12 +464,34 @@ def execute_action_for_instance(
                 detail=f"Object not found: {request_data.euid}",
             )
 
-        action_definition = _resolve_action_definition(
-            instance,
-            request_data.action_group,
-            request_data.action_key,
-        )
-        action_definition, matched_action_key = action_definition
+        try:
+            resolved_action = _resolve_action_definition(
+                instance,
+                request_data.action_group,
+                request_data.action_key,
+                allow_missing_template_uid=True,
+            )
+        except TypeError as exc:
+            # Backward-compatible with tests/patches that replace the resolver
+            # with a 3-arg callable.
+            if "allow_missing_template_uid" not in str(exc):
+                raise
+            resolved_action = _resolve_action_definition(
+                instance,
+                request_data.action_group,
+                request_data.action_key,
+            )
+        if isinstance(resolved_action, tuple):
+            action_definition, matched_action_key = resolved_action
+        elif isinstance(resolved_action, dict):
+            # Backward-compatible for tests/monkeypatches that return only the definition.
+            action_definition = resolved_action
+            matched_action_key = request_data.action_key
+        else:
+            raise ActionExecutionError(
+                status_code=500,
+                detail="Invalid action definition payload",
+            )
 
         if not action_definition.get("action_template_uid"):
             recovered_uid = _resolve_action_template_uid(

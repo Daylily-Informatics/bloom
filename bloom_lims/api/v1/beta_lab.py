@@ -15,6 +15,11 @@ from bloom_lims.auth.rbac import Permission
 from bloom_lims.domain.beta_lab import BetaLabService
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
+    BetaClaimCreateRequest,
+    BetaClaimReleaseRequest,
+    BetaClaimResponse,
+    BetaConsumeMaterialRequest,
+    BetaConsumeMaterialResponse,
     BetaExtractionCreateRequest,
     BetaExtractionResponse,
     BetaLibraryPrepCreateRequest,
@@ -26,12 +31,15 @@ from bloom_lims.schemas.beta_lab import (
     BetaPostExtractQCResponse,
     BetaQueueTransitionRequest,
     BetaQueueTransitionResponse,
+    BetaReservationCreateRequest,
+    BetaReservationReleaseRequest,
+    BetaReservationResponse,
     BetaRunCreateRequest,
     BetaRunResolutionResponse,
     BetaRunResponse,
+    BetaSpecimenUpdateRequest,
     BetaTubeCreateRequest,
     BetaTubeResponse,
-    BetaSpecimenUpdateRequest,
     BetaTubeUpdateRequest,
 )
 
@@ -180,6 +188,149 @@ async def move_material_to_queue(
         ) from exc
     except Exception as exc:
         logger.exception("Failed moving Bloom material to beta queue")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.post(
+    "/queues/{queue_name}/items/{material_euid}/claim",
+    response_model=BetaClaimResponse,
+)
+async def claim_material_in_queue(
+    queue_name: str,
+    material_euid: str,
+    payload: BetaClaimCreateRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.claim_material_in_queue(
+            material_euid=material_euid,
+            queue_name=queue_name,
+            metadata=payload.metadata,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed claiming Bloom beta queue material")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.post("/claims/{claim_euid}/release", response_model=BetaClaimResponse)
+async def release_claim(
+    claim_euid: str,
+    payload: BetaClaimReleaseRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.release_claim(
+            claim_euid=claim_euid,
+            reason=payload.reason,
+            metadata=payload.metadata,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed releasing Bloom beta queue claim")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.post(
+    "/materials/{material_euid}/reservations",
+    response_model=BetaReservationResponse,
+)
+async def reserve_material(
+    material_euid: str,
+    payload: BetaReservationCreateRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.reserve_material(
+            material_euid=material_euid,
+            reason=payload.reason,
+            metadata=payload.metadata,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed reserving Bloom beta material")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.post(
+    "/reservations/{reservation_euid}/release",
+    response_model=BetaReservationResponse,
+)
+async def release_reservation(
+    reservation_euid: str,
+    payload: BetaReservationReleaseRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.release_reservation(
+            reservation_euid=reservation_euid,
+            reason=payload.reason,
+            metadata=payload.metadata,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed releasing Bloom beta material reservation")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        service.close()
+
+
+@router.post(
+    "/materials/{material_euid}/consume",
+    response_model=BetaConsumeMaterialResponse,
+)
+async def consume_material(
+    material_euid: str,
+    payload: BetaConsumeMaterialRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.consume_material(
+            material_euid=material_euid,
+            reason=payload.reason,
+            metadata=payload.metadata,
+            idempotency_key=idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_status_for_value_error(exc), detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed consuming Bloom beta material")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         service.close()

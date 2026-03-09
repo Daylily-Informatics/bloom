@@ -38,6 +38,7 @@ Canonical queues:
 - `ont_start_seq_run`
 
 Atlas records intake outcomes first. Bloom accepts only Atlas-approved material, links that material to Atlas TRF/Test/process-item context through explicit graph-linked reference objects, and preserves lineage from specimen/container through plate and well placement, library prep, pooling, sequencing run creation, and sequenced library assignment.
+The atomic business/fulfillment/reporting unit is `TRF.test`; `TRF` is a rollup container across child tests.
 Accepted-material ingress queue membership is applied to the physical container (`container_euid`), with specimen queue reads falling back to containing-container queue state when needed.
 
 Ursa resolves the canonical sequencing unit through Bloom with:
@@ -79,6 +80,11 @@ The queue-driven beta endpoints are:
 
 - `POST /api/v1/external/atlas/beta/materials`
 - `POST /api/v1/external/atlas/beta/queues/{queue_name}/items/{material_euid}`
+- `POST /api/v1/external/atlas/beta/queues/{queue_name}/items/{material_euid}/claim`
+- `POST /api/v1/external/atlas/beta/claims/{claim_euid}/release`
+- `POST /api/v1/external/atlas/beta/materials/{material_euid}/reservations`
+- `POST /api/v1/external/atlas/beta/reservations/{reservation_euid}/release`
+- `POST /api/v1/external/atlas/beta/materials/{material_euid}/consume`
 - `POST /api/v1/external/atlas/beta/extractions`
 - `POST /api/v1/external/atlas/beta/post-extract-qc`
 - `POST /api/v1/external/atlas/beta/library-prep`
@@ -86,6 +92,15 @@ The queue-driven beta endpoints are:
 - `POST /api/v1/external/atlas/beta/runs`
 - `GET /api/v1/external/atlas/beta/runs/{run_euid}/resolve?flowcell_id=...&lane=...&library_barcode=...`
 - `POST /api/v1/external/atlas/tests/{test_euid}/status-events`
+
+Execution metadata for extraction/QC/library-prep/pool/run and work-control events is normalized in-place:
+
+- canonical keys: `operator`, `instrument_euid`, `method_version`, `reagent_euid`
+- empty strings are stripped
+- unknown keys are preserved
+- `instrument_euid` and `reagent_euid` (when provided) are validated and written as lineage:
+  - `beta_used_instrument`
+  - `beta_used_reagent`
 
 ## Embedded TapDB Admin Mount
 

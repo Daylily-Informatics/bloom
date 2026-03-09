@@ -33,17 +33,30 @@ for root in (ATLAS_ROOT, URSA_ROOT):
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.app import create_app as create_bloom_app
-from daylib.analysis_store import (  # noqa: E402
-    AnalysisArtifact,
-    AnalysisRecord,
-    AnalysisState,
-    ReviewState,
-    RunResolution,
-)
-from daylib.atlas_result_client import AtlasResultClient  # noqa: E402
-from daylib.bloom_resolver_client import BloomResolverClient  # noqa: E402
-from daylib.config import Settings  # noqa: E402
-from daylib.workset_api import create_app as create_ursa_app  # noqa: E402
+try:  # noqa: E402
+    from daylib_ursa.analysis_store import (
+        AnalysisArtifact,
+        AnalysisRecord,
+        AnalysisState,
+        ReviewState,
+        RunResolution,
+    )
+    from daylib_ursa.atlas_result_client import AtlasResultClient
+    from daylib_ursa.bloom_resolver_client import BloomResolverClient
+    from daylib_ursa.config import Settings
+    from daylib_ursa.workset_api import create_app as create_ursa_app
+except ModuleNotFoundError:  # pragma: no cover - compatibility fallback
+    from daylib.analysis_store import (
+        AnalysisArtifact,
+        AnalysisRecord,
+        AnalysisState,
+        ReviewState,
+        RunResolution,
+    )
+    from daylib.atlas_result_client import AtlasResultClient
+    from daylib.bloom_resolver_client import BloomResolverClient
+    from daylib.config import Settings
+    from daylib.workset_api import create_app as create_ursa_app
 
 import app.api.routes.intake as atlas_intake_routes  # noqa: E402
 import app.api.routes.ursa_integration as atlas_ursa_routes  # noqa: E402

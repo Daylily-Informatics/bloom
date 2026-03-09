@@ -19,6 +19,27 @@ Current defaults and constraints:
 - `saliva` is not currently available as a specimen template in Bloom.
 - No order-alert subscription/webhook endpoint exists yet. Use polling (documented below).
 
+Beta contract guardrails:
+
+1. The atomic business/fulfillment/reporting unit is `TRF.test`; `TRF` is rollup context only.
+2. External contracts are EUID-only (do not depend on UUIDs).
+3. Container context may link to multiple tests on the same TRF; direct container-linked tests/process-items are the authoritative processing set.
+
+Beta work-control endpoints (queue claim/reservation/consume):
+
+1. `POST /api/v1/external/atlas/beta/queues/{queue_name}/items/{material_euid}/claim`
+2. `POST /api/v1/external/atlas/beta/claims/{claim_euid}/release`
+3. `POST /api/v1/external/atlas/beta/materials/{material_euid}/reservations`
+4. `POST /api/v1/external/atlas/beta/reservations/{reservation_euid}/release`
+5. `POST /api/v1/external/atlas/beta/materials/{material_euid}/consume`
+
+Execution metadata normalization for extraction/QC/library-prep/pool/run and work-control events:
+
+1. canonical keys: `operator`, `instrument_euid`, `method_version`, `reagent_euid`
+2. unknown keys are preserved
+3. empty strings are stripped
+4. `instrument_euid` and `reagent_euid` (if provided) are validated and emitted as lineage (`beta_used_instrument`, `beta_used_reagent`)
+
 ## 2. Authentication Prerequisites
 
 Atlas should use a Bloom-issued bearer token:
@@ -323,7 +344,7 @@ Retry guidance for Atlas:
 |---|---|
 | `container_euid` | Required to re-link/update specimen placement later |
 | `specimen_euid` | Primary key for Bloom specimen lifecycle operations |
-| `specimen_uuid` | Secondary stable identifier for traceability |
+| UUID fields | Not part of the public beta contract; persist EUIDs only |
 | `atlas_refs` | Cross-system reconciliation and lookup |
 | `idempotency_key` used | Safe retries without duplication |
 

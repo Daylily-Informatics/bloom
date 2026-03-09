@@ -39,6 +39,26 @@ _ACTION_TEMPLATE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Move Material To Queue",
         "description": "Moves Bloom beta material into a canonical beta queue.",
     },
+    "claim_material_in_queue": {
+        "name": "Claim Material In Queue",
+        "description": "Creates a work claim for queued beta material.",
+    },
+    "release_claim": {
+        "name": "Release Claim",
+        "description": "Releases a work claim for queued beta material.",
+    },
+    "reserve_material": {
+        "name": "Reserve Material",
+        "description": "Creates a reservation lock on beta material.",
+    },
+    "release_reservation": {
+        "name": "Release Reservation",
+        "description": "Releases a reservation lock on beta material.",
+    },
+    "consume_material": {
+        "name": "Consume Material",
+        "description": "Records beta material consumption to prevent stage reuse.",
+    },
     "create_extraction": {
         "name": "Create Extraction",
         "description": "Creates a Bloom beta extraction output from queued material.",
