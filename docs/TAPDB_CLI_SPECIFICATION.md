@@ -45,11 +45,11 @@ python -m daylily_tapdb.cli pg logs
 
 ```bash
 python -m daylily_tapdb.cli db create dev
-python -m daylily_tapdb.cli db setup dev --include-workflow
+python -m daylily_tapdb.cli db setup dev
 python -m daylily_tapdb.cli db schema status dev
 python -m daylily_tapdb.cli db schema migrate dev
 python -m daylily_tapdb.cli db schema reset dev --force
-python -m daylily_tapdb.cli db data seed dev --include-workflow
+python -m daylily_tapdb.cli db data seed dev
 python -m daylily_tapdb.cli db data backup dev
 python -m daylily_tapdb.cli db data restore dev
 ```

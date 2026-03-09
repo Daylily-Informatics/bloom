@@ -32,10 +32,8 @@
   - removed response field: `uuid`
 - `GET /api/v1/templates...`
   - removed response field: `uuid`
-- `GET|POST /api/v1/workflows...`
-  - removed response field: `uuid`
-- `GET /api/v1/workflows/{euid}/steps`
-  - removed step field: `uuid`
+- `/api/v1/workflows/*`
+  - retired for queue-centric Bloom beta
 - `GET /api/v1/worksets/{euid}`
   - removed response field: `uuid`
 - `GET /api/v1/search/`

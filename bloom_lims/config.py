@@ -29,6 +29,15 @@ TEMPLATE_CONFIG_FILE = (
 )
 
 
+def _validate_optional_https_url(value: str, *, field_name: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if not normalized.startswith("https://"):
+        raise ValueError(f"{field_name} must use an absolute https:// URL")
+    return normalized.rstrip("/")
+
+
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """Deep merge two dictionaries. Override values take precedence."""
     result = base.copy()
@@ -321,6 +330,11 @@ class AtlasSettings(BaseModel):
         description="Base backoff delay in seconds for Bloom -> Atlas status event retries",
     )
 
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        return _validate_optional_https_url(value, field_name="atlas.base_url")
+
 
 class LoggingSettings(BaseModel):
     """Logging configuration."""
@@ -502,7 +516,10 @@ class BloomSettings(BaseSettings):
         """
         atlas_base_url = os.environ.get("BLOOM_ATLAS__BASE_URL")
         if atlas_base_url is not None:
-            self.atlas.base_url = atlas_base_url
+            self.atlas.base_url = _validate_optional_https_url(
+                atlas_base_url,
+                field_name="atlas.base_url",
+            )
 
         atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
         if atlas_token is not None:

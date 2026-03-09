@@ -6,27 +6,9 @@ from html import escape as html_escape
 from bloom_lims.bobjs import BloomObj
 
 
-def _build_assay_selection_options(bobdb: BloomObj) -> list[dict]:
-    """Build assay options from live workflow/assay instances."""
-    assay_workflows = bobdb.query_instance_by_component_v2(category="workflow", type="assay")
-    assay_workflows = [wf for wf in assay_workflows if not getattr(wf, "is_deleted", False)]
-    assay_workflows.sort(
-        key=lambda wf: (
-            str(getattr(wf, "subtype", "") or "").lower(),
-            str(getattr(wf, "version", "") or ""),
-            str(getattr(wf, "name", "") or "").lower(),
-            str(getattr(wf, "euid", "") or ""),
-        )
-    )
-
-    options = []
-    for wf in assay_workflows:
-        props = wf.json_addl.get("properties", {}) if isinstance(wf.json_addl, dict) else {}
-        display_name = (props.get("name") if isinstance(props, dict) else None) or wf.name or wf.subtype or wf.euid
-        label = f"{display_name} ({wf.subtype} v{wf.version}) [{wf.euid}]"
-        options.append({"value": str(wf.euid), "label": str(label)})
-
-    return options
+def _build_assay_selection_options(_bobdb: BloomObj) -> list[dict]:
+    """Workflow-backed assay selection is retired in queue-centric Bloom beta."""
+    return []
 
 
 def _normalize_action_slug(action_data: dict) -> str:

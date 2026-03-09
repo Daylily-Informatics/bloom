@@ -241,7 +241,7 @@ def _seed_bloom_templates() -> None:
 def _seed_tapdb_templates(
     env_name: str,
     *,
-    include_workflow: bool = True,
+    include_workflow: bool = False,
     overwrite: bool = False,
 ) -> None:
     """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
@@ -256,8 +256,6 @@ def _seed_tapdb_templates(
         console.print(
             "[cyan]TapDB template seed:[/cyan] using built-in TapDB core config"
         )
-    if include_workflow:
-        args.append("--include-workflow")
     args.append("--overwrite" if overwrite else "--skip-existing")
     _run_tapdb(args)
 
@@ -284,11 +282,11 @@ def db_init(force: bool):
         )
         _run_tapdb(["pg", "init", env_name], check=False)
         _run_tapdb(["pg", "start-local", env_name, "--port", local_port])
-        setup_args = ["db", "setup", env_name, "--include-workflow"]
+        setup_args = ["db", "setup", env_name]
         if force:
             setup_args.append("--force")
         _run_tapdb(setup_args)
-        _seed_tapdb_templates(env_name, include_workflow=True, overwrite=force)
+        _seed_tapdb_templates(env_name, overwrite=force)
         _seed_bloom_templates()
         return
 
@@ -297,12 +295,12 @@ def db_init(force: bool):
         create_args.append("--force")
     _run_tapdb(create_args, check=False)
 
-    setup_args = ["db", "setup", env_name, "--include-workflow"]
+    setup_args = ["db", "setup", env_name]
     _ensure_schema_available_for_bloom_root()
     if force:
         setup_args.append("--force")
     _run_tapdb(setup_args)
-    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=force)
+    _seed_tapdb_templates(env_name, overwrite=force)
     _seed_bloom_templates()
 
 
@@ -388,7 +386,7 @@ def db_migrate(revision: str):
 def db_seed():
     """Seed template data via tapdb."""
     env_name = _current_env()
-    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=False)
+    _seed_tapdb_templates(env_name, include_workflow=False, overwrite=False)
     _seed_bloom_templates()
 
 
@@ -421,7 +419,7 @@ def db_reset(yes: bool):
     args = ["db", "schema", "reset", env_name, "--force"]
     _ensure_schema_available_for_bloom_root()
     _run_tapdb(args)
-    setup_args = ["db", "setup", env_name, "--include-workflow", "--force"]
+    setup_args = ["db", "setup", env_name, "--force"]
     _run_tapdb(setup_args)
-    _seed_tapdb_templates(env_name, include_workflow=True, overwrite=True)
+    _seed_tapdb_templates(env_name, include_workflow=False, overwrite=True)
     _seed_bloom_templates()

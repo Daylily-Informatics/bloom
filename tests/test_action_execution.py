@@ -47,7 +47,7 @@ class _ErrorDispatcher:
         return {"status": "error", "message": "No handler for action"}
 
 
-def test_execute_action_backfills_missing_template_uid(monkeypatch):
+def test_execute_action_upgrades_active_definition_to_modern_template(monkeypatch):
     instance = SimpleNamespace(
         euid="OB-1",
         category="container",
@@ -58,6 +58,7 @@ def test_execute_action_backfills_missing_template_uid(monkeypatch):
                         "/core/set-object-status/": {
                             "action_name": "Set Status",
                             "method_name": "do_action_set_object_status",
+                            "action_template_code": "action/core/set_object_status/1.0",
                             "capture_data": "yes",
                             "captured_data": {},
                             "ui_schema": {"title": "Set Status", "fields": []},
@@ -70,22 +71,39 @@ def test_execute_action_backfills_missing_template_uid(monkeypatch):
 
     fake_db = _FakeDB()
     query_obj = _FakeQueryObj(instance)
-    backfilled = {}
+
+    template = SimpleNamespace(
+        uid="123e4567-e89b-12d3-a456-426614174000",
+        euid="AT-SET-STATUS-1",
+    )
+
+    class _FakeTemplateQuery:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def one_or_none(self):
+            return template
+
+    query_obj.Base = SimpleNamespace(
+        classes=SimpleNamespace(
+            generic_template=SimpleNamespace(
+                is_deleted="is_deleted",
+                category="category",
+                type="type",
+                subtype="subtype",
+                version="version",
+            )
+        )
+    )
+    query_obj.session = SimpleNamespace(
+        flush=lambda: None,
+        query=lambda _model: _FakeTemplateQuery(),
+    )
 
     monkeypatch.setattr(action_exec, "BLOOMdb3", lambda app_username: fake_db)
     monkeypatch.setattr(action_exec, "BloomObj", lambda _bdb: query_obj)
     monkeypatch.setattr(action_exec, "_resolve_executor", lambda _instance, _bdb: _FakeExecutor())
     monkeypatch.setattr(action_exec, "BloomTapDBActionDispatcher", _SuccessDispatcher)
-    monkeypatch.setattr(
-        action_exec,
-        "_resolve_action_template_uid",
-        lambda _query_obj, _action_def, _action_key: "123e4567-e89b-12d3-a456-426614174000",
-    )
-
-    def _capture_backfill(**kwargs):
-        backfilled.update(kwargs)
-
-    monkeypatch.setattr(action_exec, "_backfill_action_template_uid", _capture_backfill)
 
     request = action_exec.ActionExecuteRequest(
         euid="OB-1",
@@ -103,8 +121,10 @@ def test_execute_action_backfills_missing_template_uid(monkeypatch):
 
     assert result["status"] == "success"
     assert result["message"] == "done"
-    assert backfilled["action_group"] == "core"
-    assert backfilled["action_template_uid"] == "123e4567-e89b-12d3-a456-426614174000"
+    upgraded = instance.json_addl["action_groups"]["core"]["actions"]["/core/set-object-status/"]
+    assert upgraded["action_template_uid"] == template.uid
+    assert upgraded["action_template_euid"] == template.euid
+    assert upgraded["action_template_code"] == "action/core/set_object_status/1.0"
 
 
 def test_execute_action_surfaces_dispatcher_errors(monkeypatch):

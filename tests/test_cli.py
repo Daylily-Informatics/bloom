@@ -186,7 +186,7 @@ class TestDbSubcommands:
             ),
             (["pg", "init", "dev"], False),
             (["pg", "start-local", "dev", "--port", "5566"], True),
-            (["db", "setup", "dev", "--include-workflow"], True),
+            (["db", "setup", "dev"], True),
         ]
 
     def test_ensure_tapdb_namespace_config_fills_required_metadata(

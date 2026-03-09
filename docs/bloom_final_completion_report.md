@@ -20,7 +20,7 @@ Bloom is now queue-centric on supported product surfaces.
 
 ## What was isolated
 
-- Workflow/workset runtime modules remain on disk only as archival code and are not mounted as supported API/GUI product paths.
+- Workflow/workset compatibility module names remain importable, but runtime behavior is retired and not mounted as supported API/GUI product paths.
 - `/workflows` UI path is hard-disabled with retirement behavior.
 
 ## Relationship and action anti-pattern fixes in this pass

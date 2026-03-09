@@ -145,29 +145,24 @@ class TestAssaysEndpoint:
     """Tests for /assays endpoint - fixed TapDB column names."""
 
     def test_assays_default_returns_html(self, client):
-        """Test assays endpoint returns HTML."""
+        """Assay workflow pages are retired in queue-centric Bloom beta."""
         response = client.get("/assays")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 410
 
     def test_assays_show_type_all(self, client):
-        """Test assays with show_type=all parameter."""
+        """Assay workflow pages stay retired regardless of query params."""
         response = client.get("/assays?show_type=all")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 410
 
     def test_assays_show_type_accessioning(self, client):
-        """Accessioning show_type is retired and should normalize to non-accession output."""
+        """Accessioning show_type stays retired with the page."""
         response = client.get("/assays?show_type=accessioning")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        assert '<option value="all" selected' in response.text
+        assert response.status_code == 410
 
     def test_assays_show_type_assay(self, client):
-        """Test assays with show_type=assay parameter."""
+        """Assay workflow pages stay retired for assay-specific views too."""
         response = client.get("/assays?show_type=assay")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 410
 
     def test_admin_has_api_token_management_panels(self, client):
         """Admin page renders API token user and token-management panels."""
@@ -521,12 +516,9 @@ class TestModernTemplateUsage:
         assert "bloom_modern.css" in content
 
     def test_assays_uses_modern_template(self, client):
-        """Test assays page uses modern template."""
+        """Assays route is retired rather than templated."""
         response = client.get("/assays")
-        assert response.status_code == 200
-        content = response.text
-        assert "bloom_modern.css" in content
-        assert "Queue Runtime" in content
+        assert response.status_code == 410
 
     def test_workflow_summary_uses_modern_template(self, client):
         """Workflow summary route is retired."""
@@ -608,8 +600,8 @@ class TestModernUIElements:
         assert "footer" in content.lower()
 
     def test_pages_have_breadcrumb_or_header(self, client):
-        """Test pages have page header with title."""
-        response = client.get("/assays")
+        """Queue runtime remains visible from the dashboard after assay-page retirement."""
+        response = client.get("/")
         assert response.status_code == 200
         content = response.text
         assert "page-header" in content or "Queue Runtime" in content
@@ -894,13 +886,9 @@ class TestLoginLogoutButtonDisplay:
         assert 'href="/logout"' in content
 
     def test_assays_page_shows_logout(self, client):
-        """Test assays page shows logout button for authenticated users."""
+        """Assays page is retired and no longer renders authenticated HTML."""
         response = client.get("/assays")
-        assert response.status_code == 200
-        content = response.text
-
-        # Should show logout button
-        assert 'href="/logout"' in content
+        assert response.status_code == 410
 
 
 class TestModernUINavigation:
@@ -1623,7 +1611,7 @@ class TestWorkflowManagementEndpoints:
     def test_workflow_details_with_euid(self, client):
         """Test workflow details with EUID."""
         response = client.get("/workflow_details?euid=WF1")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
 class TestAssaysEndpoints:
@@ -1632,7 +1620,7 @@ class TestAssaysEndpoints:
     def test_assays_page(self, client):
         """Test assays page endpoint."""
         response = client.get("/assays")
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 410
 
 
 class TestAuditLogEndpoints:

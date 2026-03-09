@@ -26,6 +26,15 @@ class AtlasClientError(Exception):
         self.path = path
 
 
+def _require_https_url(value: str, *, field_name: str) -> str:
+    normalized = str(value or "").strip().rstrip("/")
+    if not normalized:
+        raise AtlasClientError(f"{field_name} is required")
+    if not normalized.startswith("https://"):
+        raise AtlasClientError(f"{field_name} must use an absolute https:// URL")
+    return normalized
+
+
 class AtlasClient:
     """Simple Atlas API client wrapper with explicit lookup methods."""
 
@@ -37,7 +46,7 @@ class AtlasClient:
         timeout_seconds: int = 10,
         verify_ssl: bool = True,
     ):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _require_https_url(base_url, field_name="Atlas base URL")
         self.token = token
         self.timeout_seconds = timeout_seconds
         self.verify_ssl = verify_ssl

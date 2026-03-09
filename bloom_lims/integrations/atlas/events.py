@@ -25,6 +25,8 @@ class AtlasEventClient:
 
     def _endpoint(self) -> str:
         base = str(self.settings.base_url or "").strip().rstrip("/")
+        if base and not base.startswith("https://"):
+            raise ValueError("atlas.base_url must use an absolute https:// URL")
         path = str(self.settings.events_path or "").strip()
         if not path:
             path = "/api/integrations/bloom/v1/events"

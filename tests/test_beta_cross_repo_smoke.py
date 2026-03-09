@@ -494,18 +494,18 @@ def test_cross_repo_beta_smoke(monkeypatch):
             ursa_app = create_ursa_app(
                 store=store,
                 bloom_client=BloomResolverClient(
-                    base_url="http://testserver",
+                    base_url="https://testserver",
                     client=bloom_client,  # type: ignore[arg-type]
                 ),
                 atlas_client=AtlasResultClient(
-                    base_url="http://testserver",
+                    base_url="https://testserver",
                     api_key="atlas-smoke-key",
                     client=atlas_result_client,  # type: ignore[arg-type]
                 ),
                 settings=Settings(
                     ursa_internal_api_key="ursa-smoke-key",
-                    bloom_base_url="http://testserver",
-                    atlas_base_url="http://testserver",
+                    bloom_base_url="https://testserver",
+                    atlas_base_url="https://testserver",
                     atlas_internal_api_key="atlas-smoke-key",
                 ),
                 require_api_key=False,

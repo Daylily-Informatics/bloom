@@ -198,16 +198,6 @@ def test_action_required_field_extraction_and_missing_detection():
     )
     assert ui_required == ["status"]
 
-    legacy_required = action_exec._extract_required_fields_from_legacy_markup(
-        {
-            "captured_data": {
-                "status": '<input name="status" required>',
-                "optional": '<input name="optional">',
-            }
-        }
-    )
-    assert legacy_required == ["status"]
-
     assert action_exec._missing_required_fields({"status": ""}, ["status"]) == ["status"]
     assert action_exec._missing_required_fields({"status": "ready"}, ["status"]) == []
 
@@ -231,15 +221,9 @@ def test_action_safe_get_by_euid_raises_unexpected_errors():
 
 def test_action_required_field_extractors_handle_non_schema():
     assert action_exec._extract_required_fields_from_ui_schema({"ui_schema": None}) == []
-    assert action_exec._extract_required_fields_from_legacy_markup({"captured_data": None}) == []
 
 
-def test_action_extract_legacy_required_uses_key_fallback_and_collection_missing():
-    required = action_exec._extract_required_fields_from_legacy_markup(
-        {"captured_data": {"batch_id": "<input required>"}}
-    )
-    assert required == ["batch_id"]
-
+def test_action_missing_required_handles_collections():
     missing = action_exec._missing_required_fields(
         {"batch_id": [], "other": None, "meta": {}},
         ["batch_id", "other", "meta"],
@@ -338,7 +322,10 @@ def test_action_execute_success_and_not_found(monkeypatch):
     monkeypatch.setattr(
         action_exec,
         "_resolve_action_definition",
-        lambda *_: {"action_template_uid": str(uuid.uuid4()), "captured_data": {}, "ui_schema": {"fields": []}},
+        lambda *args, **kwargs: (
+            {"action_template_uid": str(uuid.uuid4()), "captured_data": {}, "ui_schema": {"fields": []}},
+            "/set-status/",
+        ),
     )
     monkeypatch.setattr(
         action_exec,
@@ -402,11 +389,14 @@ def test_action_execute_missing_required_fields_and_message_fallback(monkeypatch
     monkeypatch.setattr(
         action_exec,
         "_resolve_action_definition",
-        lambda *_: {
-            "action_template_uid": str(uuid.uuid4()),
-            "captured_data": {},
-            "ui_schema": {"fields": [{"name": "status", "required": True}]},
-        },
+        lambda *args, **kwargs: (
+            {
+                "action_template_uid": str(uuid.uuid4()),
+                "captured_data": {},
+                "ui_schema": {"fields": [{"name": "status", "required": True}]},
+            },
+            "/set-status/",
+        ),
     )
 
     with pytest.raises(action_exec.ActionExecutionError) as missing_required:
@@ -489,30 +479,16 @@ def test_action_map_exception_passthrough_for_structured_errors():
     assert mapped is structured
 
 
-def test_action_resolve_executor_branches(monkeypatch):
-    class _Workflow:
-        def __init__(self, bdb):
-            self.bdb = bdb
-
-    class _WorkflowStep:
-        def __init__(self, bdb):
-            self.bdb = bdb
-
+def test_action_resolve_executor_returns_bloom_obj(monkeypatch):
     class _Obj:
         def __init__(self, bdb):
             self.bdb = bdb
 
-    monkeypatch.setattr("bloom_lims.domain.workflows.BloomWorkflow", _Workflow)
-    monkeypatch.setattr("bloom_lims.domain.workflows.BloomWorkflowStep", _WorkflowStep)
     monkeypatch.setattr(action_exec, "BloomObj", _Obj)
 
     fake_bdb = object()
-    wf_exec = action_exec._resolve_executor(SimpleNamespace(category="workflow"), fake_bdb)
-    step_exec = action_exec._resolve_executor(SimpleNamespace(category="workflow_step"), fake_bdb)
     obj_exec = action_exec._resolve_executor(SimpleNamespace(category="container"), fake_bdb)
 
-    assert isinstance(wf_exec, _Workflow)
-    assert isinstance(step_exec, _WorkflowStep)
     assert isinstance(obj_exec, _Obj)
 
 
@@ -745,12 +721,9 @@ def test_beta_flow_records_modern_action_instances(bdb):
 def test_beta_flow_does_not_call_legacy_do_action(monkeypatch):
     app.dependency_overrides[require_external_token_auth] = _external_rw_user
 
-    def _fail(*args, **kwargs):  # pragma: no cover - assertion path only
-        raise AssertionError("legacy do_action must not be called by beta endpoints")
-
     from bloom_lims.domain.base import BloomObj
 
-    monkeypatch.setattr(BloomObj, "do_action", _fail)
+    assert not hasattr(BloomObj, "do_action")
 
     atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),

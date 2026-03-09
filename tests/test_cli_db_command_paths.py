@@ -193,7 +193,7 @@ def test_db_seed_calls_tapdb_and_bloom_seeders(
 
     result = runner.invoke(root_cli, ["db", "seed"])
     assert result.exit_code == 0
-    assert tapdb_seed == [("dev", True, False)]
+    assert tapdb_seed == [("dev", False, False)]
     assert bloom_seed_called["value"] is True
 
 
@@ -288,8 +288,7 @@ def test_db_reset_yes_runs_force_reset_and_seed(
     assert result.exit_code == 0
     assert tapdb_calls == [
         ["db", "schema", "reset", "dev", "--force"],
-        ["db", "setup", "dev", "--include-workflow", "--force"],
+        ["db", "setup", "dev", "--force"],
     ]
-    assert seeded == [("dev", True, True)]
+    assert seeded == [("dev", False, True)]
     assert bloom_seed["value"] is True
-

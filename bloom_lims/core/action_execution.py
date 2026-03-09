@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import copy
-import html
 import logging
-import re
 import secrets
 from dataclasses import dataclass
 from typing import Any
-
-from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.core.exceptions import BloomValidationError
 from bloom_lims.core.tapdb_action_dispatcher import BloomTapDBActionDispatcher
@@ -136,28 +132,6 @@ def _extract_required_fields_from_ui_schema(action_ds: dict[str, Any]) -> list[s
     return required_fields
 
 
-def _extract_required_fields_from_legacy_markup(action_ds: dict[str, Any]) -> list[str]:
-    captured_data = action_ds.get("captured_data")
-    if not isinstance(captured_data, dict):
-        return []
-
-    required_fields: list[str] = []
-    for key, value in captured_data.items():
-        if not isinstance(value, str):
-            continue
-        decoded = html.unescape(value)
-        if "required" not in decoded.lower():
-            continue
-        name_match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', decoded, flags=re.IGNORECASE)
-        if name_match:
-            required_fields.append(name_match.group(1).strip())
-            continue
-        if isinstance(key, str) and key and not key.startswith("_"):
-            required_fields.append(key)
-
-    return required_fields
-
-
 def _missing_required_fields(captured_data: dict[str, Any], required_fields: list[str]) -> list[str]:
     missing: list[str] = []
 
@@ -217,16 +191,6 @@ def _resolve_action_definition(
             matched_key = candidate
             break
 
-    if action_data is None:
-        requested_slug = _normalize_action_slug(action_key)
-        for key, value in actions.items():
-            if not isinstance(value, dict):
-                continue
-            if _normalize_action_slug(str(key)) == requested_slug:
-                action_data = value
-                matched_key = str(key)
-                break
-
     if not isinstance(action_data, dict):
         raise ActionExecutionError(
             status_code=404,
@@ -247,104 +211,75 @@ def _resolve_action_definition(
     return resolved, matched_key
 
 
-def _normalize_slug_value(value: str | None) -> str:
-    return str(value or "").strip().replace("-", "_").lower()
-
-
-def _resolve_action_template_uid(
-    query_obj: BloomObj,
-    action_definition: dict[str, Any],
-    action_key: str,
-) -> str | None:
-    template = query_obj.Base.classes.generic_template
-    parts = [part for part in str(action_key or "").strip("/").split("/") if part]
-
-    direct_type = None
-    direct_subtype = None
-    direct_version = None
-    if len(parts) == 4 and parts[0] == "action":
-        direct_type = parts[1]
-        direct_subtype = parts[2]
-        direct_version = parts[3]
-
-    if direct_type and direct_subtype and direct_version:
-        direct_match = (
-            query_obj.session.query(template)
-            .filter(
-                template.is_deleted == False,  # noqa: E712
-                template.category == "action",
-                template.type == direct_type,
-                template.subtype == direct_subtype,
-                template.version == direct_version,
-            )
-            .first()
-        )
-        if direct_match is not None:
-            return str(direct_match.uid)
-
-    slug_candidates = {
-        _normalize_action_slug(action_key),
-        _normalize_slug_value(action_definition.get("method_name", "")).removeprefix("do_action_"),
-        _normalize_slug_value(action_definition.get("action_name")),
-    }
-    slug_candidates.discard("")
-
-    if not slug_candidates:
-        return None
-
-    matches = (
-        query_obj.session.query(template)
-        .filter(
-            template.is_deleted == False,  # noqa: E712
-            template.category == "action",
-        )
-        .order_by(template.type.asc(), template.subtype.asc(), template.version.asc())
-        .all()
-    )
-    for row in matches:
-        subtype_slug = _normalize_slug_value(getattr(row, "subtype", ""))
-        if subtype_slug in slug_candidates:
-            return str(row.uid)
-
-    return None
-
-
-def _backfill_action_template_uid(
+def _upgrade_active_action_definition(
     *,
     instance: Any,
     action_group: str,
     matched_action_key: str,
-    action_template_uid: str,
+    action_definition: dict[str, Any],
     query_obj: BloomObj,
-) -> None:
+) -> dict[str, Any]:
+    if action_definition.get("action_template_uid"):
+        return action_definition
+
+    template_code = str(
+        action_definition.get("action_template_code") or matched_action_key or ""
+    ).strip("/")
+    parts = [part for part in template_code.split("/") if part]
+    if len(parts) != 4 or parts[0] != "action":
+        raise ActionExecutionError(
+            status_code=409,
+            detail=(
+                f"Action {matched_action_key} is missing TapDB template metadata "
+                "and cannot be upgraded from a retired legacy definition."
+            ),
+        )
+
+    template = query_obj.Base.classes.generic_template
+    action_template = (
+        query_obj.session.query(template)
+        .filter(
+            template.is_deleted == False,  # noqa: E712
+            template.category == "action",
+            template.type == parts[1],
+            template.subtype == parts[2],
+            template.version == parts[3],
+        )
+        .one_or_none()
+    )
+    if action_template is None:
+        raise ActionExecutionError(
+            status_code=409,
+            detail=(
+                f"Action {matched_action_key} is missing TapDB template metadata "
+                "and no exact modern action template exists for upgrade."
+            ),
+        )
+
     action_groups = (instance.json_addl or {}).get("action_groups", {})
     if not isinstance(action_groups, dict):
-        return
+        return action_definition
     group_data = action_groups.get(action_group)
     if not isinstance(group_data, dict):
-        return
+        return action_definition
     actions = group_data.get("actions", {})
     if not isinstance(actions, dict):
-        return
+        return action_definition
 
     entry = actions.get(matched_action_key)
     if not isinstance(entry, dict):
-        requested_slug = _normalize_action_slug(matched_action_key)
-        for key, value in actions.items():
-            if not isinstance(value, dict):
-                continue
-            if _normalize_action_slug(str(key)) == requested_slug:
-                entry = value
-                break
-    if not isinstance(entry, dict):
-        return
+        return action_definition
 
-    if entry.get("action_template_uid"):
-        return
+    upgraded_definition = copy.deepcopy(action_definition)
+    upgraded_definition["action_template_uid"] = str(action_template.uid)
+    upgraded_definition["action_template_euid"] = action_template.euid
+    upgraded_definition["action_template_code"] = "/".join(parts)
 
-    entry["action_template_uid"] = str(action_template_uid)
-    flag_modified(instance, "json_addl")
+    entry["action_template_uid"] = str(action_template.uid)
+    entry["action_template_euid"] = action_template.euid
+    entry["action_template_code"] = "/".join(parts)
     query_obj.session.flush()
+    return upgraded_definition
 
 
 def _infer_required_fields(
@@ -395,14 +330,6 @@ def _build_action_ds(
 
 
 def _resolve_executor(instance: Any, bdb: BLOOMdb3):
-    if instance.category == "workflow":
-        from bloom_lims.domain.workflows import BloomWorkflow
-
-        return BloomWorkflow(bdb)
-    if instance.category == "workflow_step":
-        from bloom_lims.domain.workflows import BloomWorkflowStep
-
-        return BloomWorkflowStep(bdb)
     return BloomObj(bdb)
 
 
@@ -464,61 +391,21 @@ def execute_action_for_instance(
                 detail=f"Object not found: {request_data.euid}",
             )
 
-        try:
-            resolved_action = _resolve_action_definition(
-                instance,
-                request_data.action_group,
-                request_data.action_key,
-                allow_missing_template_uid=True,
-            )
-        except TypeError as exc:
-            # Backward-compatible with tests/patches that replace the resolver
-            # with a 3-arg callable.
-            if "allow_missing_template_uid" not in str(exc):
-                raise
-            resolved_action = _resolve_action_definition(
-                instance,
-                request_data.action_group,
-                request_data.action_key,
-            )
-        if isinstance(resolved_action, tuple):
-            action_definition, matched_action_key = resolved_action
-        elif isinstance(resolved_action, dict):
-            # Backward-compatible for tests/monkeypatches that return only the definition.
-            action_definition = resolved_action
-            matched_action_key = request_data.action_key
-        else:
-            raise ActionExecutionError(
-                status_code=500,
-                detail="Invalid action definition payload",
-            )
-
-        if not action_definition.get("action_template_uid"):
-            recovered_uid = _resolve_action_template_uid(
-                query_obj,
-                action_definition,
-                request_data.action_key,
-            )
-            if not recovered_uid:
-                raise ActionExecutionError(
-                    status_code=409,
-                    detail=(
-                        f"Action {request_data.action_key} is missing TapDB template metadata "
-                        "(action_template_uid) and could not be auto-resolved."
-                    ),
-                )
-            action_definition["action_template_uid"] = recovered_uid
-            _backfill_action_template_uid(
-                instance=instance,
-                action_group=request_data.action_group,
-                matched_action_key=matched_action_key,
-                action_template_uid=recovered_uid,
-                query_obj=query_obj,
-            )
+        action_definition, matched_action_key = _resolve_action_definition(
+            instance,
+            request_data.action_group,
+            request_data.action_key,
+            allow_missing_template_uid=True,
+        )
+        action_definition = _upgrade_active_action_definition(
+            instance=instance,
+            action_group=request_data.action_group,
+            matched_action_key=matched_action_key,
+            action_definition=action_definition,
+            query_obj=query_obj,
+        )
 
         required_fields = _extract_required_fields_from_ui_schema(action_definition)
-        if not required_fields:
-            required_fields = _extract_required_fields_from_legacy_markup(action_definition)
         if not required_fields:
             required_fields = _infer_required_fields(action_definition, request_data.action_key)
 

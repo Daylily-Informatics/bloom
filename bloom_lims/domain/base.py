@@ -1290,32 +1290,6 @@ class BloomObj:
         ##self.session.flush()
         self.session.commit()
 
-    #
-    # Global Object Actions
-    #
-    def do_action(self, euid, action, action_group, action_ds, now_dt=""):
-        action_code = str(action_ds.get("action_key") or action or "").strip("/")
-        parts = [p for p in action_code.split("/") if p]
-        if len(parts) >= 3:
-            action_name = parts[2]
-        elif parts:
-            action_name = parts[-1]
-        else:
-            raise Exception("Missing action key for action execution")
-
-        handler_name = f"do_action_{action_name}"
-        handler = getattr(self, handler_name, None)
-        if not callable(handler):
-            raise Exception(f"Unknown action handler {handler_name}")
-
-        now_dt = get_datetime_string()
-        if handler_name == "do_action_set_object_status":
-            r = handler(euid, action_ds, action_group, action)
-        else:
-            r = handler(euid, action_ds)
-        self._do_action_base(euid, action, action_group, action_ds, now_dt)
-        return r
-
     def do_action_add_file_to_file_set(self, file_set_euid, action_ds):
         bfs = BloomFileSet(BLOOMdb3())
         bfs.add_files_to_file_set(
@@ -1660,83 +1634,6 @@ class BloomObj:
             self.logger.exception(f"ERROR: {e}")
             self.session.rollback()
             raise e
-
-        return bobj
-
-    def _do_action_base(
-        self, euid, action, action_group, action_ds, now_dt=get_datetime_string()
-    ):
-        """_summary_
-
-        Args:
-            wfs_euid (_type_): _description_
-            action (_type_): _description_
-            action_ds (_type_): _description_
-            now_dt (_type_, optional): _description_. Defaults to get_datetime_string().
-
-        Returns:
-            _type_: _description_
-        """
-        self.logger.debug(
-            f"Completing Action: {action} for {euid} at {now_dt}  with {action_ds}"
-        )
-        bobj = self.get_by_euid(euid)
-
-        #                 #bobj.json_addl["actions"][action]["action_executed"]
-
-        if "action_groups" in bobj.json_addl:
-
-            curr_action_count = int(
-                bobj.json_addl["action_groups"][action_group]["actions"][action][
-                    "action_executed"
-                ]
-            )
-            new_action_count = curr_action_count + 1
-
-            max_action_count = int(
-                bobj.json_addl["action_groups"][action_group]["actions"][action][
-                    "max_executions"
-                ]
-            )
-            if max_action_count > 0 and new_action_count >= max_action_count:
-                bobj.json_addl["action_groups"][action_group]["actions"][action][
-                    "action_enabled"
-                ] = "0"
-            bobj.json_addl["action_groups"][action_group]["actions"][action][
-                "action_executed"
-            ] = f"{new_action_count}"
-
-            for deactivate_action in action_ds.get(
-                "deactivate_actions_when_executed", []
-            ):
-                # This is meant to reach into other actions for when this action is executed, but has not been extended for the
-                # new action_groups structure yet, so quietly allowing failuers for now.
-                # THIS probably no longer should live in the action definition, but be defined in the action group w/the action group
-                try:
-                    bobj.json_addl["action_groups"][action_group]["actions"][action][
-                        deactivate_action
-                    ]["action_enabled"] = "0"
-                except Exception as e:
-                    self.logger.debug(
-                        f"Failed to deactivate {deactivate_action} for {euid} at {now_dt}  with {action_ds}"
-                    )
-
-            bobj.json_addl["action_groups"][action_group]["actions"][action][
-                "executed_datetime"
-            ].append(now_dt)
-            bobj.json_addl["action_groups"][action_group]["actions"][action][
-                "action_user"
-            ].append(action_ds.get("curr_user", "bloomdborm"))
-
-        # from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(bobj, "json_addl")
-        ##self.session.flush()
-        self.session.commit()
-        self.track_user_interaction(
-            euid,
-            relationship_type=f"user_action:{action}",
-            action_ds=action_ds,
-        )
 
         return bobj
 
