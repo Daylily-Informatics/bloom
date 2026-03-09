@@ -60,10 +60,10 @@ def _atlas_context_payload() -> dict[str, object]:
         "atlas_test_euid": _opaque("test-primary"),
         "atlas_test_euids": [_opaque("test-secondary")],
         "atlas_patient_euid": _opaque("patient"),
-        "process_items": [
+        "fulfillment_items": [
             {
                 "atlas_test_euid": _opaque("test"),
-                "atlas_test_process_item_euid": _opaque("proc"),
+                "atlas_test_fulfillment_item_euid": _opaque("proc"),
             }
         ],
     }
@@ -137,10 +137,10 @@ def test_beta_queue_flow_end_to_end():
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
         "atlas_patient_euid": _opaque("patient"),
-        "process_items": [
+        "fulfillment_items": [
             {
                 "atlas_test_euid": _opaque("test"),
-                "atlas_test_process_item_euid": _opaque("proc"),
+                "atlas_test_fulfillment_item_euid": _opaque("proc"),
             }
         ],
     }
@@ -167,8 +167,8 @@ def test_beta_queue_flow_end_to_end():
             == atlas_context["atlas_patient_euid"]
         )
         assert (
-            material["atlas_context"]["process_items"][0]["atlas_test_process_item_euid"]
-            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+            material["atlas_context"]["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
 
         replay = client.post(
@@ -206,7 +206,7 @@ def test_beta_queue_flow_end_to_end():
                 "well_name": "A1",
                 "extraction_type": "cfdna",
                 "output_name": "beta-cfdna-output",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0]["atlas_test_process_item_euid"],
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
                 "metadata": {"operator": "pytest"},
             },
         )
@@ -215,8 +215,8 @@ def test_beta_queue_flow_end_to_end():
         _assert_no_uuid_keys(extraction_body)
         assert extraction_body["current_queue"] == "post_extract_qc"
         assert (
-            extraction_body["atlas_test_process_item_euid"]
-            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+            extraction_body["atlas_test_fulfillment_item_euid"]
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
         extraction_output_euid = extraction_body["extraction_output_euid"]
 
@@ -247,8 +247,8 @@ def test_beta_queue_flow_end_to_end():
         library_body = library_prep.json()
         assert library_body["current_queue"] == "ilmn_seq_pool"
         assert (
-            library_body["atlas_test_process_item_euid"]
-            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+            library_body["atlas_test_fulfillment_item_euid"]
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
         lib_output_euid = library_body["library_prep_output_euid"]
 
@@ -322,11 +322,11 @@ def test_beta_queue_flow_end_to_end():
         assert resolved_body["atlas_trf_euid"] == atlas_context["atlas_trf_euid"]
         assert (
             resolved_body["atlas_test_euid"]
-            == atlas_context["process_items"][0]["atlas_test_euid"]
+            == atlas_context["fulfillment_items"][0]["atlas_test_euid"]
         )
         assert (
-            resolved_body["atlas_test_process_item_euid"]
-            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+            resolved_body["atlas_test_fulfillment_item_euid"]
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
 
 
@@ -418,8 +418,8 @@ def test_reservation_blocks_claim_and_stage_until_release():
                 "plate_name": "beta-reservation-plate",
                 "well_name": "A1",
                 "extraction_type": "cfdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
                 "metadata": {"operator": "pytest"},
             },
@@ -441,8 +441,8 @@ def test_reservation_blocks_claim_and_stage_until_release():
                 "plate_name": "beta-reservation-plate",
                 "well_name": "A1",
                 "extraction_type": "cfdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
                 "metadata": {"operator": "pytest"},
             },
@@ -463,8 +463,8 @@ def test_consume_prevents_stage_reuse_and_implicit_claim_still_works():
                 "plate_name": "beta-consume-plate",
                 "well_name": "A1",
                 "extraction_type": "cfdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
                 "consume_source": True,
                 "metadata": {"operator": "pytest"},
@@ -480,8 +480,8 @@ def test_consume_prevents_stage_reuse_and_implicit_claim_still_works():
                 "plate_name": "beta-consume-plate",
                 "well_name": "A2",
                 "extraction_type": "cfdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
                 "metadata": {"operator": "pytest"},
             },
@@ -505,8 +505,8 @@ def test_metadata_normalization_and_execution_lineage_validation():
                 "plate_name": "beta-metadata-plate",
                 "well_name": "A1",
                 "extraction_type": "cfdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
                 "metadata": {
                     "operator": "  tech-1  ",
@@ -529,8 +529,8 @@ def test_metadata_normalization_and_execution_lineage_validation():
                 "plate_name": "beta-metadata-plate",
                 "well_name": "A2",
                 "extraction_type": "cfdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
                 "metadata": {
                     "instrument_euid": material["specimen_euid"],

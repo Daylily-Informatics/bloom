@@ -46,10 +46,10 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
         "atlas_patient_euid": _opaque("patient"),
-        "process_items": [
+        "fulfillment_items": [
             {
                 "atlas_test_euid": _opaque("test"),
-                "atlas_test_process_item_euid": _opaque("proc"),
+                "atlas_test_fulfillment_item_euid": _opaque("proc"),
             }
         ],
     }
@@ -77,7 +77,7 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
             "source_specimen_euid": specimen_euid,
             "well_name": "A1",
             "extraction_type": "gdna",
-            "atlas_test_process_item_euid": atlas_context["process_items"][0]["atlas_test_process_item_euid"],
+            "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
         },
     )
     assert extraction.status_code == 200, extraction.text
@@ -134,14 +134,14 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         },
     )
     assert run.status_code == 200, run.text
-    return run.json()["run_euid"], atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+    return run.json()["run_euid"], atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
 
 
 def test_run_resolver_returns_404_for_unknown_index():
     app.dependency_overrides[require_external_token_auth] = _external_rw_user
 
     with TestClient(app) as client:
-        run_euid, expected_process_item = _seed_beta_run(client)
+        run_euid, expected_fulfillment_item = _seed_beta_run(client)
 
         missing = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_euid}/resolve",
@@ -162,4 +162,4 @@ def test_run_resolver_returns_404_for_unknown_index():
             },
         )
         assert resolved.status_code == 200, resolved.text
-        assert resolved.json()["atlas_test_process_item_euid"] == expected_process_item
+        assert resolved.json()["atlas_test_fulfillment_item_euid"] == expected_fulfillment_item

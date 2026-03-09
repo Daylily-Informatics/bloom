@@ -304,7 +304,6 @@ def test_lineages_create_and_delete(client: TestClient) -> None:
 
 def test_subjects_workflows_and_steps(client: TestClient, bdb) -> None:
     subj_template = _get_template_euid(bdb, category="subject", type_name="generic", subtype="generic-subject", version="1.0")
-    wf_template = _get_template_euid(bdb, category="workflow", type_name="extraction", subtype="blood-whole-to-gdna", version="1.0")
 
     subj = client.post("/api/v1/subjects/", json={"template_euid": subj_template, "name": "subj-1", "external_id": "X1"})
     assert subj.status_code == 200, subj.text
@@ -322,24 +321,18 @@ def test_subjects_workflows_and_steps(client: TestClient, bdb) -> None:
     subj_delete = client.delete(f"/api/v1/subjects/{subj_euid}")
     assert subj_delete.status_code == 200, subj_delete.text
 
-    wf = client.post(f"/api/v1/workflows/?template_euid={wf_template}&name=coverage-workflow")
-    assert wf.status_code == 200, wf.text
-    wf_payload = wf.json()
-    assert "uuid" not in wf_payload
-    wf_euid = wf_payload["euid"]
+    # Workflows API is retired for beta queue-driven execution and should not be mounted.
+    wf = client.post("/api/v1/workflows/?template_euid=WF-NOT-USED&name=coverage-workflow")
+    assert wf.status_code == 404, wf.text
 
-    wf_get = client.get(f"/api/v1/workflows/{wf_euid}")
-    assert wf_get.status_code == 200, wf_get.text
-    assert "uuid" not in wf_get.json()
+    wf_get = client.get("/api/v1/workflows/WF-NOT-USED")
+    assert wf_get.status_code == 404, wf_get.text
 
-    wf_update = client.put(f"/api/v1/workflows/{wf_euid}?status=in_progress", json={"properties": {"note": "x"}})
-    assert wf_update.status_code == 200, wf_update.text
+    wf_update = client.put("/api/v1/workflows/WF-NOT-USED?status=in_progress", json={"properties": {"note": "x"}})
+    assert wf_update.status_code == 404, wf_update.text
 
-    steps = client.get(f"/api/v1/workflows/{wf_euid}/steps")
-    assert steps.status_code == 200, steps.text
-    assert steps.json()["workflow_euid"] == wf_euid
-    for step in steps.json()["steps"]:
-        assert "uuid" not in step
+    steps = client.get("/api/v1/workflows/WF-NOT-USED/steps")
+    assert steps.status_code == 404, steps.text
 
 
 def test_equipment_create_and_maintenance(client: TestClient, bdb) -> None:

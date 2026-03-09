@@ -526,7 +526,7 @@ class TestModernTemplateUsage:
         assert response.status_code == 200
         content = response.text
         assert "bloom_modern.css" in content
-        assert "Assays" in content
+        assert "Queue Runtime" in content
 
     def test_workflow_summary_uses_modern_template(self, client):
         """Workflow summary route is retired."""
@@ -612,7 +612,7 @@ class TestModernUIElements:
         response = client.get("/assays")
         assert response.status_code == 200
         content = response.text
-        assert "page-header" in content or "Assays" in content
+        assert "page-header" in content or "Queue Runtime" in content
 
 
 class TestModernAPIs:

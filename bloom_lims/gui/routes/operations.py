@@ -275,9 +275,9 @@ async def assays(request: Request, show_type: str = "all", _auth=Depends(require
     atype = {}
 
     if show_type == "assay":
-        atype["type"] = "Assays"
+        atype["type"] = "Queue Runtime"
     else:
-        atype["type"] = "All Assays, etc"
+        atype["type"] = "All Queue Runtime Objects"
 
     for i in sorted(ay_ds.keys()):
         assays.append(ay_ds[i])

@@ -2,20 +2,20 @@
 
 ## Accepted Material Registration
 
-Bloom accepts Atlas-approved material only after Atlas records an `ACCEPTED` intake outcome and materializes one or more test process items.
+Bloom accepts Atlas-approved material only after Atlas records an `ACCEPTED` intake outcome and materializes one or more test fulfillment items.
 
 Minimum request context:
 
 - `atlas_context.atlas_trf_euid`
 - `atlas_context.atlas_patient_euid`
-- `atlas_context.process_items[].atlas_test_euid`
-- `atlas_context.process_items[].atlas_test_process_item_euid`
+- `atlas_context.fulfillment_items[].atlas_test_euid`
+- `atlas_context.fulfillment_items[].atlas_test_fulfillment_item_euid`
 - patient context
 - shipment or test kit context
 - queue intent
 - idempotency key
 
-Bloom persists Atlas linkage through graph-linked reference objects and returns EUID-only identifiers for created material plus `process_item_euids[]`.
+Bloom persists Atlas linkage through graph-linked reference objects and returns EUID-only identifiers for created material plus `fulfillment_item_euids[]`.
 
 For accepted-material ingress, queue transitions are expected on `container_euid` (container-first lab movement).
 
@@ -52,7 +52,7 @@ Output:
 - `atlas_tenant_id`
 - `atlas_trf_euid`
 - `atlas_test_euid`
-- `atlas_test_process_item_euid`
+- `atlas_test_fulfillment_item_euid`
 
 Rules:
 

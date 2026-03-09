@@ -122,7 +122,7 @@ class SmokeAnalysisStore:
                 atlas_tenant_id=resolution.atlas_tenant_id,
                 atlas_trf_euid=resolution.atlas_trf_euid,
                 atlas_test_euid=resolution.atlas_test_euid,
-                atlas_test_process_item_euid=resolution.atlas_test_process_item_euid,
+                atlas_test_fulfillment_item_euid=resolution.atlas_test_fulfillment_item_euid,
                 analysis_type=kwargs["analysis_type"],
                 state=AnalysisState.INGESTED.value,
                 review_state=ReviewState.PENDING.value,
@@ -243,7 +243,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
     atlas_test_accept = _opaque("test")
     atlas_test_hold = _opaque("test")
     atlas_test_reject = _opaque("test")
-    process_item_accept = _opaque("tpc")
+    fulfillment_item_accept = _opaque("tpc")
     patient_euid = _opaque("patient")
     shipment_euid = _opaque("shipment")
     captured_return: dict[str, object] = {}
@@ -261,7 +261,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                     trf_euid=data.trf_euid,
                     trf_status="REJECTED",
                     test_euids=data.test_euids,
-                    process_item_euids=[],
+                    fulfillment_item_euids=[],
                     test_statuses={data.test_euids[0]: "REJECTED"},
                     patient_euid=data.patient_euid,
                     container_euid=None,
@@ -275,7 +275,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                     trf_euid=data.trf_euid,
                     trf_status="ON_HOLD",
                     test_euids=data.test_euids,
-                    process_item_euids=[],
+                    fulfillment_item_euids=[],
                     test_statuses={data.test_euids[0]: "ON_HOLD"},
                     patient_euid=data.patient_euid,
                     container_euid=None,
@@ -288,7 +288,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 trf_euid=data.trf_euid,
                 trf_status="IN_PROGRESS",
                 test_euids=data.test_euids,
-                process_item_euids=[process_item_accept],
+                fulfillment_item_euids=[fulfillment_item_accept],
                 test_statuses={test_euid: "SPECIMEN_RECEIVED" for test_euid in data.test_euids},
                 patient_euid=data.patient_euid,
                 container_euid="CNT-SMOKE",
@@ -303,8 +303,8 @@ def test_cross_repo_beta_smoke(monkeypatch):
         def apply(self, data):
             captured_return["request"] = data
             return SimpleNamespace(
-                assay_run_euid="ASR-SMOKE",
-                assay_result_euid="RES-SMOKE",
+                fulfillment_run_euid="ASR-SMOKE",
+                fulfillment_output_euid="RES-SMOKE",
                 artifact_euids=["ART-SMOKE-1"],
                 results_set_euid="RSET-SMOKE",
                 idempotent_replay=False,
@@ -347,7 +347,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 body = response.json()
                 _assert_no_uuid_keys(body)
                 assert body["accepted"] is False
-                assert body["process_item_euids"] == []
+                assert body["fulfillment_item_euids"] == []
 
             accepted_response = atlas_intake_client.post(
                 "/api/intake/outcomes",
@@ -364,15 +364,15 @@ def test_cross_repo_beta_smoke(monkeypatch):
             accepted_body = accepted_response.json()
             _assert_no_uuid_keys(accepted_body)
             assert accepted_body["accepted"] is True
-            assert accepted_body["process_item_euids"] == [process_item_accept]
+            assert accepted_body["fulfillment_item_euids"] == [fulfillment_item_accept]
 
             atlas_context = {
                 "atlas_tenant_id": str(tenant_id),
                 "atlas_trf_euid": atlas_trf_euid,
-                "process_items": [
+                "fulfillment_items": [
                     {
                         "atlas_test_euid": atlas_test_accept,
-                        "atlas_test_process_item_euid": process_item_accept,
+                        "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
                     }
                 ],
             }
@@ -404,7 +404,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                     "source_specimen_euid": specimen_euid,
                     "well_name": "A1",
                     "extraction_type": "gdna",
-                    "atlas_test_process_item_euid": process_item_accept,
+                    "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
                 },
             )
             assert extraction.status_code == 200, extraction.text
@@ -488,7 +488,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
             assert resolved.status_code == 200, resolved.text
             resolved_body = resolved.json()
             _assert_no_uuid_keys(resolved_body)
-            assert resolved_body["atlas_test_process_item_euid"] == process_item_accept
+            assert resolved_body["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
 
             store = SmokeAnalysisStore()
             ursa_app = create_ursa_app(
@@ -531,7 +531,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 ingest_payload = ingest.json()
                 _assert_no_uuid_keys(ingest_payload)
                 analysis_euid = ingest_payload["analysis_euid"]
-                assert ingest_payload["atlas_test_process_item_euid"] == process_item_accept
+                assert ingest_payload["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
                 assert (
                     ingest_payload["sequenced_library_assignment_euid"]
                     == resolved_body["sequenced_library_assignment_euid"]
@@ -578,7 +578,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
     assert recorded_request.atlas_tenant_id == str(tenant_id)
     assert recorded_request.atlas_trf_euid == atlas_trf_euid
     assert recorded_request.atlas_test_euid == atlas_test_accept
-    assert recorded_request.atlas_test_process_item_euid == process_item_accept
+    assert recorded_request.atlas_test_fulfillment_item_euid == fulfillment_item_accept
     assert recorded_request.flowcell_id == flowcell_id
     assert recorded_request.lane == lane
     assert recorded_request.library_barcode == library_barcode

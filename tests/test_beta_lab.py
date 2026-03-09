@@ -65,7 +65,7 @@ def test_run_resolver_requires_full_key_query_params():
         app.dependency_overrides.pop(require_external_ursa_read, None)
 
 
-def test_material_registration_links_process_items_on_container_and_patient_on_specimen(bdb):
+def test_material_registration_links_fulfillment_items_on_container_and_patient_on_specimen(bdb):
     def _atlas_rw_user() -> APIUser:
         token = secrets.token_hex(8)
         return APIUser(
@@ -106,10 +106,10 @@ def test_material_registration_links_process_items_on_container_and_patient_on_s
             "atlas_testkit_euid": f"kit-{secrets.token_hex(8)}",
             "atlas_shipment_euid": f"shipment-{secrets.token_hex(8)}",
             "atlas_organization_site_euid": f"site-{secrets.token_hex(8)}",
-            "process_items": [
+            "fulfillment_items": [
                 {
                     "atlas_test_euid": f"test-{secrets.token_hex(8)}",
-                    "atlas_test_process_item_euid": f"proc-{secrets.token_hex(8)}",
+                    "atlas_test_fulfillment_item_euid": f"proc-{secrets.token_hex(8)}",
                 }
             ],
         }
@@ -147,8 +147,8 @@ def test_material_registration_links_process_items_on_container_and_patient_on_s
         )
         assert any(
             str(ref.get("reference_type")) == "atlas_test_process_item"
-            and str(ref.get("atlas_test_process_item_euid"))
-            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+            and str(ref.get("atlas_test_fulfillment_item_euid"))
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
             for ref in container_refs
         )
         assert any(
@@ -186,8 +186,8 @@ def test_material_registration_links_process_items_on_container_and_patient_on_s
                 "source_specimen_euid": specimen_euid,
                 "well_name": "A1",
                 "extraction_type": "gdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0][
-                    "atlas_test_process_item_euid"
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                    "atlas_test_fulfillment_item_euid"
                 ],
             },
         )

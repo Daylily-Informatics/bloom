@@ -64,12 +64,12 @@ def _render_search_page(
 async def modern_dashboard(request: Request, _=Depends(require_auth)):
     user_data = request.session.get("user_data", {})
     stats = {
-        "assays_total": 0,
+        "queue_runtime_total": 0,
         "objects_total": 0,
         "equipment_total": 0,
         "reagents_total": 0,
     }
-    recent_assays = []
+    recent_queue_runtime = []
     recent_objects = []
     db_unavailable = not _is_tapdb_reachable()
 
@@ -77,7 +77,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
         try:
             bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
             stats = {
-                "assays_total": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+                "queue_runtime_total": bobdb.session.query(bobdb.Base.classes.workflow_instance)
                 .filter_by(is_deleted=False, is_singleton=True)
                 .count(),
                 "objects_total": bobdb.session.query(bobdb.Base.classes.generic_instance)
@@ -93,7 +93,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
                 )
                 .count(),
             }
-            recent_assays = (
+            recent_queue_runtime = (
                 bobdb.session.query(bobdb.Base.classes.workflow_instance)
                 .filter_by(is_deleted=False, is_singleton=True)
                 .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
@@ -115,7 +115,7 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
         "request": request,
         "udat": user_data,
         "stats": stats,
-        "recent_assays": recent_assays,
+        "recent_queue_runtime": recent_queue_runtime,
         "recent_objects": recent_objects,
         "db_unavailable": db_unavailable,
     }

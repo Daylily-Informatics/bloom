@@ -1,12 +1,12 @@
 {% extends "modern/base.html" %}
 
-{% block title %}Assays - BLOOM LIMS{% endblock %}
+{% block title %}Queue Runtime - BLOOM LIMS{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1>Assays</h1>
-    <p class="text-muted">Manage laboratory assay objects</p>
+    <h1>Queue Runtime</h1>
+    <p class="text-muted">Queue/material/run-centric operational objects</p>
   </div>
   <div class="page-actions">
   </div>
@@ -15,9 +15,9 @@
 <!-- Filter Bar -->
 <div class="filter-bar mb-lg">
   <div class="filter-group">
-    <label class="filter-label">Type:</label>
+    <label class="filter-label">Runtime Type:</label>
     <select class="form-select" id="filter-type" onchange="filterAssays()">
-      <option value="all" {% if show_type == 'all' %}selected{% endif %}>All Types</option>
+      <option value="all" {% if show_type == 'all' %}selected{% endif %}>All Runtime Types</option>
       {% for atype in assay_types %}
       <option value="{{ atype }}" {% if show_type == atype %}selected{% endif %}>{{ atype }}</option>
       {% endfor %}
@@ -33,12 +33,12 @@
     </select>
   </div>
   <div class="filter-search">
-    <input type="text" class="form-input" placeholder="Search assays..." id="search-input" onkeyup="searchAssays(this.value)">
+    <input type="text" class="form-input" placeholder="Search queue runtime objects..." id="search-input" onkeyup="searchAssays(this.value)">
     <i class="fas fa-search"></i>
   </div>
 </div>
 
-<!-- Assays Grid -->
+<!-- Queue Runtime Grid -->
 <div class="grid grid-3" id="assays-grid">
   {% if assays %}
     {% for assay in assays %}
@@ -69,7 +69,7 @@
     <div class="empty-state" style="grid-column: 1 / -1;">
       <div class="empty-state-icon"><i class="fas fa-flask"></i></div>
       <p>No assays found</p>
-      <p class="text-muted text-sm">Create a new assay to get started</p>
+      <p class="text-muted text-sm">Queue runtime objects appear as material and run operations progress</p>
     </div>
   {% endif %}
 </div>

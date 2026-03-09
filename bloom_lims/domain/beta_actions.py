@@ -21,7 +21,7 @@ BETA_ACTION_TEMPLATE_PREFIX = "BXA"
 _ACTION_TEMPLATE_DEFINITIONS: dict[str, dict[str, Any]] = {
     "register_accepted_material": {
         "name": "Register Accepted Material",
-        "description": "Creates accepted Bloom beta material and links Atlas process-item references.",
+        "description": "Creates accepted Bloom beta material and links Atlas fulfillment-item references.",
     },
     "create_empty_tube": {
         "name": "Create Empty Tube",

@@ -38,7 +38,7 @@ class BetaLabService:
 
     EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
     EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
-    PROCESS_ITEM_REFERENCE_TYPE = "atlas_test_process_item"
+    PROCESS_ITEM_REFERENCE_TYPE = "atlas_test_fulfillment_item"
     PATIENT_REFERENCE_TYPE = "atlas_patient"
     TRF_REFERENCE_TYPE = "atlas_trf"
     TEST_REFERENCE_TYPE = "atlas_test"
@@ -139,7 +139,7 @@ class BetaLabService:
             container,
             atlas_context=payload.atlas_context.model_dump(),
         )
-        self._replace_process_item_references(
+        self._replace_fulfillment_item_references(
             container,
             atlas_context=payload.atlas_context.model_dump(),
         )
@@ -209,7 +209,7 @@ class BetaLabService:
             container,
             atlas_context=payload.atlas_context.model_dump(),
         )
-        self._replace_process_item_references(
+        self._replace_fulfillment_item_references(
             container,
             atlas_context=payload.atlas_context.model_dump(),
         )
@@ -247,7 +247,7 @@ class BetaLabService:
         if payload.atlas_context is not None:
             atlas_context = payload.atlas_context.model_dump()
             self._replace_container_entity_references(container, atlas_context=atlas_context)
-            self._replace_process_item_references(container, atlas_context=atlas_context)
+            self._replace_fulfillment_item_references(container, atlas_context=atlas_context)
 
         self._record_action(
             target_instance=container,
@@ -669,9 +669,9 @@ class BetaLabService:
             stage_label="extraction",
         )
 
-        process_item_context = self._resolve_process_item_context(
+        fulfillment_item_context = self._resolve_fulfillment_item_context(
             source,
-            target_process_item_euid=payload.atlas_test_process_item_euid,
+            target_fulfillment_item_euid=payload.atlas_test_fulfillment_item_euid,
         )
         plate = self._resolve_or_create_plate(
             plate_euid=payload.plate_euid,
@@ -710,7 +710,7 @@ class BetaLabService:
             relationship_type="contains",
         )
         self._attach_execution_metadata_lineage(output, normalized_metadata)
-        self._replace_process_item_references(output, atlas_context=process_item_context)
+        self._replace_fulfillment_item_references(output, atlas_context=fulfillment_item_context)
         response = self._transition_material(
             material=output,
             queue_name="post_extract_qc",
@@ -746,7 +746,7 @@ class BetaLabService:
                 "well_name": payload.well_name,
                 "extraction_type": payload.extraction_type,
                 "output_name": payload.output_name,
-                "atlas_test_process_item_euid": payload.atlas_test_process_item_euid,
+                "atlas_test_fulfillment_item_euid": payload.atlas_test_fulfillment_item_euid,
                 "metadata": normalized_metadata,
                 "claim_euid": payload.claim_euid,
                 "consume_source": bool(payload.consume_source),
@@ -768,8 +768,8 @@ class BetaLabService:
             well_euid=well.euid,
             well_name=payload.well_name,
             extraction_output_euid=output.euid,
-            atlas_test_process_item_euid=process_item_context[
-                "atlas_test_process_item_euid"
+            atlas_test_fulfillment_item_euid=fulfillment_item_context[
+                "atlas_test_fulfillment_item_euid"
             ],
             current_queue=response.current_queue,
             idempotent_replay=False,
@@ -885,12 +885,12 @@ class BetaLabService:
             )
             if existing is not None:
                 source = self._first_parent(existing, "beta_library_prep_output")
-                process_item_context = self._resolve_process_item_context(existing)
+                fulfillment_item_context = self._resolve_fulfillment_item_context(existing)
                 return BetaLibraryPrepResponse(
                     source_extraction_output_euid=source.euid if source is not None else "",
                     library_prep_output_euid=existing.euid,
-                    atlas_test_process_item_euid=process_item_context[
-                        "atlas_test_process_item_euid"
+                    atlas_test_fulfillment_item_euid=fulfillment_item_context[
+                        "atlas_test_fulfillment_item_euid"
                     ],
                     current_queue=self._current_queue_for_instance(existing) or "",
                     idempotent_replay=True,
@@ -913,7 +913,7 @@ class BetaLabService:
             stage_label="library_prep",
         )
 
-        process_item_context = self._resolve_process_item_context(source)
+        fulfillment_item_context = self._resolve_fulfillment_item_context(source)
         normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         lib_output = self._create_data_record(
             beta_kind="library_prep_output",
@@ -930,9 +930,9 @@ class BetaLabService:
             lib_output.euid,
             relationship_type="beta_library_prep_output",
         )
-        self._replace_process_item_references(
+        self._replace_fulfillment_item_references(
             lib_output,
-            atlas_context=process_item_context,
+            atlas_context=fulfillment_item_context,
         )
         self._attach_execution_metadata_lineage(lib_output, normalized_metadata)
         transition = self._transition_material(
@@ -976,8 +976,8 @@ class BetaLabService:
         return BetaLibraryPrepResponse(
             source_extraction_output_euid=source.euid,
             library_prep_output_euid=lib_output.euid,
-            atlas_test_process_item_euid=process_item_context[
-                "atlas_test_process_item_euid"
+            atlas_test_fulfillment_item_euid=fulfillment_item_context[
+                "atlas_test_fulfillment_item_euid"
             ],
             current_queue=transition.current_queue,
             idempotent_replay=False,
@@ -1187,7 +1187,7 @@ class BetaLabService:
 
         for assignment in payload.assignments:
             source = self._require_instance(assignment.library_prep_output_euid)
-            process_item_context = self._resolve_process_item_context(source)
+            fulfillment_item_context = self._resolve_fulfillment_item_context(source)
             assignment_record = self._create_data_record(
                 beta_kind="sequenced_library_assignment",
                 name=f"{run.euid}:{assignment.lane}:{assignment.library_barcode}",
@@ -1207,9 +1207,9 @@ class BetaLabService:
                 assignment_record.euid,
                 relationship_type="beta_assignment_source",
             )
-            self._replace_process_item_references(
+            self._replace_fulfillment_item_references(
                 assignment_record,
-                atlas_context=process_item_context,
+                atlas_context=fulfillment_item_context,
             )
 
         for artifact in payload.artifacts:
@@ -1322,18 +1322,18 @@ class BetaLabService:
                 != normalized_library_barcode
             ):
                 continue
-            process_item_context = self._resolve_process_item_context(assignment)
+            fulfillment_item_context = self._resolve_fulfillment_item_context(assignment)
             return BetaRunResolutionResponse(
                 run_euid=run.euid,
                 flowcell_id=normalized_flowcell_id,
                 lane=normalized_lane,
                 library_barcode=normalized_library_barcode,
                 sequenced_library_assignment_euid=assignment.euid,
-                atlas_tenant_id=process_item_context["atlas_tenant_id"],
-                atlas_trf_euid=process_item_context["atlas_trf_euid"],
-                atlas_test_euid=process_item_context["atlas_test_euid"],
-                atlas_test_process_item_euid=process_item_context[
-                    "atlas_test_process_item_euid"
+                atlas_tenant_id=fulfillment_item_context["atlas_tenant_id"],
+                atlas_trf_euid=fulfillment_item_context["atlas_trf_euid"],
+                atlas_test_euid=fulfillment_item_context["atlas_test_euid"],
+                atlas_test_fulfillment_item_euid=fulfillment_item_context[
+                    "atlas_test_fulfillment_item_euid"
                 ],
             )
 
@@ -1852,15 +1852,15 @@ class BetaLabService:
         source = self._first_parent(extraction_output, "beta_extraction_output")
         well = self._first_parent(extraction_output, "contains")
         plate = self._first_parent(well, "contains") if well is not None else None
-        process_item_context = self._resolve_process_item_context(extraction_output)
+        fulfillment_item_context = self._resolve_fulfillment_item_context(extraction_output)
         return BetaExtractionResponse(
             source_specimen_euid=source.euid if source is not None else "",
             plate_euid=plate.euid if plate is not None else "",
             well_euid=well.euid if well is not None else "",
             well_name=self._well_name(well),
             extraction_output_euid=extraction_output.euid,
-            atlas_test_process_item_euid=process_item_context[
-                "atlas_test_process_item_euid"
+            atlas_test_fulfillment_item_euid=fulfillment_item_context[
+                "atlas_test_fulfillment_item_euid"
             ],
             current_queue=self._current_queue_for_instance(extraction_output) or "",
             idempotent_replay=replay,
@@ -2003,37 +2003,37 @@ class BetaLabService:
                 return container_queue
         return None
 
-    def _resolve_process_item_context(
+    def _resolve_fulfillment_item_context(
         self,
         instance,
         *,
-        target_process_item_euid: str | None = None,
+        target_fulfillment_item_euid: str | None = None,
     ) -> dict[str, str]:
         matches = {
-            ref["atlas_test_process_item_euid"]: ref
-            for ref in self._reachable_process_item_refs(instance)
+            ref["atlas_test_fulfillment_item_euid"]: ref
+            for ref in self._reachable_fulfillment_item_refs(instance)
         }
-        target = str(target_process_item_euid or "").strip()
+        target = str(target_fulfillment_item_euid or "").strip()
         if target:
             if target in matches:
                 return matches[target]
             raise ValueError(
-                "No Atlas test process item could be resolved from "
+                "No Atlas test fulfillment item could be resolved from "
                 f"Bloom lineage for {instance.euid}: {target}"
             )
         if len(matches) == 1:
             return next(iter(matches.values()))
         if len(matches) > 1:
             raise ValueError(
-                "Multiple Atlas test process items are reachable from "
+                "Multiple Atlas test fulfillment items are reachable from "
                 f"{instance.euid}; choose one explicitly before sequencing"
             )
         raise ValueError(
-            "No Atlas test process item could be resolved from "
+            "No Atlas test fulfillment item could be resolved from "
             f"Bloom lineage for {instance.euid}"
         )
 
-    def _reachable_process_item_refs(self, instance) -> list[dict[str, str]]:
+    def _reachable_fulfillment_item_refs(self, instance) -> list[dict[str, str]]:
         visited: set[int] = set()
         to_visit = [instance]
         refs: dict[str, dict[str, str]] = {}
@@ -2043,8 +2043,8 @@ class BetaLabService:
             if current_uid in visited:
                 continue
             visited.add(current_uid)
-            for ref in self._process_item_refs_for_instance(current):
-                refs[ref["atlas_test_process_item_euid"]] = ref
+            for ref in self._fulfillment_item_refs_for_instance(current):
+                refs[ref["atlas_test_fulfillment_item_euid"]] = ref
             for lineage in get_child_lineages(current):
                 if lineage.is_deleted:
                     continue
@@ -2054,28 +2054,28 @@ class BetaLabService:
                 to_visit.append(parent)
         return list(refs.values())
 
-    def _process_item_refs_for_instance(self, instance) -> list[dict[str, str]]:
+    def _fulfillment_item_refs_for_instance(self, instance) -> list[dict[str, str]]:
         refs: dict[str, dict[str, str]] = {}
         for payload in self._atlas_reference_payloads_for_instance(instance):
             ref_type = str(payload.get("reference_type") or "").strip()
             if ref_type != self.PROCESS_ITEM_REFERENCE_TYPE:
                 continue
-            process_item_euid = str(payload.get("atlas_test_process_item_euid") or "").strip()
+            fulfillment_item_euid = str(payload.get("atlas_test_fulfillment_item_euid") or "").strip()
             atlas_test_euid = str(payload.get("atlas_test_euid") or "").strip()
             atlas_tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
             atlas_trf_euid = str(payload.get("atlas_trf_euid") or "").strip()
             if not (
-                process_item_euid
+                fulfillment_item_euid
                 and atlas_test_euid
                 and atlas_tenant_id
                 and atlas_trf_euid
             ):
                 continue
-            refs[process_item_euid] = {
+            refs[fulfillment_item_euid] = {
                 "atlas_tenant_id": atlas_tenant_id,
                 "atlas_trf_euid": atlas_trf_euid,
                 "atlas_test_euid": atlas_test_euid,
-                "atlas_test_process_item_euid": process_item_euid,
+                "atlas_test_fulfillment_item_euid": fulfillment_item_euid,
             }
         return list(refs.values())
 
@@ -2149,7 +2149,7 @@ class BetaLabService:
             and str(snapshot.get("collection_event_euid") or "").strip()
         )
 
-    def _replace_process_item_references(self, instance, *, atlas_context: dict[str, Any]) -> None:
+    def _replace_fulfillment_item_references(self, instance, *, atlas_context: dict[str, Any]) -> None:
         self._delete_reference_type(
             instance,
             reference_type=self.PROCESS_ITEM_REFERENCE_TYPE,
@@ -2157,18 +2157,18 @@ class BetaLabService:
 
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
-        process_items = list(atlas_context.get("process_items") or [])
+        fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
 
-        for process_item in process_items:
-            atlas_test_euid = str(process_item.get("atlas_test_euid") or "").strip()
-            atlas_test_process_item_euid = str(
-                process_item.get("atlas_test_process_item_euid") or ""
+        for fulfillment_item in fulfillment_items:
+            atlas_test_euid = str(fulfillment_item.get("atlas_test_euid") or "").strip()
+            atlas_test_fulfillment_item_euid = str(
+                fulfillment_item.get("atlas_test_fulfillment_item_euid") or ""
             ).strip()
             if not (
                 atlas_tenant_id
                 and atlas_trf_euid
                 and atlas_test_euid
-                and atlas_test_process_item_euid
+                and atlas_test_fulfillment_item_euid
             ):
                 continue
             ref_obj = self.bobj.create_instance_by_code(
@@ -2178,12 +2178,12 @@ class BetaLabService:
                         "properties": {
                             "provider": "atlas",
                             "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
-                            "reference_value": atlas_test_process_item_euid,
-                            "foreign_reference": atlas_test_process_item_euid,
+                            "reference_value": atlas_test_fulfillment_item_euid,
+                            "foreign_reference": atlas_test_fulfillment_item_euid,
                             "atlas_tenant_id": atlas_tenant_id,
                             "atlas_trf_euid": atlas_trf_euid,
                             "atlas_test_euid": atlas_test_euid,
-                            "atlas_test_process_item_euid": atlas_test_process_item_euid,
+                            "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
                             "validation": {},
                         }
                     }
@@ -2215,9 +2215,9 @@ class BetaLabService:
                 continue
             seen_tests.add(clean_value)
             atlas_test_euids.append(clean_value)
-        process_items = list(atlas_context.get("process_items") or [])
-        for process_item in process_items:
-            candidate = str(process_item.get("atlas_test_euid") or "").strip()
+        fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
+        for fulfillment_item in fulfillment_items:
+            candidate = str(fulfillment_item.get("atlas_test_euid") or "").strip()
             if not candidate or candidate in seen_tests:
                 continue
             seen_tests.add(candidate)
@@ -2524,7 +2524,7 @@ class BetaLabService:
         }
 
     def _atlas_context_for_instance(self, instance) -> dict[str, Any]:
-        process_items = self._reachable_process_item_refs(instance)
+        fulfillment_items = self._reachable_fulfillment_item_refs(instance)
         patient_ref = self._patient_ref_for_instance(instance)
         collection_event_ref = self._collection_event_ref_for_instance(instance)
         atlas_trf_euid = self._first_reachable_reference_value(
@@ -2568,8 +2568,8 @@ class BetaLabService:
             seen_test_euids.add(atlas_test_euid)
             atlas_test_euids.append(atlas_test_euid)
         for item in sorted(
-            process_items,
-            key=lambda item: item["atlas_test_process_item_euid"],
+            fulfillment_items,
+            key=lambda item: item["atlas_test_fulfillment_item_euid"],
         ):
             candidate = str(item["atlas_test_euid"] or "").strip()
             if not candidate or candidate in seen_test_euids:
@@ -2601,7 +2601,7 @@ class BetaLabService:
         ) or (
             collection_event_ref["atlas_tenant_id"] if collection_event_ref is not None else ""
         )
-        if not process_items:
+        if not fulfillment_items:
             return {
                 "atlas_tenant_id": fallback_tenant_id,
                 "atlas_trf_euid": atlas_trf_euid,
@@ -2623,9 +2623,9 @@ class BetaLabService:
                 "atlas_patient_euid": (
                     patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
                 ),
-                "process_items": [],
+                "fulfillment_items": [],
             }
-        first = process_items[0]
+        first = fulfillment_items[0]
         return {
             "atlas_tenant_id": first["atlas_tenant_id"],
             "atlas_trf_euid": first["atlas_trf_euid"] or atlas_trf_euid,
@@ -2647,14 +2647,14 @@ class BetaLabService:
             "atlas_patient_euid": (
                 patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
             ),
-            "process_items": [
+            "fulfillment_items": [
                 {
                     "atlas_test_euid": item["atlas_test_euid"],
-                    "atlas_test_process_item_euid": item["atlas_test_process_item_euid"],
+                    "atlas_test_fulfillment_item_euid": item["atlas_test_fulfillment_item_euid"],
                 }
                 for item in sorted(
-                    process_items,
-                    key=lambda item: item["atlas_test_process_item_euid"],
+                    fulfillment_items,
+                    key=lambda item: item["atlas_test_fulfillment_item_euid"],
                 )
             ],
         }

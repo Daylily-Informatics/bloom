@@ -19,9 +19,9 @@ CanonicalQueueName = Literal[
 ]
 
 
-class AtlasProcessItemReference(BaseModel):
+class AtlasFulfillmentItemReference(BaseModel):
     atlas_test_euid: str
-    atlas_test_process_item_euid: str
+    atlas_test_fulfillment_item_euid: str
 
 
 class AtlasCollectionEventSnapshot(BaseModel):
@@ -36,7 +36,7 @@ class AtlasCollectionEventSnapshot(BaseModel):
     expected_label_text: str | None = None
 
 
-class AtlasProcessContext(BaseModel):
+class AtlasFulfillmentContext(BaseModel):
     atlas_tenant_id: str
     atlas_trf_euid: str | None = None
     atlas_test_euid: str | None = None
@@ -47,10 +47,10 @@ class AtlasProcessContext(BaseModel):
     atlas_organization_site_euid: str | None = None
     atlas_collection_event_euid: str | None = None
     collection_event_snapshot: AtlasCollectionEventSnapshot | None = None
-    process_items: list[AtlasProcessItemReference] = Field(default_factory=list)
+    fulfillment_items: list[AtlasFulfillmentItemReference] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_context(self) -> "AtlasProcessContext":
+    def validate_context(self) -> "AtlasFulfillmentContext":
         if not self.atlas_tenant_id.strip():
             raise ValueError("atlas_tenant_id is required")
         if self.atlas_trf_euid is not None and not self.atlas_trf_euid.strip():
@@ -100,9 +100,9 @@ class AtlasProcessContext(BaseModel):
                     "collection_event_snapshot.collection_event_euid must match "
                     "atlas_collection_event_euid"
                 )
-        if self.process_items:
+        if self.fulfillment_items:
             if not (self.atlas_trf_euid and self.atlas_trf_euid.strip()):
-                raise ValueError("atlas_trf_euid is required when process_items are provided")
+                raise ValueError("atlas_trf_euid is required when fulfillment_items are provided")
         elif (self.atlas_test_euid is not None or self.atlas_test_euids) and not self.atlas_trf_euid:
             raise ValueError("atlas_trf_euid is required when atlas_test_euid is provided")
         return self
@@ -115,26 +115,26 @@ class BetaAcceptedMaterialCreateRequest(BaseModel):
     container_template_code: str = Field(default="container/tube/tube-generic-10ml/1.0")
     status: str = Field(default="active")
     properties: dict[str, Any] = Field(default_factory=dict)
-    atlas_context: AtlasProcessContext
+    atlas_context: AtlasFulfillmentContext
 
 
 class BetaTubeCreateRequest(BaseModel):
     container_template_code: str = Field(default="container/tube/tube-generic-10ml/1.0")
     status: str = Field(default="active")
     properties: dict[str, Any] = Field(default_factory=dict)
-    atlas_context: AtlasProcessContext
+    atlas_context: AtlasFulfillmentContext
 
 
 class BetaTubeUpdateRequest(BaseModel):
     status: str | None = None
     properties: dict[str, Any] | None = None
-    atlas_context: AtlasProcessContext | None = None
+    atlas_context: AtlasFulfillmentContext | None = None
 
 
 class BetaSpecimenUpdateRequest(BaseModel):
     status: str | None = None
     properties: dict[str, Any] | None = None
-    atlas_context: AtlasProcessContext | None = None
+    atlas_context: AtlasFulfillmentContext | None = None
 
 
 class BetaMaterialResponse(BaseModel):
@@ -179,7 +179,7 @@ class BetaExtractionCreateRequest(BaseModel):
     well_name: str
     extraction_type: Literal["cfdna", "gdna"] = Field(default="cfdna")
     output_name: str | None = None
-    atlas_test_process_item_euid: str | None = None
+    atlas_test_fulfillment_item_euid: str | None = None
     claim_euid: str | None = None
     consume_source: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -191,7 +191,7 @@ class BetaExtractionResponse(BaseModel):
     well_euid: str
     well_name: str
     extraction_output_euid: str
-    atlas_test_process_item_euid: str
+    atlas_test_fulfillment_item_euid: str
     current_queue: str
     idempotent_replay: bool = False
 
@@ -229,7 +229,7 @@ class BetaLibraryPrepCreateRequest(BaseModel):
 class BetaLibraryPrepResponse(BaseModel):
     source_extraction_output_euid: str
     library_prep_output_euid: str
-    atlas_test_process_item_euid: str
+    atlas_test_fulfillment_item_euid: str
     current_queue: str
     idempotent_replay: bool = False
 
@@ -316,7 +316,7 @@ class BetaRunResolutionResponse(BaseModel):
     atlas_tenant_id: str
     atlas_trf_euid: str
     atlas_test_euid: str
-    atlas_test_process_item_euid: str
+    atlas_test_fulfillment_item_euid: str
 
 
 class BetaClaimCreateRequest(BaseModel):

@@ -82,9 +82,10 @@ def test_api_root_lists_new_auth_endpoints(client):
     assert "admin_auth" in endpoints
 
 
-def test_external_specimen_endpoints_removed(client):
+def test_external_specimen_endpoints_require_external_token_auth(client):
     response = client.get("/api/v1/external/specimens/by-reference?order_number=ORD-1")
-    assert response.status_code == 404
+    assert response.status_code == 401
+    assert "requires Bloom API bearer token" in response.json()["detail"]
 
 
 def test_user_tokens_endpoints_create_list_usage_revoke(client):

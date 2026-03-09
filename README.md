@@ -46,7 +46,7 @@ Canonical queues:
 - `ilmn_start_seq_run`
 - `ont_start_seq_run`
 
-Atlas records intake outcomes first. Bloom accepts only Atlas-approved material, links that material to Atlas TRF/Test/process-item context through explicit graph-linked reference objects, and preserves lineage from specimen/container through plate and well placement, library prep, pooling, sequencing run creation, and sequenced library assignment.
+Atlas records intake outcomes first. Bloom accepts only Atlas-approved material, links that material to Atlas TRF/Test/fulfillment-item context through explicit graph-linked reference objects, and preserves lineage from specimen/container through plate and well placement, library prep, pooling, sequencing run creation, and sequenced library assignment.
 The atomic business/fulfillment/reporting unit is `TRF.test`; `TRF` is a rollup container across child tests.
 Accepted-material ingress queue membership is applied to the physical container (`container_euid`), with specimen queue reads falling back to containing-container queue state when needed.
 
@@ -63,7 +63,7 @@ Bloom returns:
 - `atlas_tenant_id`
 - `atlas_trf_euid`
 - `atlas_test_euid`
-- `atlas_test_process_item_euid`
+- `atlas_test_fulfillment_item_euid`
 
 Public beta APIs return EUIDs only. Internal UUIDs are not part of the supported contract.
 
@@ -137,7 +137,7 @@ Workflow/workset runtime surfaces are retired from active API/GUI mounts for the
 
 ## Development
 
-Bloom runs on the TapDB-backed adapter layer used across the LSMC refactor. The beta queue flow uses explicit object creation, lineage writes, targeted lookup queries, process-item references, and idempotency keys on direct integration calls.
+Bloom runs on the TapDB-backed adapter layer used across the LSMC refactor. The beta queue flow uses explicit object creation, lineage writes, targeted lookup queries, fulfillment-item references, and idempotency keys on direct integration calls.
 
 Focused validation commands for the beta path:
 

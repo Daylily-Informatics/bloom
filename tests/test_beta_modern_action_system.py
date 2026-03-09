@@ -599,10 +599,10 @@ def test_beta_flow_records_modern_action_instances(bdb):
     atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
-        "process_items": [
+        "fulfillment_items": [
             {
                 "atlas_test_euid": _opaque("test"),
-                "atlas_test_process_item_euid": _opaque("proc"),
+                "atlas_test_fulfillment_item_euid": _opaque("proc"),
             }
         ],
     }
@@ -636,7 +636,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
                 "well_name": "A1",
                 "extraction_type": "cfdna",
                 "output_name": "beta-action-output",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0]["atlas_test_process_item_euid"],
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
             },
         )
         assert extraction.status_code == 200, extraction.text
@@ -755,10 +755,10 @@ def test_beta_flow_does_not_call_legacy_do_action(monkeypatch):
     atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
-        "process_items": [
+        "fulfillment_items": [
             {
                 "atlas_test_euid": _opaque("test"),
-                "atlas_test_process_item_euid": _opaque("proc"),
+                "atlas_test_fulfillment_item_euid": _opaque("proc"),
             }
         ],
     }
@@ -786,10 +786,10 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
     atlas_context = {
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_trf_euid": _opaque("trf"),
-        "process_items": [
+        "fulfillment_items": [
             {
                 "atlas_test_euid": _opaque("test"),
-                "atlas_test_process_item_euid": _opaque("proc"),
+                "atlas_test_fulfillment_item_euid": _opaque("proc"),
             }
         ],
     }
@@ -819,7 +819,7 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
                 "plate_name": "beta-graph-plate",
                 "well_name": "A1",
                 "extraction_type": "gdna",
-                "atlas_test_process_item_euid": atlas_context["process_items"][0]["atlas_test_process_item_euid"],
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
             },
         )
         assert extraction.status_code == 200, extraction.text
@@ -890,6 +890,6 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
         )
         assert resolved.status_code == 200, resolved.text
         assert (
-            resolved.json()["atlas_test_process_item_euid"]
-            == atlas_context["process_items"][0]["atlas_test_process_item_euid"]
+            resolved.json()["atlas_test_fulfillment_item_euid"]
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )

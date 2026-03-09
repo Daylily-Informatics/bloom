@@ -23,7 +23,7 @@ Beta contract guardrails:
 
 1. The atomic business/fulfillment/reporting unit is `TRF.test`; `TRF` is rollup context only.
 2. External contracts are EUID-only (do not depend on UUIDs).
-3. Container context may link to multiple tests on the same TRF; direct container-linked tests/process-items are the authoritative processing set.
+3. Container context may link to multiple tests on the same TRF; direct container-linked tests/fulfillment-items are the authoritative processing set.
 
 Beta work-control endpoints (queue claim/reservation/consume):
 
