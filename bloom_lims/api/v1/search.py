@@ -26,8 +26,6 @@ SEARCHABLE_TYPES = [
     "content",
     "workflow",
     "equipment",
-    "file",
-    "file_set",
     "subject",
     "data",
 ]

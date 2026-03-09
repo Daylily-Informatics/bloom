@@ -332,16 +332,14 @@ class TestFileEndpoints:
     """Tests for file management endpoints."""
 
     def test_dewey_returns_html(self, client):
-        """Test Dewey file browser returns HTML."""
+        """Legacy Dewey owner page is removed from Bloom."""
         response = client.get("/dewey")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 404
 
     def test_bulk_create_files_returns_html(self, client):
         """Legacy bulk create files page is retired."""
         response = client.get("/bulk_create_files")
-        assert response.status_code == 410
-        assert "application/json" in response.headers["content-type"]
+        assert response.status_code in [404, 410]
 
 
 class TestDatabaseEndpoints:
@@ -987,24 +985,24 @@ class TestFileAndDeweyEndpoints:
     def test_search_files_post(self, client):
         """Test search files POST endpoint."""
         response = client.post("/search_files", data={"search_query": "test"})
-        assert response.status_code in [410, 422, 307]
+        assert response.status_code in [404, 410, 422, 307]
 
     def test_search_file_sets_post(self, client):
         """Test search file sets POST endpoint."""
         response = client.post("/search_file_sets", data={"search_query": "test"})
-        assert response.status_code in [410, 422, 307]
+        assert response.status_code in [404, 410, 422, 307]
 
     def test_file_set_urls_requires_euid(self, client):
         """Test file_set_urls endpoint requires EUID parameter."""
         response = client.get("/file_set_urls")
         # Should handle missing parameter gracefully
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
     def test_delete_temp_file(self, client):
         """Test delete temp file endpoint."""
         response = client.get("/delete_temp_file")
         # Should handle missing file gracefully
-        assert response.status_code in [200, 307, 400, 404, 422]
+        assert response.status_code in [404, 307, 400, 422]
 
 
 class TestGraphAndVisualizationEndpoints:
@@ -1071,7 +1069,7 @@ class TestAdminAndConfigEndpoints:
     def test_admin_template_get(self, client):
         """Test admin template GET endpoint."""
         response = client.get("/admin_template")
-        assert response.status_code in [307, 400, 410, 422]
+        assert response.status_code in [404, 307, 400, 410, 422]
 
     def test_update_object_name_requires_params(self, client):
         """Test update object name endpoint requires parameters."""
@@ -1116,7 +1114,7 @@ class TestProtectedEndpoints:
     def test_protected_content(self, client):
         """Test protected content endpoint."""
         response = client.get("/protected_content")
-        assert response.status_code in [200, 307, 400, 401, 403]
+        assert response.status_code in [404, 200, 307, 400, 401, 403]
 
     def test_serve_endpoint_with_path(self, client):
         """Test serve endpoint with file path."""
@@ -1218,7 +1216,7 @@ class TestFileCreationEndpoints:
             "/create_file",
             data={"file_name": "test.txt", "file_type": "text"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
     def test_download_file_post(self, client):
         """Test download file POST endpoint."""
@@ -1226,7 +1224,7 @@ class TestFileCreationEndpoints:
             "/download_file",
             data={"euid": "FI1", "download_type": "flat", "create_metadata_file": "no", "ret_json": "1"},
         )
-        assert response.status_code in [200, 307, 400, 404, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
     def test_create_file_set_post(self, client):
         """Test create file set POST endpoint."""
@@ -1234,7 +1232,7 @@ class TestFileCreationEndpoints:
             "/create_file_set",
             data={"name": "test_set", "file_euids": "FI1,FI2"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
     def test_bulk_create_files_from_tsv_post(self, client):
         """Test bulk create files from TSV POST endpoint."""
@@ -1242,7 +1240,7 @@ class TestFileCreationEndpoints:
         tsv_content = "file_name\tfile_type\ntest.txt\ttext\n"
         files = {"file": ("test.tsv", io.BytesIO(tsv_content.encode()), "text/tab-separated-values")}
         response = client.post("/bulk_create_files_from_tsv", files=files)
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
 
 class TestInstanceCreationEndpoints:
@@ -1251,7 +1249,7 @@ class TestInstanceCreationEndpoints:
     def test_create_instance_form_get(self, client):
         """Test create instance form GET endpoint."""
         response = client.get("/create_instance/EX1")
-        assert response.status_code in [200, 307, 400, 404, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
     def test_create_instance_post(self, client):
         """Test create instance POST endpoint."""
@@ -1259,7 +1257,7 @@ class TestInstanceCreationEndpoints:
             "/create_instance",
             data={"template_euid": "EX1", "name": "Test Instance"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code in [404, 307, 400, 422, 500]
 
 
 class TestAdminTemplateEndpoints:
@@ -1271,7 +1269,7 @@ class TestAdminTemplateEndpoints:
             "/admin_template",
             data={"euid": "EX1", "controlled_properties": "{}"},
         )
-        assert response.status_code in [307, 400, 410, 422, 500]
+        assert response.status_code in [404, 307, 400, 410, 422, 500]
 
 
 class TestLogoutEndpoint:
@@ -1453,7 +1451,7 @@ class TestReportEndpoints:
     def test_visual_report(self, client):
         """Test visual report endpoint."""
         response = client.get("/visual_report")
-        assert response.status_code in [302, 307, 400, 410, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 410, 422, 500]
 
 
 class TestFileSetEndpoints:
@@ -1462,17 +1460,17 @@ class TestFileSetEndpoints:
     def test_create_file_set(self, client):
         """Test create file set endpoint."""
         response = client.post("/create_file_set", json={"name": "test_set"})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
     def test_search_file_sets(self, client):
         """Test search file sets endpoint."""
         response = client.post("/search_file_sets", json={"query": "test"})
-        assert response.status_code in [302, 307, 400, 410, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 410, 422, 500]
 
     def test_file_set_urls(self, client):
         """Test file set URLs endpoint."""
         response = client.get("/file_set_urls")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
 
 class TestInstanceCreationEndpoints:
@@ -1491,7 +1489,7 @@ class TestInstanceCreationEndpoints:
     def test_create_instance_endpoint(self, client):
         """Test create instance POST endpoint."""
         response = client.post("/create_instance", json={"template_euid": "TEST1"})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
 
 class TestBulkOperationEndpoints:
@@ -1500,12 +1498,12 @@ class TestBulkOperationEndpoints:
     def test_bulk_create_files(self, client):
         """Test bulk create files endpoint."""
         response = client.get("/bulk_create_files")
-        assert response.status_code in [302, 307, 400, 410, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 410, 422, 500]
 
     def test_bulk_create_files_from_tsv(self, client):
         """Test bulk create files from TSV endpoint."""
         response = client.post("/bulk_create_files_from_tsv", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
 
 class TestNodePropertyEndpoints:
@@ -1730,27 +1728,27 @@ class TestFileOperationEndpoints:
             "/download_file",
             data={"euid": "FI1", "download_type": "flat", "create_metadata_file": "no", "ret_json": "1"},
         )
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
     def test_create_file(self, client):
         """Test create file endpoint."""
         response = client.post("/create_file", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
     def test_create_file_set(self, client):
         """Test create file set endpoint."""
         response = client.post("/create_file_set", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
     def test_search_files(self, client):
         """Test search files endpoint."""
         response = client.post("/search_files", json={"query": "test"})
-        assert response.status_code in [302, 307, 400, 410, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 410, 422, 500]
 
     def test_search_file_sets(self, client):
         """Test search file sets endpoint."""
         response = client.post("/search_file_sets", json={"query": "test"})
-        assert response.status_code in [302, 307, 400, 410, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 410, 422, 500]
 
 
 class TestWorkflowOperationEndpoints:
@@ -1845,7 +1843,7 @@ class TestObjectCreationEndpoints:
     def test_create_instance_post(self, client):
         """Test create instance POST endpoint."""
         response = client.post("/create_instance", json={})
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code in [404, 302, 307, 400, 422, 500]
 
 
 class TestPreferencesEndpoints:

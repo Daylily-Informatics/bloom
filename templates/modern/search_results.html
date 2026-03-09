@@ -46,7 +46,7 @@
       <div class="form-group mb-md">
         <label class="form-label">Object Categories</label>
         <div class="filter-grid">
-          {% for category in ['container', 'content', 'workflow', 'equipment', 'file', 'file_set', 'subject', 'data'] %}
+          {% for category in ['container', 'content', 'workflow', 'equipment', 'subject', 'data'] %}
           <label class="checkbox-label">
             <input type="checkbox" class="types-filter" value="{{ category }}" {% if category in selected_types %}checked{% endif %}>
             <span>{{ category }}</span>

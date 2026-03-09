@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from packaging.version import Version
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -336,6 +336,30 @@ class AtlasSettings(BaseModel):
         return _validate_optional_https_url(value, field_name="atlas.base_url")
 
 
+class DeweySettings(BaseModel):
+    """Dewey integration settings."""
+
+    enabled: bool = Field(default=False, description="Enable Bloom -> Dewey artifact registration")
+    base_url: str = Field(default="", description="Dewey API base URL")
+    token: str = Field(default="", description="Dewey API bearer token")
+    timeout_seconds: int = Field(default=10, description="Dewey API timeout seconds")
+    verify_ssl: bool = Field(default=True, description="Verify Dewey TLS certificates")
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        return _validate_optional_https_url(value, field_name="dewey.base_url")
+
+    @model_validator(mode="after")
+    def validate_enabled_contract(self) -> "DeweySettings":
+        if self.enabled:
+            if not str(self.base_url or "").strip():
+                raise ValueError("dewey.base_url is required when dewey.enabled=true")
+            if not str(self.token or "").strip():
+                raise ValueError("dewey.token is required when dewey.enabled=true")
+        return self
+
+
 class LoggingSettings(BaseModel):
     """Logging configuration."""
 
@@ -493,6 +517,7 @@ class BloomSettings(BaseSettings):
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     atlas: AtlasSettings = Field(default_factory=AtlasSettings)
+    dewey: DeweySettings = Field(default_factory=DeweySettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
     ui: UISettings = Field(default_factory=UISettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
@@ -551,6 +576,48 @@ class BloomSettings(BaseSettings):
                 "yes",
                 "on",
             }
+
+        dewey_enabled = os.environ.get("BLOOM_DEWEY__ENABLED")
+        if dewey_enabled is not None:
+            self.dewey.enabled = str(dewey_enabled).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+
+        dewey_base_url = os.environ.get("BLOOM_DEWEY__BASE_URL")
+        if dewey_base_url is not None:
+            self.dewey.base_url = _validate_optional_https_url(
+                dewey_base_url,
+                field_name="dewey.base_url",
+            )
+
+        dewey_token = os.environ.get("BLOOM_DEWEY__TOKEN")
+        if dewey_token is not None:
+            self.dewey.token = dewey_token
+
+        dewey_timeout = os.environ.get("BLOOM_DEWEY__TIMEOUT_SECONDS")
+        if dewey_timeout is not None:
+            try:
+                self.dewey.timeout_seconds = int(dewey_timeout)
+            except ValueError:
+                pass
+
+        dewey_verify_ssl = os.environ.get("BLOOM_DEWEY__VERIFY_SSL")
+        if dewey_verify_ssl is not None:
+            self.dewey.verify_ssl = str(dewey_verify_ssl).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+
+        if self.dewey.enabled:
+            if not str(self.dewey.base_url or "").strip():
+                raise ValueError("dewey.base_url is required when dewey.enabled=true")
+            if not str(self.dewey.token or "").strip():
+                raise ValueError("dewey.token is required when dewey.enabled=true")
 
     @field_validator("environment")
     @classmethod

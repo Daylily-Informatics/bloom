@@ -67,6 +67,23 @@ Bloom returns:
 
 Public beta APIs return EUIDs only. Internal UUIDs are not part of the supported contract.
 
+## Dewey Artifact Registration
+
+Bloom is the producer for wet-lab run artifacts. When Dewey integration is enabled, Bloom registers each run artifact via authenticated HTTPS at run creation time.
+
+Required config when enabled:
+
+- `BLOOM_DEWEY__ENABLED=true`
+- `BLOOM_DEWEY__BASE_URL=https://dewey.example.org`
+- `BLOOM_DEWEY__TOKEN=<dewey-bearer-token>`
+
+Optional:
+
+- `BLOOM_DEWEY__TIMEOUT_SECONDS=10`
+- `BLOOM_DEWEY__VERIFY_SSL=true`
+
+If `BLOOM_DEWEY__ENABLED=true`, Bloom startup fails fast when Dewey base URL or token is missing.
+
 ## Active Beta APIs
 
 Atlas and Ursa integration paths live under:
