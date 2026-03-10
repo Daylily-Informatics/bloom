@@ -19,6 +19,8 @@ from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
+
 logger = logging.getLogger(__name__)
 
 # Config file paths
@@ -229,7 +231,10 @@ class APISettings(BaseModel):
         default=300, description="Long-running op timeout"
     )
 
-    cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
+    cors_origins: List[str] = Field(
+        default_factory=lambda: [f"https://{item}" for item in APPROVED_WEB_DOMAIN_SUFFIXES],
+        description="Allowed CORS origins",
+    )
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
 
 

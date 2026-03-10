@@ -10,10 +10,18 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
+from bloom_lims.config import get_settings
+from bloom_lims.domain_access import (
+    build_allowed_origin_regex,
+    build_trusted_hosts,
+    is_allowed_origin,
+)
 from bloom_lims.gui.errors import register_exception_handlers
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
 from bloom_lims.tapdb_metrics import (
@@ -24,6 +32,8 @@ from bloom_lims.tapdb_metrics import (
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+    allow_local_domain_access = not settings.is_production
     app = FastAPI()
 
     @app.on_event("shutdown")
@@ -48,12 +58,26 @@ def create_app() -> FastAPI:
     app.mount("/tmp", StaticFiles(directory="tmp"), name="tmp")
 
     app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=build_trusted_hosts(allow_local=allow_local_domain_access),
+    )
+    app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
+        allow_origins=[],
+        allow_origin_regex=build_allowed_origin_regex(
+            allow_local=allow_local_domain_access
+        ),
+        allow_credentials=settings.api.cors_allow_credentials,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def _enforce_origin_allowlist(request, call_next):
+        origin = request.headers.get("origin")
+        if origin and not is_allowed_origin(origin, allow_local=allow_local_domain_access):
+            return PlainTextResponse("Origin not allowed", status_code=403)
+        return await call_next(request)
 
     app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
 
