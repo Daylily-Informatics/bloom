@@ -115,3 +115,4 @@ ruff check bloom_lims tests
 Historical execution plans remain in `docs/`, but they are reference material rather than the primary source of truth.
 
 <!-- release-sweep: 2026-03-10 -->
+ 
