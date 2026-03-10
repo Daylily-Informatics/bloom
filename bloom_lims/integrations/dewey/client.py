@@ -48,7 +48,7 @@ class DeweyArtifactClient:
         metadata: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> str:
-        url = f"{_require_https_url(self.base_url, field_name='Dewey base URL')}/api/v1/artifacts"
+        url = f"{_require_https_url(self.base_url, field_name='Dewey base URL')}/api/v1/artifacts/import"
         payload = {
             "artifact_type": str(artifact_type or "").strip(),
             "storage_uri": str(storage_uri or "").strip(),

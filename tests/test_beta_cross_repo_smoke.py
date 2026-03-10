@@ -197,6 +197,26 @@ class SmokeAnalysisStore:
         return self.record
 
 
+class SmokeDeweyClient:
+    def __init__(self) -> None:
+        self._seq = 1
+
+    def register_artifact(
+        self,
+        *,
+        artifact_type: str,
+        storage_uri: str,
+        metadata: dict | None = None,
+        idempotency_key: str | None = None,
+    ) -> str:
+        token = f"AT-SMOKE-{self._seq}"
+        self._seq += 1
+        return token
+
+    def resolve_artifact(self, artifact_euid: str) -> dict:
+        return {"artifact_euid": artifact_euid}
+
+
 def _build_atlas_intake_app(tenant_id: uuid.UUID) -> FastAPI:
     app = FastAPI()
     app.include_router(atlas_intake_routes.router)
@@ -495,6 +515,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 store=store,
                 bloom_client=BloomResolverClient(
                     base_url="https://testserver",
+                    token="bloom-smoke-token",
                     client=bloom_client,  # type: ignore[arg-type]
                 ),
                 atlas_client=AtlasResultClient(
@@ -502,19 +523,23 @@ def test_cross_repo_beta_smoke(monkeypatch):
                     api_key="atlas-smoke-key",
                     client=atlas_result_client,  # type: ignore[arg-type]
                 ),
+                dewey_client=SmokeDeweyClient(),
                 settings=Settings(
                     ursa_internal_api_key="ursa-smoke-key",
                     bloom_base_url="https://testserver",
+                    bloom_api_token="bloom-smoke-token",
                     atlas_base_url="https://testserver",
                     atlas_internal_api_key="atlas-smoke-key",
                 ),
-                require_api_key=False,
             )
 
             with TestClient(ursa_app) as ursa_client:
                 ingest = ursa_client.post(
                     "/api/analyses/ingest",
-                    headers={"Idempotency-Key": _opaque("idem-ingest")},
+                    headers={
+                        "Idempotency-Key": _opaque("idem-ingest"),
+                        "X-API-Key": "ursa-smoke-key",
+                    },
                     json={
                         "run_euid": run_body["run_euid"],
                         "flowcell_id": flowcell_id,
@@ -539,6 +564,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
                 artifact = ursa_client.post(
                     f"/api/analyses/{analysis_euid}/artifacts",
+                    headers={"X-API-Key": "ursa-smoke-key"},
                     json={
                         "artifact_type": "vcf",
                         "storage_uri": "s3://beta-analysis-artifacts/result.vcf.gz",
@@ -549,13 +575,17 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
                 preapproval = ursa_client.post(
                     f"/api/analyses/{analysis_euid}/return",
-                    headers={"Idempotency-Key": _opaque("idem-return-pre")},
+                    headers={
+                        "Idempotency-Key": _opaque("idem-return-pre"),
+                        "X-API-Key": "ursa-smoke-key",
+                    },
                     json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
                 )
                 assert preapproval.status_code == 409, preapproval.text
 
                 review = ursa_client.post(
                     f"/api/analyses/{analysis_euid}/review",
+                    headers={"X-API-Key": "ursa-smoke-key"},
                     json={
                         "review_state": "APPROVED",
                         "reviewer": "qa-reviewer",
@@ -565,7 +595,10 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
                 returned = ursa_client.post(
                     f"/api/analyses/{analysis_euid}/return",
-                    headers={"Idempotency-Key": _opaque("idem-return")},
+                    headers={
+                        "Idempotency-Key": _opaque("idem-return"),
+                        "X-API-Key": "ursa-smoke-key",
+                    },
                     json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
                 )
                 assert returned.status_code == 200, returned.text
