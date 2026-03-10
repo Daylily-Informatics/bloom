@@ -1,5 +1,11 @@
 # daylily-tapdb: Templated Abstract Polymorphic Database Library
 
+This document is a Bloom-local snapshot retained for reference. Current TapDB
+overview and operator guidance live in the sibling `daylily-tapdb` repository:
+
+- [../../daylily-tapdb/README.md](../../daylily-tapdb/README.md)
+- [../../daylily-tapdb/docs/README.md](../../daylily-tapdb/docs/README.md)
+
 ## Technical Specification Document
 
 **Version:** 1.3.1
@@ -2628,7 +2634,7 @@ def create_instances_batch(
 
 ## 10. Development Guidelines
 
-See [AGENT.md](./AGENT.md) for detailed development guidelines and AI assistant instructions.
+See [../AGENTS.md](../AGENTS.md) for detailed development guidelines and AI assistant instructions.
 
 ### 10.1 Code Style
 
@@ -2746,7 +2752,7 @@ The following are implementation details and may change between minor versions:
 daylily-tapdb/
 ├── README.md                    # Quick start and overview
 ├── SPECIFICATION.md             # This document
-├── AGENT.md                     # AI assistant guidelines
+├── AGENTS.md                    # AI assistant guidelines
 ├── LICENSE                      # MIT License
 ├── pyproject.toml               # Package configuration
 │
