@@ -46,7 +46,7 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
     """
     Get dashboard statistics and recent activity.
 
-    Returns aggregated counts for assays, workflows, equipment, reagents,
+    Returns aggregated counts for queue runtime, workflows, equipment, reagents,
     and recent activity across all object types.
     """
     try:
@@ -74,7 +74,21 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
                 if str(getattr(row, "bstatus", "") or "").strip().lower() in {"open", "active"}
             ]
 
-            stats.assays_total = len(queue_definitions)
+            queue_statuses = [
+                str(getattr(row, "bstatus", "") or "").strip().lower()
+                for row in queue_definitions
+            ]
+
+            stats.queue_runtime_total = len(queue_definitions)
+            stats.queue_runtime_in_progress = len(
+                [status for status in queue_statuses if status in {"active", "open", "in_progress"}]
+            )
+            stats.queue_runtime_complete = len(
+                [status for status in queue_statuses if status in {"complete", "completed"}]
+            )
+            stats.queue_runtime_exception = len(
+                [status for status in queue_statuses if status in {"exception", "failed", "error"}]
+            )
             stats.workflows_total = len(work_items)
             stats.workflows_active = len(open_work_items)
 
@@ -112,12 +126,12 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
         recent_activity = RecentActivitySchema()
 
         try:
-            recent_assays = sorted(
+            recent_queue_runtime = sorted(
                 [row for row in generic_rows if _beta_kind(row) == "queue_definition"],
                 key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
                 reverse=True,
             )[:5]
-            recent_activity.recent_assays = [
+            recent_activity.recent_queue_runtime = [
                 RecentActivityItem(
                     euid=a.euid,
                     name=a.name,
@@ -126,7 +140,7 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
                     status=a.bstatus,
                     created_dt=a.created_dt,
                 )
-                for a in recent_assays
+                for a in recent_queue_runtime
             ]
 
             recent_workflows = sorted(

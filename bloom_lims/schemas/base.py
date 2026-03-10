@@ -153,10 +153,14 @@ class ErrorResponse(BloomBaseSchema):
 class DashboardStatsSchema(BloomBaseSchema):
     """Dashboard statistics response schema."""
 
-    assays_total: int = Field(default=0, description="Total number of assays")
-    assays_in_progress: int = Field(default=0, description="Assays in progress")
-    assays_complete: int = Field(default=0, description="Completed assays")
-    assays_exception: int = Field(default=0, description="Assays with exceptions")
+    queue_runtime_total: int = Field(default=0, description="Total queue runtime objects")
+    queue_runtime_in_progress: int = Field(
+        default=0, description="Queue runtime objects in progress"
+    )
+    queue_runtime_complete: int = Field(default=0, description="Completed queue runtime objects")
+    queue_runtime_exception: int = Field(
+        default=0, description="Queue runtime objects with exceptions"
+    )
 
     workflows_total: int = Field(default=0, description="Total number of workflows")
     workflows_active: int = Field(default=0, description="Active workflows")
@@ -188,8 +192,8 @@ class RecentActivityItem(BloomBaseSchema):
 class RecentActivitySchema(BloomBaseSchema):
     """Recent activity response schema."""
 
-    recent_assays: List[RecentActivityItem] = Field(
-        default_factory=list, description="Recent assay activities"
+    recent_queue_runtime: List[RecentActivityItem] = Field(
+        default_factory=list, description="Recent queue runtime activities"
     )
     recent_workflows: List[RecentActivityItem] = Field(
         default_factory=list, description="Recent workflow activities"

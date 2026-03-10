@@ -17,7 +17,7 @@
 
 <!-- Quick Stats -->
 <div class="grid grid-4 mb-lg">
-  <a href="/assays" class="stat-card">
+  <a href="/queue_details" class="stat-card">
     <div class="card-icon success">
       <i class="fas fa-list-check"></i>
     </div>
@@ -64,19 +64,19 @@
   <div class="card">
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-list-check"></i> Recent Queue Runtime</h3>
-      <a href="/assays" class="btn btn-outline btn-sm">View All</a>
+      <a href="/queue_details" class="btn btn-outline btn-sm">View All</a>
     </div>
     <div class="card-body">
       {% if recent_queue_runtime %}
         <div class="list-group">
-          {% for assay in recent_queue_runtime[:5] %}
-          <a href="/euid_details?euid={{ assay.euid }}" class="list-item">
+          {% for queue_item in recent_queue_runtime[:5] %}
+          <a href="/euid_details?euid={{ queue_item.euid }}" class="list-item">
             <div class="list-item-content">
-              <span class="badge badge-euid">{{ assay.euid }}</span>
-              <span class="list-item-title">{{ assay.name | default(assay.euid) }}</span>
+              <span class="badge badge-euid">{{ queue_item.euid }}</span>
+              <span class="list-item-title">{{ queue_item.name | default(queue_item.euid) }}</span>
             </div>
-            <span class="badge badge-{% if assay.status == 'complete' %}success{% elif assay.status == 'exception' %}error{% else %}info{% endif %}">
-              {{ assay.status | default('active') }}
+            <span class="badge badge-{% if queue_item.status == 'complete' %}success{% elif queue_item.status == 'exception' %}error{% else %}info{% endif %}">
+              {{ queue_item.status | default('active') }}
             </span>
           </a>
           {% endfor %}
@@ -85,7 +85,7 @@
         <div class="empty-state">
           <div class="empty-state-icon"><i class="fas fa-list-check"></i></div>
           <p>No recent queue runtime objects</p>
-          <a href="/assays" class="btn btn-primary btn-sm">Open Queue Runtime</a>
+          <a href="/queue_details" class="btn btn-primary btn-sm">Open Queue Runtime</a>
         </div>
       {% endif %}
     </div>
@@ -129,7 +129,7 @@
   </div>
   <div class="card-body">
     <div class="quick-actions">
-      <a href="/assays" class="btn btn-outline"><i class="fas fa-list-check"></i> Queue Runtime</a>
+      <a href="/queue_details" class="btn btn-outline"><i class="fas fa-list-check"></i> Queue Runtime</a>
       <a href="/equipment_overview" class="btn btn-outline"><i class="fas fa-microscope"></i> Equipment</a>
       <a href="/reagent_overview" class="btn btn-outline"><i class="fas fa-vial"></i> Reagents</a>
       <a href="/object_templates_summary" class="btn btn-outline"><i class="fas fa-cubes"></i> Templates</a>

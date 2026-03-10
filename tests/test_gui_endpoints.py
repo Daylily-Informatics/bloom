@@ -142,27 +142,27 @@ class TestMainGUIEndpoints:
 
 
 class TestAssaysEndpoint:
-    """Tests for /assays endpoint - fixed TapDB column names."""
+    """Tests for retired /assays endpoint."""
 
     def test_assays_default_returns_html(self, client):
-        """Assay workflow pages are retired in queue-centric Bloom beta."""
+        """Assay workflow pages are unmounted in queue-centric Bloom beta."""
         response = client.get("/assays")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
     def test_assays_show_type_all(self, client):
-        """Assay workflow pages stay retired regardless of query params."""
+        """Unmounted route stays unavailable regardless of query params."""
         response = client.get("/assays?show_type=all")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
     def test_assays_show_type_accessioning(self, client):
-        """Accessioning show_type stays retired with the page."""
+        """Accessioning query still resolves to unmounted route."""
         response = client.get("/assays?show_type=accessioning")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
     def test_assays_show_type_assay(self, client):
-        """Assay workflow pages stay retired for assay-specific views too."""
+        """Assay-specific query still resolves to unmounted route."""
         response = client.get("/assays?show_type=assay")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
     def test_admin_has_api_token_management_panels(self, client):
         """Admin page renders API token user and token-management panels."""
@@ -514,9 +514,9 @@ class TestModernTemplateUsage:
         assert "bloom_modern.css" in content
 
     def test_assays_uses_modern_template(self, client):
-        """Assays route is retired rather than templated."""
+        """Assays route is removed (not templated, not stubbed)."""
         response = client.get("/assays")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
     def test_workflow_summary_uses_modern_template(self, client):
         """Workflow summary route is retired."""
@@ -884,9 +884,9 @@ class TestLoginLogoutButtonDisplay:
         assert 'href="/logout"' in content
 
     def test_assays_page_shows_logout(self, client):
-        """Assays page is retired and no longer renders authenticated HTML."""
+        """Unmounted assays page no longer renders authenticated HTML."""
         response = client.get("/assays")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
 
 class TestModernUINavigation:
@@ -900,7 +900,8 @@ class TestModernUINavigation:
 
         # Check for main navigation links
         assert 'href="/"' in content  # Dashboard
-        assert 'href="/assays"' in content
+        assert 'href="/queue_details"' in content
+        assert 'href="/assays"' not in content
         assert 'href="/workflows"' not in content
         assert 'href="/admin"' in content
         assert 'href="/create_object"' in content
@@ -1613,12 +1614,12 @@ class TestWorkflowManagementEndpoints:
 
 
 class TestAssaysEndpoints:
-    """Tests for assay endpoints."""
+    """Tests for retired assay endpoints."""
 
     def test_assays_page(self, client):
-        """Test assays page endpoint."""
+        """Retired assays page endpoint should not be mounted."""
         response = client.get("/assays")
-        assert response.status_code == 410
+        assert response.status_code == 404
 
 
 class TestAuditLogEndpoints:

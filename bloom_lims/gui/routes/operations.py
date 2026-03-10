@@ -250,14 +250,6 @@ async def lims(request: Request, _=Depends(require_auth)):
     return RedirectResponse(url="/", status_code=303)
 
 
-@router.get("/assays", response_class=HTMLResponse)
-async def assays(request: Request, show_type: str = "all", _auth=Depends(require_auth)):
-    raise HTTPException(
-        status_code=410,
-        detail="Assay workflow pages are retired in queue-centric Bloom beta.",
-    )
-
-
 @router.get("/calculate_cogs_children")
 async def Acalculate_cogs_children(euid, request: Request, _auth=Depends(require_auth)):
     try:

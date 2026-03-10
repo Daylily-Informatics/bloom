@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from bloom_lims.gui.actions import hydrate_dynamic_action_groups
 
 
-def test_hydrate_dynamic_action_groups_backfills_legacy_assay_markup_from_ui_schema():
+def test_hydrate_dynamic_action_groups_removes_retired_assay_markup():
     action_groups = {
         "test_requisitions": {
             "group_name": "Test Requisitions",
@@ -38,6 +38,5 @@ def test_hydrate_dynamic_action_groups_backfills_legacy_assay_markup_from_ui_sch
     hydrated_action = hydrated["test_requisitions"]["actions"]["action/test_requisitions/add_container_to_assay_q/1.0"]
 
     assert original_action["captured_data"] == {}
-    assert 'name="assay_selection"' in hydrated_action["captured_data"]["___workflow/assay/"]
-    assert "No assay workflows available" in hydrated_action["captured_data"]["___workflow/assay/"]
-    assert hydrated_action["ui_schema"]["fields"][0]["options"] == []
+    assert "___workflow/assay/" not in hydrated_action["captured_data"]
+    assert hydrated_action["ui_schema"]["fields"] == []

@@ -399,14 +399,14 @@ class TestStatsAPI:
 
         # Validate stats structure
         stats = data["stats"]
-        assert "assays_total" in stats
+        assert "queue_runtime_total" in stats
         assert "workflows_total" in stats
         assert "equipment_total" in stats
         assert "reagents_total" in stats
 
         # Validate recent_activity structure
         recent = data["recent_activity"]
-        assert "recent_assays" in recent
+        assert "recent_queue_runtime" in recent
         assert "recent_workflows" in recent
 
 
