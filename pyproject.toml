@@ -29,7 +29,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "psutil>=5.9.0",
     "zebra-day==2.4.1",
-    "daylily-carrier-trackin==0.5.1",
+    "daylily-carrier-tracking==0.5.1",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
