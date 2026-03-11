@@ -47,6 +47,7 @@ from bloom_lims.gui.deps import (
 )
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
 from bloom_lims.gui.jinja import templates
+from bloom_lims.graph_support import resolve_external_refs_for_object
 
 
 router = APIRouter()
@@ -1011,6 +1012,10 @@ async def euid_details(
             "subjects_for_object": subjects_for_object,
             "is_admin": is_admin,
             "action_groups": action_groups,
+            "external_refs": [
+                ref.to_public_dict(ref_index=index)
+                for index, ref in enumerate(resolve_external_refs_for_object(obj))
+            ],
         }
         return HTMLResponse(content=template.render(context))
 

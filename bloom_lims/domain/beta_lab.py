@@ -13,7 +13,16 @@ from bloom_lims.bobjs import BloomObj
 from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.domain.beta_actions import BloomBetaActionRecorder
+from bloom_lims.domain.execution_queue import ExecutionQueueService
 from bloom_lims.integrations.dewey.client import DeweyArtifactClient, DeweyClientError
+from bloom_lims.schemas.execution_queue import (
+    ClaimQueueItemRequest,
+    CompleteQueueExecutionRequest,
+    ExecutionState,
+    ReleaseQueueLeaseRequest,
+    RequeueSubjectRequest,
+    WorkerType,
+)
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaClaimResponse,
@@ -67,6 +76,7 @@ class BetaLabService:
     REL_USED_REAGENT = "beta_used_reagent"
     POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
+    LIBRARY_PREP_OUTPUT_TEMPLATE_CODE = "data/wetlab/library_prep_output/1.0"
     EXTRACTION_TEMPLATE_BY_TYPE = {
         "cfdna": "content/sample/cfdna/1.0",
         "gdna": "content/sample/gdna/1.0",
@@ -94,6 +104,28 @@ class BetaLabService:
         "ilmn_start_seq_run",
         "ont_start_seq_run",
     )
+    NEXT_ACTION_BY_QUEUE = {
+        "extraction_prod": "create_extraction",
+        "extraction_rnd": "create_extraction",
+        "post_extract_qc": "record_post_extract_qc",
+        "ilmn_lib_prep": "create_library_prep",
+        "ont_lib_prep": "create_library_prep",
+        "ilmn_seq_pool": "create_pool",
+        "ont_seq_pool": "create_pool",
+        "ilmn_start_seq_run": "create_run",
+        "ont_start_seq_run": "create_run",
+    }
+    QUEUE_CAPABILITIES = {
+        "extraction_prod": ["wetlab.extraction"],
+        "extraction_rnd": ["wetlab.extraction"],
+        "post_extract_qc": ["wetlab.post_extract_qc"],
+        "ilmn_lib_prep": ["wetlab.library_prep", "platform.ILMN"],
+        "ont_lib_prep": ["wetlab.library_prep", "platform.ONT"],
+        "ilmn_seq_pool": ["wetlab.pooling", "platform.ILMN"],
+        "ont_seq_pool": ["wetlab.pooling", "platform.ONT"],
+        "ilmn_start_seq_run": ["wetlab.run_start", "platform.ILMN"],
+        "ont_start_seq_run": ["wetlab.run_start", "platform.ONT"],
+    }
 
     def __init__(
         self,
@@ -104,6 +136,10 @@ class BetaLabService:
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
         self.action_recorder = BloomBetaActionRecorder(self.bdb.session)
+        self.execution = ExecutionQueueService(
+            app_username=app_username,
+            bdb=self.bdb,
+        )
         self.dewey_client = dewey_client if dewey_client is not None else self._build_dewey_client()
 
     def close(self) -> None:
@@ -345,24 +381,24 @@ class BetaLabService:
         idempotency_key: str | None,
     ) -> BetaQueueTransitionResponse:
         material = self._require_instance(material_euid)
-        replay = False
-        if idempotency_key:
-            existing = self._find_operation_record(
-                beta_kind=self.BETA_KIND_QUEUE_EVENT,
-                idempotency_key=idempotency_key,
-            )
-            if existing is not None:
-                replay = True
-                return self._queue_transition_response_from_event(
-                    existing, replay=replay
-                )
-
-        response = self._transition_material(
-            material=material,
+        previous_queue = self._current_queue_for_instance(material)
+        queue_action = self.NEXT_ACTION_BY_QUEUE.get(str(queue_name or "").strip())
+        action_response = self.execution.requeue_subject(
+            RequeueSubjectRequest(
+                subject_euid=material.euid,
+                queue_key=queue_name,
+                next_action_key=queue_action,
+                idempotency_key=idempotency_key or f"queue:{material.euid}:{queue_name}",
+            ),
+            executed_by=self.bdb.app_username,
+        )
+        response = BetaQueueTransitionResponse(
+            material_euid=material.euid,
+            queue_euid=self.execution.get_queue(queue_name).queue_euid,
             queue_name=queue_name,
-            metadata=metadata or {},
-            idempotency_key=idempotency_key,
-            replay=replay,
+            previous_queue=previous_queue,
+            current_queue=queue_name,
+            idempotent_replay=action_response.replayed,
         )
         self._record_action(
             target_instance=material,
@@ -395,44 +431,31 @@ class BetaLabService:
         normalized_queue = str(queue_name or "").strip()
         if normalized_queue not in self.CANONICAL_QUEUES:
             raise ValueError(f"Unsupported beta queue: {queue_name}")
-        if idempotency_key:
-            existing = self._find_data_record_by_property(
-                beta_kind=self.BETA_KIND_CLAIM,
-                property_key="idempotency_key",
-                expected=idempotency_key,
-            )
-            if existing is not None:
-                return self._claim_response(existing, replay=True)
-
         material = self._require_instance(material_euid)
         self._assert_not_reserved(material)
         self._assert_not_consumed(material, stage_label="claim")
-        current_queue = self._current_queue_for_instance(material)
-        if current_queue != normalized_queue:
-            raise ValueError(
-                "Material must already be in requested queue before claim "
-                f"(expected={normalized_queue!r} current_queue={current_queue!r})"
-            )
-        work_item = self._require_open_work_item(
-            material=material,
-            expected_queue=normalized_queue,
+        queue_subject = self._execution_subject_for_material(
+            material,
+            expected_queues={normalized_queue},
         )
-        active_claim = self._active_claim_for_work_item(work_item)
-        if active_claim is not None:
-            raise ValueError(
-                "Material already has an active claim in the requested queue "
-                f"(claim_euid={active_claim.euid})"
-            )
-        claim = self._create_claim_record(
-            material=material,
+        worker = self._resolve_queue_worker(
             queue_name=normalized_queue,
-            work_item=work_item,
-            metadata=metadata or {},
-            idempotency_key=idempotency_key,
-            implicit=False,
+            worker_type=WorkerType.SERVICE,
         )
+        claim_result = self.execution.claim_queue_item(
+            ClaimQueueItemRequest(
+                worker_euid=worker.worker_euid,
+                queue_key=normalized_queue,
+                subject_euid=queue_subject.euid,
+                idempotency_key=idempotency_key or f"claim:{queue_subject.euid}:{normalized_queue}",
+                expected_state=ExecutionState.READY,
+                payload=metadata or {},
+            ),
+            executed_by=self.bdb.app_username,
+        )
+        lease = self.execution._require_lease(str(claim_result.lease_euid))
         self._record_action(
-            target_instance=material,
+            target_instance=queue_subject,
             action_key="claim_material_in_queue",
             captured_data={
                 "material_euid": material_euid,
@@ -442,13 +465,13 @@ class BetaLabService:
             },
             result={
                 "status": "success",
-                "claim_euid": claim.euid,
+                "claim_euid": lease.euid,
                 "queue_name": normalized_queue,
-                "material_euid": material.euid,
+                "material_euid": queue_subject.euid,
             },
         )
         self.bdb.session.commit()
-        return self._claim_response(claim, replay=False)
+        return self._claim_response(lease, replay=claim_result.replayed)
 
     def release_claim(
         self,
@@ -458,30 +481,19 @@ class BetaLabService:
         metadata: dict[str, Any] | None,
         idempotency_key: str | None,
     ) -> BetaClaimResponse:
-        claim = self._require_instance(claim_euid)
-        if not self._is_data_kind(claim, self.BETA_KIND_CLAIM):
-            raise ValueError(f"Bloom claim not found: {claim_euid}")
-        claim_props = self._props(claim)
-        if (
-            idempotency_key
-            and str(claim_props.get("last_release_idempotency_key") or "").strip()
-            == str(idempotency_key).strip()
-        ):
-            return self._claim_response(claim, replay=True)
-
-        release_status = str(reason or "").strip().lower() or "released"
-        if release_status not in {"released", "completed", "abandoned"}:
-            release_status = "released"
-        claim_props["status"] = release_status
-        claim_props["released_at"] = self._timestamp()
-        claim_props["release_reason"] = str(reason or "").strip() or release_status
-        claim_props["release_metadata"] = self.normalize_execution_metadata(
-            metadata or {}
+        lease = self.execution._require_lease(claim_euid)
+        worker_euid = str(self.execution._props(lease).get("worker_lookup_euid") or "")
+        action_response = self.execution.release_queue_lease(
+            ReleaseQueueLeaseRequest(
+                lease_euid=claim_euid,
+                worker_euid=worker_euid,
+                idempotency_key=idempotency_key or f"release:{claim_euid}",
+                reason=reason,
+            ),
+            executed_by=self.bdb.app_username,
         )
-        claim_props["last_release_idempotency_key"] = idempotency_key or ""
-        self._write_props(claim, claim_props)
         self._record_action(
-            target_instance=claim,
+            target_instance=lease,
             action_key="release_claim",
             captured_data={
                 "claim_euid": claim_euid,
@@ -489,10 +501,10 @@ class BetaLabService:
                 "metadata": metadata or {},
                 "idempotency_key": idempotency_key or "",
             },
-            result={"status": "success", "claim_euid": claim.euid},
+            result={"status": "success", "claim_euid": lease.euid},
         )
         self.bdb.session.commit()
-        return self._claim_response(claim, replay=False)
+        return self._claim_response(lease, replay=action_response.replayed)
 
     def reserve_material(
         self,
@@ -673,21 +685,17 @@ class BetaLabService:
             if existing is not None:
                 return self._extraction_response(existing, replay=True)
 
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         source = self._require_instance(payload.source_specimen_euid)
         self._assert_not_reserved(source)
         self._assert_not_consumed(source, stage_label="extraction")
-        current_queue = self._current_queue_for_instance(source)
-        if current_queue not in {"extraction_prod", "extraction_rnd"}:
-            raise ValueError(
-                "Source specimen must be queued in extraction_prod or extraction_rnd "
-                f"(current_queue={current_queue!r})"
-            )
-        claim = self._resolve_stage_claim(
+        lease = self._resolve_stage_claim(
             material=source,
             expected_queues={"extraction_prod", "extraction_rnd"},
             claim_euid=payload.claim_euid,
             stage_label="extraction",
         )
+        execution_subject = self.execution._subject_for_lease(lease) or source
 
         fulfillment_item_context = self._resolve_fulfillment_item_context(
             source,
@@ -699,8 +707,6 @@ class BetaLabService:
             plate_name=payload.plate_name,
         )
         well = self._require_plate_well(plate, payload.well_name)
-
-        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         output = self.bobj.create_instance_by_code(
             self.EXTRACTION_TEMPLATE_BY_TYPE[payload.extraction_type],
             {
@@ -731,17 +737,24 @@ class BetaLabService:
         )
         self._attach_execution_metadata_lineage(output, normalized_metadata)
         self._replace_fulfillment_item_references(output, atlas_context=fulfillment_item_context)
-        response = self._transition_material(
-            material=output,
+        self.execution.queue_subject(
+            subject_euid=output.euid,
+            queue_key="post_extract_qc",
+            next_action_key="record_post_extract_qc",
+            idempotency_key=(
+                f"{idempotency_key}:post_extract_qc"
+                if idempotency_key
+                else f"queue:post_extract_qc:{output.euid}"
+            ),
+            executed_by=self.bdb.app_username,
+        )
+        response = BetaQueueTransitionResponse(
+            material_euid=output.euid,
+            queue_euid=self.execution.get_queue("post_extract_qc").queue_euid,
             queue_name="post_extract_qc",
-            metadata={
-                "stage": "extraction",
-                "well_name": payload.well_name,
-                **normalized_metadata,
-            },
-            idempotency_key=f"{idempotency_key}:post_extract_qc"
-            if idempotency_key
-            else None,
+            previous_queue=None,
+            current_queue="post_extract_qc",
+            idempotent_replay=False,
         )
         if payload.consume_source:
             self._consume_material_instance(
@@ -749,11 +762,16 @@ class BetaLabService:
                 reason="stage:extraction",
                 metadata={"stage": "extraction", **normalized_metadata},
             )
-        self._set_claim_status(
-            claim,
-            status="completed",
-            reason="stage:extraction",
-            metadata={"stage": "extraction"},
+        self._complete_stage_execution(
+            subject=execution_subject,
+            lease=lease,
+            action_key="create_extraction",
+            idempotency_key=idempotency_key or f"complete:create_extraction:{execution_subject.euid}",
+            result_payload={
+                "output_euid": output.euid,
+                "queue_name": "post_extract_qc",
+                "well_name": payload.well_name,
+            },
         )
         self._record_action(
             target_instance=output,
@@ -855,16 +873,44 @@ class BetaLabService:
 
         next_queue = None
         if payload.passed and payload.next_queue:
-            transition = self._transition_material(
-                material=output,
-                queue_name=payload.next_queue,
-                metadata={
-                    "stage": "post_extract_qc",
-                    **self.normalize_execution_metadata(payload.metadata or {}),
+            self._complete_stage_execution(
+                subject=output,
+                lease=self._resolve_stage_claim(
+                    material=output,
+                    expected_queues={"post_extract_qc"},
+                    claim_euid=None,
+                    stage_label="post_extract_qc",
+                ),
+                action_key="record_post_extract_qc",
+                idempotency_key=idempotency_key or f"complete:post_extract_qc:{output.euid}",
+                next_queue_key=payload.next_queue,
+                next_action_key="create_library_prep",
+                terminal=False,
+                result_payload={
+                    "passed": True,
+                    "next_queue": payload.next_queue,
+                    "metrics": payload.metrics or {},
                 },
-                idempotency_key=f"{idempotency_key}:queue" if idempotency_key else None,
             )
-            next_queue = transition.current_queue
+            next_queue = payload.next_queue
+        else:
+            lease = self._resolve_stage_claim(
+                material=output,
+                expected_queues={"post_extract_qc"},
+                claim_euid=None,
+                stage_label="post_extract_qc",
+            )
+            self._complete_stage_execution(
+                subject=output,
+                lease=lease,
+                action_key="record_post_extract_qc",
+                idempotency_key=idempotency_key or f"complete:post_extract_qc:{output.euid}",
+                terminal=True,
+                result_payload={
+                    "passed": False,
+                    "metrics": payload.metrics or {},
+                },
+            )
 
         self._record_action(
             target_instance=output,
@@ -899,10 +945,7 @@ class BetaLabService:
         idempotency_key: str | None,
     ) -> BetaLibraryPrepResponse:
         if idempotency_key:
-            existing = self._find_data_record(
-                beta_kind="library_prep_output",
-                idempotency_key=idempotency_key,
-            )
+            existing = self._find_library_prep_output_record(idempotency_key=idempotency_key)
             if existing is not None:
                 source = self._first_parent(existing, "beta_library_prep_output")
                 fulfillment_item_context = self._resolve_fulfillment_item_context(existing)
@@ -916,17 +959,12 @@ class BetaLabService:
                     idempotent_replay=True,
                 )
 
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         source = self._require_instance(payload.source_extraction_output_euid)
         self._assert_not_reserved(source)
         self._assert_not_consumed(source, stage_label="library_prep")
         expected_queue = self.LIB_PREP_QUEUE_BY_PLATFORM[payload.platform]
-        current_queue = self._current_queue_for_instance(source)
-        if current_queue != expected_queue:
-            raise ValueError(
-                "Extraction output must be queued for library prep "
-                f"(expected={expected_queue!r} current_queue={current_queue!r})"
-            )
-        claim = self._resolve_stage_claim(
+        lease = self._resolve_stage_claim(
             material=source,
             expected_queues={expected_queue},
             claim_euid=payload.claim_euid,
@@ -934,17 +972,23 @@ class BetaLabService:
         )
 
         fulfillment_item_context = self._resolve_fulfillment_item_context(source)
-        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
-        lib_output = self._create_data_record(
-            beta_kind="library_prep_output",
-            name=payload.output_name
-            or f"{payload.platform.lower()}-lib-prep:{source.euid}",
-            properties={
-                "platform": payload.platform,
-                "idempotency_key": idempotency_key or "",
-                "metadata": normalized_metadata,
+        lib_output = self.bobj.create_instance_by_code(
+            self.LIBRARY_PREP_OUTPUT_TEMPLATE_CODE,
+            {
+                "json_addl": {
+                    "properties": {
+                        "platform": payload.platform,
+                        "idempotency_key": idempotency_key or "",
+                        "metadata": normalized_metadata,
+                    }
+                }
             },
         )
+        lib_props = self._props(lib_output)
+        lib_name = payload.output_name or f"{payload.platform.lower()}-lib-prep:{source.euid}"
+        lib_output.name = lib_name
+        lib_props["name"] = lib_name
+        self._write_props(lib_output, lib_props)
         self.bobj.create_generic_instance_lineage_by_euids(
             source.euid,
             lib_output.euid,
@@ -955,11 +999,16 @@ class BetaLabService:
             atlas_context=fulfillment_item_context,
         )
         self._attach_execution_metadata_lineage(lib_output, normalized_metadata)
-        transition = self._transition_material(
-            material=lib_output,
-            queue_name=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
-            metadata={"stage": "library_prep", **normalized_metadata},
-            idempotency_key=f"{idempotency_key}:queue" if idempotency_key else None,
+        self.execution.queue_subject(
+            subject_euid=lib_output.euid,
+            queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+            next_action_key="create_pool",
+            idempotency_key=(
+                f"{idempotency_key}:queue"
+                if idempotency_key
+                else f"queue:libprep:{lib_output.euid}"
+            ),
+            executed_by=self.bdb.app_username,
         )
         if payload.consume_source:
             self._consume_material_instance(
@@ -967,11 +1016,15 @@ class BetaLabService:
                 reason="stage:library_prep",
                 metadata={"stage": "library_prep", **normalized_metadata},
             )
-        self._set_claim_status(
-            claim,
-            status="completed",
-            reason="stage:library_prep",
-            metadata={"stage": "library_prep"},
+        self._complete_stage_execution(
+            subject=source,
+            lease=lease,
+            action_key="create_library_prep",
+            idempotency_key=idempotency_key or f"complete:create_library_prep:{source.euid}",
+            result_payload={
+                "library_prep_output_euid": lib_output.euid,
+                "queue_name": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+            },
         )
         self._record_action(
             target_instance=lib_output,
@@ -989,7 +1042,7 @@ class BetaLabService:
                 "status": "success",
                 "source_extraction_output_euid": source.euid,
                 "library_prep_output_euid": lib_output.euid,
-                "current_queue": transition.current_queue,
+                "current_queue": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
             },
         )
         self.bdb.session.commit()
@@ -999,7 +1052,7 @@ class BetaLabService:
             atlas_test_fulfillment_item_euid=fulfillment_item_context[
                 "atlas_test_fulfillment_item_euid"
             ],
-            current_queue=transition.current_queue,
+            current_queue=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
             idempotent_replay=False,
         )
 
@@ -1023,6 +1076,7 @@ class BetaLabService:
                     idempotent_replay=True,
                 )
 
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         members = [self._require_instance(euid) for euid in payload.member_euids]
         expected_queue = self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform]
         claims = []
@@ -1050,7 +1104,6 @@ class BetaLabService:
                         stage_label="pool",
                     )
                 )
-        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
 
         pool = self.bobj.create_instance_by_code(
             self.POOL_TEMPLATE_CODE,
@@ -1089,11 +1142,16 @@ class BetaLabService:
             )
         self._attach_execution_metadata_lineage(pool, normalized_metadata)
 
-        transition = self._transition_material(
-            material=pool,
-            queue_name=self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
-            metadata={"platform": payload.platform, **normalized_metadata},
-            idempotency_key=f"{idempotency_key}:queue" if idempotency_key else None,
+        self.execution.queue_subject(
+            subject_euid=pool.euid,
+            queue_key=self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
+            next_action_key="create_run",
+            idempotency_key=(
+                f"{idempotency_key}:queue"
+                if idempotency_key
+                else f"queue:pool:{pool.euid}"
+            ),
+            executed_by=self.bdb.app_username,
         )
         if payload.consume_members:
             for member in members:
@@ -1103,11 +1161,16 @@ class BetaLabService:
                     metadata={"stage": "pool", **normalized_metadata},
                 )
         for claim in claims:
-            self._set_claim_status(
-                claim,
-                status="completed",
-                reason="stage:pool",
-                metadata={"stage": "pool"},
+            subject = self.execution._subject_for_lease(claim) or members[0]
+            self._complete_stage_execution(
+                subject=subject,
+                lease=claim,
+                action_key="create_pool",
+                idempotency_key=f"{idempotency_key or 'complete:create_pool'}:{subject.euid}",
+                result_payload={
+                    "pool_euid": pool.euid,
+                    "queue_name": self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
+                },
             )
         self._record_action(
             target_instance=pool,
@@ -1125,7 +1188,7 @@ class BetaLabService:
                 "status": "success",
                 "pool_euid": pool.euid,
                 "pool_container_euid": pool_container.euid,
-                "current_queue": transition.current_queue,
+                "current_queue": self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
                 "member_count": len(members),
             },
         )
@@ -1133,7 +1196,7 @@ class BetaLabService:
         return BetaPoolResponse(
             pool_euid=pool.euid,
             pool_container_euid=pool_container.euid,
-            current_queue=transition.current_queue,
+            current_queue=self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
             member_euids=[member.euid for member in members],
             idempotent_replay=False,
         )
@@ -1195,23 +1258,17 @@ class BetaLabService:
                     idempotent_replay=True,
                 )
 
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         pool = self._require_instance(payload.pool_euid)
         self._assert_not_reserved(pool)
         self._assert_not_consumed(pool, stage_label="start_run")
         expected_queue = self.START_RUN_QUEUE_BY_PLATFORM[payload.platform]
-        current_queue = self._current_queue_for_instance(pool)
-        if current_queue != expected_queue:
-            raise ValueError(
-                "Pool must be queued to start sequencing "
-                f"(expected={expected_queue!r} current_queue={current_queue!r})"
-            )
-        claim = self._resolve_stage_claim(
+        lease = self._resolve_stage_claim(
             material=pool,
             expected_queues={expected_queue},
             claim_euid=payload.claim_euid,
             stage_label="start_run",
         )
-        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
 
         run = self._create_data_record(
             beta_kind="sequencing_run",
@@ -1301,11 +1358,15 @@ class BetaLabService:
                 reason="stage:start_run",
                 metadata={"stage": "start_run", **normalized_metadata},
             )
-        self._set_claim_status(
-            claim,
-            status="completed",
-            reason="stage:start_run",
-            metadata={"stage": "start_run"},
+        self._complete_stage_execution(
+            subject=pool,
+            lease=lease,
+            action_key="create_run",
+            idempotency_key=idempotency_key or f"complete:create_run:{pool.euid}",
+            result_payload={
+                "run_euid": run.euid,
+                "status": payload.status,
+            },
         )
 
         self._record_action(
@@ -1764,6 +1825,87 @@ class BetaLabService:
         claim_props["release_metadata"] = self.normalize_execution_metadata(metadata or {})
         self._write_props(claim, claim_props)
 
+    def _resolve_queue_worker(
+        self,
+        *,
+        queue_name: str,
+        worker_type: WorkerType,
+    ):
+        worker_key = self.execution.synthetic_worker_key_for_user(
+            user_id=self.bdb.app_username,
+            service=worker_type == WorkerType.SERVICE,
+            scope_key=queue_name,
+        )
+        display_name = f"{self.bdb.app_username} {queue_name}"
+        return self.execution.resolve_synthetic_worker(
+            worker_key=worker_key,
+            display_name=display_name,
+            worker_type=worker_type,
+            capabilities=list(self.QUEUE_CAPABILITIES.get(queue_name, [])),
+            max_concurrent_leases=64,
+            executed_by=self.bdb.app_username,
+        )
+
+    def _find_execution_container(self, material):
+        for lineage in get_child_lineages(material):
+            if lineage.is_deleted or lineage.relationship_type != "contains":
+                continue
+            parent = lineage.parent_instance
+            if parent is None or parent.is_deleted or parent.category != "container":
+                continue
+            return parent
+        return None
+
+    def _execution_subject_for_material(
+        self,
+        material,
+        *,
+        expected_queues: set[str],
+    ):
+        material_queue = self.execution._authoritative_queue_key_for_instance(material)
+        if material_queue in expected_queues:
+            return material
+        container = self._find_execution_container(material)
+        if (
+            container is not None
+            and self.execution._authoritative_queue_key_for_instance(container) in expected_queues
+        ):
+            return container
+        expected = ", ".join(sorted(expected_queues))
+        raise ValueError(
+            f"Source material must be queued in one of [{expected}] "
+            f"(current_queue={material_queue!r})"
+        )
+
+    def _complete_stage_execution(
+        self,
+        *,
+        subject,
+        lease,
+        action_key: str,
+        idempotency_key: str,
+        result_payload: dict[str, Any],
+        next_queue_key: str | None = None,
+        next_action_key: str | None = None,
+        terminal: bool = True,
+    ) -> None:
+        worker_euid = str(self.execution._props(lease).get("worker_lookup_euid") or "")
+        self.execution.complete_queue_execution(
+            CompleteQueueExecutionRequest(
+                subject_euid=subject.euid,
+                worker_euid=worker_euid,
+                lease_euid=lease.euid,
+                action_key=action_key,
+                expected_state=ExecutionState.READY,
+                idempotency_key=idempotency_key,
+                next_queue_key=next_queue_key,
+                next_action_key=next_action_key,
+                result_payload=result_payload,
+                terminal=terminal,
+            ),
+            executed_by=self.bdb.app_username,
+        )
+
     def _resolve_stage_claim(
         self,
         *,
@@ -1774,55 +1916,37 @@ class BetaLabService:
     ):
         self._assert_not_reserved(material)
         self._assert_not_consumed(material, stage_label=stage_label)
-        current_queue = self._current_queue_for_instance(material)
-        if current_queue not in expected_queues:
-            expected = ", ".join(sorted(expected_queues))
-            raise ValueError(
-                f"Source material must be queued in one of [{expected}] "
-                f"(current_queue={current_queue!r})"
-            )
+        queue_subject = self._execution_subject_for_material(
+            material,
+            expected_queues=expected_queues,
+        )
+        current_queue = self.execution._authoritative_queue_key_for_instance(queue_subject)
         if claim_euid:
-            claim = self._require_instance(claim_euid)
-            if not self._is_data_kind(claim, self.BETA_KIND_CLAIM):
-                raise ValueError(f"Bloom claim not found: {claim_euid}")
-            claim_props = self._props(claim)
-            claim_status = str(claim_props.get("status") or "").strip().lower()
-            if claim_status != "active":
+            lease = self.execution._require_lease(claim_euid)
+            lease_subject = self.execution._subject_for_lease(lease)
+            if lease_subject is None or lease_subject.euid != queue_subject.euid:
                 raise ValueError(
-                    f"Claim is not active and cannot be used: {claim_euid}"
-                )
-            work_item = self._first_parent(claim, self.REL_WORK_ITEM_CLAIM)
-            if work_item is None:
-                raise ValueError(f"Claim is not linked to a work item: {claim_euid}")
-            claim_material = self._first_parent(work_item, self.REL_WORK_ITEM_SUBJECT)
-            if claim_material is None or claim_material.euid != material.euid:
-                raise ValueError(
-                    "claim_euid does not match source material "
+                    "claim_euid does not match source execution subject "
                     f"(claim_euid={claim_euid} material_euid={material.euid})"
                 )
-            claim_queue = str(claim_props.get("queue_name") or "").strip()
-            if claim_queue != current_queue:
-                raise ValueError(
-                    "claim_euid queue does not match source queue "
-                    f"(claim_queue={claim_queue!r} current_queue={current_queue!r})"
-                )
-            return claim
+            return lease
 
-        work_item = self._require_open_work_item(material=material, expected_queue=current_queue or "")
-        active_claim = self._active_claim_for_work_item(work_item)
-        if active_claim is not None:
-            raise ValueError(
-                "Source material already has an active claim; supply claim_euid explicitly "
-                f"(claim_euid={active_claim.euid})"
-            )
-        return self._create_claim_record(
-            material=material,
+        worker = self._resolve_queue_worker(
             queue_name=current_queue or "",
-            work_item=work_item,
-            metadata={"stage": stage_label, "implicit_claim": True},
-            idempotency_key=None,
-            implicit=True,
+            worker_type=WorkerType.SERVICE,
         )
+        claim_result = self.execution.claim_queue_item(
+            ClaimQueueItemRequest(
+                worker_euid=worker.worker_euid,
+                queue_key=current_queue or "",
+                subject_euid=queue_subject.euid,
+                idempotency_key=f"implicit:{stage_label}:{queue_subject.euid}",
+                expected_state=ExecutionState.READY,
+                payload={"stage": stage_label, "implicit_claim": True},
+            ),
+            executed_by=self.bdb.app_username,
+        )
+        return self.execution._require_lease(str(claim_result.lease_euid))
 
     def _consume_material_instance(
         self,
@@ -1858,6 +1982,22 @@ class BetaLabService:
         return event
 
     def _claim_response(self, claim, *, replay: bool) -> BetaClaimResponse:
+        if self.execution._is_execution_instance(claim, subtype="queue_lease"):
+            claim_props = self.execution._props(claim)
+            lease_status = str(claim_props.get("status") or "").strip().upper()
+            release_reason = str(claim_props.get("release_reason") or "").strip().lower()
+            display_status = lease_status.lower()
+            if lease_status == "RELEASED" and release_reason in {"released", "completed", "abandoned"}:
+                display_status = release_reason
+            return BetaClaimResponse(
+                claim_euid=claim.euid,
+                material_euid=str(claim_props.get("subject_lookup_euid") or ""),
+                queue_name=str(claim_props.get("queue_lookup_key") or ""),
+                work_item_euid=claim.euid,
+                status=display_status,
+                metadata={},
+                idempotent_replay=replay,
+            )
         claim_props = self._props(claim)
         work_item = self._first_parent(claim, self.REL_WORK_ITEM_CLAIM)
         material = (
@@ -2033,35 +2173,7 @@ class BetaLabService:
             lineage.is_deleted = True
 
     def _current_queue_for_instance(self, instance) -> str | None:
-        props = self._props(instance)
-        current_queue = str(props.get("current_queue") or "").strip()
-        if current_queue:
-            return current_queue
-        for lineage in get_child_lineages(instance):
-            if (
-                lineage.is_deleted
-                or lineage.relationship_type != self.REL_QUEUE_MEMBERSHIP
-            ):
-                continue
-            parent = lineage.parent_instance
-            if parent is None or parent.is_deleted:
-                continue
-            parent_props = self._props(parent)
-            queue_name = str(parent_props.get("queue_name") or "").strip()
-            if queue_name:
-                return queue_name
-        # Queue membership is tracked on the physical container for ingress material.
-        # If content lacks direct queue state, fall back to its containing container.
-        for lineage in get_child_lineages(instance):
-            if lineage.is_deleted or lineage.relationship_type != "contains":
-                continue
-            parent = lineage.parent_instance
-            if parent is None or parent.is_deleted or parent.category != "container":
-                continue
-            container_queue = self._current_queue_for_instance(parent)
-            if container_queue:
-                return container_queue
-        return None
+        return self.execution.current_queue_for_instance(instance)
 
     def _resolve_fulfillment_item_context(
         self,
@@ -2446,6 +2558,40 @@ class BetaLabService:
             beta_kind=beta_kind,
             property_key="idempotency_key",
             expected=idempotency_key,
+        )
+
+    def _find_library_prep_output_record(self, *, idempotency_key: str):
+        return self._find_instance_by_template_property(
+            category="data",
+            type_name="wetlab",
+            subtype="library_prep_output",
+            property_key="idempotency_key",
+            expected=idempotency_key,
+        )
+
+    def _find_instance_by_template_property(
+        self,
+        *,
+        category: str,
+        type_name: str,
+        subtype: str,
+        property_key: str,
+        expected: str,
+    ):
+        return (
+            self.bdb.session.query(self.bdb.Base.classes.generic_instance)
+            .filter(
+                self.bdb.Base.classes.generic_instance.category == category,
+                self.bdb.Base.classes.generic_instance.type == type_name,
+                self.bdb.Base.classes.generic_instance.subtype == subtype,
+                self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
+                func.jsonb_extract_path_text(
+                    self.bdb.Base.classes.generic_instance.json_addl["properties"],
+                    property_key,
+                )
+                == str(expected).strip(),
+            )
+            .first()
         )
 
     def _find_content_record(self, *, beta_kind: str, idempotency_key: str):

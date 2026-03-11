@@ -205,8 +205,15 @@ class TestModernActionUI:
     """Tests for modern UI action wiring on object detail pages."""
 
     def test_euid_details_uses_modern_action_module(self, client, bdb):
+        from bloom_lims.bobjs import BloomObj
+
         GI = bdb.Base.classes.generic_instance
         instance = bdb.session.query(GI).filter(GI.is_deleted.is_(False)).first()
+        if instance is None:
+            GT = bdb.Base.classes.generic_template
+            template = bdb.session.query(GT).filter(GT.is_deleted.is_(False)).first()
+            assert template is not None
+            instance = BloomObj(bdb).create_instances(template.euid)[0][0]
         assert instance is not None
 
         response = client.get(f"/euid_details?euid={instance.euid}")
@@ -321,6 +328,11 @@ class TestDAGEndpoints:
         response = client.get("/dindex2")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+
+    def test_dindex2_bootstraps_external_merge_ref(self, client):
+        response = client.get("/dindex2?start_euid=CX-1&merge_ref=2")
+        assert response.status_code == 200
+        assert '"defaultMergeRef": 2' in response.text
 
     def test_get_dagv2_requires_euid(self, client):
         """Test get_dagv2 requires euid parameter."""

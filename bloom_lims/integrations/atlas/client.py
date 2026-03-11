@@ -77,6 +77,31 @@ class AtlasClient:
             extra_headers={"X-Atlas-Tenant-Id": clean_tenant},
         )
 
+    def get_graph_data(
+        self,
+        *,
+        start_euid: str,
+        depth: int,
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
+        path = f"/api/graph/data?start_euid={start_euid}&depth={int(depth)}"
+        clean_tenant = str(tenant_id or "").strip()
+        if clean_tenant:
+            path = f"{path}&tenant_id={clean_tenant}"
+        return self._get_json(path)
+
+    def get_graph_object_detail(
+        self,
+        *,
+        euid: str,
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
+        path = f"/api/graph/object/{euid}"
+        clean_tenant = str(tenant_id or "").strip()
+        if clean_tenant:
+            path = f"{path}?tenant_id={clean_tenant}"
+        return self._get_json(path)
+
     def push_test_status_event(
         self,
         *,

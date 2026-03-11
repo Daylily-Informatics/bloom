@@ -1,0 +1,184 @@
+{
+  "queue": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "print_barcode_label": "action/core/print_barcode_label/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Execution Queue Definition",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "queue_key": "",
+        "display_name": "",
+        "enabled": true,
+        "manual_only": false,
+        "operator_visible": true,
+        "dispatch_priority": 100,
+        "subject_template_codes": [],
+        "eligible_states": [
+          "READY",
+          "FAILED_RETRYABLE"
+        ],
+        "required_worker_capabilities": [],
+        "site_scope": [],
+        "platform_scope": [],
+        "assay_scope": [],
+        "lease_ttl_seconds": 900,
+        "max_attempts_default": 5,
+        "retry_policy": {
+          "mode": "EXPONENTIAL_BACKOFF",
+          "initial_delay_seconds": 60,
+          "backoff_factor": 2.0,
+          "max_delay_seconds": 3600
+        },
+        "selection_policy": {
+          "order": [
+            "priority_desc",
+            "due_at_asc",
+            "ready_at_asc",
+            "created_dt_asc",
+            "euid_asc"
+          ]
+        },
+        "diagnostics_enabled": true,
+        "revision": 1,
+        "disabled_reason": null
+      },
+      "singleton": "0"
+    }
+  },
+  "queue_lease": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Execution Queue Lease",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "lease_token": "",
+        "queue_lookup_key": "",
+        "subject_lookup_euid": "",
+        "worker_lookup_euid": "",
+        "status": "ACTIVE",
+        "claimed_at": "",
+        "heartbeat_at": "",
+        "expires_at": "",
+        "released_at": null,
+        "release_reason": null,
+        "attempt_number": 0,
+        "ttl_seconds": 900,
+        "next_action_key": null,
+        "idempotency_key": "",
+        "subject_revision_at_claim": 0,
+        "payload_hash": ""
+      },
+      "singleton": "0"
+    }
+  },
+  "execution_record": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Execution Attempt Record",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "subject_lookup_euid": "",
+        "queue_lookup_key": "",
+        "worker_lookup_euid": "",
+        "lease_lookup_euid": "",
+        "attempt_number": 0,
+        "status": "STARTED",
+        "action_key": "",
+        "idempotency_key": "",
+        "payload_hash": "",
+        "expected_state": "",
+        "start_state": "",
+        "end_state": null,
+        "start_revision": 0,
+        "end_revision": null,
+        "started_at": "",
+        "finished_at": null,
+        "duration_ms": null,
+        "retryable": false,
+        "error_class": null,
+        "error_code": null,
+        "error_message": null,
+        "correlation": {},
+        "input_snapshot": {},
+        "result_snapshot": {},
+        "policy_refs": []
+      },
+      "singleton": "0"
+    }
+  },
+  "hold": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Execution Hold",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "subject_lookup_euid": "",
+        "queue_lookup_key": null,
+        "placed_by_lookup_euid": "",
+        "status": "ACTIVE",
+        "hold_code": "",
+        "reason": "",
+        "placed_at": "",
+        "released_at": null,
+        "released_by_lookup_euid": null
+      },
+      "singleton": "0"
+    }
+  },
+  "dead_letter": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Execution Dead Letter Record",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "subject_lookup_euid": "",
+        "queue_lookup_key": "",
+        "last_execution_record_lookup_euid": "",
+        "last_lease_lookup_euid": "",
+        "dead_lettered_at": "",
+        "failure_count": 0,
+        "error_class": null,
+        "error_message": null,
+        "resolution_state": "OPEN",
+        "resolved_by_lookup_euid": null,
+        "resolved_at": null
+      },
+      "singleton": "0"
+    }
+  }
+}

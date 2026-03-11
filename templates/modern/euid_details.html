@@ -168,6 +168,49 @@
   </div>
 </div>
 
+{% if external_refs %}
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-up-right-from-square"></i> External References</h3>
+  </div>
+  <div class="card-body">
+    <div style="display: grid; gap: var(--spacing-sm);">
+      {% for ref in external_refs %}
+      <div style="border: 1px solid var(--color-border); border-radius: 8px; padding: var(--spacing-sm);">
+        <div style="display: flex; justify-content: space-between; gap: var(--spacing-sm); flex-wrap: wrap; align-items: flex-start;">
+          <div>
+            <div style="font-weight: 600;">{{ ref.label }}</div>
+            <div style="color: var(--color-gray-400); font-size: 0.875rem; margin-top: 0.25rem;">
+              {{ ref.system }} :: {{ ref.root_euid }}{% if ref.tenant_id %} :: {{ ref.tenant_id }}{% endif %}
+            </div>
+            {% if not ref.graph_expandable and ref.reason %}
+            <div style="color: var(--color-gray-400); font-size: 0.8rem; margin-top: 0.35rem;">{{ ref.reason }}</div>
+            {% endif %}
+          </div>
+          <div style="display: flex; gap: var(--spacing-xs); flex-wrap: wrap;">
+            {% if ref.href %}
+            <a href="{{ ref.href }}" target="_blank" rel="noreferrer" class="btn btn-outline btn-sm">
+              <i class="fas fa-up-right-from-square"></i> Open Remote
+            </a>
+            {% endif %}
+            {% if ref.graph_expandable %}
+            <a href="/dindex2?start_euid={{ obj.euid }}&depth=4&merge_ref={{ ref.ref_index }}" class="btn btn-primary btn-sm">
+              <i class="fas fa-project-diagram"></i> Open In Graph
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-primary btn-sm" disabled>
+              <i class="fas fa-project-diagram"></i> Open In Graph
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Object Actions -->
 {% if action_groups %}
 <div class="card" style="margin-top: var(--spacing-lg);">

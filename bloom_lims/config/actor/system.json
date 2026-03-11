@@ -1,0 +1,38 @@
+{
+  "worker": {
+    "1.0": {
+      "action_groups": {},
+      "action_imports": {
+        "add_relationships": "action/core/add-relationships/1.0",
+        "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+        "set_object_status": "action/core/set_object_status/1.0"
+      },
+      "description": "Execution System Worker",
+      "expected_inputs": [],
+      "expected_outputs": [],
+      "instantiation_layouts": [],
+      "properties": {
+        "worker_key": "",
+        "display_name": "",
+        "worker_type": "SERVICE",
+        "status": "ONLINE",
+        "capabilities": [],
+        "site_scope": [],
+        "platform_scope": [],
+        "assay_scope": [],
+        "max_concurrent_leases": 1,
+        "heartbeat_at": "",
+        "heartbeat_ttl_seconds": 60,
+        "build_version": "",
+        "host": "",
+        "process_identity": "",
+        "drain_requested": false,
+        "disabled_reason": null,
+        "last_error_at": null,
+        "last_error_class": null,
+        "revision": 1
+      },
+      "singleton": "0"
+    }
+  }
+}
