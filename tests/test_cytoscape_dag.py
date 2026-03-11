@@ -286,6 +286,16 @@ class TestDistanceFiltering:
         return result
 
 
+class TestExternalGraphContracts:
+    def test_graph_js_contains_external_merge_hooks(self):
+        js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "graph.js"
+        content = js_path.read_text(encoding="utf-8")
+
+        assert "mergeExternalRef" in content
+        assert "/api/graph/external/object" in content
+        assert "is_external_bridge" in content
+
+
 class TestGraphDataGeneration:
     """Tests for DAG JSON generation from database."""
 

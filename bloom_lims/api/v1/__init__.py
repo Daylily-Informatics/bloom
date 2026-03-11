@@ -20,7 +20,9 @@ from .beta_lab import router as beta_lab_router
 from .containers import router as containers_router
 from .content import router as content_router
 from .equipment import router as equipment_router
+from .execution_queue import router as execution_queue_router
 from .external_specimens import router as external_specimens_router
+from .graph import router as graph_router
 from .lineages import router as lineages_router
 from .object_creation import router as object_creation_router
 from .objects import router as objects_router
@@ -41,6 +43,7 @@ router.include_router(auth_router)
 router.include_router(containers_router)
 router.include_router(content_router)
 router.include_router(equipment_router)
+router.include_router(execution_queue_router)
 router.include_router(batch_router)
 router.include_router(async_tasks_router)
 router.include_router(templates_router)
@@ -56,6 +59,7 @@ router.include_router(admin_auth_router)
 router.include_router(external_specimens_router)
 router.include_router(atlas_bridge_router)
 router.include_router(beta_lab_router)
+router.include_router(graph_router)
 
 
 @router.get("/")
@@ -71,6 +75,7 @@ async def api_v1_info():
             "containers": "/api/v1/containers",
             "content": "/api/v1/content",
             "equipment": "/api/v1/equipment",
+            "execution": "/api/v1/execution",
             "batch": "/api/v1/batch",
             "tasks": "/api/v1/tasks",
             "templates": "/api/v1/templates",
@@ -85,5 +90,6 @@ async def api_v1_info():
             "external_specimens": "/api/v1/external/specimens",
             "external_atlas": "/api/v1/external/atlas",
             "external_atlas_beta": "/api/v1/external/atlas/beta",
+            "graph": "/api/v1/graph",
         },
     }

@@ -11,8 +11,17 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3
+from bloom_lims.graph_support import (
+    build_graph_elements_for_start as _shared_build_graph_elements_for_start,
+    build_graph_object_payload,
+    namespace_external_graph,
+    normalize_graph_request_params as _shared_normalize_graph_request_params,
+    resolve_external_ref_by_index,
+)
 from bloom_lims.gui.deps import _require_graph_admin, _resolve_auth_email, _resolve_auth_role, require_auth
 from bloom_lims.gui.jinja import templates
+from bloom_lims.integrations.atlas.client import AtlasClientError
+from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 
 
 router = APIRouter()
@@ -61,78 +70,11 @@ def _normalize_graph_request_params(
     start_euid: str | None,
     depth: int | None,
 ) -> tuple[str, int]:
-    resolved_start = (start_euid or "AY1").strip() or "AY1"
-
-    try:
-        resolved_depth = int(depth if depth is not None else 4)
-    except (TypeError, ValueError):
-        resolved_depth = 4
-
-    resolved_depth = max(1, min(resolved_depth, 10))
-    return resolved_start, resolved_depth
+    return _shared_normalize_graph_request_params(start_euid, depth)
 
 
 def _build_graph_elements_for_start(bobj: BloomObj, start_euid: str, depth: int) -> tuple[list, list]:
-    instance_result = {}
-    lineage_result = {}
-
-    for row in bobj.fetch_graph_data_by_node_depth(start_euid, depth):
-        node_euid = row[0]
-        if node_euid not in [None, "", "None"]:
-            instance_result[node_euid] = {
-                "euid": row[0],
-                "name": row[2],
-                "type": row[3],
-                "category": row[4],
-                "subtype": row[5],
-                "version": row[6],
-            }
-
-        lineage_euid = row[8]
-        if lineage_euid not in [None, "", "None"]:
-            lineage_result[lineage_euid] = {
-                "parent_euid": row[9],
-                "child_euid": row[10],
-                "lineage_euid": lineage_euid,
-                "relationship_type": row[11] or "generic",
-            }
-
-    nodes = []
-    for key in sorted(instance_result.keys()):
-        node = instance_result[key]
-        color = _graph_node_color(node["category"], node["type"], node["subtype"])
-        nodes.append(
-            {
-                "data": {
-                    "id": str(node["euid"]),
-                    "euid": str(node["euid"]),
-                    "name": node["name"] or str(node["euid"]),
-                    "type": node["type"],
-                    "obj_type": node["type"],
-                    "category": node["category"],
-                    "subtype": node["subtype"],
-                    "version": node["version"],
-                    "color": color,
-                }
-            }
-        )
-
-    edges = []
-    for key in sorted(lineage_result.keys()):
-        edge = lineage_result[key]
-        edges.append(
-            {
-                "data": {
-                    "id": str(edge["lineage_euid"]),
-                    # Directionality in graph view: child -> parent
-                    "source": str(edge["child_euid"]),
-                    "target": str(edge["parent_euid"]),
-                    "relationship_type": str(edge["relationship_type"]),
-                }
-            }
-        )
-
-    return nodes, edges
+    return _shared_build_graph_elements_for_start(bobj, start_euid, depth)
 
 
 @router.get("/dagg", response_class=HTMLResponse)
@@ -146,6 +88,7 @@ async def dindex2(
     globalZoom: float = Query(default=0),
     start_euid: str | None = Query(default=None),
     depth: int | None = Query(default=None, ge=1, le=10),
+    merge_ref: int | None = Query(default=None, ge=0),
     auth=Depends(require_auth),
 ):
     resolved_start_euid, resolved_depth = _normalize_graph_request_params(
@@ -161,6 +104,7 @@ async def dindex2(
         "globalZoom": globalZoom,
         "start_euid": resolved_start_euid,
         "depth": resolved_depth,
+        "merge_ref": merge_ref,
         "is_admin": user_role == "admin",
         "udat": user_data,
     }
@@ -213,55 +157,82 @@ async def api_graph_object_detail(
 ):
     user_email = _resolve_auth_email(auth, request)
     bobj = BloomObj(BLOOMdb3(app_username=user_email))
-    instance_cls = bobj.Base.classes.generic_instance
 
     try:
-        obj = bobj.get_by_euid(euid)
+        return build_graph_object_payload(bobj, euid)
     except Exception:
         raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
 
-    object_kind = "instance"
-    if isinstance(obj, bobj.Base.classes.generic_template):
-        object_kind = "template"
-    elif isinstance(obj, bobj.Base.classes.generic_instance_lineage):
-        object_kind = "lineage"
 
-    payload = {
-        "euid": obj.euid,
-        "name": getattr(obj, "name", None),
-        "type": object_kind,
-        "obj_type": getattr(obj, "type", ""),
-        "category": getattr(obj, "category", ""),
-        "subtype": getattr(obj, "subtype", ""),
-        "version": getattr(obj, "version", ""),
-        "bstatus": getattr(obj, "bstatus", ""),
-        "json_addl": getattr(obj, "json_addl", {}) or {},
-        "created_dt": obj.created_dt.isoformat() if getattr(obj, "created_dt", None) else None,
-        "modified_dt": obj.modified_dt.isoformat() if getattr(obj, "modified_dt", None) else None,
-    }
+@router.get("/api/graph/external")
+async def api_external_graph(
+    request: Request,
+    source_euid: str,
+    ref_index: int = Query(..., ge=0),
+    depth: int = Query(default=4, ge=1, le=10),
+    auth=Depends(require_auth),
+):
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+    try:
+        source_obj = bobj.get_by_euid(source_euid)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Object not found: {source_euid}") from exc
 
-    if object_kind == "lineage":
-        parent_instance_uid = getattr(obj, "parent_instance_uid", None)
-        child_instance_uid = getattr(obj, "child_instance_uid", None)
-        parent_obj = None
-        child_obj = None
-        if parent_instance_uid is not None:
-            parent_obj = (
-                bobj.session.query(instance_cls)
-                .filter(instance_cls.uid == parent_instance_uid)
-                .first()
-            )
-        if child_instance_uid is not None:
-            child_obj = (
-                bobj.session.query(instance_cls)
-                .filter(instance_cls.uid == child_instance_uid)
-                .first()
-            )
-        payload["relationship_type"] = getattr(obj, "relationship_type", "generic") or "generic"
-        payload["source"] = child_obj.euid if child_obj else None
-        payload["target"] = parent_obj.euid if parent_obj else None
+    try:
+        ref = resolve_external_ref_by_index(source_obj, ref_index)
+    except IndexError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not ref.graph_expandable:
+        raise HTTPException(status_code=424, detail=ref.reason or "External graph unavailable")
 
-    return payload
+    try:
+        payload = AtlasService().client.get_graph_data(
+            start_euid=ref.root_euid,
+            depth=depth,
+            tenant_id=ref.tenant_id,
+        )
+    except (AtlasDependencyError, AtlasClientError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return namespace_external_graph(
+        payload,
+        ref=ref,
+        ref_index=ref_index,
+        source_euid=source_euid,
+    )
+
+
+@router.get("/api/graph/external/object")
+async def api_external_graph_object(
+    request: Request,
+    source_euid: str,
+    ref_index: int = Query(..., ge=0),
+    euid: str = Query(...),
+    auth=Depends(require_auth),
+):
+    user_email = _resolve_auth_email(auth, request)
+    bobj = BloomObj(BLOOMdb3(app_username=user_email))
+    try:
+        source_obj = bobj.get_by_euid(source_euid)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Object not found: {source_euid}") from exc
+
+    try:
+        ref = resolve_external_ref_by_index(source_obj, ref_index)
+    except IndexError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not ref.graph_expandable:
+        raise HTTPException(status_code=424, detail=ref.reason or "External object unavailable")
+
+    try:
+        return AtlasService().client.get_graph_object_detail(euid=euid, tenant_id=ref.tenant_id)
+    except (AtlasDependencyError, AtlasClientError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/get_dagv2")

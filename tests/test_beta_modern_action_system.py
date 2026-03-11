@@ -19,6 +19,7 @@ from bloom_lims.core.tapdb_action_dispatcher import (
     BloomTapDBActionDispatcher,
     _normalize_action_slug,
 )
+from bloom_lims.domain.execution_queue import ExecutionQueueService
 from bloom_lims.tapdb_adapter import (
     action_instance,
     action_instance_lineage,
@@ -866,3 +867,26 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
             resolved.json()["atlas_test_fulfillment_item_euid"]
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
+
+    service = ExecutionQueueService(app_username="beta-modern-actions@example.com")
+    try:
+        workers = {
+            worker.worker_key: worker
+            for worker in service.list_workers()
+            if worker.worker_key.startswith(
+                "worker://bloom/service/beta-modern-actions@example.com/"
+            )
+        }
+    finally:
+        service.close()
+
+    qc_worker = workers["worker://bloom/service/beta-modern-actions@example.com/post_extract_qc"]
+    ont_lib_prep_worker = workers[
+        "worker://bloom/service/beta-modern-actions@example.com/ont_lib_prep"
+    ]
+    assert qc_worker.worker_euid != ont_lib_prep_worker.worker_euid
+    assert qc_worker.capabilities == ["wetlab.post_extract_qc"]
+    assert ont_lib_prep_worker.capabilities == [
+        "wetlab.library_prep",
+        "platform.ONT",
+    ]

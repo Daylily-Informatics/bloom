@@ -501,7 +501,8 @@
 <script>
 window.BloomGraphConfig = {
     canEdit: {{ "true" if is_admin else "false" }},
-    graphPath: "/dindex2"
+    graphPath: "/dindex2",
+    defaultMergeRef: {{ merge_ref | tojson }}
 };
 </script>
 <script src="/static/js/graph.js"></script>

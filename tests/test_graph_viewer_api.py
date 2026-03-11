@@ -44,6 +44,14 @@ class _FakeInstance:
     uid = "uid"
 
 
+class _FakeExternalRef:
+    def __init__(self, **payload):
+        self.payload = payload
+
+    def to_public_dict(self, *, ref_index: int):
+        return {"ref_index": ref_index, **self.payload}
+
+
 def _fake_bobj_for_object_detail(euid: str = "CX-TEST"):
     fake_instance = _FakeInstance()
     fake_instance.uid = 101
@@ -242,6 +250,106 @@ class TestGraphViewerApis:
         assert "uuid" not in payload
         assert "btype" not in payload
         assert "b_sub_type" not in payload
+
+    def test_api_object_detail_includes_external_refs(self, client):
+        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        refs = [
+            _FakeExternalRef(
+                label="atlas:patient:AT-PAT-1",
+                system="atlas",
+                root_euid="AT-PAT-1",
+                tenant_id="atlas-tenant-1",
+                href="https://atlas.local/graph?start_euid=AT-PAT-1&depth=4",
+                graph_expandable=True,
+            )
+        ]
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ), patch(
+            "bloom_lims.graph_support.resolve_external_refs_for_object",
+            return_value=refs,
+        ):
+            response = client.get("/api/object/CX-TEST")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["external_refs"] == [
+            {
+                "label": "atlas:patient:AT-PAT-1",
+                "system": "atlas",
+                "root_euid": "AT-PAT-1",
+                "tenant_id": "atlas-tenant-1",
+                "href": "https://atlas.local/graph?start_euid=AT-PAT-1&depth=4",
+                "graph_expandable": True,
+                "ref_index": 0,
+            }
+        ]
+
+    def test_api_external_graph_namespaces_remote_graph(self, client):
+        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_ref = SimpleNamespace(
+            root_euid="AT-PAT-1",
+            tenant_id="atlas-tenant-1",
+            graph_expandable=True,
+            reason=None,
+            system="atlas",
+        )
+        fake_service = SimpleNamespace(
+            client=SimpleNamespace(
+                get_graph_data=lambda **_kwargs: {
+                    "elements": {
+                        "nodes": [{"data": {"id": "AT-PAT-1", "euid": "AT-PAT-1", "category": "atlas", "color": "#123456"}}],
+                        "edges": [{"data": {"id": "AT-LIN-1", "source": "AT-CH-1", "target": "AT-PAT-1"}}],
+                    }
+                }
+            )
+        )
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ), patch(
+            "bloom_lims.gui.routes.graph.resolve_external_ref_by_index",
+            return_value=fake_ref,
+        ), patch(
+            "bloom_lims.gui.routes.graph.AtlasService",
+            return_value=fake_service,
+        ):
+            response = client.get("/api/graph/external?source_euid=CX-TEST&ref_index=0&depth=3")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["elements"]["nodes"][0]["data"]["id"] == "ext::atlas::atlas-tenant-1::AT-PAT-1"
+        assert body["elements"]["nodes"][0]["data"]["is_external"] is True
+        assert body["elements"]["edges"][-1]["data"]["is_external_bridge"] is True
+
+    def test_api_external_graph_object_proxies_remote_detail(self, client):
+        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_ref = SimpleNamespace(
+            root_euid="AT-PAT-1",
+            tenant_id="atlas-tenant-1",
+            graph_expandable=True,
+            reason=None,
+            system="atlas",
+        )
+        fake_service = SimpleNamespace(
+            client=SimpleNamespace(
+                get_graph_object_detail=lambda **_kwargs: {"euid": "AT-PAT-1", "external_refs": []}
+            )
+        )
+        with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
+            "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
+        ), patch(
+            "bloom_lims.gui.routes.graph.resolve_external_ref_by_index",
+            return_value=fake_ref,
+        ), patch(
+            "bloom_lims.gui.routes.graph.AtlasService",
+            return_value=fake_service,
+        ):
+            response = client.get(
+                "/api/graph/external/object?source_euid=CX-TEST&ref_index=0&euid=AT-PAT-1"
+            )
+
+        assert response.status_code == 200
+        assert response.json()["euid"] == "AT-PAT-1"
 
     def test_get_node_info_returns_payload_without_uuid(self, client):
         fake_bobj = _fake_bobj_for_object_detail("CX-TEST")

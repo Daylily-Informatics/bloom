@@ -13,6 +13,12 @@ from bloom_lims.api.v1.dependencies import (
 )
 from bloom_lims.auth.rbac import Permission
 from bloom_lims.domain.beta_lab import BetaLabService
+from bloom_lims.domain.execution_queue import (
+    ExecutionQueueConflictError,
+    ExecutionQueueError,
+    ExecutionQueueNotFoundError,
+    ExecutionQueuePermissionError,
+)
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaClaimCreateRequest,
@@ -71,6 +77,20 @@ def _status_for_value_error(exc: ValueError) -> int:
     return 400
 
 
+def _raise_beta_http_error(exc: Exception, *, logger_message: str) -> None:
+    if isinstance(exc, ValueError):
+        raise HTTPException(
+            status_code=_status_for_value_error(exc),
+            detail=str(exc),
+        ) from exc
+    if isinstance(exc, ExecutionQueueNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, (ExecutionQueueConflictError, ExecutionQueuePermissionError, ExecutionQueueError)):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    logger.exception(logger_message)
+    raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.post("/materials", response_model=BetaMaterialResponse)
 async def register_accepted_material(
     payload: BetaAcceptedMaterialCreateRequest,
@@ -83,13 +103,11 @@ async def register_accepted_material(
             payload=payload,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed registering accepted material")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed registering accepted material",
+        )
     finally:
         service.close()
 
@@ -106,13 +124,11 @@ async def create_empty_tube(
             payload=payload,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed creating empty Bloom tube")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed creating empty Bloom tube",
+        )
     finally:
         service.close()
 
@@ -129,13 +145,11 @@ async def update_tube(
             container_euid=container_euid,
             payload=payload,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed updating Bloom tube")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed updating Bloom tube",
+        )
     finally:
         service.close()
 
@@ -152,13 +166,11 @@ async def update_specimen(
             specimen_euid=specimen_euid,
             payload=payload,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed updating Bloom specimen")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed updating Bloom specimen",
+        )
     finally:
         service.close()
 
@@ -182,13 +194,11 @@ async def move_material_to_queue(
             metadata=payload.metadata,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed moving Bloom material to beta queue")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed moving Bloom material to beta queue",
+        )
     finally:
         service.close()
 
@@ -212,13 +222,11 @@ async def claim_material_in_queue(
             metadata=payload.metadata,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed claiming Bloom beta queue material")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed claiming Bloom beta queue material",
+        )
     finally:
         service.close()
 
@@ -238,13 +246,11 @@ async def release_claim(
             metadata=payload.metadata,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed releasing Bloom beta queue claim")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed releasing Bloom beta queue claim",
+        )
     finally:
         service.close()
 
@@ -267,13 +273,11 @@ async def reserve_material(
             metadata=payload.metadata,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed reserving Bloom beta material")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed reserving Bloom beta material",
+        )
     finally:
         service.close()
 
@@ -296,13 +300,11 @@ async def release_reservation(
             metadata=payload.metadata,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed releasing Bloom beta material reservation")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed releasing Bloom beta material reservation",
+        )
     finally:
         service.close()
 
@@ -325,13 +327,11 @@ async def consume_material(
             metadata=payload.metadata,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed consuming Bloom beta material")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed consuming Bloom beta material",
+        )
     finally:
         service.close()
 
@@ -347,13 +347,11 @@ async def create_extraction(
         return service.create_extraction(
             payload=payload, idempotency_key=idempotency_key
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed creating Bloom beta extraction output")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed creating Bloom beta extraction output",
+        )
     finally:
         service.close()
 
@@ -370,13 +368,11 @@ async def record_post_extract_qc(
             payload=payload,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed recording Bloom beta post-extract QC")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed recording Bloom beta post-extract QC",
+        )
     finally:
         service.close()
 
@@ -393,13 +389,11 @@ async def create_library_prep(
             payload=payload,
             idempotency_key=idempotency_key,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed creating Bloom beta library prep output")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed creating Bloom beta library prep output",
+        )
     finally:
         service.close()
 
@@ -413,13 +407,11 @@ async def create_pool(
     service = BetaLabService(app_username=user.email)
     try:
         return service.create_pool(payload=payload, idempotency_key=idempotency_key)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed creating Bloom beta sequencing pool")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed creating Bloom beta sequencing pool",
+        )
     finally:
         service.close()
 
@@ -433,13 +425,11 @@ async def create_run(
     service = BetaLabService(app_username=user.email)
     try:
         return service.create_run(payload=payload, idempotency_key=idempotency_key)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed creating Bloom beta sequencing run")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed creating Bloom beta sequencing run",
+        )
     finally:
         service.close()
 
@@ -460,12 +450,10 @@ async def resolve_run_assignment(
             lane=lane,
             library_barcode=library_barcode,
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=_status_for_value_error(exc), detail=str(exc)
-        ) from exc
     except Exception as exc:
-        logger.exception("Failed resolving Bloom beta run index")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed resolving Bloom beta run index",
+        )
     finally:
         service.close()
