@@ -229,6 +229,10 @@ class BetaLibraryPrepCreateRequest(BaseModel):
 class BetaLibraryPrepResponse(BaseModel):
     source_extraction_output_euid: str
     library_prep_output_euid: str
+    library_material_euid: str | None = None
+    library_container_euid: str | None = None
+    library_plate_euid: str | None = None
+    library_well_euid: str | None = None
     atlas_test_fulfillment_item_euid: str
     current_queue: str
     idempotent_replay: bool = False

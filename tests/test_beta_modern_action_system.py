@@ -641,12 +641,14 @@ def test_beta_flow_records_modern_action_instances(bdb):
         )
         assert library_prep.status_code == 200, library_prep.text
         lib_output_euid = library_prep.json()["library_prep_output_euid"]
+        library_material_euid = library_prep.json()["library_material_euid"]
+        assert library_material_euid.startswith("MX-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
             headers={"Idempotency-Key": _opaque("idem-pool")},
             json={
-                "member_euids": [lib_output_euid],
+                "member_euids": [library_material_euid],
                 "platform": "ILMN",
                 "pool_name": "beta-action-pool",
             },

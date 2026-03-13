@@ -148,13 +148,21 @@ class ExecutionQueueService:
         "ilmn_seq_pool": {
             "display_name": "Illumina Sequencing Pool",
             "dispatch_priority": 100,
-            "subject_template_codes": ["data/wetlab/library_prep_output/1.0"],
+            "subject_template_codes": [
+                "data/wetlab/library_prep_output/1.0",
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
             "required_worker_capabilities": ["wetlab.pooling", "platform.ILMN"],
         },
         "ont_seq_pool": {
             "display_name": "ONT Sequencing Pool",
             "dispatch_priority": 100,
-            "subject_template_codes": ["data/wetlab/library_prep_output/1.0"],
+            "subject_template_codes": [
+                "data/wetlab/library_prep_output/1.0",
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
             "required_worker_capabilities": ["wetlab.pooling", "platform.ONT"],
         },
         "ilmn_start_seq_run": {
@@ -192,6 +200,13 @@ class ExecutionQueueService:
         for queue_key, defaults in self.WETLAB_QUEUE_DEFAULTS.items():
             queue = self._find_queue_by_key(queue_key)
             if queue is not None:
+                props = self._props(queue)
+                merged = self._queue_definition_defaults(queue_key, defaults)
+                merged["revision"] = int(props.get("revision") or 0) + 1
+                props.update(merged)
+                queue.name = defaults["display_name"]
+                props["name"] = queue.name
+                self._write_props(queue, props)
                 continue
             queue = self.bobj.create_instance_by_code(
                 self.EXECUTION_QUEUE_TEMPLATE_CODE,

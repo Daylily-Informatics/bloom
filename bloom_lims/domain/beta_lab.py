@@ -77,6 +77,7 @@ class BetaLabService:
     POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
     LIBRARY_PREP_OUTPUT_TEMPLATE_CODE = "data/wetlab/library_prep_output/1.0"
+    LIBRARY_PLATE_TEMPLATE_CODE = "container/plate/fixed-plate-96/1.0"
     EXTRACTION_TEMPLATE_BY_TYPE = {
         "cfdna": "content/sample/cfdna/1.0",
         "gdna": "content/sample/gdna/1.0",
@@ -948,14 +949,38 @@ class BetaLabService:
             existing = self._find_library_prep_output_record(idempotency_key=idempotency_key)
             if existing is not None:
                 source = self._first_parent(existing, "beta_library_prep_output")
+                library_material = self._find_content_record(
+                    beta_kind="library_material",
+                    idempotency_key=idempotency_key,
+                )
+                library_well = (
+                    self._first_parent(library_material, "contains")
+                    if library_material is not None
+                    else None
+                )
+                library_plate = (
+                    self._first_parent(library_well, "contains")
+                    if library_well is not None
+                    else None
+                )
                 fulfillment_item_context = self._resolve_fulfillment_item_context(existing)
                 return BetaLibraryPrepResponse(
                     source_extraction_output_euid=source.euid if source is not None else "",
                     library_prep_output_euid=existing.euid,
+                    library_material_euid=(
+                        library_material.euid if library_material is not None else None
+                    ),
+                    library_container_euid=(
+                        library_plate.euid if library_plate is not None else None
+                    ),
+                    library_plate_euid=library_plate.euid if library_plate is not None else None,
+                    library_well_euid=library_well.euid if library_well is not None else None,
                     atlas_test_fulfillment_item_euid=fulfillment_item_context[
                         "atlas_test_fulfillment_item_euid"
                     ],
-                    current_queue=self._current_queue_for_instance(existing) or "",
+                    current_queue=(
+                        self._current_queue_for_instance(library_material or existing) or ""
+                    ),
                     idempotent_replay=True,
                 )
 
@@ -972,6 +997,8 @@ class BetaLabService:
         )
 
         fulfillment_item_context = self._resolve_fulfillment_item_context(source)
+        source_well = self._first_parent(source, "contains")
+        source_well_name = self._well_name(source_well) or "A1"
         lib_output = self.bobj.create_instance_by_code(
             self.LIBRARY_PREP_OUTPUT_TEMPLATE_CODE,
             {
@@ -994,11 +1021,67 @@ class BetaLabService:
             lib_output.euid,
             relationship_type="beta_library_prep_output",
         )
+        extraction_type = str(self._props(source).get("extraction_type") or "gdna").strip().lower()
+        library_material = self.bobj.create_instance_by_code(
+            self.EXTRACTION_TEMPLATE_BY_TYPE.get(extraction_type, "content/sample/gdna/1.0"),
+            {
+                "json_addl": {
+                    "properties": {
+                        "beta_kind": "library_material",
+                        "platform": payload.platform,
+                        "idempotency_key": idempotency_key or "",
+                        "metadata": normalized_metadata,
+                    }
+                }
+            },
+        )
+        library_material_props = self._props(library_material)
+        library_material_name = (
+            f"{payload.output_name} seq lib"
+            if payload.output_name
+            else f"{payload.platform.lower()}-seq-lib:{source.euid}"
+        )
+        library_material.name = library_material_name
+        library_material_props["name"] = library_material_name
+        self._write_props(library_material, library_material_props)
+        self.bobj.create_generic_instance_lineage_by_euids(
+            source.euid,
+            library_material.euid,
+            relationship_type="beta_library_material_output",
+        )
+        library_plate = self._resolve_or_create_plate(
+            plate_euid=None,
+            plate_template_code=self.LIBRARY_PLATE_TEMPLATE_CODE,
+            plate_name=(
+                f"{payload.output_name} plate"
+                if payload.output_name
+                else f"{payload.platform.lower()}-seq-lib-plate:{source.euid}"
+            ),
+        )
+        library_plate_props = self._props(library_plate)
+        library_plate_props["beta_kind"] = "library_plate"
+        library_plate_props["idempotency_key"] = idempotency_key or ""
+        self._write_props(library_plate, library_plate_props)
+        library_well = self._require_plate_well(library_plate, source_well_name)
+        library_well_props = self._props(library_well)
+        library_well_props["beta_kind"] = "library_plate_well"
+        library_well_props["idempotency_key"] = idempotency_key or ""
+        self._write_props(library_well, library_well_props)
+        self.bobj.create_generic_instance_lineage_by_euids(
+            library_well.euid,
+            library_material.euid,
+            relationship_type="contains",
+        )
         self._replace_fulfillment_item_references(
             lib_output,
             atlas_context=fulfillment_item_context,
         )
+        self._replace_fulfillment_item_references(
+            library_material,
+            atlas_context=fulfillment_item_context,
+        )
         self._attach_execution_metadata_lineage(lib_output, normalized_metadata)
+        self._attach_execution_metadata_lineage(library_material, normalized_metadata)
         self.execution.queue_subject(
             subject_euid=lib_output.euid,
             queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
@@ -1007,6 +1090,17 @@ class BetaLabService:
                 f"{idempotency_key}:queue"
                 if idempotency_key
                 else f"queue:libprep:{lib_output.euid}"
+            ),
+            executed_by=self.bdb.app_username,
+        )
+        self.execution.queue_subject(
+            subject_euid=library_material.euid,
+            queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+            next_action_key="create_pool",
+            idempotency_key=(
+                f"{idempotency_key}:queue:material"
+                if idempotency_key
+                else f"queue:libprep-material:{library_material.euid}"
             ),
             executed_by=self.bdb.app_username,
         )
@@ -1042,6 +1136,10 @@ class BetaLabService:
                 "status": "success",
                 "source_extraction_output_euid": source.euid,
                 "library_prep_output_euid": lib_output.euid,
+                "library_material_euid": library_material.euid,
+                "library_container_euid": library_plate.euid,
+                "library_plate_euid": library_plate.euid,
+                "library_well_euid": library_well.euid,
                 "current_queue": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
             },
         )
@@ -1049,6 +1147,10 @@ class BetaLabService:
         return BetaLibraryPrepResponse(
             source_extraction_output_euid=source.euid,
             library_prep_output_euid=lib_output.euid,
+            library_material_euid=library_material.euid,
+            library_container_euid=library_plate.euid,
+            library_plate_euid=library_plate.euid,
+            library_well_euid=library_well.euid,
             atlas_test_fulfillment_item_euid=fulfillment_item_context[
                 "atlas_test_fulfillment_item_euid"
             ],

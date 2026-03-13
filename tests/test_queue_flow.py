@@ -251,12 +251,20 @@ def test_beta_queue_flow_end_to_end():
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
         lib_output_euid = library_body["library_prep_output_euid"]
+        library_material_euid = library_body["library_material_euid"]
+        library_container_euid = library_body["library_container_euid"]
+        library_plate_euid = library_body["library_plate_euid"]
+        library_well_euid = library_body["library_well_euid"]
+        assert library_material_euid.startswith("MX-")
+        assert library_container_euid.startswith("CX-")
+        assert library_plate_euid.startswith("CX-")
+        assert library_well_euid.startswith("CWX-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
             headers={"Idempotency-Key": _opaque("idem-pool")},
             json={
-                "member_euids": [lib_output_euid],
+                "member_euids": [library_material_euid],
                 "platform": "ILMN",
                 "pool_name": "beta-seq-pool",
                 "metadata": {"pool_strategy": "singleplex"},
