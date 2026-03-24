@@ -139,8 +139,8 @@ except Exception:
     print("  \033[1;33m⚠\033[0m daylily-tapdb not installed")
     raise SystemExit(0)
 
-if not (Version("0.1.35") <= v < Version("0.2.0")):
-    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.1.35, 0.2.0)")
+if not (Version("0.2.5") <= v < Version("0.3.0")):
+    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.2.5, 0.3.0)")
 else:
     print(f"  \033[0;32m✓\033[0m daylily-tapdb version {v}")
 PY
