@@ -34,9 +34,9 @@ _BLOOM_PYTHON=""
 echo -e "${_BLUE}Activating BLOOM LIMS environment...${_NC}"
 
 if command -v conda &> /dev/null; then
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         eval "$(conda shell.zsh hook)" 2>/dev/null || true
-    elif [[ -n "$BASH_VERSION" ]]; then
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
         eval "$(conda shell.bash hook)" 2>/dev/null || true
     else
         source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
@@ -89,11 +89,11 @@ else
 fi
 
 if [[ "$-" == *i* ]]; then
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         if eval "$(_BLOOM_COMPLETE=zsh_source bloom 2>/dev/null)" 2>/dev/null; then
             echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (zsh)"
         fi
-    elif [[ -n "$BASH_VERSION" ]]; then
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
         if eval "$(_BLOOM_COMPLETE=bash_source bloom 2>/dev/null)" 2>/dev/null; then
             echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (bash)"
         fi
