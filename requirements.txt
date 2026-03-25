@@ -7,7 +7,7 @@ zebra_day==2.1.4
 fedex_tracking_day==0.2.8
 setuptools~=51.1.0
 SQLAlchemy~=2.0.19
-daylily-tapdb==0.2.5
+daylily-tapdb==0.2.7
 daylily-cognito==0.1.24
 pytz~=2023.3
 h11~=0.14.0
