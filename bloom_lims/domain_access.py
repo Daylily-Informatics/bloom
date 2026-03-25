@@ -58,14 +58,9 @@ def is_allowed_origin(origin: str, *, allow_local: bool) -> bool:
     return parsed.scheme == "https" and is_approved_domain(host)
 
 
-def build_trusted_hosts(*, allow_local: bool) -> list[str]:
-    hosts = [
-        *APPROVED_WEB_DOMAIN_SUFFIXES,
-        *[f"*.{item}" for item in APPROVED_WEB_DOMAIN_SUFFIXES],
-    ]
-    if allow_local:
-        hosts.extend(["localhost", "127.0.0.1", "[::1]", "testserver"])
-    return hosts
+def build_trusted_hosts(*, allow_local: bool) -> list[str]:  # noqa: ARG001
+    # Host filtering is now handled upstream (security groups / load balancer).
+    return ["*"]
 
 
 def build_allowed_origin_regex(*, allow_local: bool) -> str:
