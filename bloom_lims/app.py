@@ -31,8 +31,48 @@ from bloom_lims.tapdb_metrics import (
 )
 
 
+def _validate_required_config(settings) -> None:
+    """Fail hard at startup if critical configuration is missing.
+
+    Bypass with BLOOM_SKIP_STARTUP_VALIDATION=1 (tests only).
+    """
+    if os.environ.get("BLOOM_SKIP_STARTUP_VALIDATION", "").strip() in ("1", "true", "yes"):
+        logging.getLogger(__name__).warning(
+            "Startup config validation skipped (BLOOM_SKIP_STARTUP_VALIDATION)"
+        )
+        return
+
+    errors: list[str] = []
+
+    # TapDB config must be resolvable
+    try:
+        from bloom_lims.config import get_tapdb_db_config
+
+        get_tapdb_db_config()
+    except Exception as exc:
+        errors.append(f"TapDB config: {exc}")
+
+    # Cognito auth must be configured
+    auth = settings.auth
+    if not auth.cognito_user_pool_id:
+        errors.append("auth.cognito_user_pool_id is empty")
+    if not auth.cognito_client_id:
+        errors.append("auth.cognito_client_id is empty")
+    if not auth.cognito_domain:
+        errors.append("auth.cognito_domain is empty")
+    if not auth.cognito_redirect_uri:
+        errors.append("auth.cognito_redirect_uri is empty")
+
+    if errors:
+        msg = "BLOOM startup aborted — missing required configuration:\n" + "\n".join(
+            f"  • {e}" for e in errors
+        )
+        raise RuntimeError(msg)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
+    _validate_required_config(settings)
     allow_local_domain_access = not settings.is_production
     app = FastAPI()
 

@@ -129,18 +129,18 @@ def get_user_preferences(email: str) -> dict:
 
 
 def _get_request_cognito_auth(request: Request) -> CognitoAuth:
-    """Resolve Cognito auth with request-origin callback/logout URLs."""
+    """Resolve Cognito auth using daycog/config values (proxy-safe).
+
+    Does NOT derive callback/logout URLs from the request, because behind
+    a reverse proxy (e.g. Caddy) ``request.url_for()`` resolves to the
+    internal bind address instead of the public domain.  The correct URLs
+    come from the daycog env file or bloom-config.yaml.
+    """
     try:
         from bloom_lims.config import get_settings
 
         settings = get_settings()
-        callback_url = str(request.url_for("auth_callback_get"))
-        logout_url = str(request.base_url).rstrip("/") + "/"
-        return CognitoAuth.from_settings(
-            settings.auth,
-            expected_callback_url=callback_url,
-            expected_logout_url=logout_url,
-        )
+        return CognitoAuth.from_settings(settings.auth)
     except CognitoConfigurationError:
         raise
     except Exception:

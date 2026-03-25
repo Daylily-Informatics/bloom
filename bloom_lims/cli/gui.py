@@ -118,9 +118,39 @@ def gui(port, host, reload, background):
     try:
         from bloom_lims.config import apply_runtime_environment, get_settings
 
-        apply_runtime_environment(get_settings())
+        settings = get_settings()
+        apply_runtime_environment(settings)
     except Exception as exc:
         console.print(f"[red]✗[/red]  Failed to apply runtime environment: {exc}")
+        raise SystemExit(1)
+
+    # ── Fail hard if critical configs are missing ──────────────────────
+    _preflight_errors: list[str] = []
+
+    # TapDB config must be resolvable
+    try:
+        from bloom_lims.config import get_tapdb_db_config
+
+        get_tapdb_db_config()
+    except Exception as exc:
+        _preflight_errors.append(f"TapDB config: {exc}")
+
+    # Cognito auth must be configured (pool + client + domain + redirect)
+    _auth = settings.auth
+    if not _auth.cognito_user_pool_id:
+        _preflight_errors.append("auth.cognito_user_pool_id is empty")
+    if not _auth.cognito_client_id:
+        _preflight_errors.append("auth.cognito_client_id is empty")
+    if not _auth.cognito_domain:
+        _preflight_errors.append("auth.cognito_domain is empty")
+    if not _auth.cognito_redirect_uri:
+        _preflight_errors.append("auth.cognito_redirect_uri is empty")
+
+    if _preflight_errors:
+        console.print("[red]✗[/red]  Startup aborted — missing required configuration:")
+        for err in _preflight_errors:
+            console.print(f"   • {err}")
+        console.print("\n   Fix your config ([cyan]bloom config -e[/cyan]) or run [cyan]bloom db init[/cyan].")
         raise SystemExit(1)
 
     pid = _get_pid()
