@@ -34,9 +34,9 @@ _BLOOM_PYTHON=""
 echo -e "${_BLUE}Activating BLOOM LIMS environment...${_NC}"
 
 if command -v conda &> /dev/null; then
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         eval "$(conda shell.zsh hook)" 2>/dev/null || true
-    elif [[ -n "$BASH_VERSION" ]]; then
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
         eval "$(conda shell.bash hook)" 2>/dev/null || true
     else
         source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
@@ -89,11 +89,11 @@ else
 fi
 
 if [[ "$-" == *i* ]]; then
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         if eval "$(_BLOOM_COMPLETE=zsh_source bloom 2>/dev/null)" 2>/dev/null; then
             echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (zsh)"
         fi
-    elif [[ -n "$BASH_VERSION" ]]; then
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
         if eval "$(_BLOOM_COMPLETE=bash_source bloom 2>/dev/null)" 2>/dev/null; then
             echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (bash)"
         fi
@@ -139,8 +139,8 @@ except Exception:
     print("  \033[1;33m⚠\033[0m daylily-tapdb not installed")
     raise SystemExit(0)
 
-if not (Version("0.1.35") <= v < Version("0.2.0")):
-    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.1.35, 0.2.0)")
+if not (Version("0.2.5") <= v < Version("0.3.0")):
+    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.2.5, 0.3.0)")
 else:
     print(f"  \033[0;32m✓\033[0m daylily-tapdb version {v}")
 PY
