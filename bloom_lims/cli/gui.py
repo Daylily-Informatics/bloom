@@ -103,12 +103,13 @@ def _ensure_https_certs() -> tuple[Path, Path]:
 
 @click.command()
 @click.option('--port', '-p', default=8912, type=int, help='Port to run on (default: 8912)')
+@click.option('--host', '-h', default='0.0.0.0', type=str, help='Host to bind to (default: 0.0.0.0)')
 @click.option('--reload', '-r', is_flag=True, help='Enable auto-reload for development')
 @click.option('--background/--foreground', '-b/-f', default=True, help='Run in background (default)')
-def gui(port, reload, background):
+def gui(port, host, reload, background):
     """Start the BLOOM web UI."""
     _ensure_dir()
-    host = "localhost"
+    display_host = "localhost" if host in ("0.0.0.0", "::") else host
     protocol = "https"
     cert_file, key_file = _ensure_https_certs()
 
@@ -125,7 +126,7 @@ def gui(port, reload, background):
     pid = _get_pid()
     if pid:
         console.print(f"[yellow]⚠[/yellow]  Server already running (PID {pid})")
-        console.print(f"   URL: [cyan]{protocol}://{host}:{port}[/cyan]")
+        console.print(f"   URL: [cyan]{protocol}://{display_host}:{port}[/cyan]")
         console.print("   Use [cyan]bloom stop[/cyan] to stop or [cyan]bloom logs[/cyan] to view logs")
         return
 
@@ -148,12 +149,12 @@ def gui(port, reload, background):
                 raise SystemExit(1)
             PID_FILE.write_text(str(proc.pid))
             console.print(f"[green]✓[/green]  Server started (PID {proc.pid})")
-            console.print(f"   URL: [cyan]{protocol}://{host}:{port}[/cyan]")
+            console.print(f"   URL: [cyan]{protocol}://{display_host}:{port}[/cyan]")
             console.print(f"   Logs: [dim]{log_file}[/dim]")
             console.print("   Use [cyan]bloom logs[/cyan] to view logs or [cyan]bloom stop[/cyan] to stop")
     else:
         console.print(f"[cyan]Starting BLOOM UI on {host}:{port}...[/cyan]")
-        console.print(f"   URL: [cyan]{protocol}://{host}:{port}[/cyan]")
+        console.print(f"   URL: [cyan]{protocol}://{display_host}:{port}[/cyan]")
         console.print("   Press Ctrl+C to stop\n")
         os.chdir(PROJECT_ROOT)
         try:

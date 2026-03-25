@@ -17,11 +17,12 @@ def server():
 
 @server.command("start")
 @click.option("--port", "-p", default=8912, type=int, help="Port to run on")
+@click.option("--host", "-h", default="0.0.0.0", type=str, help="Host to bind to")
 @click.option("--reload", "-r", is_flag=True, help="Enable auto-reload for development")
 @click.option("--background/--foreground", "-b/-f", default=True, help="Run in background")
-def start(port: int, reload: bool, background: bool):
+def start(port: int, host: str, reload: bool, background: bool):
     """Start the BLOOM GUI server."""
-    gui_command.callback(port=port, reload=reload, background=background)
+    gui_command.callback(port=port, host=host, reload=reload, background=background)
 
 
 @server.command("stop")
