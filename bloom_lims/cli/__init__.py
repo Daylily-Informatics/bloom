@@ -15,7 +15,7 @@ import sys
 import click
 from rich.console import Console
 
-from bloom_lims.cli.config_cmd import config
+from bloom_lims.cli.config_cmd import config, config_validate
 from bloom_lims.cli.db import db
 from bloom_lims.cli.gui import gui, stop
 from bloom_lims.cli.info import doctor, info, status, version
@@ -64,6 +64,7 @@ cli.add_command(status)
 cli.add_command(doctor)
 cli.add_command(version)
 cli.add_command(config)
+cli.add_command(config_validate)
 cli.add_command(server)
 cli.add_command(test)
 cli.add_command(quality)
