@@ -119,7 +119,7 @@ def gui(port, host, reload, background):
         console.print("\n   Fix your config ([cyan]bloom config -e[/cyan]) or run [cyan]bloom db init[/cyan].")
         raise SystemExit(1)
 
-    pid = _get_pid()
+    pid = read_pid(PID_FILE)
     if pid:
         console.print(f"[yellow]⚠[/yellow]  Server already running (PID {pid})")
         console.print(f"   URL: [cyan]{protocol}://{display_host}:{port}[/cyan]")
