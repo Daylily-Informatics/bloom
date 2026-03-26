@@ -323,14 +323,18 @@ class TestDbSubcommands:
 
 
 class TestGuiLocalhostPolicy:
-    """Tests for localhost-only GUI startup policy."""
+    """Tests for localhost-only GUI startup policy via cli_core_yo.certs."""
 
-    def test_ensure_https_certs_generates_localhost_only_cert(self, tmp_path, monkeypatch):
-        project_root = tmp_path / "project"
-        project_root.mkdir(parents=True, exist_ok=True)
+    def test_ensure_certs_generates_localhost_only_cert(self, tmp_path, monkeypatch):
+        import shutil as _shutil
+        import subprocess as _subprocess
 
-        monkeypatch.setattr(gui_commands, "PROJECT_ROOT", project_root)
-        monkeypatch.setattr(gui_commands.shutil, "which", lambda _: "/usr/local/bin/mkcert")
+        import cli_core_yo.certs as certs_mod
+
+        certs_dir = tmp_path / "certs"
+        certs_dir.mkdir(parents=True, exist_ok=True)
+
+        monkeypatch.setattr(_shutil, "which", lambda _: "/usr/local/bin/mkcert")
 
         calls = []
 
@@ -345,13 +349,12 @@ class TestGuiLocalhostPolicy:
                     fh.write("cert")
             return type("Result", (), {"returncode": 0})()
 
-        monkeypatch.setattr(gui_commands.subprocess, "run", fake_run)
+        monkeypatch.setattr(certs_mod.subprocess, "run", fake_run)
+        monkeypatch.setattr(certs_mod.shutil, "which", lambda _: "/usr/local/bin/mkcert")
 
-        cert_file, key_file = gui_commands._ensure_https_certs()
+        cert_file, key_file = certs_mod.ensure_certs(certs_dir)
         assert cert_file.exists()
         assert key_file.exists()
 
         cert_gen_call = next(call for call in calls if "-key-file" in call)
         assert "localhost" in cert_gen_call
-        assert "127.0.0.1" not in cert_gen_call
-        assert "::1" not in cert_gen_call

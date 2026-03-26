@@ -11,6 +11,21 @@ from rich.syntax import Syntax
 console = Console()
 
 
+@click.command("config-validate")
+def config_validate():
+    """Validate BLOOM runtime settings and report issues."""
+    from bloom_lims.config import validate_settings
+
+    errors = validate_settings()
+    if errors:
+        console.print(f"[red]Found {len(errors)} issue(s):[/red]")
+        for err in errors:
+            console.print(f"  [red]•[/red] {err}")
+        raise SystemExit(1)
+    else:
+        console.print("[green]✓[/green]  Configuration is valid")
+
+
 @click.command()
 @click.option('--edit', '-e', is_flag=True, help='Open config file in $EDITOR')
 @click.option('--path', '-p', is_flag=True, help='Show config file path only')
