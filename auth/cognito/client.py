@@ -130,20 +130,6 @@ class CognitoAuth:
         return cls(config)
 
     @staticmethod
-    def _parse_env_file(path: Path) -> Dict[str, str]:
-        values: Dict[str, str] = {}
-        try:
-            for raw_line in path.read_text(encoding="utf-8").splitlines():
-                line = raw_line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                values[key.strip()] = value.strip()
-        except Exception:
-            return {}
-        return values
-
-    @staticmethod
     def _normalize_url(url: str) -> str:
         return (url or "").strip().rstrip("/")
 
@@ -218,104 +204,6 @@ class CognitoAuth:
             )
 
     @classmethod
-    def _load_daycog_values_for_pool(
-        cls,
-        user_pool_id: str,
-        region: str = "",
-        expected_callback_url: str = "",
-        expected_logout_url: str = "",
-        required_client_name: str = "",
-    ) -> Dict[str, str]:
-        """Load matching daycog env values for a given pool ID."""
-        cfg_dir = Path.home() / ".config" / "daycog"
-        if not cfg_dir.exists():
-            return {}
-
-        target_region = region or user_pool_id.split("_", 1)[0]
-        normalized_expected_callback = cls._normalize_url(expected_callback_url)
-        normalized_expected_logout = cls._normalize_url(expected_logout_url)
-        normalized_required_client_name = (required_client_name or "").strip().lower()
-        matches: List[tuple[int, Dict[str, str]]] = []
-        for env_file in sorted(cfg_dir.glob("*.env")):
-            values = cls._parse_env_file(env_file)
-            if values.get("COGNITO_USER_POOL_ID") != user_pool_id:
-                continue
-            if target_region and values.get("COGNITO_REGION") and values.get("COGNITO_REGION") != target_region:
-                continue
-
-            score = 0
-            lower_name = env_file.name.lower()
-            if env_file.name != "default.env":
-                # Prefer pool/app-scoped files over global default.env.
-                score += 20
-            else:
-                score -= 5
-            if "bloom" in lower_name:
-                score += 10
-            if target_region and target_region in lower_name:
-                score += 5
-
-            client_name = values.get("COGNITO_CLIENT_NAME", "").strip().lower()
-            if normalized_required_client_name:
-                if client_name == normalized_required_client_name:
-                    score += 70
-                elif client_name:
-                    score -= 200
-                else:
-                    score -= 20
-
-            callback_url = values.get("COGNITO_CALLBACK_URL", "")
-            normalized_callback = cls._normalize_url(callback_url)
-            if callback_url.startswith("https://localhost:8912"):
-                score += 5
-
-            if normalized_expected_callback:
-                if normalized_callback == normalized_expected_callback:
-                    score += 80
-                elif cls._same_origin(normalized_callback, normalized_expected_callback):
-                    score += 20
-                elif normalized_callback:
-                    score -= 10
-
-            logout_url = values.get("COGNITO_LOGOUT_URL", "")
-            normalized_logout = cls._normalize_url(logout_url)
-            if normalized_expected_logout:
-                if normalized_logout == normalized_expected_logout:
-                    score += 40
-                elif cls._same_origin(normalized_logout, normalized_expected_logout):
-                    score += 10
-
-            domain = values.get("COGNITO_DOMAIN", "")
-            expected_domain_suffix = (
-                f".auth.{target_region}.amazoncognito.com" if target_region else ""
-            )
-            if expected_domain_suffix and domain:
-                if expected_domain_suffix in domain:
-                    score += 3
-                else:
-                    score -= 10
-            elif expected_domain_suffix and not domain:
-                # Prefer candidate env files that include Hosted UI domain.
-                score -= 5
-            matches.append((score, values))
-
-        if not matches:
-            return {}
-
-        if normalized_expected_callback:
-            exact_callback_matches = [
-                (score, values)
-                for score, values in matches
-                if cls._normalize_url(values.get("COGNITO_CALLBACK_URL", "")) == normalized_expected_callback
-            ]
-            if exact_callback_matches:
-                exact_callback_matches.sort(key=lambda item: item[0], reverse=True)
-                return exact_callback_matches[0][1]
-
-        matches.sort(key=lambda item: item[0], reverse=True)
-        return matches[0][1]
-
-    @classmethod
     def from_settings(
         cls,
         auth_settings,
@@ -329,110 +217,32 @@ class CognitoAuth:
         Args:
             auth_settings: AuthSettings instance from bloom_lims.config
         """
-        pool_id = auth_settings.cognito_user_pool_id or os.getenv("COGNITO_USER_POOL_ID", "")
-        env_pool_id = os.getenv("COGNITO_USER_POOL_ID", "")
+        pool_id = auth_settings.cognito_user_pool_id or ""
         expected_callback_url = (expected_callback_url or "").strip()
         expected_logout_url = (expected_logout_url or "").strip()
-        required_client_name = (
-            (required_client_name or os.getenv("BLOOM_COGNITO_APP_NAME") or "bloom")
-            .strip()
-        )
+        required_client_name = (required_client_name or "").strip()
 
         region = auth_settings.cognito_region or ""
         if not region and pool_id:
             region = pool_id.split("_", 1)[0]
-        if not region:
-            region = os.getenv("COGNITO_REGION", "")
-
-        daycog_values = (
-            cls._load_daycog_values_for_pool(
-                pool_id,
-                region=region,
-                expected_callback_url=expected_callback_url,
-                expected_logout_url=expected_logout_url,
-                required_client_name=required_client_name,
-            )
-            if pool_id
-            else {}
-        )
-
-        # Only trust process-level COGNITO_* overrides when they target the same pool.
-        # This prevents cross-service contamination when different apps share one shell.
-        allow_env_overrides = not pool_id or not env_pool_id or env_pool_id == pool_id
-
-        def env_value(*keys: str) -> str:
-            if not allow_env_overrides:
-                return ""
-            for key in keys:
-                value = os.getenv(key, "").strip()
-                if value:
-                    return value
-            return ""
 
         client_id = (
             auth_settings.cognito_client_id
-            or daycog_values.get("COGNITO_APP_CLIENT_ID")
-            or daycog_values.get("COGNITO_CLIENT_ID")
-            or env_value("COGNITO_APP_CLIENT_ID", "COGNITO_CLIENT_ID")
             or ""
         )
         client_secret = (
             auth_settings.cognito_client_secret
-            or daycog_values.get("COGNITO_APP_CLIENT_SECRET")
-            or daycog_values.get("COGNITO_CLIENT_SECRET")
-            or env_value("COGNITO_APP_CLIENT_SECRET", "COGNITO_CLIENT_SECRET")
             or ""
         )
-        client_name = (
-            daycog_values.get("COGNITO_CLIENT_NAME")
-            or env_value("COGNITO_CLIENT_NAME")
-            or ""
-        ).strip()
-        domain = (
-            auth_settings.cognito_domain
-            or daycog_values.get("COGNITO_DOMAIN", "")
-            or env_value("COGNITO_DOMAIN")
-            or ""
-        )
-        stored_redirect_uri = (
-            auth_settings.cognito_redirect_uri
-            or daycog_values.get("COGNITO_CALLBACK_URL", "")
-            or env_value("COGNITO_CALLBACK_URL", "COGNITO_REDIRECT_URI")
-            or ""
-        )
-        stored_logout_uri = (
-            auth_settings.cognito_logout_redirect_uri
-            or daycog_values.get("COGNITO_LOGOUT_URL", "")
-            or env_value("COGNITO_LOGOUT_URL", "COGNITO_LOGOUT_REDIRECT_URI")
-            or stored_redirect_uri
-        )
-        redirect_uri = (
-            auth_settings.cognito_redirect_uri
-            or expected_callback_url
-            or daycog_values.get("COGNITO_CALLBACK_URL", "")
-            or env_value("COGNITO_CALLBACK_URL", "COGNITO_REDIRECT_URI")
-            or ""
-        )
-        logout_uri = (
-            auth_settings.cognito_logout_redirect_uri
-            or expected_logout_url
-            or daycog_values.get("COGNITO_LOGOUT_URL")
-            or env_value("COGNITO_LOGOUT_URL", "COGNITO_LOGOUT_REDIRECT_URI")
-            or redirect_uri
-        )
+        client_name = required_client_name
+        domain = auth_settings.cognito_domain or ""
+        stored_redirect_uri = auth_settings.cognito_redirect_uri or ""
+        stored_logout_uri = auth_settings.cognito_logout_redirect_uri or stored_redirect_uri
+        redirect_uri = auth_settings.cognito_redirect_uri or expected_callback_url or ""
+        logout_uri = auth_settings.cognito_logout_redirect_uri or expected_logout_url or redirect_uri
 
         if required_client_name:
-            if not client_name:
-                raise CognitoConfigurationError(
-                    "Cognito client name is missing from the selected daycog/env context. "
-                    f"Bloom requires app client name '{required_client_name}'."
-                )
-            if client_name.lower() != required_client_name.lower():
-                raise CognitoConfigurationError(
-                    f"Cognito app client name mismatch for pool '{pool_id or '(unset)'}' client "
-                    f"'{client_id or '(unset)'}': selected '{client_name}', expected '{required_client_name}'. "
-                    "Create/select a Cognito app client named 'bloom' and set it as active."
-                )
+            client_name = required_client_name
 
         cls._validate_runtime_uri_port_match(
             label="callback",
@@ -527,19 +337,8 @@ class CognitoAuth:
 
 @lru_cache(maxsize=1)
 def get_cognito_auth() -> CognitoAuth:
-    """Create (and cache) a CognitoAuth instance from YAML config.
-    
-    Falls back to environment variables if YAML config is incomplete.
-    """
-    try:
-        from bloom_lims.config import get_settings
-        settings = get_settings()
-        # Pool ID is sufficient when daycog env files are present.
-        if settings.auth.cognito_user_pool_id:
-            return CognitoAuth.from_settings(settings.auth)
-    except CognitoConfigurationError:
-        raise
-    except Exception:
-        pass
-    # Fall back to environment variables
-    return CognitoAuth.from_env()
+    """Create (and cache) a CognitoAuth instance from Bloom YAML/env config."""
+    from bloom_lims.config import get_settings
+
+    settings = get_settings()
+    return CognitoAuth.from_settings(settings.auth)

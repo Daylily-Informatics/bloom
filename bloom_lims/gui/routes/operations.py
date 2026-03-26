@@ -1102,7 +1102,7 @@ async def user_audit_logs(request: Request, username: str, _auth=Depends(require
 async def user_home(request: Request):
     if os.environ.get("BLOOM_OAUTH", "yes") == "no":
         request.session["user_data"] = request.session.get("user_data") or {
-            "email": "john@daylilyinformatics.com",
+            "email": "john@daylilyinformatics.bio",
             "dag_fnv2": "",
         }
 

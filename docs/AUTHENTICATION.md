@@ -5,12 +5,12 @@ Bloom authentication is Cognito-backed and should be managed through TapDB/`tapd
 ## Key Policy
 
 - Bloom stores only the Cognito pool binding (`auth.cognito_user_pool_id`) in Bloom config.
-- App/domain/client/callback details are resolved from daycog-managed env files.
-- Use pool-scoped daycog env files to avoid cross-app collisions under one OS user.
+- App/domain/client/callback details are resolved from Daycog-managed contexts in `~/.config/daycog/config.yaml`.
+- Use pool-scoped Daycog contexts to avoid cross-app collisions under one OS user.
 
-Daycog file pattern:
-- `~/.config/daycog/<pool>.<region>.env`
-- `~/.config/daycog/<pool>.<region>.<app>.env`
+Daycog context naming:
+- `<pool>.<region>`
+- `<pool>.<region>.<app>`
 
 ## Recommended Runtime Context
 
@@ -46,7 +46,7 @@ Logout URL:
 
 ## Bloom Config
 
-Example `~/.config/bloom/bloom-config.yaml`:
+Example `~/.config/bloom/config.yaml`:
 
 ```yaml
 auth:

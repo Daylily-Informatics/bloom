@@ -255,7 +255,7 @@ async def verify_api_key(api_key: str) -> APIUser | None:
     if not (valid_key and api_key == valid_key):
         return None
     return _make_user(
-        email="api-legacy@daylilyinformatics.com",
+        email="api-legacy@daylilyinformatics.bio",
         user_id="legacy-api-key",
         role_hint=Role.ADMIN.value,
         auth_source="legacy_api_key",
@@ -272,7 +272,7 @@ async def get_api_user(
     """Authenticate API requests and return resolved RBAC context."""
     if _is_dev_bypass_active():
         return APIUser(
-            email="api-dev@daylilyinformatics.com",
+            email="api-dev@daylilyinformatics.bio",
             user_id="dev-bypass-admin",
             roles=[Role.ADMIN.value],
             groups=[

@@ -336,7 +336,7 @@ For a custom domain like `auth.yourcompany.com`:
 BLOOM uses a YAML-based configuration system. Configuration is loaded from:
 
 1. **Environment variables** (highest priority) — Use `BLOOM_*` prefix with `__` for nesting
-2. **User config file** — `~/.config/bloom/bloom-config.yaml`
+2. **User config file** — `~/.config/bloom/config.yaml`
 3. **Template defaults** — `config/bloom-config-template.yaml`
 
 ### Setting Up Configuration
@@ -345,10 +345,10 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
 
    ```bash
    mkdir -p ~/.config/bloom
-   cp config/bloom-config-template.yaml ~/.config/bloom/bloom-config.yaml
+   cp config/bloom-config-template.yaml ~/.config/bloom/config.yaml
    ```
 
-2. **Edit `~/.config/bloom/bloom-config.yaml`** with your Cognito settings:
+2. **Edit `~/.config/bloom/config.yaml`** with your Cognito settings:
 
    ```yaml
    # -----------------------------------------------------------------------------
@@ -433,7 +433,7 @@ For rapid local development, you can bypass Cognito:
 # Set environment variable
 export BLOOM_OAUTH=no
 
-# Or add to ~/.config/bloom/bloom-config.yaml under a top-level key (not nested)
+# Or add to ~/.config/bloom/config.yaml under a top-level key (not nested)
 ```
 
 > ⚠️ **Warning**: Never use `BLOOM_OAUTH=no` in production. This creates a fake user session without any authentication.
@@ -447,7 +447,7 @@ If you need to test from different hosts (e.g., mobile device on same network):
    http://192.168.1.100:8000/
    ```
 
-2. Update your `~/.config/bloom/bloom-config.yaml`:
+2. Update your `~/.config/bloom/config.yaml`:
    ```yaml
    auth:
      cognito_redirect_uri: "http://192.168.1.100:8000/"
@@ -548,7 +548,7 @@ python -c "from bloom_lims.config import get_settings; s = get_settings(); print
 ```
 
 **Checklist**:
-- [ ] `~/.config/bloom/bloom-config.yaml` exists with auth settings
+- [ ] `~/.config/bloom/config.yaml` exists with auth settings
 - [ ] No typos in YAML keys
 - [ ] YAML syntax is valid (proper indentation, colons, quotes)
 - [ ] Or environment variables are set with `BLOOM_AUTH__` prefix
@@ -716,7 +716,7 @@ python main.py
 
 #### ✅ Configuration Security
 
-- [ ] Never commit `~/.config/bloom/bloom-config.yaml` to version control
+- [ ] Never commit `~/.config/bloom/config.yaml` to version control
 - [ ] Use secrets management (AWS Secrets Manager, HashiCorp Vault) for sensitive values
 - [ ] Rotate credentials periodically
 - [ ] Set `environment: production` in your config
@@ -745,7 +745,7 @@ response.set_cookie(
 - [ ] Never use `BLOOM_OAUTH=no` in production
 
 ```yaml
-# Production example in ~/.config/bloom/bloom-config.yaml
+# Production example in ~/.config/bloom/config.yaml
 auth:
   cognito_allowed_domains:
     - "yourcompany.com"
@@ -871,7 +871,7 @@ aws cognito-idp describe-user-pool-client \
 
 If you're migrating from the previous Supabase authentication:
 
-1. **Remove Supabase configuration** from `~/.config/bloom/bloom-config.yaml`:
+1. **Remove Supabase configuration** from `~/.config/bloom/config.yaml`:
    ```yaml
    # Remove any supabase-related keys if present
    ```

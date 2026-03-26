@@ -1,3 +1,6 @@
+# Large result/output directories — do not commit binaries
+inflection_results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

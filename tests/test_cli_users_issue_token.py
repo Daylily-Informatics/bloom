@@ -54,7 +54,7 @@ def test_issue_token_emits_plaintext_token(monkeypatch) -> None:
             "users",
             "issue-token",
             "--username",
-            "john@daylilyinformatics.com",
+            "john@daylilyinformatics.bio",
             "--token-name",
             "atlas-demo",
             "--scope",

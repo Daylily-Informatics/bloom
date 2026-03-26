@@ -4,11 +4,11 @@ import re
 from urllib.parse import urlsplit
 
 APPROVED_WEB_DOMAIN_SUFFIXES: tuple[str, ...] = (
-    "daylilyinformatics.com",
-    "dyly.bio",
     "lsmc.com",
     "lsmc.bio",
     "lsmc.life",
+    "dyly.bio",
+    "daylilyinformatics.bio",
     "inflectionmedicine.com",
 )
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]", "testserver"})

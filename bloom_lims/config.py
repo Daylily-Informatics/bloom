@@ -3,7 +3,7 @@ BLOOM LIMS Configuration Management.
 
 Configuration precedence (highest to lowest):
 1. Environment variables (BLOOM_* prefix and TAPDB_* runtime context)
-2. User config file (~/.config/bloom/bloom-config.yaml)
+2. User config file (~/.config/bloom/config.yaml)
 3. Template defaults
 """
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
-USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
+USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
 )
@@ -277,7 +277,8 @@ class AuthSettings(BaseModel):
         description="Cognito OAuth scopes",
     )
     cognito_allowed_domains: List[str] = Field(
-        default_factory=list, description="Allowed email domains"
+        default_factory=lambda: list(APPROVED_WEB_DOMAIN_SUFFIXES),
+        description="Allowed email domains",
     )
 
     jwt_secret: str = Field(default="", description="JWT secret key")
@@ -781,7 +782,7 @@ def validate_settings() -> List[str]:
     if not settings.auth.cognito_user_pool_id:
         warnings.append(
             "Cognito pool binding is missing (auth.cognito_user_pool_id). "
-            "Bloom resolves client/domain/callback from daycog env files."
+            "Bloom resolves client/domain/callback from Bloom config or the active Daycog context."
         )
 
     if not settings.auth.jwt_secret and settings.is_production:

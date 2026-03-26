@@ -15,6 +15,7 @@ from auth.cognito.client import (
     get_cognito_auth,
 )
 
+from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
 from bloom_lims.gui.errors import AuthenticationRequiredException, MissingCognitoEnvVarsException
 
 DEFAULT_DISPLAY_TIMEZONE = "UTC"
@@ -129,12 +130,12 @@ def get_user_preferences(email: str) -> dict:
 
 
 def _get_request_cognito_auth(request: Request) -> CognitoAuth:
-    """Resolve Cognito auth using daycog/config values (proxy-safe).
+    """Resolve Cognito auth using Bloom config and the active Daycog context.
 
     Does NOT derive callback/logout URLs from the request, because behind
     a reverse proxy (e.g. Caddy) ``request.url_for()`` resolves to the
     internal bind address instead of the public domain.  The correct URLs
-    come from the daycog env file or bloom-config.yaml.
+    come from Bloom config or the active Daycog context.
     """
     try:
         from bloom_lims.config import get_settings
@@ -148,12 +149,12 @@ def _get_request_cognito_auth(request: Request) -> CognitoAuth:
 
 
 def get_allowed_domains() -> List[str]:
-    """Get allowed email domains from YAML config or environment.
+    """Get allowed email domains from canonical Bloom settings.
 
     Returns:
-        Empty list [] = allow all domains
         List with domains = only those domains allowed
-        List with ["__BLOCK_ALL__"] = block all domains (when config is empty)
+        List with ["*"] = allow all domains
+        List with ["__BLOCK_ALL__"] = block all domains
     """
     try:
         from bloom_lims.config import get_settings
@@ -161,28 +162,12 @@ def get_allowed_domains() -> List[str]:
         settings = get_settings()
         domains = settings.auth.cognito_allowed_domains
 
-        # If YAML config has domains, use them
         if domains:
-            # ["*"] = allow all
-            if domains == ["*"]:
-                return []
             return domains
 
-        # Empty list in YAML = block all
         return ["__BLOCK_ALL__"]
     except Exception:
-        pass
-
-    whitelist_domains = os.getenv("COGNITO_WHITELIST_DOMAINS", "all")
-
-    # Empty string = block all domains
-    if whitelist_domains == "":
-        return ["__BLOCK_ALL__"]
-
-    if whitelist_domains.lower() in ("all", "*"):
-        return []
-
-    return [domain.strip() for domain in whitelist_domains.split(",") if domain.strip()]
+        return list(APPROVED_WEB_DOMAIN_SUFFIXES)
 
 
 async def require_auth(request: Request):
@@ -193,7 +178,7 @@ async def require_auth(request: Request):
 
     if os.environ.get("BLOOM_OAUTH", "yes") == "no":
         request.session["user_data"] = {
-            "email": "john@daylilyinformatics.com",
+            "email": "john@daylilyinformatics.bio",
             "dag_fnv2": "",
             "role": "admin",
             "display_timezone": DEFAULT_DISPLAY_TIMEZONE,
@@ -204,7 +189,7 @@ async def require_auth(request: Request):
         _get_request_cognito_auth(request)
     except CognitoConfigurationError as exc:
         msg = (
-            "Cognito configuration missing. Check ~/.config/bloom/bloom-config.yaml "
+            "Cognito configuration missing. Check ~/.config/bloom/config.yaml "
             f"or BLOOM_AUTH__* env vars. ({exc})"
         )
         logging.error(msg)

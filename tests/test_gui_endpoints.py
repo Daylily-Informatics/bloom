@@ -136,7 +136,7 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert response.json()["status"] == "success"
         mocked_persist.assert_called_once_with(
-            "john@daylilyinformatics.com",
+            "john@daylilyinformatics.bio",
             "America/Chicago",
         )
 
@@ -853,7 +853,7 @@ class TestLoginLogoutButtonDisplay:
         # Should see logout button
         assert "Logout" in content or "logout" in content.lower()
         # Should see the user email (from test session)
-        assert "john@daylilyinformatics.com" in content or "email" in content.lower()
+        assert "john@daylilyinformatics.bio" in content or "email" in content.lower()
         assert 'href="/user_home"' in content
 
     def test_dashboard_shows_logout_with_udat(self, client):

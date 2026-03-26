@@ -1,11 +1,11 @@
 # =============================================================================
 # BLOOM LIMS Configuration Template
 # =============================================================================
-# Copy this file to ~/.config/bloom/bloom-config.yaml and customize as needed.
+# Copy this file to ~/.config/bloom/config.yaml and customize as needed.
 #
 # Configuration precedence (highest to lowest):
 #   1. Environment variables (BLOOM_* prefix)
-#   2. User config file (~/.config/bloom/bloom-config.yaml)
+#   2. User config file (~/.config/bloom/config.yaml)
 #   3. Template defaults (this file)
 #
 # Environment variable format:
@@ -95,21 +95,25 @@ api:
 # Authentication Configuration
 # -----------------------------------------------------------------------------
 auth:
-  # Cognito pool binding (required for Cognito auth).
-  # Bloom resolves client/domain/callback from daycog env files.
-  # Required Cognito app client name is "bloom" (override via BLOOM_COGNITO_APP_NAME).
-  # Expected callback convention: https://localhost:8912/auth/callback
+  # Cognito settings are read directly from this YAML file
+  # or from BLOOM_AUTH__COGNITO_* environment overrides.
   cognito_user_pool_id: ""
-  cognito_client_id: ""           # Optional explicit override
-  cognito_region: ""              # Optional explicit override
-  cognito_domain: ""              # Optional explicit override
-  cognito_redirect_uri: ""        # Optional explicit override
-  cognito_logout_redirect_uri: "" # Optional explicit override
+  cognito_client_id: ""
+  cognito_region: ""
+  cognito_domain: ""
+  cognito_redirect_uri: "https://localhost:8912/auth/callback"
+  cognito_logout_redirect_uri: "https://localhost:8912/login"
   cognito_scopes:
     - "openid"
     - "email"
     - "profile"
-  cognito_allowed_domains: []
+  cognito_allowed_domains:
+    - "lsmc.com"
+    - "lsmc.bio"
+    - "lsmc.life"
+    - "dyly.bio"
+    - "daylilyinformatics.bio"
+    - "inflectionmedicine.com"
 
   # JWT settings
   jwt_secret: ""                # REQUIRED for production
