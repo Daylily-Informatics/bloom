@@ -43,6 +43,8 @@
     
     <!-- Header -->
     <header class="header">
+        {% set current_user = user or udat %}
+        {% set is_admin_user = current_user and (current_user.role | default('user') | lower == 'admin') %}
         <a href="/" class="header-logo">
             <i class="fas fa-spa"></i>
             BLOOM
@@ -52,11 +54,8 @@
             <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
                 <i class="fas fa-home"></i> Dashboard
             </a>
-            <a href="/assays" class="{% if '/assays' in request.url.path %}active{% endif %}">
-                <i class="fas fa-flask"></i> Assays
-            </a>
-            <a href="/workflows" class="{% if '/workflows' in request.url.path %}active{% endif %}">
-                <i class="fas fa-project-diagram"></i> Workflows
+            <a href="/queue_details" class="{% if '/queue_details' in request.url.path %}active{% endif %}">
+                <i class="fas fa-list-check"></i> Queue Runtime
             </a>
             <a href="/equipment" class="{% if '/equipment' in request.url.path %}active{% endif %}">
                 <i class="fas fa-microscope"></i> Equipment
@@ -76,9 +75,11 @@
                     <a href="/bulk_create_containers"><i class="fas fa-upload"></i> Bulk Create Containers</a>
                 </div>
             </div>
+            {% if is_admin_user %}
             <a href="/admin" class="{% if '/admin' in request.url.path %}active{% endif %}">
                 <i class="fas fa-cog"></i> Admin
             </a>
+            {% endif %}
         </nav>
         
         <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
@@ -86,9 +87,8 @@
         </button>
         
         <div class="header-actions">
-            {% set current_user = user or udat %}
             {% if current_user and current_user.email %}
-            <span class="text-sm text-muted">{{ current_user.email }}</span>
+            <a href="/user_home" class="text-sm text-muted">{{ current_user.email }}</a>
             <a href="/logout" class="btn btn-outline btn-sm">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </a>
@@ -148,6 +148,7 @@
     </div>
     
     <!-- BLOOM Modern JS -->
+    <script src="/static/modern/js/timezone.js"></script>
     <script src="/static/modern/js/bloom_modern.js"></script>
 
     <!-- Global configuration -->
@@ -157,6 +158,12 @@
             user: {{ udat | tojson | safe if udat else 'null' }},
             version: '{{ version | default("dev") }}'
         };
+        if (!window.BloomConfig.user) {
+            window.BloomConfig.user = {};
+        }
+        if (!window.BloomConfig.user.display_timezone) {
+            window.BloomConfig.user.display_timezone = 'UTC';
+        }
 
         // Apply theme from localStorage
         (function() {

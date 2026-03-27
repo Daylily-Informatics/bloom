@@ -34,9 +34,9 @@ _BLOOM_PYTHON=""
 echo -e "${_BLUE}Activating BLOOM LIMS environment...${_NC}"
 
 if command -v conda &> /dev/null; then
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         eval "$(conda shell.zsh hook)" 2>/dev/null || true
-    elif [[ -n "$BASH_VERSION" ]]; then
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
         eval "$(conda shell.bash hook)" 2>/dev/null || true
     else
         source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
@@ -89,11 +89,11 @@ else
 fi
 
 if [[ "$-" == *i* ]]; then
-    if [[ -n "$ZSH_VERSION" ]]; then
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
         if eval "$(_BLOOM_COMPLETE=zsh_source bloom 2>/dev/null)" 2>/dev/null; then
             echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (zsh)"
         fi
-    elif [[ -n "$BASH_VERSION" ]]; then
+    elif [[ -n "${BASH_VERSION:-}" ]]; then
         if eval "$(_BLOOM_COMPLETE=bash_source bloom 2>/dev/null)" 2>/dev/null; then
             echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (bash)"
         fi
@@ -108,6 +108,8 @@ export TAPDB_STRICT_NAMESPACE="${TAPDB_STRICT_NAMESPACE:-1}"
 export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-5566}"
 export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
+_BLOOM_DEFAULT_TAPDB_CONFIG_PATH="$BLOOM_ROOT/config/tapdb-config-${TAPDB_DATABASE_NAME}.yaml"
+export TAPDB_CONFIG_PATH="${TAPDB_CONFIG_PATH:-$_BLOOM_DEFAULT_TAPDB_CONFIG_PATH}"
 export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
 export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
 export AWS_REGION="${AWS_REGION:-us-west-2}"
@@ -117,6 +119,7 @@ echo -e "  ${_GREEN}✓${_NC} TAPDB_ENV=${TAPDB_ENV}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_CLIENT_ID=${TAPDB_CLIENT_ID}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DATABASE_NAME=${TAPDB_DATABASE_NAME}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_STRICT_NAMESPACE=${TAPDB_STRICT_NAMESPACE}"
+echo -e "  ${_GREEN}✓${_NC} TAPDB_CONFIG_PATH=${TAPDB_CONFIG_PATH}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DEV_PORT=${TAPDB_DEV_PORT}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_TEST_PORT=${TAPDB_TEST_PORT}"
 echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
@@ -139,8 +142,8 @@ except Exception:
     print("  \033[1;33m⚠\033[0m daylily-tapdb not installed")
     raise SystemExit(0)
 
-if not (Version("0.1.35") <= v < Version("0.2.0")):
-    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.1.35, 0.2.0)")
+if not (Version("0.2.5") <= v < Version("0.3.0")):
+    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [0.2.5, 0.3.0)")
 else:
     print(f"  \033[0;32m✓\033[0m daylily-tapdb version {v}")
 PY
@@ -153,6 +156,7 @@ deactivate_bloom() {
     unset TAPDB_CLIENT_ID
     unset TAPDB_DATABASE_NAME
     unset TAPDB_STRICT_NAMESPACE
+    unset TAPDB_CONFIG_PATH
     unset BLOOM_TAPDB_LOCAL_PG_PORT
     unset TAPDB_DEV_PORT
     unset TAPDB_TEST_PORT

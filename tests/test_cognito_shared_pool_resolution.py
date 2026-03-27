@@ -4,7 +4,6 @@ import pytest
 
 from auth.cognito.client import CognitoAuth, CognitoConfigurationError
 
-
 def _auth_settings(**overrides):
     payload = {
         "cognito_user_pool_id": "us-east-1_POOL123",
@@ -31,7 +30,6 @@ def test_from_settings_uses_yaml_only_configuration():
     assert auth.config.redirect_uri == "https://localhost:8912/auth/callback"
     assert auth.config.logout_redirect_uri == "https://localhost:8912/"
     assert auth.config.domain == "bloom.auth.us-east-1.amazoncognito.com"
-
 
 def test_from_settings_rejects_missing_yaml_values():
     with pytest.raises(CognitoConfigurationError) as exc:

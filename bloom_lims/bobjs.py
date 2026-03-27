@@ -14,13 +14,13 @@ Legacy imports still work:
 import os
 import logging
 from logging.handlers import RotatingFileHandler
-from datetime import datetime
+from datetime import UTC, datetime
 
 os.makedirs("logs", exist_ok=True)
 
 
 def get_clean_timestamp():
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
 
 
 def setup_logging():

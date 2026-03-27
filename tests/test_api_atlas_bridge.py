@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 import bloom_lims.api.v1.atlas_bridge as atlas_bridge_mod
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.auth.rbac import API_ACCESS_GROUP, ENABLE_ATLAS_API_GROUP
 from bloom_lims.integrations.atlas.service import AtlasDependencyError
 
 
@@ -34,6 +35,7 @@ def _external_rw_user() -> APIUser:
         email="atlas-bridge@example.com",
         user_id=_opaque_id("user"),
         roles=["INTERNAL_READ_WRITE"],
+        groups=[API_ACCESS_GROUP, ENABLE_ATLAS_API_GROUP],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",
@@ -46,6 +48,7 @@ def _external_ro_user() -> APIUser:
         email="atlas-bridge-ro@example.com",
         user_id=_opaque_id("user"),
         roles=["INTERNAL_READ_ONLY"],
+        groups=[API_ACCESS_GROUP, ENABLE_ATLAS_API_GROUP],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_ro",

@@ -8,6 +8,9 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, 
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
+from bloom_lims.auth.rbac import Role
+from bloom_lims.auth.services.groups import GroupService, map_legacy_role
+from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import _get_request_cognito_auth, get_allowed_domains, get_user_preferences, require_auth
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
 from bloom_lims.gui.jinja import templates
@@ -44,6 +47,44 @@ async def get_login_page(request: Request):
 def _login_error_redirect(error_message: str) -> RedirectResponse:
     msg = (error_message or "authentication_failed").strip()
     return RedirectResponse(url=f"/login?error={quote(msg)}", status_code=303)
+
+
+def _resolve_login_roles_and_groups(
+    *,
+    email: str,
+    cognito_sub: str | None,
+    fallback_role: str | None,
+) -> tuple[list[str], list[str], str]:
+    normalized_email = str(email or "").strip()
+    normalized_sub = str(cognito_sub or "").strip()
+    fallback = map_legacy_role(fallback_role)
+
+    bdb = BLOOMdb3(app_username=normalized_email or "cognito-login")
+    try:
+        service = GroupService(bdb.session)
+        service.ensure_system_groups()
+
+        for candidate in (normalized_sub, normalized_email):
+            if not candidate:
+                continue
+            resolution = service.resolve_user_roles_and_groups(
+                user_id=candidate,
+                fallback_role=fallback,
+            )
+            if resolution.groups:
+                return resolution.roles, resolution.groups, candidate
+
+        default_user_id = normalized_sub or normalized_email
+        resolution = service.resolve_user_roles_and_groups(
+            user_id=default_user_id,
+            fallback_role=fallback,
+        )
+        return resolution.roles, resolution.groups, default_user_id
+    except Exception as exc:
+        logging.warning("Failed to resolve session RBAC for %s: %s", normalized_email, exc)
+        return [fallback or Role.INTERNAL_READ_WRITE.value], [], (normalized_sub or normalized_email)
+    finally:
+        bdb.close()
 
 
 async def _complete_cognito_login(
@@ -93,13 +134,28 @@ async def _complete_cognito_login(
                 detail="Email domain not allowed",
             )
 
+    token_role_hint = decoded_token.get("custom:role") or decoded_token.get("role")
+    cognito_sub = decoded_token.get("sub")
+    roles, groups, resolved_user_id = _resolve_login_roles_and_groups(
+        email=primary_email,
+        cognito_sub=cognito_sub,
+        fallback_role=token_role_hint,
+    )
+    primary_role = (roles[0] if roles else map_legacy_role(token_role_hint)).upper()
+
     user_data = get_user_preferences(primary_email)
     user_data.update(
         {
             "id_token": id_token,
             "access_token": access_token,
             "cognito_username": decoded_token.get("cognito:username"),
-            "cognito_sub": decoded_token.get("sub"),
+            "cognito_sub": cognito_sub,
+            "sub": cognito_sub,
+            "user_id": resolved_user_id,
+            "name": decoded_token.get("name") or decoded_token.get("cognito:username") or primary_email,
+            "role": primary_role,
+            "roles": roles,
+            "groups": groups,
         }
     )
     request.session["user_data"] = user_data
@@ -233,4 +289,3 @@ async def logout(request: Request, response: Response):
         )
 
     return RedirectResponse(url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER)
-

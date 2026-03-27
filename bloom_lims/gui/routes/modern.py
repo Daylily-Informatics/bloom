@@ -15,6 +15,16 @@ from bloom_lims.search import SearchRequest, SearchService
 router = APIRouter()
 
 
+def _props(instance) -> dict:
+    payload = instance.json_addl if isinstance(instance.json_addl, dict) else {}
+    props = payload.get("properties", {})
+    return props if isinstance(props, dict) else {}
+
+
+def _is_queue_runtime_record(instance, beta_kind: str) -> bool:
+    return str(_props(instance).get("beta_kind") or "").strip() == beta_kind
+
+
 def _parse_csv_param(raw_value: str) -> List[str]:
     return [token.strip().lower() for token in (raw_value or "").split(",") if token.strip()]
 
@@ -64,25 +74,35 @@ def _render_search_page(
 async def modern_dashboard(request: Request, _=Depends(require_auth)):
     user_data = request.session.get("user_data", {})
     stats = {
-        "assays_total": 0,
-        "workflows_active": 0,
+        "queue_runtime_total": 0,
+        "objects_total": 0,
         "equipment_total": 0,
         "reagents_total": 0,
     }
-    recent_assays = []
-    active_workflows = []
+    recent_queue_runtime = []
+    recent_objects = []
     db_unavailable = not _is_tapdb_reachable()
 
     if not db_unavailable:
         try:
             bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
-            stats = {
-                "assays_total": bobdb.session.query(bobdb.Base.classes.workflow_instance)
-                .filter_by(is_deleted=False, is_singleton=True)
-                .count(),
-                "workflows_active": bobdb.session.query(bobdb.Base.classes.workflow_instance)
+            generic_rows = (
+                bobdb.session.query(bobdb.Base.classes.generic_instance)
                 .filter_by(is_deleted=False)
-                .count(),
+                .all()
+            )
+            queue_definitions = [
+                row for row in generic_rows if _is_queue_runtime_record(row, "queue_definition")
+            ]
+            open_work_items = [
+                row
+                for row in generic_rows
+                if _is_queue_runtime_record(row, "beta_work_item")
+                and str(getattr(row, "bstatus", "") or "").strip().lower() in {"open", "active"}
+            ]
+            stats = {
+                "queue_runtime_total": len(open_work_items),
+                "objects_total": len(generic_rows),
                 "equipment_total": bobdb.session.query(bobdb.Base.classes.equipment_instance)
                 .filter_by(is_deleted=False)
                 .count(),
@@ -93,17 +113,15 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
                 )
                 .count(),
             }
-            recent_assays = (
-                bobdb.session.query(bobdb.Base.classes.workflow_instance)
-                .filter_by(is_deleted=False, is_singleton=True)
-                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
-                .limit(5)
-                .all()
-            )
-            active_workflows = (
-                bobdb.session.query(bobdb.Base.classes.workflow_instance)
+            recent_queue_runtime = sorted(
+                queue_definitions,
+                key=lambda row: getattr(row, "created_dt", None),
+                reverse=True,
+            )[:5]
+            recent_objects = (
+                bobdb.session.query(bobdb.Base.classes.generic_instance)
                 .filter_by(is_deleted=False)
-                .order_by(bobdb.Base.classes.workflow_instance.created_dt.desc())
+                .order_by(bobdb.Base.classes.generic_instance.created_dt.desc())
                 .limit(5)
                 .all()
             )
@@ -115,8 +133,8 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
         "request": request,
         "udat": user_data,
         "stats": stats,
-        "recent_assays": recent_assays,
-        "active_workflows": active_workflows,
+        "recent_queue_runtime": recent_queue_runtime,
+        "recent_objects": recent_objects,
         "db_unavailable": db_unavailable,
     }
 
@@ -220,4 +238,3 @@ async def modern_bulk_create_containers(request: Request, _=Depends(require_auth
     template = templates.get_template("modern/bulk_create_containers.html")
     context = {"request": request, "udat": user_data}
     return HTMLResponse(content=template.render(context), status_code=200)
-

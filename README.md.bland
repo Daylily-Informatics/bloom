@@ -1,0 +1,118 @@
+# Bloom
+
+Bloom is the wet-lab and material-state authority in this workspace.
+
+It owns the physical side of the beta LIMS flow:
+
+- containers and placements
+- specimens and derived materials
+- extraction, QC, library-prep, pool, and run objects
+- sequenced library assignments
+- wet-lab queue membership and queue-transition state
+- Bloom-side lineage linking to Atlas fulfillment context
+
+It does not own:
+
+- customer-portal data and tenant administration
+- patient, clinician, shipment, TRF, or test truth
+- artifact registry authority
+- analysis execution or result-return workflows
+
+## Runtime Shape
+
+Bloom is a FastAPI application with both API and server-rendered GUI surfaces.
+
+Primary entrypoints:
+
+- app entrypoint: `main.py`
+- app factory: `bloom_lims.app:create_app`
+- CLI entrypoint: `bloom`
+
+Primary CLI groups:
+
+- `bloom server`: start, stop, status, logs
+- `bloom db`: TapDB lifecycle and Bloom template seeding
+- `bloom integrations atlas`: show and validate Atlas integration config
+- `bloom test`, `bloom quality`, `bloom users`, `bloom config`
+
+## API Surface
+
+Canonical API router prefix: `/api/v1`
+
+Core route groups mounted today:
+
+- `/api/v1/objects`
+- `/api/v1/containers`
+- `/api/v1/content`
+- `/api/v1/equipment`
+- `/api/v1/templates`
+- `/api/v1/subjects`
+- `/api/v1/lineages`
+- `/api/v1/search`
+- `/api/v1/search/v2`
+- `/api/v1/object-creation`
+- `/api/v1/tracking`
+- `/api/v1/user-tokens`
+- `/api/v1/admin/*`
+- `/api/v1/external/specimens`
+- `/api/v1/external/atlas`
+- `/api/v1/external/atlas/beta`
+
+Server-rendered GUI routes remain active under the root app, including login, operational views, and graph screens.
+
+## Cross-Repo Boundaries
+
+- Atlas sends accepted-material and status traffic into Bloom.
+- Bloom links physical execution state back to Atlas TRF/test/fulfillment-item context.
+- Bloom can register run artifacts in Dewey when Dewey integration is enabled.
+- Ursa resolves sequencing context from Bloom using run and lane identifiers.
+
+## TapDB Mount
+
+Bloom can mount the TapDB admin surface inside the same server process.
+
+Mounted path defaults to `/admin/tapdb`.
+
+Mounted-mode rules:
+
+- Bloom session auth is the gate.
+- access is admin-only
+- unauthenticated browser requests redirect to `/login`
+- mounted TapDB local login is disabled
+
+## Timezone Policy
+
+- Bloom persists timestamps in UTC.
+- display timezone is user-configurable via TapDB-backed `system_user` preferences
+- canonical preference key: `display_timezone`
+
+## Local Development
+
+Typical local flow:
+
+```bash
+source bloom_activate.sh
+pip install -e .
+bloom db build
+bloom server start --foreground
+```
+
+Focused validation commands:
+
+```bash
+source bloom_activate.sh
+pytest --no-cov tests/test_api_atlas_bridge.py tests/test_atlas_lookup_resilience.py tests/test_queue_flow.py tests/test_run_resolver.py tests/test_beta_cross_repo_smoke.py
+ruff check bloom_lims tests
+```
+
+## Current Docs
+
+- [Docs index](docs/README.md)
+- [Bloom beta API contracts](docs/bloom_beta_api_contracts.md)
+- [Search V2](docs/SEARCH_V2.md)
+- [Authentication](docs/AUTHENTICATION.md)
+
+Historical execution plans remain in `docs/`, but they are reference material rather than the primary source of truth.
+
+<!-- release-sweep: 2026-03-10 -->
+ 

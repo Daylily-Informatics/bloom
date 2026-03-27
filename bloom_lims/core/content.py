@@ -10,7 +10,7 @@ originally in bloom_lims/bobjs.py.
 
 import logging
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -186,7 +186,7 @@ def create_aliquot(
         'is_aliquot': True,
         'parent_sample_euid': parent_sample.euid,
         'aliquot_number': existing_aliquots + 1,
-        'created_from_parent_at': datetime.utcnow().isoformat(),
+        'created_from_parent_at': datetime.now(UTC).isoformat(),
     }
 
     if volume is not None:
@@ -275,4 +275,3 @@ try:
 except ImportError:
     BloomContent = None
     BloomSample = None
-

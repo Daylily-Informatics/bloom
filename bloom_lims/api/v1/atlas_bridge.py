@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.api.v1.dependencies import APIUser, require_external_atlas_api_enabled
 from bloom_lims.auth.rbac import Permission
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 from bloom_lims.schemas.atlas_bridge import (
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/external/atlas", tags=["External Atlas"])
 
 
-def require_external_write(user: APIUser = Depends(require_external_token_auth)) -> APIUser:
+def require_external_write(user: APIUser = Depends(require_external_atlas_api_enabled)) -> APIUser:
     if not user.has_permission(Permission.BLOOM_WRITE):
         raise HTTPException(status_code=403, detail="Write permission required")
     return user

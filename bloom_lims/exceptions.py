@@ -18,7 +18,7 @@ Usage:
 
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class BloomError(Exception):
         self.error_code = error_code or self.default_error_code
         self.details = details or {}
         self.cause = cause
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = datetime.now(UTC).isoformat()
         self.http_status = self.default_http_status
         
         super().__init__(self.message)

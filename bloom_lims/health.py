@@ -16,7 +16,7 @@ Usage:
 import logging
 import platform
 import psutil
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -65,7 +65,7 @@ class ReadinessResponse(BaseModel):
 
 
 # Track startup time for uptime calculation
-_startup_time = datetime.utcnow()
+_startup_time = datetime.now(UTC)
 
 
 # Create routers
@@ -193,7 +193,7 @@ async def health_check() -> HealthResponse:
     - Version information
     """
     settings = get_settings()
-    uptime = (datetime.utcnow() - _startup_time).total_seconds()
+    uptime = (datetime.now(UTC) - _startup_time).total_seconds()
 
     # Check components
     components = []
@@ -215,7 +215,7 @@ async def health_check() -> HealthResponse:
 
     return HealthResponse(
         status=overall_status,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
         version=settings.api.version,
         environment=settings.environment,
         uptime_seconds=round(uptime, 2),
@@ -234,7 +234,7 @@ async def liveness_probe() -> LivenessResponse:
     """
     return LivenessResponse(
         status="alive",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
     )
 
 
@@ -262,7 +262,7 @@ async def readiness_probe() -> ReadinessResponse:
     response = ReadinessResponse(
         status="ready" if ready else "not_ready",
         ready=ready,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
         checks=checks,
     )
 
@@ -293,10 +293,10 @@ async def metrics() -> Dict[str, Any]:
     For production, consider using Prometheus metrics.
     """
     settings = get_settings()
-    uptime = (datetime.utcnow() - _startup_time).total_seconds()
+    uptime = (datetime.now(UTC) - _startup_time).total_seconds()
 
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "uptime_seconds": round(uptime, 2),
         "environment": settings.environment,
         "system": get_system_info(),

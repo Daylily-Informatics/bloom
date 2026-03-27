@@ -5,7 +5,7 @@ Dashboard statistics, aggregations, and recent activity for the modern UI.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,6 +24,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stats", tags=["Statistics"])
 
 
+def _props(instance: Any) -> Dict[str, Any]:
+    payload = instance.json_addl if isinstance(instance.json_addl, dict) else {}
+    props = payload.get("properties", {})
+    return props if isinstance(props, dict) else {}
+
+
+def _beta_kind(instance: Any) -> str:
+    return str(_props(instance).get("beta_kind") or "").strip()
+
+
 def get_bdb(username: str = "anonymous"):
     """Get database connection."""
     from bloom_lims.db import BLOOMdb3
@@ -36,7 +46,7 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
     """
     Get dashboard statistics and recent activity.
 
-    Returns aggregated counts for assays, workflows, equipment, reagents,
+    Returns aggregated counts for queue runtime, workflows, equipment, reagents,
     and recent activity across all object types.
     """
     try:
@@ -44,19 +54,43 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
 
         # Gather statistics
         stats = DashboardStatsSchema()
+        generic_rows: list[Any] = []
 
         try:
-            # Workflow/Assay counts
-            wf_class = bdb.Base.classes.workflow_instance
-            stats.workflows_total = (
-                bdb.session.query(wf_class).filter_by(is_deleted=False).count()
+            generic_rows = (
+                bdb.session.query(bdb.Base.classes.generic_instance)
+                .filter_by(is_deleted=False)
+                .all()
             )
-            stats.assays_total = (
-                bdb.session.query(wf_class)
-                .filter_by(is_deleted=False, is_singleton=True)
-                .count()
+            queue_definitions = [
+                row for row in generic_rows if _beta_kind(row) == "queue_definition"
+            ]
+            work_items = [
+                row for row in generic_rows if _beta_kind(row) == "beta_work_item"
+            ]
+            open_work_items = [
+                row
+                for row in work_items
+                if str(getattr(row, "bstatus", "") or "").strip().lower() in {"open", "active"}
+            ]
+
+            queue_statuses = [
+                str(getattr(row, "bstatus", "") or "").strip().lower()
+                for row in queue_definitions
+            ]
+
+            stats.queue_runtime_total = len(queue_definitions)
+            stats.queue_runtime_in_progress = len(
+                [status for status in queue_statuses if status in {"active", "open", "in_progress"}]
             )
-            stats.workflows_active = stats.workflows_total
+            stats.queue_runtime_complete = len(
+                [status for status in queue_statuses if status in {"complete", "completed"}]
+            )
+            stats.queue_runtime_exception = len(
+                [status for status in queue_statuses if status in {"exception", "failed", "error"}]
+            )
+            stats.workflows_total = len(work_items)
+            stats.workflows_active = len(open_work_items)
 
             # Equipment counts
             eq_class = bdb.Base.classes.equipment_instance
@@ -92,41 +126,33 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
         recent_activity = RecentActivitySchema()
 
         try:
-            wf_class = bdb.Base.classes.workflow_instance
-
-            # Recent assays (singleton workflows)
-            recent_assays = (
-                bdb.session.query(wf_class)
-                .filter_by(is_deleted=False, is_singleton=True)
-                .order_by(wf_class.created_dt.desc())
-                .limit(5)
-                .all()
-            )
-            recent_activity.recent_assays = [
+            recent_queue_runtime = sorted(
+                [row for row in generic_rows if _beta_kind(row) == "queue_definition"],
+                key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
+                reverse=True,
+            )[:5]
+            recent_activity.recent_queue_runtime = [
                 RecentActivityItem(
                     euid=a.euid,
                     name=a.name,
-                    type=a.type or "workflow",
+                    type=a.type or "queue_runtime",
                     subtype=a.subtype,
                     status=a.bstatus,
                     created_dt=a.created_dt,
                 )
-                for a in recent_assays
+                for a in recent_queue_runtime
             ]
 
-            # Recent workflows
-            recent_workflows = (
-                bdb.session.query(wf_class)
-                .filter_by(is_deleted=False)
-                .order_by(wf_class.created_dt.desc())
-                .limit(5)
-                .all()
-            )
+            recent_workflows = sorted(
+                [row for row in generic_rows if _beta_kind(row) == "beta_work_item"],
+                key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
+                reverse=True,
+            )[:5]
             recent_activity.recent_workflows = [
                 RecentActivityItem(
                     euid=w.euid,
                     name=w.name,
-                    type=w.type or "workflow",
+                    type=w.type or "queue_runtime",
                     subtype=w.subtype,
                     status=w.bstatus,
                     created_dt=w.created_dt,
@@ -140,10 +166,9 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
         return DashboardResponseSchema(
             stats=stats,
             recent_activity=recent_activity,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(UTC),
         )
 
     except Exception as e:
         logger.error(f"Error getting dashboard stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

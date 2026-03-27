@@ -25,6 +25,8 @@ class Permission(StrEnum):
 
 
 API_ACCESS_GROUP = "API_ACCESS"
+ENABLE_ATLAS_API_GROUP = "ENABLE_ATLAS_API"
+ENABLE_URSA_API_GROUP = "ENABLE_URSA_API"
 
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.INTERNAL_READ_ONLY: {
@@ -164,4 +166,3 @@ def constrain_roles_by_scope(roles: Iterable[str | Role], scope: str | None) -> 
     if not constrained:
         constrained = [cap_role.value]
     return normalize_roles(constrained, fallback=cap_role.value)
-

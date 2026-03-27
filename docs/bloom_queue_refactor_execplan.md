@@ -1,39 +1,60 @@
-# Bloom Queue Refactor Execution Plan
+# Bloom Queue Refactor Execution Plan (Finalization Pass)
 
-## Goal
+## Scope
 
-Refactor Bloom into the authoritative beta owner of material objects and queue-driven wet-lab execution state, without relying on the legacy workflow/workflow-step runtime for active beta paths.
+This document tracks the final Bloom beta-completion pass for:
 
-## Current Findings
+- hard retirement of workflow/workset/test-requisition API+GUI surfaces
+- create-page exposure/sorting fixes for non-retired templates
+- modern TapDB action execution parity and reliability
+- admin token/group UX fixes
+- Atlas/Ursa external integration authorization gates
+- zebra service start reliability
 
-- `bloom_lims/core/action_execution.py` still routes through legacy object/workflow executors and legacy required-field extraction.
-- `bloom_lims/domain/base.py` still contains active `do_action_*` plumbing and grouped action payload assumptions.
-- `bloom_lims/domain/workflows.py` still performs queue routing through workflow-step objects.
-- `bloom_lims/domain/external_specimens.py` still uses broad scans for reference and idempotency lookup paths.
-- No resolver currently exists for `run_euid + index_string`.
+## Change Groups
 
-## Decisions
+1. **Legacy retirement and routing**
+   - unmount `/api/v1/workflows` and `/api/v1/worksets`
+   - remove workflow GUI router mounts and nav/dashboard links
+   - keep workflow artifacts on disk only as non-mounted retired code
 
-- The beta queue model will be explicit and first-class; it will not be represented as active workflow/workflow-step runtime.
-- Bloom will preserve material lineage with `generic_instance_lineage`.
-- Atlas links will stay explicit through external-object link instances rather than embedded private identifiers.
-- Public beta APIs will be EUID-only.
-- Existing workflow code may remain on disk temporarily, but it must not remain on the active beta-critical path.
+2. **Create flow correctness**
+   - remove workflow/assay shortcut behavior
+   - filter retired categories at API source: `workflow`, `workflow_step`, `test_requisition`
+   - sort category/type/subtype/version options case-insensitively with stable ordering
 
-## Implementation Outline
+3. **Action execution parity**
+   - keep `/ui/actions/execute` as active endpoint independent of workflow module
+   - propagate dispatcher status and fail on dispatcher `error/failed` outcomes
+   - robust action-key lookup and action-template UID backfill for legacy instances
+   - inject required UI fields for core actions (`set_object_status`, `add_relationships`)
 
-1. Add queue-domain services for beta queue definition, membership, transition, and lineage-aware movement.
-2. Add sequencing-run and run-index resolution services that return Atlas order and test-order EUIDs.
-3. Keep external specimen creation as the Atlas entry point for accepted material, but rewrite its lookup paths to avoid broad scans.
-4. Remove workflow router exposure from the active beta API surface and stop documenting workflow/workflow-step as the primary model.
-5. Replace or isolate legacy action execution paths so beta queue transitions use modern TapDB-backed execution only.
+4. **Admin + RBAC integration**
+   - add system groups: `ENABLE_ATLAS_API`, `ENABLE_URSA_API`
+   - add admin issue-token-for-selected-user endpoint
+   - make add-user deterministic (`added`, `exists`, `reactivated`)
+   - add Atlas/Ursa enablement panels in admin GUI
+   - enforce Atlas/Ursa groups on external API routes
 
-## Required Validation
+5. **Zebra service reliability**
+   - prefer `zday gui start --background`
+   - check running state deterministically (`already running`, `started`, `failed`)
+   - fallback to background `zday_start` only when needed
 
-- create/register container plus specimen with Atlas external links
-- place accepted material into an extraction queue
-- map extraction output into plate/well lineage
-- advance through post-extract QC and lib prep queue selection
-- create pool and sequencing run
-- resolve `run_euid + index_string`
-- confirm public API payloads do not expose private UUIDs
+## Beta Acceptance Checks
+
+- Atlas external routes are token-authenticated, write-permitted, and `ENABLE_ATLAS_API` gated.
+- Resolver route remains full-key (`run_euid + flowcell_id + lane + library_barcode`) and `ENABLE_URSA_API` gated.
+- Create page does not offer retired object domains.
+- Action buttons execute through modern TapDB path with truthful success/error reporting.
+- Admin page can:
+  - add API users with deterministic feedback
+  - issue a token for a selected API user
+  - enable Atlas/Ursa API group access
+- Zebra start reports deterministic outcomes in both HTML redirect and JSON modes.
+
+## Breaking Changes
+
+- `/api/v1/workflows/*` and `/api/v1/worksets/*` are retired (no active beta support).
+- GUI workflow pages are retired and no longer linked from navigation/dashboard.
+- External integration routes now require explicit Atlas/Ursa enablement groups in addition to token auth and permissions.

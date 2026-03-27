@@ -42,7 +42,7 @@ Logout URL:
 
 ## Bloom Config
 
-Example `~/.config/bloom/bloom-config.yaml`:
+Example `~/.config/bloom/config.yaml`:
 
 ```yaml
 auth:

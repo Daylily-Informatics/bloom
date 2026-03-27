@@ -18,7 +18,7 @@
       <div class="info-grid">
         <div class="info-row"><span class="info-key">Email</span><span class="info-val font-mono">{{ user_data.get('email', '') }}</span></div>
         <div class="info-row"><span class="info-key">Role</span><span class="info-val">{{ user_data.get('role', 'user') }}</span></div>
-        <div class="info-row"><span class="info-key">Skin</span><span class="info-val font-mono">{{ user_data.get('style_css', '/static/legacy/skins/bloom.css') }}</span></div>
+        <div class="info-row"><span class="info-key">Skin</span><span class="info-val font-mono">{{ user_data.get('style_css', '/static/modern/css/bloom_modern.css') }}</span></div>
       </div>
     </div>
   </div>
@@ -75,6 +75,15 @@
           {% endfor %}
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label" for="display_timezone">Display Timezone</label>
+        <select id="display_timezone" class="form-select" onchange="updatePreferenceAndReload('display_timezone', this.value)">
+          {% set current_tz = user_data.get('display_timezone', 'UTC') %}
+          {% for option in timezone_options %}
+          <option value="{{ option }}" {% if current_tz == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
   </div>
 
@@ -117,9 +126,11 @@
         <a class="btn btn-outline" href="/user_audit_logs?username={{ user_data.get('email', '') }}">
           <i class="fas fa-clipboard-list"></i> View My Audit Logs
         </a>
+        {% if user_data.get('role', 'user') | lower == 'admin' %}
         <a class="btn btn-outline" href="/admin">
           <i class="fas fa-cog"></i> Open Admin
         </a>
+        {% endif %}
       </div>
     </div>
   </div>

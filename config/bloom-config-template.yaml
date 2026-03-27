@@ -1,7 +1,7 @@
 # =============================================================================
 # BLOOM LIMS Configuration Template
 # =============================================================================
-# Copy this file to ~/.config/bloom/bloom-config.yaml and customize as needed.
+# Copy this file to ~/.config/bloom/config.yaml and customize as needed.
 #
 # Configuration precedence (highest to lowest):
 #   1. Environment variables (BLOOM_* prefix) for non-Cognito settings
@@ -40,8 +40,8 @@ tapdb:
   strict_namespace: true        # TAPDB_STRICT_NAMESPACE (requires TapDB v2 namespaced config)
   config_path: ""               # Optional TAPDB_CONFIG_PATH override
   local_pg_port: 5566           # Default local TapDB PostgreSQL port for dev/test
-  min_version: "0.1.35"         # Required minimum daylily-tapdb version
-  max_version_exclusive: "0.2.0"
+  min_version: "3.0.1"         # Required minimum daylily-tapdb version
+  max_version_exclusive: "4.0.0"
 
 # -----------------------------------------------------------------------------
 # Storage Configuration
@@ -107,7 +107,13 @@ auth:
     - "openid"
     - "email"
     - "profile"
-  cognito_allowed_domains: []
+  cognito_allowed_domains:
+    - "lsmc.com"
+    - "lsmc.bio"
+    - "lsmc.life"
+    - "dyly.bio"
+    - "daylilyinformatics.bio"
+    - "inflectionmedicine.com"
 
   # JWT settings
   jwt_secret: ""                # REQUIRED for production
@@ -146,6 +152,16 @@ atlas:
   webhook_secret: ""            # Shared secret for X-Bloom-Signature HMAC
   events_timeout_seconds: 10
   events_max_retries: 2
+
+# -----------------------------------------------------------------------------
+# Dewey Integration
+# -----------------------------------------------------------------------------
+dewey:
+  enabled: false
+  base_url: ""                  # e.g., https://dewey.example.org
+  token: ""                     # Bearer token used for Dewey artifact registration APIs
+  timeout_seconds: 10
+  verify_ssl: true
 
 # -----------------------------------------------------------------------------
 # Logging Configuration
@@ -218,7 +234,7 @@ constants:
   # Default printer/lab settings
   default_label_style: "tube_2inX1in"
   default_lab_code: "BLOOM"
-  default_timezone: "US/Eastern"
+  default_timezone: "UTC"
 
   # Template config paths (relative to bloom_lims)
   config_base_path: "config"

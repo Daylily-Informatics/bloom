@@ -11,6 +11,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
+    ENABLE_ATLAS_API_GROUP,
+    ENABLE_URSA_API_GROUP,
     Permission,
     Role,
     effective_permissions,
@@ -253,7 +255,7 @@ async def verify_api_key(api_key: str) -> APIUser | None:
     if not (valid_key and api_key == valid_key):
         return None
     return _make_user(
-        email="api-legacy@daylilyinformatics.com",
+        email="api-legacy@daylilyinformatics.bio",
         user_id="legacy-api-key",
         role_hint=Role.ADMIN.value,
         auth_source="legacy_api_key",
@@ -270,10 +272,15 @@ async def get_api_user(
     """Authenticate API requests and return resolved RBAC context."""
     if _is_dev_bypass_active():
         return APIUser(
-            email="api-dev@daylilyinformatics.com",
+            email="api-dev@daylilyinformatics.bio",
             user_id="dev-bypass-admin",
             roles=[Role.ADMIN.value],
-            groups=[Role.ADMIN.value, API_ACCESS_GROUP],
+            groups=[
+                Role.ADMIN.value,
+                API_ACCESS_GROUP,
+                ENABLE_ATLAS_API_GROUP,
+                ENABLE_URSA_API_GROUP,
+            ],
             permissions=sorted(permission.value for permission in Permission),
             role=Role.ADMIN.value,
             auth_source="dev_bypass",
@@ -359,6 +366,29 @@ async def require_external_token_auth(user: APIUser = Depends(get_api_user)) -> 
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def _require_group_membership(user: APIUser, group_code: str) -> APIUser:
+    normalized_required = str(group_code or "").strip().upper()
+    groups = {str(group or "").strip().upper() for group in user.groups}
+    if normalized_required not in groups:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Group membership required: {normalized_required}",
+        )
+    return user
+
+
+async def require_external_atlas_api_enabled(
+    user: APIUser = Depends(require_external_token_auth),
+) -> APIUser:
+    return _require_group_membership(user, ENABLE_ATLAS_API_GROUP)
+
+
+async def require_external_ursa_api_enabled(
+    user: APIUser = Depends(require_external_token_auth),
+) -> APIUser:
+    return _require_group_membership(user, ENABLE_URSA_API_GROUP)
 
 
 def require_permission(permission: Permission | str):

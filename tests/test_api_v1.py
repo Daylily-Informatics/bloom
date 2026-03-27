@@ -8,6 +8,7 @@ import os
 import sys
 import pytest
 from unittest.mock import patch, MagicMock
+from types import SimpleNamespace
 
 # Set up auth bypass BEFORE importing FastAPI app
 # Uses the dev-only bypass (blocked when APP_ENV=production)
@@ -42,6 +43,20 @@ class TestAPIRoot:
         assert "version" in data
         assert "endpoints" in data
         assert "search_v2" in data["endpoints"]
+        assert "workflows" not in data["endpoints"]
+        assert "worksets" not in data["endpoints"]
+
+
+class TestRetiredAPIRoutes:
+    """Tests for retired API surfaces."""
+
+    def test_workflows_route_is_not_mounted(self, client):
+        response = client.get("/api/v1/workflows/")
+        assert response.status_code == 404
+
+    def test_worksets_route_is_not_mounted(self, client):
+        response = client.get("/api/v1/worksets/")
+        assert response.status_code == 404
 
 
 class TestObjectsAPI:
@@ -146,6 +161,7 @@ class TestContentAPI:
         assert response.status_code == 404
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPI:
     """Tests for /api/v1/workflows endpoints."""
     
@@ -162,6 +178,152 @@ class TestWorkflowsAPI:
         """Test getting non-existent workflow."""
         response = client.get("/api/v1/workflows/NONEXISTENT_EUID")
         assert response.status_code == 404
+
+    def test_advance_workflow_success(self, client):
+        """Test advancing a workflow uses modern endpoint contract."""
+
+        class _Session:
+            def __init__(self):
+                self.committed = False
+
+            def commit(self):
+                self.committed = True
+
+        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+        fake_workflow = SimpleNamespace(euid="WF_ADV", bstatus="in_progress")
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.core.workflows.advance_workflow", return_value=fake_workflow):
+                response = client.post("/api/v1/workflows/WF_ADV/advance", json={"ok": True})
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["euid"] == "WF_ADV"
+        assert payload["status"] == "in_progress"
+
+    def test_create_workflow_success(self, client):
+        """Test creating a workflow from template."""
+
+        class _Session:
+            def __init__(self):
+                self.committed = False
+
+            def commit(self):
+                self.committed = True
+
+        class _BloomWorkflow:
+            def __init__(self, _bdb):
+                self.user = None
+
+            def set_actor_context(self, user_id=None, email=None):
+                self.user = (user_id, email)
+
+            def create_instances(self, _template_euid):
+                wf = SimpleNamespace(euid="WF_NEW", name="new-workflow", bstatus="queued")
+                return [[wf]]
+
+            def track_user_interaction(self, *_args, **_kwargs):
+                return None
+
+        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+                response = client.post("/api/v1/workflows/?template_euid=TEMPLATE1&name=renamed")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["euid"] == "WF_NEW"
+        assert payload["name"] == "renamed"
+
+    def test_update_workflow_success(self, client):
+        """Test updating workflow metadata."""
+
+        class _Session:
+            def commit(self):
+                return None
+
+        workflow = SimpleNamespace(
+            euid="WF_UPD",
+            name="before",
+            bstatus="queued",
+            json_addl={"properties": {"x": 1}},
+        )
+
+        class _BloomWorkflow:
+            def __init__(self, _bdb):
+                pass
+
+            def set_actor_context(self, **_kwargs):
+                return None
+
+            def get_by_euid(self, _euid):
+                return workflow
+
+            def track_user_interaction(self, *_args, **_kwargs):
+                return None
+
+        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+                with patch("sqlalchemy.orm.attributes.flag_modified", lambda *_args, **_kwargs: None):
+                    response = client.put(
+                        "/api/v1/workflows/WF_UPD?name=after&status=completed",
+                        json={"reviewed": True},
+                    )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert workflow.name == "after"
+        assert workflow.bstatus == "completed"
+        assert workflow.json_addl["reviewed"] is True
+
+    def test_get_workflow_steps_success(self, client):
+        """Test workflow steps list is derived from workflow lineage."""
+
+        child_step = SimpleNamespace(
+            euid="WS_1",
+            name="Step 1",
+            type="step",
+            subtype="extraction",
+            bstatus="queued",
+            json_addl={"properties": {"order": 2}},
+        )
+        child_queue = SimpleNamespace(
+            euid="WQ_1",
+            name="Queue 1",
+            type="queue",
+            subtype="default",
+            bstatus="queued",
+            json_addl={"properties": {"order": 1}},
+        )
+        lineage_step = SimpleNamespace(is_deleted=False, child_instance=child_step)
+        lineage_queue = SimpleNamespace(is_deleted=False, child_instance=child_queue)
+
+        class _BloomWorkflow:
+            def __init__(self, _bdb):
+                pass
+
+            def get_by_euid(self, _euid):
+                return SimpleNamespace(euid="WF_STEPS")
+
+        fake_db = SimpleNamespace(session=SimpleNamespace(), Base=SimpleNamespace(classes=SimpleNamespace()))
+
+        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+                with patch(
+                    "bloom_lims.api.v1.workflows.get_parent_lineages",
+                    return_value=[lineage_step, lineage_queue],
+                ):
+                    response = client.get("/api/v1/workflows/WF_STEPS/steps")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["count"] == 2
+        assert [step["euid"] for step in payload["steps"]] == ["WQ_1", "WS_1"]
 
 
 class TestTemplatesAPI:
@@ -237,14 +399,14 @@ class TestStatsAPI:
 
         # Validate stats structure
         stats = data["stats"]
-        assert "assays_total" in stats
+        assert "queue_runtime_total" in stats
         assert "workflows_total" in stats
         assert "equipment_total" in stats
         assert "reagents_total" in stats
 
         # Validate recent_activity structure
         recent = data["recent_activity"]
-        assert "recent_assays" in recent
+        assert "recent_queue_runtime" in recent
         assert "recent_workflows" in recent
 
 
@@ -401,27 +563,17 @@ class TestEquipmentAPI:
 
 
 class TestFilesAPI:
-    """Tests for files API endpoints."""
+    """Tests for retired files API endpoints."""
 
     def test_list_files(self, client):
-        """Test listing files."""
+        """Legacy files endpoint is removed."""
         response = client.get("/api/v1/files/")
-        assert response.status_code == 200
-        data = response.json()
-        # API returns paginated response
-        assert "items" in data
-        assert "total" in data
-        _assert_items_do_not_expose_uuid(data)
+        assert response.status_code == 404
 
     def test_list_file_sets(self, client):
-        """Test listing file sets."""
+        """Legacy file-sets endpoint is removed."""
         response = client.get("/api/v1/file-sets/")
-        assert response.status_code == 200
-        data = response.json()
-        # API returns paginated response
-        assert "items" in data
-        assert "total" in data
-        _assert_items_do_not_expose_uuid(data)
+        assert response.status_code == 404
 
 
 class TestActionsAPI:
@@ -475,6 +627,24 @@ class TestObjectCreationAPI:
         # Should include common categories
         type_names = [item.get("name") or item for item in categories]
         assert any("container" in str(cat).lower() for cat in type_names)
+
+    def test_get_categories_excludes_retired_domains(self, client):
+        """Retired workflow/workflow_step/test_requisition categories are hidden."""
+        response = client.get("/api/v1/object-creation/categories")
+        assert response.status_code == 200
+        categories = response.json().get("categories", [])
+        names = [item.get("name") for item in categories]
+        assert "workflow" not in names
+        assert "workflow_step" not in names
+        assert "test_requisition" not in names
+
+    def test_get_categories_sorted_alphabetically(self, client):
+        """Category list is sorted case-insensitively by display name."""
+        response = client.get("/api/v1/object-creation/categories")
+        assert response.status_code == 200
+        categories = response.json().get("categories", [])
+        display_names = [item.get("display_name", item.get("name", "")) for item in categories]
+        assert display_names == sorted(display_names, key=lambda value: str(value).casefold())
 
     def test_get_types_for_category(self, client):
         """Test getting types for a category."""
@@ -592,6 +762,7 @@ class TestTemplatesAPIExtended:
                     assert "uuid" not in response.json()
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPIExtended:
     """Extended tests for workflows API endpoints."""
 
@@ -708,20 +879,17 @@ class TestSearchAPIExtended:
 
 
 class TestFileSetsAPIExtended:
-    """Extended tests for file sets API endpoints."""
+    """Extended tests for retired file sets API endpoints."""
 
     def test_list_file_sets_with_pagination(self, client):
-        """Test listing file sets with pagination."""
+        """Legacy file-sets endpoint is removed."""
         response = client.get("/api/v1/file-sets/?page=1&page_size=10")
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
+        assert response.status_code == 404
 
     def test_get_file_set_not_found(self, client):
-        """Test getting non-existent file set."""
+        """Legacy file-sets endpoint is removed."""
         response = client.get("/api/v1/file-sets/00000000-0000-0000-0000-000000000000")
-        assert response.status_code in [404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestObjectsAPIExtended:
@@ -842,6 +1010,7 @@ class TestSubjectsAPIDeep:
         assert response.status_code in [404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPIDeep:
     """Deeper tests for workflows API."""
 
@@ -1022,6 +1191,7 @@ class TestFilesAPI:
         assert response.status_code in [404, 405, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPIDeep:
     """Extended tests for workflows API."""
 
@@ -1133,7 +1303,7 @@ class TestFileLinking:
     def test_file_link(self, client):
         """Test file linking endpoint."""
         response = client.post("/api/v1/files/DAT1/link/CX1")
-        assert response.status_code in [200, 400, 404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestSubjectSpecimens:
@@ -1145,6 +1315,7 @@ class TestSubjectSpecimens:
         assert response.status_code in [200, 400, 404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowAdvance:
     """Tests for /api/v1/workflows advance endpoint."""
 
@@ -1231,6 +1402,7 @@ class TestAsyncTasks:
         assert response.status_code in [200, 400, 404, 422, 500]
 
 
+@pytest.mark.skip(reason="Workset APIs are retired in queue-centric Bloom beta.")
 class TestWorksetsAPI:
     """Tests for /api/v1/worksets endpoints."""
 

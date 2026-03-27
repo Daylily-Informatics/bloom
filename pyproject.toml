@@ -12,7 +12,7 @@
 # =============================================================================
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -23,11 +23,26 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
-    "daylily-tapdb==0.1.35",
-    "daylily-cognito==0.1.24",
+    "daylily-tapdb==3.0.1",
+    "daylily-cognito==0.1.26",
+    "click>=8.0",
+    "fastapi>=0.110.0",
+    "httpx>=0.27.2",
+    "itsdangerous>=2.1.2",
+    "Jinja2>=3.0.3",
     "pydantic>=2.6.0",
     "pydantic-settings>=2.0.0",
+    "PyJWT>=2.8.0",
+    "python-multipart>=0.0.9",
     "psutil>=5.9.0",
+    "PyYAML>=6.0",
+    "requests>=2.28.2",
+    "rich>=13.0",
+    "sqlalchemy>=2.0.23",
+    "starlette>=0.35.1",
+    "uvicorn>=0.28.0",
+    "zebra-day==2.4.1",
+    "daylily-carrier-tracking==0.5.1",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -59,8 +74,9 @@ dev = [
 [project.scripts]
 bloom = "bloom_lims.cli:main"
 
-[tool.setuptools.dynamic]
-version = {attr = "bloom_lims._version.FALLBACK_VERSION"}
+[tool.setuptools_scm]
+version_file = "bloom_lims/_scm_version.py"
+fallback_version = "0.0.0.dev0"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -25,3 +25,10 @@ def test_modern_workflow_details_uses_data_attribute_action_handler():
     assert "data-action-json=\"{{ action_value | tojson | e }}\"" in template
     assert "onclick=\"showCapturedDataForm(this, {{ action_value }}" not in template
     assert "onclick=\"showCapturedDataForm(this, {{ action_value | tojson }}" not in template
+
+
+def test_action_buttons_uses_ui_schema_fields_array_for_filtering():
+    script = _read("static/modern/js/action_buttons.js")
+
+    assert "schema.fields.filter(" in script
+    assert "schema.filter(" not in script

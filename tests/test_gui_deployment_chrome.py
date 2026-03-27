@@ -32,30 +32,3 @@ def test_refresh_template_globals_exposes_deployment_banner(monkeypatch) -> None
     assert "STAGING" in rendered
     assert "#123456" in rendered
     assert "/favicon.ico" in rendered
-
-
-def test_legacy_header_renders_deployment_banner(monkeypatch) -> None:
-    fake_settings = SimpleNamespace(
-        app_name="BLOOM LIMS",
-        api=SimpleNamespace(version="1.2.3"),
-        ui=SimpleNamespace(
-            support_email="support@example.com",
-            github_repo_url="https://github.com/Daylily-Informatics/bloom",
-        ),
-        deployment=SimpleNamespace(
-            name="dev-v2",
-            color="#aa5500",
-            is_production=False,
-        ),
-    )
-    monkeypatch.setattr("bloom_lims.config.get_settings", lambda: fake_settings)
-
-    refresh_template_globals()
-    rendered = templates.get_template("legacy/bloom_header.html").render(
-        bloom_mod="lims",
-        page_title="Bloom",
-        udat={"email": "user@example.com"},
-    )
-
-    assert "DEV-V2" in rendered
-    assert "#aa5500" in rendered

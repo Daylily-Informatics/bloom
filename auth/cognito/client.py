@@ -27,6 +27,16 @@ class CognitoConfig:
     scopes: List[str]
 
     @property
+    def _bare_domain(self) -> str:
+        """Domain without protocol prefix for URL construction."""
+        d = (self.domain or "").strip().rstrip("/")
+        if d.startswith("https://"):
+            d = d[len("https://"):]
+        elif d.startswith("http://"):
+            d = d[len("http://"):]
+        return d
+
+    @property
     def issuer(self) -> str:
         return f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool_id}"
 
@@ -44,21 +54,24 @@ class CognitoConfig:
                 "scope": " ".join(self.scopes),
             }
         )
-        return f"https://{self.domain}/oauth2/authorize?{query}"
+        return f"https://{self._bare_domain}/oauth2/authorize?{query}"
 
     @property
     def token_url(self) -> str:
-        return f"https://{self.domain}/oauth2/token"
+        return f"https://{self._bare_domain}/oauth2/token"
 
     @property
     def logout_url(self) -> str:
+        # Cognito managed login /logout requires redirect_uri (must match a
+        # registered CallbackURL) + response_type=code instead of logout_uri.
         query = urlencode(
             {
                 "client_id": self.client_id,
-                "logout_uri": self.logout_redirect_uri,
+                "redirect_uri": self.redirect_uri.rstrip("/"),
+                "response_type": "code",
             }
         )
-        return f"https://{self.domain}/logout?{query}"
+        return f"https://{self._bare_domain}/logout?{query}"
 
 
 class CognitoAuth:

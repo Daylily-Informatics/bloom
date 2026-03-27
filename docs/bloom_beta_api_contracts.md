@@ -2,16 +2,22 @@
 
 ## Accepted Material Registration
 
-Bloom accepts Atlas-approved material only after Atlas records an `ACCEPTED` intake outcome.
+Bloom accepts Atlas-approved material only after Atlas records an `ACCEPTED` intake outcome and materializes one or more test fulfillment items.
 
 Minimum request context:
 
-- Atlas identity context for the accepted item
-- Atlas order EUID
-- Atlas test-order EUID
+- `atlas_context.atlas_trf_euid`
+- `atlas_context.atlas_patient_euid`
+- `atlas_context.fulfillment_items[].atlas_test_euid`
+- `atlas_context.fulfillment_items[].atlas_test_fulfillment_item_euid`
+- patient context
+- shipment or test kit context
+- queue intent
 - idempotency key
 
-Bloom response must include EUID-only identifiers for created material and explicit Atlas-link metadata.
+Bloom persists Atlas linkage through graph-linked reference objects and returns EUID-only identifiers for created material plus `fulfillment_item_euids[]`.
+
+For accepted-material ingress, queue transitions are expected on `container_euid` (container-first lab movement).
 
 Implemented endpoint:
 
@@ -36,23 +42,28 @@ Canonical beta queues:
 Input:
 
 - `run_euid`
-- `index_string`
+- `flowcell_id`
+- `lane`
+- `library_barcode`
 
 Output:
 
+- `sequenced_library_assignment_euid`
 - `atlas_tenant_id`
-- `atlas_order_euid`
-- `atlas_test_order_euid`
+- `atlas_trf_euid`
+- `atlas_test_euid`
+- `atlas_test_fulfillment_item_euid`
 
 Rules:
 
 - response is deterministic and replay-safe
 - response contains no private UUIDs
-- resolver uses Bloom lineage plus explicit Atlas external links
+- resolver traverses Bloom lineage and graph-linked reference objects
+- one full resolver key maps to exactly one sequenced library assignment
 
 Implemented endpoint:
 
-- `GET /api/v1/external/atlas/beta/runs/{run_euid}/resolve?index_string=...`
+- `GET /api/v1/external/atlas/beta/runs/{run_euid}/resolve?flowcell_id=...&lane=...&library_barcode=...`
 
 Other queue-driven beta endpoints:
 
@@ -62,6 +73,7 @@ Other queue-driven beta endpoints:
 - `POST /api/v1/external/atlas/beta/library-prep`
 - `POST /api/v1/external/atlas/beta/pools`
 - `POST /api/v1/external/atlas/beta/runs`
+- `POST /api/v1/external/atlas/tests/{test_euid}/status-events`
 
 ## Status And Reliability
 

@@ -1,115 +1,65 @@
-"""
-BLOOM LIMS Containers Module
+"""Deprecated container helpers rewritten to use graph edges, not JSON links."""
 
-This module contains container-related functionality for BLOOM LIMS.
-Containers are objects that can hold other objects (plates, racks, boxes, etc.).
-
-For backward compatibility, this module re-exports functionality that was
-originally in bloom_lims/bobjs.py.
-"""
+from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from bloom_lims.exceptions import (
-    NotFoundError,
-    ValidationError,
-    DatabaseError,
-)
-
+from bloom_lims.exceptions import DatabaseError, NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ContainerPosition:
-    """
-    Represents a position within a container.
-    
-    Positions can be specified as:
-    - Well format: A1, B12, etc. (rows A-Z, columns 1-n)
-    - Index format: 0, 1, 2, etc.
-    - Coordinate format: (row, col)
-    """
+    """Represents a position within a container."""
+
     row: int
     column: int
-    
+
     @classmethod
     def from_well(cls, well: str) -> "ContainerPosition":
-        """
-        Create position from well notation (e.g., 'A1', 'B12').
-        
-        Args:
-            well: Well string like 'A1' or 'H12'
-            
-        Returns:
-            ContainerPosition instance
-            
-        Raises:
-            ValidationError: If well format is invalid
-        """
         well = well.upper().strip()
-        match = re.match(r'^([A-Z])(\d+)$', well)
+        match = re.match(r"^([A-Z])(\\d+)$", well)
         if not match:
             raise ValidationError(f"Invalid well format: {well}", field="position")
-        
-        row = ord(match.group(1)) - ord('A')
+        row = ord(match.group(1)) - ord("A")
         column = int(match.group(2)) - 1
         return cls(row=row, column=column)
-    
+
     @classmethod
     def from_index(cls, index: int, num_columns: int) -> "ContainerPosition":
-        """
-        Create position from linear index.
-        
-        Args:
-            index: Linear index (0-based)
-            num_columns: Number of columns in container
-            
-        Returns:
-            ContainerPosition instance
-        """
-        row = index // num_columns
-        column = index % num_columns
-        return cls(row=row, column=column)
-    
+        return cls(row=index // num_columns, column=index % num_columns)
+
     def to_well(self) -> str:
-        """Convert to well notation."""
         return f"{chr(ord('A') + self.row)}{self.column + 1}"
-    
+
     def to_index(self, num_columns: int) -> int:
-        """Convert to linear index."""
         return self.row * num_columns + self.column
-    
+
     def __str__(self) -> str:
         return self.to_well()
 
 
-def get_container_layout(container: Any) -> Dict[str, Any]:
-    """
-    Get the layout configuration for a container.
-    
-    Args:
-        container: Container object
-        
-    Returns:
-        Layout configuration dict with rows, columns, type info
-    """
-    if not container or not hasattr(container, 'json_addl'):
-        return {'rows': 1, 'columns': 1, 'type': 'unknown'}
-    
-    json_addl = container.json_addl or {}
-    layout = json_addl.get('layout', {})
-    
+def get_container_layout(container: Any) -> dict[str, Any]:
+    if not container or not hasattr(container, "json_addl"):
+        return {"rows": 1, "columns": 1, "type": "unknown"}
+
+    payload = container.json_addl or {}
+    layout = payload.get("layout", {}) if isinstance(payload, dict) else {}
+    rows = int(layout.get("rows", 8) or 8)
+    columns = int(layout.get("columns", 12) or 12)
     return {
-        'rows': layout.get('rows', 8),
-        'columns': layout.get('columns', 12),
-        'type': container.subtype or container.type,
-        'total_positions': layout.get('rows', 8) * layout.get('columns', 12),
+        "rows": rows,
+        "columns": columns,
+        "type": container.subtype or container.type,
+        "total_positions": rows * columns,
     }
 
 
@@ -117,52 +67,41 @@ def get_container_contents(
     session: Session,
     base,
     container_euid: str,
-) -> List[Dict[str, Any]]:
-    """
-    Get all contents of a container with their positions.
-    
-    Args:
-        session: SQLAlchemy session
-        base: SQLAlchemy automap base
-        container_euid: Container EUID
-        
-    Returns:
-        List of dicts with object info and position
-    """
-    logger.debug(f"Getting contents of container: {container_euid}")
-    
-    try:
-        # Query for objects in this container
-        container = session.query(base.classes.generic_instance).filter(
-            base.classes.generic_instance.euid == container_euid.upper()
-        ).first()
-        
-        if not container:
-            raise NotFoundError(
-                f"Container not found: {container_euid}",
-                resource_type="container",
-                resource_id=container_euid
-            )
-        
-        # Get contents via relationship or json_addl
-        contents = []
-        if hasattr(container, 'json_addl') and container.json_addl:
-            positions = container.json_addl.get('contents', {})
-            for pos, obj_info in positions.items():
-                contents.append({
-                    'position': pos,
-                    'euid': obj_info.get('euid'),
-                    'name': obj_info.get('name'),
-                    'type': obj_info.get('type'),
-                })
-        
-        return contents
-        
-    except NotFoundError:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting container contents: {e}")
-        return []
+) -> list[dict[str, Any]]:
+    logger.debug("Getting contents of container: %s", container_euid)
+    container = _get_instance(session, base, container_euid)
+    if container is None:
+        raise NotFoundError(
+            f"Container not found: {container_euid}",
+            resource_type="container",
+            resource_id=container_euid,
+        )
+
+    stmt = (
+        select(base.classes.generic_instance_lineage)
+        .where(
+            base.classes.generic_instance_lineage.parent_instance_uid == container.uid,
+            base.classes.generic_instance_lineage.relationship_type == "contains",
+            base.classes.generic_instance_lineage.is_deleted.is_(False),
+        )
+        .order_by(base.classes.generic_instance_lineage.created_dt.asc())
+    )
+    rows = []
+    for lineage in session.execute(stmt).scalars().all():
+        child = getattr(lineage, "child_instance", None)
+        if child is None or getattr(child, "is_deleted", False):
+            continue
+        payload = getattr(lineage, "json_addl", {}) or {}
+        props = payload.get("properties") if isinstance(payload, dict) else {}
+        rows.append(
+            {
+                "position": str((props or {}).get("position") or "").strip() or None,
+                "euid": child.euid,
+                "name": child.name,
+                "type": child.type,
+            }
+        )
+    return rows
 
 
 def place_in_container(
@@ -172,89 +111,63 @@ def place_in_container(
     object_euid: str,
     position: str,
 ) -> bool:
-    """
-    Place an object in a container at a specific position.
-
-    Args:
-        session: SQLAlchemy session
-        base: SQLAlchemy automap base
-        container_euid: Container EUID
-        object_euid: Object to place EUID
-        position: Position in container (e.g., 'A1')
-
-    Returns:
-        True if successful
-
-    Raises:
-        NotFoundError: If container or object not found
-        ValidationError: If position is invalid or occupied
-    """
-    logger.debug(f"Placing {object_euid} in {container_euid} at {position}")
-
+    logger.debug("Placing %s in %s at %s", object_euid, container_euid, position)
     try:
-        # Get container
-        container = session.query(base.classes.generic_instance).filter(
-            base.classes.generic_instance.euid == container_euid.upper()
-        ).first()
-
-        if not container:
+        container = _get_instance(session, base, container_euid)
+        if container is None:
             raise NotFoundError(
                 f"Container not found: {container_euid}",
                 resource_type="container",
-                resource_id=container_euid
+                resource_id=container_euid,
             )
-
-        # Get object
-        obj = session.query(base.classes.generic_instance).filter(
-            base.classes.generic_instance.euid == object_euid.upper()
-        ).first()
-
-        if not obj:
+        obj = _get_instance(session, base, object_euid)
+        if obj is None:
             raise NotFoundError(
                 f"Object not found: {object_euid}",
                 resource_type="object",
-                resource_id=object_euid
+                resource_id=object_euid,
             )
 
-        # Validate position
-        position = position.upper().strip()
-        ContainerPosition.from_well(position)  # Validates format
+        normalized_position = str(position or "").strip().upper()
+        ContainerPosition.from_well(normalized_position)
 
-        # Initialize contents if needed
-        if not container.json_addl:
-            container.json_addl = {}
-        if 'contents' not in container.json_addl:
-            container.json_addl['contents'] = {}
+        for entry in get_container_contents(session, base, container_euid):
+            if entry.get("position") == normalized_position:
+                raise ValidationError(
+                    f"Position {normalized_position} is already occupied",
+                    field="position",
+                )
 
-        # Check if position is occupied
-        if position in container.json_addl['contents']:
-            raise ValidationError(
-                f"Position {position} is already occupied",
-                field="position"
-            )
-
-        # Place object
-        container.json_addl['contents'][position] = {
-            'euid': obj.euid,
-            'name': obj.name,
-            'type': obj.type,
-            'placed_at': __import__('datetime').datetime.utcnow().isoformat(),
-        }
-
-        # Update object's container reference
-        if not obj.json_addl:
-            obj.json_addl = {}
-        obj.json_addl['container_euid'] = container.euid
-        obj.json_addl['container_position'] = position
-
+        lineage = base.classes.generic_instance_lineage(
+            name=f"{container.name} :: {obj.name}",
+            parent_type=(
+                f"{container.category}:{container.type}:{container.subtype}:{container.version}"
+            ),
+            child_type=f"{obj.category}:{obj.type}:{obj.subtype}:{obj.version}",
+            relationship_type="contains",
+            parent_instance_uid=container.uid,
+            child_instance_uid=obj.uid,
+            category="generic",
+            type="container",
+            subtype="contains",
+            version="1.0",
+            polymorphic_discriminator="generic_instance_lineage",
+            bstatus="active",
+            json_addl={
+                "properties": {
+                    "position": normalized_position,
+                    "placed_at": datetime.now(UTC).isoformat(),
+                }
+            },
+        )
+        session.add(lineage)
         session.flush()
         return True
-
     except (NotFoundError, ValidationError):
         raise
-    except Exception as e:
-        logger.error(f"Error placing object in container: {e}")
-        raise DatabaseError(f"Failed to place object in container: {e}")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("Error placing object in container: %s", exc)
+        raise DatabaseError(f"Failed to place object in container: {exc}")
 
 
 def remove_from_container(
@@ -262,72 +175,52 @@ def remove_from_container(
     base,
     container_euid: str,
     position: str,
-) -> Optional[str]:
-    """
-    Remove an object from a container position.
+) -> str | None:
+    logger.debug("Removing object from %s at %s", container_euid, position)
+    container = _get_instance(session, base, container_euid)
+    if container is None:
+        raise NotFoundError(
+            f"Container not found: {container_euid}",
+            resource_type="container",
+            resource_id=container_euid,
+        )
 
-    Args:
-        session: SQLAlchemy session
-        base: SQLAlchemy automap base
-        container_euid: Container EUID
-        position: Position to clear (e.g., 'A1')
-
-    Returns:
-        EUID of removed object, or None if position was empty
-    """
-    logger.debug(f"Removing object from {container_euid} at {position}")
-
-    try:
-        container = session.query(base.classes.generic_instance).filter(
-            base.classes.generic_instance.euid == container_euid.upper()
-        ).first()
-
-        if not container:
-            raise NotFoundError(
-                f"Container not found: {container_euid}",
-                resource_type="container",
-                resource_id=container_euid
-            )
-
-        position = position.upper().strip()
-
-        if not container.json_addl or 'contents' not in container.json_addl:
-            return None
-
-        if position not in container.json_addl['contents']:
-            return None
-
-        # Get object info before removing
-        obj_info = container.json_addl['contents'][position]
-        removed_euid = obj_info.get('euid')
-
-        # Remove from container
-        del container.json_addl['contents'][position]
-
-        # Clear object's container reference
-        if removed_euid:
-            obj = session.query(base.classes.generic_instance).filter(
-                base.classes.generic_instance.euid == removed_euid
-            ).first()
-
-            if obj and obj.json_addl:
-                obj.json_addl.pop('container_euid', None)
-                obj.json_addl.pop('container_position', None)
-
+    normalized_position = str(position or "").strip().upper()
+    stmt = (
+        select(base.classes.generic_instance_lineage)
+        .where(
+            base.classes.generic_instance_lineage.parent_instance_uid == container.uid,
+            base.classes.generic_instance_lineage.relationship_type == "contains",
+            base.classes.generic_instance_lineage.is_deleted.is_(False),
+        )
+        .order_by(base.classes.generic_instance_lineage.created_dt.asc())
+    )
+    for lineage in session.execute(stmt).scalars().all():
+        payload = getattr(lineage, "json_addl", {}) or {}
+        props = payload.get("properties") if isinstance(payload, dict) else {}
+        if str((props or {}).get("position") or "").strip().upper() != normalized_position:
+            continue
+        lineage.is_deleted = True
         session.flush()
-        return removed_euid
-
-    except NotFoundError:
-        raise
-    except Exception as e:
-        logger.error(f"Error removing from container: {e}")
-        return None
+        child = getattr(lineage, "child_instance", None)
+        return getattr(child, "euid", None)
+    return None
 
 
-# Re-export for backward compatibility
-try:
+def _get_instance(session: Session, base, euid: str):
+    return (
+        session.query(base.classes.generic_instance)
+        .filter(
+            base.classes.generic_instance.euid == str(euid or "").strip().upper(),
+            base.classes.generic_instance.is_deleted.is_(False),
+        )
+        .first()
+    )
+
+
+try:  # pragma: no cover - compatibility export only
     from bloom_lims.bobjs import BloomObj as _BloomObj
-    BloomContainer = _BloomObj
-except ImportError:
-    BloomContainer = None
 
+    BloomContainer = _BloomObj
+except ImportError:  # pragma: no cover - defensive
+    BloomContainer = None

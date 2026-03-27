@@ -26,6 +26,15 @@ class AtlasClientError(Exception):
         self.path = path
 
 
+def _require_https_url(value: str, *, field_name: str) -> str:
+    normalized = str(value or "").strip().rstrip("/")
+    if not normalized:
+        raise AtlasClientError(f"{field_name} is required")
+    if not normalized.startswith("https://"):
+        raise AtlasClientError(f"{field_name} must use an absolute https:// URL")
+    return normalized
+
+
 class AtlasClient:
     """Simple Atlas API client wrapper with explicit lookup methods."""
 
@@ -37,7 +46,7 @@ class AtlasClient:
         timeout_seconds: int = 10,
         verify_ssl: bool = True,
     ):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _require_https_url(base_url, field_name="Atlas base URL")
         self.token = token
         self.timeout_seconds = timeout_seconds
         self.verify_ssl = verify_ssl
@@ -67,6 +76,31 @@ class AtlasClient:
             path,
             extra_headers={"X-Atlas-Tenant-Id": clean_tenant},
         )
+
+    def get_graph_data(
+        self,
+        *,
+        start_euid: str,
+        depth: int,
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
+        path = f"/api/graph/data?start_euid={start_euid}&depth={int(depth)}"
+        clean_tenant = str(tenant_id or "").strip()
+        if clean_tenant:
+            path = f"{path}&tenant_id={clean_tenant}"
+        return self._get_json(path)
+
+    def get_graph_object_detail(
+        self,
+        *,
+        euid: str,
+        tenant_id: str | None = None,
+    ) -> dict[str, Any]:
+        path = f"/api/graph/object/{euid}"
+        clean_tenant = str(tenant_id or "").strip()
+        if clean_tenant:
+            path = f"{path}?tenant_id={clean_tenant}"
+        return self._get_json(path)
 
     def push_test_status_event(
         self,

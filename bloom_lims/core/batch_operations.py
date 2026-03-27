@@ -39,7 +39,7 @@ import asyncio
 import logging
 import secrets
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar, Union
 
@@ -90,7 +90,7 @@ class BatchJob:
     operation: str
     status: JobStatus = JobStatus.PENDING
     progress: BatchProgress = field(default_factory=BatchProgress)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     error: Optional[str] = None
@@ -201,7 +201,7 @@ class BatchProcessor:
         """
         job = self.create_job("bulk_create", count)
         job.status = JobStatus.RUNNING
-        job.started_at = datetime.utcnow()
+        job.started_at = datetime.now(UTC)
 
         try:
             # Get template
@@ -262,7 +262,7 @@ class BatchProcessor:
             self._session.rollback()
             logger.error(f"Batch create failed: {e}")
 
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(UTC)
         return job
 
     async def bulk_update_objects(
@@ -280,7 +280,7 @@ class BatchProcessor:
         """
         job = self.create_job("bulk_update", len(updates))
         job.status = JobStatus.RUNNING
-        job.started_at = datetime.utcnow()
+        job.started_at = datetime.now(UTC)
 
         try:
             for chunk in self._chunks(updates, self.chunk_size):
@@ -328,7 +328,7 @@ class BatchProcessor:
             job.error = str(e)
             self._session.rollback()
 
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(UTC)
         return job
 
     async def bulk_delete_objects(
@@ -348,7 +348,7 @@ class BatchProcessor:
         """
         job = self.create_job("bulk_delete", len(euids))
         job.status = JobStatus.RUNNING
-        job.started_at = datetime.utcnow()
+        job.started_at = datetime.now(UTC)
 
         try:
             for chunk in self._chunks(euids, self.chunk_size):
@@ -390,7 +390,7 @@ class BatchProcessor:
             job.error = str(e)
             self._session.rollback()
 
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(UTC)
         return job
 
     def get_all_jobs(self) -> List[BatchJob]:
@@ -399,7 +399,7 @@ class BatchProcessor:
 
     def cleanup_completed_jobs(self, max_age_hours: int = 24) -> int:
         """Remove old completed jobs."""
-        cutoff = datetime.utcnow()
+        cutoff = datetime.now(UTC)
         removed = 0
 
         to_remove = []
@@ -587,4 +587,3 @@ def get_batch_processor(bdb=None) -> BatchProcessor:
         )
 
     return _batch_processor
-

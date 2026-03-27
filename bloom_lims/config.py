@@ -3,7 +3,7 @@ BLOOM LIMS Configuration Management.
 
 Configuration precedence (highest to lowest):
 1. Environment variables (BLOOM_* prefix and TAPDB_* runtime context)
-2. User config file (~/.config/bloom/bloom-config.yaml)
+2. User config file (~/.config/bloom/config.yaml)
 3. Template defaults
 """
 
@@ -16,17 +16,28 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from packaging.version import Version
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
-USER_CONFIG_FILE = USER_CONFIG_DIR / "bloom-config.yaml"
+USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
 )
+
+
+def _validate_optional_https_url(value: str, *, field_name: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if not normalized.startswith("https://"):
+        raise ValueError(f"{field_name} must use an absolute https:// URL")
+    return normalized.rstrip("/")
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -113,10 +124,10 @@ class TapDBSettings(BaseModel):
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
     min_version: str = Field(
-        default="0.1.35", description="Minimum supported daylily-tapdb"
+        default="3.0.1", description="Minimum supported daylily-tapdb"
     )
     max_version_exclusive: str = Field(
-        default="0.2.0",
+        default="4.0.0",
         description="Exclusive upper bound for daylily-tapdb",
     )
 
@@ -220,7 +231,10 @@ class APISettings(BaseModel):
         default=300, description="Long-running op timeout"
     )
 
-    cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
+    cors_origins: List[str] = Field(
+        default_factory=lambda: [f"https://{item}" for item in APPROVED_WEB_DOMAIN_SUFFIXES],
+        description="Allowed CORS origins",
+    )
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
 
 
@@ -271,7 +285,8 @@ class AuthSettings(BaseModel):
         description="Cognito OAuth scopes",
     )
     cognito_allowed_domains: List[str] = Field(
-        default_factory=list, description="Allowed email domains"
+        default_factory=lambda: list(APPROVED_WEB_DOMAIN_SUFFIXES),
+        description="Allowed email domains",
     )
 
     jwt_secret: str = Field(default="", description="JWT secret key")
@@ -328,6 +343,35 @@ class AtlasSettings(BaseModel):
         default=0.5,
         description="Base backoff delay in seconds for Bloom -> Atlas status event retries",
     )
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        return _validate_optional_https_url(value, field_name="atlas.base_url")
+
+
+class DeweySettings(BaseModel):
+    """Dewey integration settings."""
+
+    enabled: bool = Field(default=False, description="Enable Bloom -> Dewey artifact registration")
+    base_url: str = Field(default="", description="Dewey API base URL")
+    token: str = Field(default="", description="Dewey API bearer token")
+    timeout_seconds: int = Field(default=10, description="Dewey API timeout seconds")
+    verify_ssl: bool = Field(default=True, description="Verify Dewey TLS certificates")
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        return _validate_optional_https_url(value, field_name="dewey.base_url")
+
+    @model_validator(mode="after")
+    def validate_enabled_contract(self) -> "DeweySettings":
+        if self.enabled:
+            if not str(self.base_url or "").strip():
+                raise ValueError("dewey.base_url is required when dewey.enabled=true")
+            if not str(self.token or "").strip():
+                raise ValueError("dewey.token is required when dewey.enabled=true")
+        return self
 
 
 class LoggingSettings(BaseModel):
@@ -455,7 +499,7 @@ class BusinessConstants(BaseModel):
     )
     default_lab_code: str = Field(default="BLOOM", description="Default lab code")
 
-    default_timezone: str = Field(default="US/Eastern", description="Default timezone")
+    default_timezone: str = Field(default="UTC", description="Default timezone")
 
     config_base_path: str = Field(
         default="config", description="Base path for template configurations"
@@ -487,6 +531,7 @@ class BloomSettings(BaseSettings):
     api: APISettings = Field(default_factory=APISettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     atlas: AtlasSettings = Field(default_factory=AtlasSettings)
+    dewey: DeweySettings = Field(default_factory=DeweySettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
     ui: UISettings = Field(default_factory=UISettings)
     deployment: DeploymentSettings = Field(default_factory=DeploymentSettings)
@@ -511,7 +556,10 @@ class BloomSettings(BaseSettings):
         """
         atlas_base_url = os.environ.get("BLOOM_ATLAS__BASE_URL")
         if atlas_base_url is not None:
-            self.atlas.base_url = atlas_base_url
+            self.atlas.base_url = _validate_optional_https_url(
+                atlas_base_url,
+                field_name="atlas.base_url",
+            )
 
         atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
         if atlas_token is not None:
@@ -543,6 +591,48 @@ class BloomSettings(BaseSettings):
                 "yes",
                 "on",
             }
+
+        dewey_enabled = os.environ.get("BLOOM_DEWEY__ENABLED")
+        if dewey_enabled is not None:
+            self.dewey.enabled = str(dewey_enabled).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+
+        dewey_base_url = os.environ.get("BLOOM_DEWEY__BASE_URL")
+        if dewey_base_url is not None:
+            self.dewey.base_url = _validate_optional_https_url(
+                dewey_base_url,
+                field_name="dewey.base_url",
+            )
+
+        dewey_token = os.environ.get("BLOOM_DEWEY__TOKEN")
+        if dewey_token is not None:
+            self.dewey.token = dewey_token
+
+        dewey_timeout = os.environ.get("BLOOM_DEWEY__TIMEOUT_SECONDS")
+        if dewey_timeout is not None:
+            try:
+                self.dewey.timeout_seconds = int(dewey_timeout)
+            except ValueError:
+                pass
+
+        dewey_verify_ssl = os.environ.get("BLOOM_DEWEY__VERIFY_SSL")
+        if dewey_verify_ssl is not None:
+            self.dewey.verify_ssl = str(dewey_verify_ssl).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+
+        if self.dewey.enabled:
+            if not str(self.dewey.base_url or "").strip():
+                raise ValueError("dewey.base_url is required when dewey.enabled=true")
+            if not str(self.dewey.token or "").strip():
+                raise ValueError("dewey.token is required when dewey.enabled=true")
 
     @field_validator("environment")
     @classmethod

@@ -9,18 +9,15 @@ import os
 import random
 import string
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
-
-import pytz
-
 
 logger = logging.getLogger(__name__)
 
 
 def get_clean_timestamp() -> str:
     """Get a clean timestamp string for logging filenames."""
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
 
 
 def generate_random_string(length: int = 10) -> str:
@@ -42,16 +39,12 @@ def get_datetime_string() -> str:
     """
     Get current datetime as formatted string with timezone.
     
-    Uses US/Eastern timezone by default.
+    Uses UTC timezone by default.
     
     Returns:
-        Formatted datetime string like "2024-01-15 10:30:00 EST-0500"
+        Formatted datetime string like "2024-01-15 10:30:00 UTC+0000"
     """
-    # Choose your desired timezone, e.g., 'US/Eastern', 'Europe/London', etc.
-    timezone = pytz.timezone("US/Eastern")
-
-    # Get current datetime with timezone
-    current_datetime_with_tz = datetime.now(timezone)
+    current_datetime_with_tz = datetime.now(UTC)
 
     # Format as string
     datetime_string = current_datetime_with_tz.strftime("%Y-%m-%d %H:%M:%S %Z%z")
@@ -146,4 +139,3 @@ __all__ = [
     "unique_non_empty_strings",
     "setup_domain_logging",
 ]
-

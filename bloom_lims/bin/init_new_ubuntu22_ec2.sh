@@ -58,9 +58,9 @@ cd ~/projects/git/bloom/
 
 # Copy the config template to your user config directory:
 #   mkdir -p ~/.config/bloom
-#   cp config/bloom-config-template.yaml ~/.config/bloom/bloom-config.yaml
+#   cp config/bloom-config-template.yaml ~/.config/bloom/config.yaml
 #
-# Edit ~/.config/bloom/bloom-config.yaml to set:
+# Edit ~/.config/bloom/config.yaml to set:
 #   - Cognito settings (auth.cognito_*)
 #   - S3 bucket prefix (storage.s3_prefix)
 #   - Database settings if needed

@@ -400,8 +400,7 @@ def create_workset(
     Returns:
         Workset subject EUID if successful, None otherwise
     """
-    from datetime import datetime
-    import pytz
+    from datetime import UTC, datetime
 
     # Map workset_type to template key
     template_key = f"workset_{workset_type}"
@@ -412,8 +411,7 @@ def create_workset(
     subject_key = generate_subject_key("workset", anchor_euid)
 
     # Build extra properties
-    timezone = pytz.timezone("US/Eastern")
-    now = datetime.now(timezone).isoformat()
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     extra_props = {
         "status": "in_progress",
@@ -452,8 +450,7 @@ def complete_workset(bob, workset_euid: str, status: str = "complete") -> bool:
     Returns:
         True if successful, False otherwise
     """
-    from datetime import datetime
-    import pytz
+    from datetime import UTC, datetime
     from sqlalchemy.orm.attributes import flag_modified
 
     if status not in ("complete", "failed", "abandoned"):
@@ -476,8 +473,7 @@ def complete_workset(bob, workset_euid: str, status: str = "complete") -> bool:
             return False
 
         # Update status and completed_at
-        timezone = pytz.timezone("US/Eastern")
-        now = datetime.now(timezone).isoformat()
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
         props["status"] = status
         props["completed_at"] = now
