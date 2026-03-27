@@ -154,8 +154,31 @@ def _resolve_gui_metadata() -> Dict[str, str]:
         "github_repo_url": github_repo_url,
     }
 
+def _resolve_deployment_metadata() -> Dict[str, str | bool]:
+    deployment = {
+        "name": "",
+        "color": "#0f766e",
+        "is_production": False,
+    }
+    try:
+        from bloom_lims.config import get_settings
 
-GUI_METADATA = _resolve_gui_metadata()
-templates.globals["gui_meta"] = GUI_METADATA
+        settings = get_settings()
+        deployment = {
+            "name": settings.deployment.name,
+            "color": settings.deployment.color,
+            "is_production": settings.deployment.is_production,
+        }
+    except Exception:
+        pass
+    return deployment
+
+
+def refresh_template_globals() -> None:
+    templates.globals["gui_meta"] = _resolve_gui_metadata()
+    templates.globals["deployment_chrome"] = _resolve_deployment_metadata()
+
+
 templates.filters["format_dt"] = format_dt
 templates.filters["dt_local_input"] = dt_local_input
+refresh_template_globals()

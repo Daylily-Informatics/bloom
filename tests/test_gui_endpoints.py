@@ -1552,22 +1552,32 @@ class TestHealthEndpoints:
     def test_health_check(self, client):
         """Test main health check endpoint."""
         response = client.get("/health")
-        assert response.status_code in [200, 307, 404]
+        assert response.status_code == 200
 
     def test_health_check_with_trailing_slash(self, client):
         """Test health check endpoint with trailing slash."""
         response = client.get("/health/")
-        assert response.status_code in [200, 307, 404]
+        assert response.status_code == 200
 
     def test_liveness_probe(self, client):
         """Test Kubernetes liveness probe."""
         response = client.get("/health/live")
-        assert response.status_code in [200, 307, 404]
+        assert response.status_code == 200
 
     def test_readiness_probe(self, client):
         """Test Kubernetes readiness probe."""
         response = client.get("/health/ready")
-        assert response.status_code in [200, 307, 404, 503]
+        assert response.status_code in [200, 503]
+
+    def test_top_level_liveness_probe(self, client):
+        """Test top-level orchestration liveness probe."""
+        response = client.get("/healthz")
+        assert response.status_code == 200
+
+    def test_top_level_readiness_probe(self, client):
+        """Test top-level orchestration readiness probe."""
+        response = client.get("/readyz")
+        assert response.status_code in [200, 503]
 
 
 class TestJSONDataEndpoints:

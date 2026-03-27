@@ -1,8 +1,6 @@
-import os
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 from urllib.parse import urlencode, urlparse
 
 import httpx
@@ -10,7 +8,7 @@ import jwt
 
 
 class CognitoConfigurationError(Exception):
-    """Raised when required Cognito environment variables are missing."""
+    """Raised when required Cognito configuration is missing."""
 
 
 class CognitoTokenError(Exception):
@@ -82,77 +80,6 @@ class CognitoAuth:
         self._jwks_client = jwt.PyJWKClient(config.jwks_url)
 
     @classmethod
-    def from_env(cls) -> "CognitoAuth":
-        client_id = os.getenv("COGNITO_APP_CLIENT_ID") or os.getenv("COGNITO_CLIENT_ID")
-        client_secret = (
-            os.getenv("COGNITO_APP_CLIENT_SECRET")
-            or os.getenv("COGNITO_CLIENT_SECRET")
-            or ""
-        )
-        redirect_uri = os.getenv("COGNITO_CALLBACK_URL") or os.getenv("COGNITO_REDIRECT_URI", "")
-
-        required_vars = {
-            "COGNITO_USER_POOL_ID": os.getenv("COGNITO_USER_POOL_ID"),
-            "COGNITO_REGION": os.getenv("COGNITO_REGION"),
-            "COGNITO_APP_CLIENT_ID": client_id,
-            "COGNITO_DOMAIN": os.getenv("COGNITO_DOMAIN"),
-            "COGNITO_CALLBACK_URL": redirect_uri,
-        }
-        missing = [name for name, value in required_vars.items() if not value]
-        if missing:
-            raise CognitoConfigurationError(
-                f"Missing Cognito configuration values: {', '.join(sorted(missing))}"
-            )
-
-        logout_redirect_uri = (
-            os.getenv("COGNITO_LOGOUT_URL")
-            or os.getenv("COGNITO_LOGOUT_REDIRECT_URI")
-            or redirect_uri
-        )
-
-        if not redirect_uri:
-            raise CognitoConfigurationError("COGNITO_REDIRECT_URI must be set.")
-        if not logout_redirect_uri:
-            raise CognitoConfigurationError("COGNITO_LOGOUT_REDIRECT_URI must be set.")
-
-        scopes = os.getenv(
-            "COGNITO_SCOPES",
-            "openid email profile",
-        ).split()
-
-        config = CognitoConfig(
-            user_pool_id=required_vars["COGNITO_USER_POOL_ID"],
-            client_id=required_vars["COGNITO_APP_CLIENT_ID"],
-            client_secret=client_secret,
-            region=required_vars["COGNITO_REGION"],
-            domain=required_vars["COGNITO_DOMAIN"],
-            redirect_uri=redirect_uri,
-            logout_redirect_uri=logout_redirect_uri,
-            scopes=scopes,
-        )
-        return cls(config)
-
-    @staticmethod
-    def _normalize_url(url: str) -> str:
-        return (url or "").strip().rstrip("/")
-
-    @classmethod
-    def _same_origin(cls, left_url: str, right_url: str) -> bool:
-        left = cls._normalize_url(left_url)
-        right = cls._normalize_url(right_url)
-        if not left or not right:
-            return False
-        try:
-            left_parts = urlparse(left)
-            right_parts = urlparse(right)
-            return (
-                left_parts.scheme.lower() == right_parts.scheme.lower()
-                and left_parts.netloc.lower() == right_parts.netloc.lower()
-            )
-        except Exception:
-            return False
-
-    @classmethod
     def _extract_port(cls, url: str) -> Optional[int]:
         normalized = (url or "").strip()
         if not normalized:
@@ -220,47 +147,41 @@ class CognitoAuth:
         Args:
             auth_settings: AuthSettings instance from bloom_lims.config
         """
-        pool_id = auth_settings.cognito_user_pool_id or ""
+        pool_id = (auth_settings.cognito_user_pool_id or "").strip()
+        region = (auth_settings.cognito_region or "").strip()
+        client_id = (auth_settings.cognito_client_id or "").strip()
+        client_secret = (auth_settings.cognito_client_secret or "").strip()
+        client_name = (required_client_name or "bloom").strip()
+        domain = (auth_settings.cognito_domain or "").strip()
+        redirect_uri = (auth_settings.cognito_redirect_uri or "").strip()
+        logout_uri = (auth_settings.cognito_logout_redirect_uri or redirect_uri).strip()
         expected_callback_url = (expected_callback_url or "").strip()
         expected_logout_url = (expected_logout_url or "").strip()
-        required_client_name = (required_client_name or "").strip()
-
-        region = auth_settings.cognito_region or ""
-        if not region and pool_id:
-            region = pool_id.split("_", 1)[0]
-
-        client_id = (
-            auth_settings.cognito_client_id
-            or ""
-        )
-        client_secret = (
-            auth_settings.cognito_client_secret
-            or ""
-        )
-        client_name = required_client_name
-        domain = auth_settings.cognito_domain or ""
-        stored_redirect_uri = auth_settings.cognito_redirect_uri or ""
-        stored_logout_uri = auth_settings.cognito_logout_redirect_uri or stored_redirect_uri
-        redirect_uri = auth_settings.cognito_redirect_uri or expected_callback_url or ""
-        logout_uri = auth_settings.cognito_logout_redirect_uri or expected_logout_url or redirect_uri
 
         if required_client_name:
-            client_name = required_client_name
+            if client_name.lower() != required_client_name.lower():
+                raise CognitoConfigurationError(
+                    f"Cognito app client name mismatch for pool '{pool_id or '(unset)'}' client "
+                    f"'{client_id or '(unset)'}': selected '{client_name}', expected '{required_client_name}'. "
+                    "Update Bloom YAML config to use the bloom app client."
+                )
 
-        cls._validate_runtime_uri_port_match(
-            label="callback",
-            stored_url=stored_redirect_uri,
-            expected_url=expected_callback_url,
-            pool_id=pool_id or "(unset)",
-            client_id=client_id or "(unset)",
-        )
-        cls._validate_runtime_uri_port_match(
-            label="logout",
-            stored_url=stored_logout_uri,
-            expected_url=expected_logout_url,
-            pool_id=pool_id or "(unset)",
-            client_id=client_id or "(unset)",
-        )
+        if expected_callback_url:
+            cls._validate_runtime_uri_port_match(
+                label="callback",
+                stored_url=redirect_uri,
+                expected_url=expected_callback_url,
+                pool_id=pool_id or "(unset)",
+                client_id=client_id or "(unset)",
+            )
+        if expected_logout_url:
+            cls._validate_runtime_uri_port_match(
+                label="logout",
+                stored_url=logout_uri,
+                expected_url=expected_logout_url,
+                pool_id=pool_id or "(unset)",
+                client_id=client_id or "(unset)",
+            )
 
         required = {
             "cognito_user_pool_id": pool_id,
@@ -287,7 +208,7 @@ class CognitoAuth:
         )
         return cls(config)
 
-    def exchange_authorization_code(self, code: str) -> Dict:
+    def exchange_authorization_code(self, code: str) -> dict:
         """Exchange an OAuth2 authorization code for Cognito tokens."""
         payload = {
             "grant_type": "authorization_code",
@@ -324,7 +245,7 @@ class CognitoAuth:
 
         return token_payload
 
-    def validate_token(self, token: str) -> Dict:
+    def validate_token(self, token: str) -> dict:
         try:
             signing_key = self._jwks_client.get_signing_key_from_jwt(token)
             return jwt.decode(
@@ -340,7 +261,8 @@ class CognitoAuth:
 
 @lru_cache(maxsize=1)
 def get_cognito_auth() -> CognitoAuth:
-    """Create (and cache) a CognitoAuth instance from Bloom YAML/env config."""
+    """Create (and cache) a CognitoAuth instance from YAML config.
+    """
     from bloom_lims.config import get_settings
 
     settings = get_settings()

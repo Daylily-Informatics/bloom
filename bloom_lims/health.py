@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from bloom_lims.config import get_settings
 
@@ -67,8 +68,9 @@ class ReadinessResponse(BaseModel):
 _startup_time = datetime.now(UTC)
 
 
-# Create router
+# Create routers
 health_router = APIRouter(prefix="/health", tags=["Health"])
+probe_router = APIRouter(tags=["Health"])
 
 
 async def check_database_health() -> ComponentHealth:
@@ -81,7 +83,7 @@ async def check_database_health() -> ComponentHealth:
         bdb = BLOOMdb3(echo_sql=False)
         
         # Execute a simple query
-        result = bdb.session.execute("SELECT 1").fetchone()
+        result = bdb.session.execute(text("SELECT 1")).fetchone()
         latency = (time.time() - start) * 1000
         
         if result:
@@ -265,9 +267,21 @@ async def readiness_probe() -> ReadinessResponse:
     )
 
     if not ready:
-        raise HTTPException(status_code=503, detail=response.model_dump())
+        raise HTTPException(status_code=503, detail=response.model_dump(mode="json"))
 
     return response
+
+
+@probe_router.get("/healthz", response_model=LivenessResponse)
+async def healthz_probe() -> LivenessResponse:
+    """Top-level liveness alias for orchestration probes."""
+    return await liveness_probe()
+
+
+@probe_router.get("/readyz", response_model=ReadinessResponse)
+async def readyz_probe() -> ReadinessResponse:
+    """Top-level readiness alias for orchestration probes."""
+    return await readiness_probe()
 
 
 @health_router.get("/metrics")

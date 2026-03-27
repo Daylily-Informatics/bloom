@@ -23,6 +23,7 @@ from bloom_lims.domain_access import (
     is_allowed_origin,
 )
 from bloom_lims.gui.errors import register_exception_handlers
+from bloom_lims.health import health_router, probe_router
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
 from bloom_lims.tapdb_metrics import (
     request_method_var,
@@ -128,6 +129,8 @@ def create_app() -> FastAPI:
         app.add_middleware(RateLimitMiddleware)
 
     # Include routers
+    app.include_router(health_router)
+    app.include_router(probe_router)
     app.include_router(api_v1_router)
     try:
         from bloom_lims.gui.router import router as gui_router

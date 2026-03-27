@@ -945,21 +945,21 @@ class TestHealthEndpoints:
     def test_health_endpoint(self, client):
         """Test /health endpoint."""
         response = client.get("/health")
-        # Health endpoint should return 200 or be not implemented (404)
-        assert response.status_code in [200, 404, 503]
-        if response.status_code == 200:
-            data = response.json()
-            assert "status" in data or isinstance(data, dict)
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data or isinstance(data, dict)
 
-    def test_ready_endpoint(self, client):
-        """Test /ready endpoint."""
-        response = client.get("/ready")
-        assert response.status_code in [200, 404, 503]
+    def test_healthz_endpoint(self, client):
+        """Test /healthz endpoint."""
+        response = client.get("/healthz")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "alive"
 
-    def test_live_endpoint(self, client):
-        """Test /live endpoint."""
-        response = client.get("/live")
-        assert response.status_code in [200, 404, 503]
+    def test_readyz_endpoint(self, client):
+        """Test /readyz endpoint."""
+        response = client.get("/readyz")
+        assert response.status_code in [200, 503]
 
 
 class TestAPIVersionInfo:
