@@ -64,10 +64,13 @@ class CognitoConfig:
 
     @property
     def logout_url(self) -> str:
+        # Cognito managed login /logout requires redirect_uri (must match a
+        # registered CallbackURL) + response_type=code instead of logout_uri.
         query = urlencode(
             {
                 "client_id": self.client_id,
-                "logout_uri": self.logout_redirect_uri,
+                "redirect_uri": self.redirect_uri.rstrip("/"),
+                "response_type": "code",
             }
         )
         return f"https://{self._bare_domain}/logout?{query}"
