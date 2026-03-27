@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - BLOOM LIMS</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
   
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -118,6 +119,11 @@
   </style>
 </head>
 <body>
+  {% if deployment_chrome.name and not deployment_chrome.is_production %}
+  <div style="height: 18px; background: {{ deployment_chrome.color }}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;">
+    {{ deployment_chrome.name|upper }}
+  </div>
+  {% endif %}
   <div class="bloom-stripe-bar"></div>
   
   <div class="login-page">

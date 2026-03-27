@@ -4,7 +4,7 @@
 # Copy this file to ~/.config/bloom/bloom-config.yaml and customize as needed.
 #
 # Configuration precedence (highest to lowest):
-#   1. Environment variables (BLOOM_* prefix)
+#   1. Environment variables (BLOOM_* prefix) for non-Cognito settings
 #   2. User config file (~/.config/bloom/bloom-config.yaml)
 #   3. Template defaults (this file)
 #
@@ -95,16 +95,14 @@ api:
 # Authentication Configuration
 # -----------------------------------------------------------------------------
 auth:
-  # Cognito pool binding (required for Cognito auth).
-  # Bloom resolves client/domain/callback from daycog env files.
-  # Required Cognito app client name is "bloom" (override via BLOOM_COGNITO_APP_NAME).
-  # Expected callback convention: https://localhost:8912/auth/callback
+  # Bloom reads the full Cognito contract from this YAML config.
   cognito_user_pool_id: ""
-  cognito_client_id: ""           # Optional explicit override
-  cognito_region: ""              # Optional explicit override
-  cognito_domain: ""              # Optional explicit override
-  cognito_redirect_uri: ""        # Optional explicit override
-  cognito_logout_redirect_uri: "" # Optional explicit override
+  cognito_client_id: ""
+  cognito_client_secret: ""
+  cognito_region: ""
+  cognito_domain: ""
+  cognito_redirect_uri: "https://localhost:8912/auth/callback"
+  cognito_logout_redirect_uri: "https://localhost:8912/"
   cognito_scopes:
     - "openid"
     - "email"
@@ -119,6 +117,14 @@ auth:
   # Session settings
   session_timeout_minutes: 30
   max_sessions_per_user: 5
+
+# -----------------------------------------------------------------------------
+# Deployment Chrome
+# -----------------------------------------------------------------------------
+deployment:
+  name: ""
+  color: "#0f766e"
+  is_production: false
 
 # -----------------------------------------------------------------------------
 # Atlas Integration

@@ -244,6 +244,14 @@ class UISettings(BaseModel):
     )
 
 
+class DeploymentSettings(BaseModel):
+    """Deployment-specific GUI chrome."""
+
+    name: str = Field(default="", description="Deployment label")
+    color: str = Field(default="#0f766e", description="Deployment banner color")
+    is_production: bool = Field(default=False, description="Hide deployment banner in production")
+
+
 class AuthSettings(BaseModel):
     """Authentication configuration."""
 
@@ -481,6 +489,7 @@ class BloomSettings(BaseSettings):
     atlas: AtlasSettings = Field(default_factory=AtlasSettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
     ui: UISettings = Field(default_factory=UISettings)
+    deployment: DeploymentSettings = Field(default_factory=DeploymentSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
     cache: CacheSettings = Field(default_factory=CacheSettings)
@@ -691,8 +700,8 @@ def validate_settings() -> List[str]:
 
     if not settings.auth.cognito_user_pool_id:
         warnings.append(
-            "Cognito pool binding is missing (auth.cognito_user_pool_id). "
-            "Bloom resolves client/domain/callback from daycog env files."
+            "Cognito configuration is missing (auth.cognito_user_pool_id). "
+            "Bloom now reads the full Cognito contract from YAML config."
         )
 
     if not settings.auth.jwt_secret and settings.is_production:

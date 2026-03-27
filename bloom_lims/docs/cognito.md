@@ -165,15 +165,13 @@ If using Google as an identity provider:
 
 5. **Allowed callback URLs**:
    ```
-   http://127.0.0.1:8000/
-   http://localhost:8000/
+   https://localhost:8912/auth/callback
    ```
-   > Add your production URL(s) here as well (e.g., `https://bloom.yourcompany.com/`)
+   > Add your production callback URL(s) here as well (e.g., `https://bloom.yourcompany.com/auth/callback`)
 
 6. **Allowed sign-out URLs**:
    ```
-   http://127.0.0.1:8000/
-   http://localhost:8000/
+   https://localhost:8912/
    ```
 
 7. **Advanced app client settings** (expand this section):
@@ -192,7 +190,7 @@ If using Google as an identity provider:
 
 1. Review all settings
 2. Click **Create user pool**
-3. **Record these values** (you'll need them for environment variables):
+3. **Record these values** (you'll need them for Bloom YAML configuration):
 
    | Value | Where to Find |
    |-------|---------------|
@@ -221,13 +219,11 @@ Click **Edit** under Hosted UI:
 │ Hosted UI Settings                                          │
 ├─────────────────────────────────────────────────────────────┤
 │ Allowed callback URLs:                                      │
-│   http://127.0.0.1:8000/                                    │
-│   http://localhost:8000/                                    │
-│   https://your-production-domain.com/                       │
+│   https://localhost:8912/auth/callback                      │
+│   https://your-production-domain.com/auth/callback          │
 │                                                             │
 │ Allowed sign-out URLs:                                      │
-│   http://127.0.0.1:8000/                                    │
-│   http://localhost:8000/                                    │
+│   https://localhost:8912/                                   │
 │   https://your-production-domain.com/                       │
 │                                                             │
 │ Identity providers:                                         │
@@ -360,8 +356,8 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
      cognito_client_id: "1abc2defgh3ijklmno4pqrst"    # Your App Client ID
      cognito_region: "us-east-1"                       # AWS region
      cognito_domain: "bloom-lims-yourorg.auth.us-east-1.amazoncognito.com"
-     cognito_redirect_uri: "http://127.0.0.1:8000/"
-     cognito_logout_redirect_uri: "http://127.0.0.1:8000/"
+     cognito_redirect_uri: "https://localhost:8912/auth/callback"
+     cognito_logout_redirect_uri: "https://localhost:8912/"
      cognito_scopes:
        - "openid"
        - "email"
@@ -369,36 +365,23 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
      cognito_allowed_domains: []  # Empty = allow all; or ["yourcompany.com", "partner.org"]
    ```
 
-### Environment Variable Override
+### YAML-Only Runtime Configuration
 
-You can override any YAML setting with environment variables using the `BLOOM_` prefix and `__` for nested keys:
-
-```bash
-# Core Cognito settings
-export BLOOM_AUTH__COGNITO_REGION=us-east-1
-export BLOOM_AUTH__COGNITO_USER_POOL_ID=us-east-1_AbCdEfGhI
-export BLOOM_AUTH__COGNITO_CLIENT_ID=1abc2defgh3ijklmno4pqrst
-export BLOOM_AUTH__COGNITO_DOMAIN=bloom-lims-yourorg.auth.us-east-1.amazoncognito.com
-export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://127.0.0.1:8000/
-export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://127.0.0.1:8000/
-
-# Disable authentication for development (NEVER use in production!)
-export BLOOM_OAUTH=no
-```
+Bloom runtime now reads Cognito settings from `~/.config/bloom/bloom-config.yaml`.
+Do not rely on `COGNITO_*`, `BLOOM_AUTH__COGNITO_*`, or daycog env files for service startup.
 
 ### Configuration Reference
 
-| YAML Key | Env Variable | Required | Default | Description |
-|----------|--------------|----------|---------|-------------|
-| `auth.cognito_region` | `BLOOM_AUTH__COGNITO_REGION` | ✅ Yes | - | AWS region (e.g., `us-east-1`) |
-| `auth.cognito_user_pool_id` | `BLOOM_AUTH__COGNITO_USER_POOL_ID` | ✅ Yes | - | User Pool ID from AWS Console |
-| `auth.cognito_client_id` | `BLOOM_AUTH__COGNITO_CLIENT_ID` | ✅ Yes | - | App Client ID (not secret) |
-| `auth.cognito_domain` | `BLOOM_AUTH__COGNITO_DOMAIN` | ✅ Yes | - | Hosted UI domain without `https://` |
-| `auth.cognito_redirect_uri` | `BLOOM_AUTH__COGNITO_REDIRECT_URI` | ✅ Yes | - | Post-login redirect URL |
-| `auth.cognito_logout_redirect_uri` | `BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI` | ⚠️ Recommended | Same as redirect | Post-logout redirect URL |
-| `auth.cognito_scopes` | - | ❌ No | `["openid", "email", "profile"]` | OAuth scopes to request |
-| `auth.cognito_allowed_domains` | - | ❌ No | `[]` (allow all) | Allowed email domains |
-| - | `BLOOM_OAUTH` | ❌ No | `yes` | Set to `no` to disable auth |
+| YAML Key | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `auth.cognito_region` | ✅ Yes | - | AWS region (e.g., `us-east-1`) |
+| `auth.cognito_user_pool_id` | ✅ Yes | - | User Pool ID from AWS Console |
+| `auth.cognito_client_id` | ✅ Yes | - | App Client ID (not secret) |
+| `auth.cognito_domain` | ✅ Yes | - | Hosted UI domain without `https://` |
+| `auth.cognito_redirect_uri` | ✅ Yes | - | Post-login redirect URL |
+| `auth.cognito_logout_redirect_uri` | ⚠️ Recommended | Same as redirect | Post-logout redirect URL |
+| `auth.cognito_scopes` | ❌ No | `["openid", "email", "profile"]` | OAuth scopes to request |
+| `auth.cognito_allowed_domains` | ❌ No | `[]` (allow all) | Allowed email domains |
 
 ---
 
@@ -409,8 +392,8 @@ export BLOOM_OAUTH=no
 1. **Set up your configuration** (see [Configuration](#configuration) above)
 
 2. **Verify your Cognito callback URLs** include your local address:
-   - `http://127.0.0.1:8000/`
-   - `http://localhost:8000/` (optional, add if you use localhost)
+   - `https://localhost:8912/auth/callback`
+   - `https://localhost:8912/`
 
 3. **Activate the environment and start the application**:
 
@@ -420,7 +403,7 @@ export BLOOM_OAUTH=no
    ```
 
 4. **Test authentication**:
-   - Navigate to `http://127.0.0.1:8000/`
+   - Navigate to `https://localhost:8912/`
    - Click **"Login with Cognito"**
    - Complete authentication in the Cognito Hosted UI
    - You should be redirected back to Bloom
@@ -444,20 +427,15 @@ If you need to test from different hosts (e.g., mobile device on same network):
 
 1. Add the IP/hostname to Cognito callback URLs:
    ```
-   http://192.168.1.100:8000/
+   https://192.168.1.100:8912/auth/callback
+   https://192.168.1.100:8912/
    ```
 
 2. Update your `~/.config/bloom/bloom-config.yaml`:
    ```yaml
    auth:
-     cognito_redirect_uri: "http://192.168.1.100:8000/"
-     cognito_logout_redirect_uri: "http://192.168.1.100:8000/"
-   ```
-
-   Or use environment variables:
-   ```bash
-   export BLOOM_AUTH__COGNITO_REDIRECT_URI=http://192.168.1.100:8000/
-   export BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI=http://192.168.1.100:8000/
+     cognito_redirect_uri: "https://192.168.1.100:8912/auth/callback"
+     cognito_logout_redirect_uri: "https://192.168.1.100:8912/"
    ```
 
 ---
@@ -477,7 +455,7 @@ sequenceDiagram
     B->>U: Render login page with Cognito URL
     U->>C: Click "Login with Cognito"
     C->>C: User authenticates (email/password or Google)
-    C->>U: Redirect to COGNITO_REDIRECT_URI with tokens in URL fragment
+    C->>U: Redirect to auth.cognito_redirect_uri with tokens in URL fragment
     U->>U: JavaScript extracts id_token and access_token
     U->>B: POST /oauth_callback with tokens
     B->>J: Fetch JWKS public keys
@@ -530,28 +508,21 @@ After successful authentication, `request.session["user_data"]` contains:
 
 ### Common Issues and Solutions
 
-#### 1. "Missing Cognito configuration values" Error
+#### 1. "Missing Cognito configuration" Error
 
-**Symptoms**: Application fails to start or shows error about missing environment variables.
+**Symptoms**: Application fails to start or shows error about missing Cognito YAML settings.
 
 **Solutions**:
 
 ```bash
-# Verify all required variables are set
-echo $COGNITO_REGION
-echo $COGNITO_USER_POOL_ID
-echo $COGNITO_CLIENT_ID
-echo $COGNITO_DOMAIN
-
 # Check configuration is being loaded
-python -c "from bloom_lims.config import get_settings; s = get_settings(); print(s.auth.cognito_region)"
+python -c "from bloom_lims.config import get_settings; s = get_settings(); print(s.auth.model_dump())"
 ```
 
 **Checklist**:
 - [ ] `~/.config/bloom/bloom-config.yaml` exists with auth settings
 - [ ] No typos in YAML keys
 - [ ] YAML syntax is valid (proper indentation, colons, quotes)
-- [ ] Or environment variables are set with `BLOOM_AUTH__` prefix
 
 ---
 
@@ -563,10 +534,10 @@ python -c "from bloom_lims.config import get_settings; s = get_settings(); print
 
 | Cause | Solution |
 |-------|----------|
-| Wrong Client ID | Verify `COGNITO_CLIENT_ID` matches App Client in AWS |
-| Wrong Region | Verify `COGNITO_REGION` matches User Pool region |
+| Wrong Client ID | Verify `auth.cognito_client_id` matches the App Client in AWS |
+| Wrong Region | Verify `auth.cognito_region` matches the User Pool region |
 | Clock skew | Ensure server time is accurate (tokens have expiry) |
-| Wrong User Pool ID | Verify `COGNITO_USER_POOL_ID` is correct |
+| Wrong User Pool ID | Verify `auth.cognito_user_pool_id` is correct |
 
 **Debug token issues**:
 
@@ -593,17 +564,15 @@ print(f"Expiry: {decoded.get('exp')}")
    - Compare callback URLs character-by-character
 
 2. **Common mismatches**:
-   - Trailing slash: `http://127.0.0.1:8000/` vs `http://127.0.0.1:8000`
-   - Protocol: `http://` vs `https://`
+   - Trailing slash: `https://localhost:8912/` vs `https://localhost:8912`
+   - Protocol: `https://` only
    - Host: `localhost` vs `127.0.0.1`
    - Port: Missing or wrong port number
 
 3. **Add all variations** you might use:
    ```
-   http://127.0.0.1:8000/
-   http://127.0.0.1:8000
-   http://localhost:8000/
-   http://localhost:8000
+   https://localhost:8912/auth/callback
+   https://localhost:8912/
    ```
 
 ---
@@ -615,14 +584,8 @@ print(f"Expiry: {decoded.get('exp')}")
 **Solutions**:
 
 ```bash
-# Check whitelist configuration
-echo $COGNITO_WHITELIST_DOMAINS
-
-# To allow all domains
-COGNITO_WHITELIST_DOMAINS=all
-
-# To allow specific domains
-COGNITO_WHITELIST_DOMAINS=yourcompany.com,partner.org
+# Check whitelist configuration in YAML
+python -c "from bloom_lims.config import get_settings; s = get_settings(); print(s.auth.cognito_allowed_domains)"
 ```
 
 ---
@@ -637,10 +600,8 @@ COGNITO_WHITELIST_DOMAINS=yourcompany.com,partner.org
    - User Pool → App integration → App client → Hosted UI
    - Check "Allowed sign-out URLs"
 
-2. **Check environment variable**:
-   ```bash
-   echo $COGNITO_LOGOUT_REDIRECT_URI
-   ```
+2. **Check Bloom YAML config**:
+   - Verify `auth.cognito_logout_redirect_uri` matches a Cognito Allowed sign-out URL
 
 3. **Clear browser data**:
    - Cognito sets its own cookies
@@ -829,22 +790,22 @@ def validate_token(self, token: str) -> Dict:
 | `GET /logout` | Clears session and redirects to Cognito logout |
 | `GET /user_home` | Shows user profile with Cognito details |
 
-### Environment Variables Summary
+### YAML Settings Summary
 
-```bash
-# Required
-COGNITO_REGION=us-east-1
-COGNITO_USER_POOL_ID=us-east-1_AbCdEfGhI
-COGNITO_CLIENT_ID=1abc2defgh3ijklmno4pqrst
-COGNITO_DOMAIN=your-domain.auth.us-east-1.amazoncognito.com
-COGNITO_REDIRECT_URI=https://your-app.com/
-
-# Recommended
-COGNITO_LOGOUT_REDIRECT_URI=https://your-app.com/
-COGNITO_WHITELIST_DOMAINS=yourcompany.com
-
-# Optional
-COGNITO_SCOPES=openid email profile
+```yaml
+auth:
+  cognito_region: us-east-1
+  cognito_user_pool_id: us-east-1_AbCdEfGhI
+  cognito_client_id: 1abc2defgh3ijklmno4pqrst
+  cognito_domain: your-domain.auth.us-east-1.amazoncognito.com
+  cognito_redirect_uri: https://your-app.com/auth/callback
+  cognito_logout_redirect_uri: https://your-app.com/
+  cognito_allowed_domains:
+    - yourcompany.com
+  cognito_scopes:
+    - openid
+    - email
+    - profile
 ```
 
 ### Useful AWS CLI Commands

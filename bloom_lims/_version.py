@@ -14,7 +14,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Fallback version if GitHub is unreachable (update when making releases)
-FALLBACK_VERSION = "0.11.2"
+FALLBACK_VERSION = "0.11.5"
 
 # GitHub repo info
 GITHUB_OWNER = "Daylily-Informatics"
