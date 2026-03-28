@@ -5,28 +5,34 @@ These tests verify that the Pydantic schemas work correctly for
 validation, serialization, and deserialization.
 """
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, date
-from pydantic import ValidationError
+
+
+@pytest.fixture(autouse=True)
+def _default_meridian_runtime(monkeypatch):
+    monkeypatch.setenv("MERIDIAN_ENVIRONMENT", "production")
+    monkeypatch.setenv("MERIDIAN_SANDBOX_PREFIX", "")
 
 
 class TestBaseSchemas:
     """Tests for base schema functionality."""
-    
+
     def test_pagination_params(self):
         """Test PaginationParams schema."""
         from bloom_lims.schemas import PaginationParams
-        
+
         params = PaginationParams(page=1, page_size=50)
         assert params.page == 1
         assert params.page_size == 50
-        
+
         # Test defaults
         params_default = PaginationParams()
         assert params_default.page == 1
         assert params_default.page_size == 50
-    
-    def test_euid_validation(self):
+
+    def test_euid_validation(self, monkeypatch):
         """Test EUID validation function.
 
         BLOOM uses TapDB/Meridian EUIDs:
@@ -34,8 +40,9 @@ class TestBaseSchemas:
         - BODY is Crockford Base32 (no leading zeros)
         - CHECK is MOD32 checksum
         """
-        from bloom_lims.schemas import validate_euid
         from daylily_tapdb.euid import format_euid
+
+        from bloom_lims.schemas import validate_euid
 
         cx1 = format_euid("CX", 1)
         cx123 = format_euid("CX", 123)
@@ -66,10 +73,28 @@ class TestBaseSchemas:
         with pytest.raises(ValueError):
             validate_euid(sandbox)
 
+    def test_euid_validation_accepts_only_configured_sandbox_prefix(self, monkeypatch):
+        monkeypatch.setenv("MERIDIAN_ENVIRONMENT", "sandbox")
+        monkeypatch.setenv("MERIDIAN_SANDBOX_PREFIX", "S")
+
+        from daylily_tapdb.euid import format_euid
+
+        from bloom_lims.schemas import validate_euid
+
+        sandbox = format_euid("CX", 1, sandbox="S")
+        wrong_prefix = format_euid("CX", 1, sandbox="T")
+        production = format_euid("CX", 1)
+
+        assert validate_euid(sandbox) == sandbox
+        with pytest.raises(ValueError):
+            validate_euid(wrong_prefix)
+        with pytest.raises(ValueError):
+            validate_euid(production)
+
 
 class TestObjectSchemas:
     """Tests for object schemas."""
-    
+
     def test_object_create_schema(self):
         """Test ObjectCreateSchema validation."""
         from bloom_lims.schemas import ObjectCreateSchema
@@ -100,8 +125,9 @@ class TestContainerSchemas:
 
     def test_container_create_schema(self):
         """Test ContainerCreateSchema validation."""
-        from bloom_lims.schemas import ContainerCreateSchema
         from daylily_tapdb.euid import format_euid
+
+        from bloom_lims.schemas import ContainerCreateSchema
 
         data = ContainerCreateSchema(
             name="Test Plate",
@@ -111,11 +137,11 @@ class TestContainerSchemas:
         )
         assert data.name == "Test Plate"
         assert data.container_type == "plate"
-    
+
     def test_container_layout_schema(self):
         """Test ContainerLayoutSchema."""
         from bloom_lims.schemas import ContainerLayoutSchema
-        
+
         layout = ContainerLayoutSchema(
             rows=8,
             columns=12,
@@ -127,12 +153,13 @@ class TestContainerSchemas:
 
 class TestContentSchemas:
     """Tests for content schemas."""
-    
+
     def test_sample_create_schema(self):
         """Test SampleCreateSchema validation."""
-        from bloom_lims.schemas import SampleCreateSchema
         from daylily_tapdb.euid import format_euid
-        
+
+        from bloom_lims.schemas import SampleCreateSchema
+
         data = SampleCreateSchema(
             name="Test Sample",
             sample_type="blood",
@@ -140,12 +167,13 @@ class TestContentSchemas:
         )
         assert data.name == "Test Sample"
         assert data.sample_type == "blood"
-    
+
     def test_reagent_create_schema(self):
         """Test ReagentCreateSchema validation."""
-        from bloom_lims.schemas import ReagentCreateSchema
         from daylily_tapdb.euid import format_euid
-        
+
+        from bloom_lims.schemas import ReagentCreateSchema
+
         data = ReagentCreateSchema(
             name="Test Reagent",
             reagent_type="buffer",
@@ -157,11 +185,12 @@ class TestContentSchemas:
 
 class TestWorkflowSchemas:
     """Tests for workflow schemas."""
-    
+
     def test_workflow_create_schema(self):
         """Test WorkflowCreateSchema validation."""
-        from bloom_lims.schemas import WorkflowCreateSchema
         from daylily_tapdb.euid import format_euid
+
+        from bloom_lims.schemas import WorkflowCreateSchema
 
         data = WorkflowCreateSchema(
             name="Test Workflow",
@@ -169,11 +198,11 @@ class TestWorkflowSchemas:
             template_euid=format_euid("GT", 4),
         )
         assert data.name == "Test Workflow"
-    
+
     def test_workflow_step_schema(self):
         """Test WorkflowStepSchema validation."""
         from bloom_lims.schemas import WorkflowStepSchema
-        
+
         step = WorkflowStepSchema(
             name="Step 1",
             step_number=1,
@@ -184,11 +213,11 @@ class TestWorkflowSchemas:
 
 class TestEquipmentSchemas:
     """Tests for equipment schemas."""
-    
+
     def test_equipment_create_schema(self):
         """Test EquipmentCreateSchema validation."""
         from bloom_lims.schemas import EquipmentCreateSchema
-        
+
         data = EquipmentCreateSchema(
             name="Test Sequencer",
             equipment_type="sequencer",
@@ -196,7 +225,7 @@ class TestEquipmentSchemas:
             manufacturer="Illumina",
         )
         assert data.serial_number == "SN12345"
-    
+
     def test_maintenance_record_schema(self):
         """Test MaintenanceRecordSchema validation."""
         from bloom_lims.schemas import MaintenanceRecordSchema
@@ -214,12 +243,18 @@ class TestPublicResponseSchemas:
 
     def test_public_response_schemas_do_not_expose_uuid_fields(self):
         from bloom_lims.schemas.actions import ActionResponseSchema
-        from bloom_lims.schemas.containers import ContainerPositionSchema, ContainerResponseSchema
+        from bloom_lims.schemas.containers import (
+            ContainerPositionSchema,
+            ContainerResponseSchema,
+        )
         from bloom_lims.schemas.content import ContentResponseSchema
         from bloom_lims.schemas.equipment import EquipmentResponseSchema
         from bloom_lims.schemas.files import FileResponseSchema, FileSetResponseSchema
         from bloom_lims.schemas.objects import ObjectResponseSchema
-        from bloom_lims.schemas.workflows import WorkflowResponseSchema, WorkflowStepResponseSchema
+        from bloom_lims.schemas.workflows import (
+            WorkflowResponseSchema,
+            WorkflowStepResponseSchema,
+        )
 
         schemas = [
             ActionResponseSchema,
@@ -401,8 +436,8 @@ class TestDomainWorkflows:
 
     def test_workflow_inherits_from_bloom_obj(self):
         """Test BloomWorkflow inherits from BloomObj."""
-        from bloom_lims.domain.workflows import BloomWorkflow
         from bloom_lims.domain.base import BloomObj
+        from bloom_lims.domain.workflows import BloomWorkflow
         assert issubclass(BloomWorkflow, BloomObj)
 
 
@@ -421,8 +456,8 @@ class TestDomainFiles:
 
     def test_file_inherits_from_bloom_obj(self):
         """Test BloomFile inherits from BloomObj."""
-        from bloom_lims.domain.files import BloomFile
         from bloom_lims.domain.base import BloomObj
+        from bloom_lims.domain.files import BloomFile
         assert issubclass(BloomFile, BloomObj)
 
 
@@ -537,8 +572,9 @@ class TestHealthModuleImports:
 
     def test_liveness_response_model(self):
         """Test LivenessResponse model creation."""
-        from bloom_lims.health import LivenessResponse
         from datetime import datetime
+
+        from bloom_lims.health import LivenessResponse
 
         response = LivenessResponse(
             status="ok",

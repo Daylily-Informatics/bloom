@@ -2,13 +2,17 @@
 Base Pydantic schemas and common validators for BLOOM LIMS.
 """
 
-import re
 from datetime import datetime
+from os import environ
 from typing import Any, Dict, Generic, List, Optional, TypeVar
-from pydantic import BaseModel, Field, field_validator, ConfigDict
 
-from daylily_tapdb.euid import validate_euid as tapdb_validate_euid
-
+from daylily_tapdb.euid import (
+    resolve_runtime_validation_context,
+)
+from daylily_tapdb.euid import (
+    validate_euid as tapdb_validate_euid,
+)
+from pydantic import BaseModel, ConfigDict, Field
 
 # Type variable for generic paginated responses
 T = TypeVar("T")
@@ -33,9 +37,8 @@ def validate_euid(value: str) -> str:
         ValueError: If the EUID format is invalid
     """
     value = value.upper().strip()
-    # Validate as production EUID by default. Sandbox EUIDs (X:TX-1C) are not
-    # currently accepted via the public API contracts.
-    if not tapdb_validate_euid(value, environment="production"):
+    validation_kwargs = resolve_runtime_validation_context(environ)
+    if not tapdb_validate_euid(value, **validation_kwargs):
         raise ValueError(
             f"Invalid EUID format: {value}. "
             "Expected TapDB/Meridian EUID format (e.g., GT-2HP, GX-8J)."
@@ -51,10 +54,10 @@ def EUIDField(description: str = "Enterprise Unique Identifier") -> Any:
 class BloomBaseSchema(BaseModel):
     """
     Base schema for all BLOOM LIMS Pydantic models.
-    
+
     Provides common configuration and utility methods.
     """
-    
+
     model_config = ConfigDict(
         str_strip_whitespace=True,
         validate_assignment=True,
@@ -65,14 +68,14 @@ class BloomBaseSchema(BaseModel):
 
 class TimestampMixin(BaseModel):
     """Mixin for models with timestamp fields."""
-    
+
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
 
 class AuditMixin(BaseModel):
     """Mixin for models with audit fields."""
-    
+
     created_by: Optional[str] = Field(None, description="User who created")
     updated_by: Optional[str] = Field(None, description="User who last updated")
 
@@ -81,17 +84,17 @@ class PaginationParams(BloomBaseSchema):
     """
     Pagination parameters for list endpoints.
     """
-    
+
     page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
     page_size: int = Field(default=50, ge=1, le=1000, description="Items per page")
     sort_by: Optional[str] = Field(None, description="Field to sort by")
     sort_order: str = Field(default="asc", pattern="^(asc|desc)$", description="Sort order")
-    
+
     @property
     def offset(self) -> int:
         """Calculate SQL offset."""
         return (self.page - 1) * self.page_size
-    
+
     @property
     def limit(self) -> int:
         """Get limit (alias for page_size)."""
@@ -102,13 +105,13 @@ class PaginatedResponse(BloomBaseSchema, Generic[T]):
     """
     Generic paginated response wrapper.
     """
-    
+
     items: List[T] = Field(description="List of items")
     total: int = Field(description="Total number of items")
     page: int = Field(description="Current page number")
     page_size: int = Field(description="Items per page")
     pages: int = Field(description="Total number of pages")
-    
+
     @classmethod
     def create(
         cls,
@@ -129,7 +132,7 @@ class PaginatedResponse(BloomBaseSchema, Generic[T]):
 
 class SuccessResponse(BloomBaseSchema):
     """Standard success response."""
-    
+
     success: bool = Field(default=True, description="Operation success flag")
     message: str = Field(default="Operation completed successfully", description="Success message")
     data: Optional[Dict[str, Any]] = Field(None, description="Response data")
