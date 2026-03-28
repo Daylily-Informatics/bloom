@@ -51,7 +51,7 @@ docker-compose up -d
 
 ```bash
 # If using conda, Metabase can run alongside BLOOM
-source bloom_activate.sh
+source ./activate
 ./analytics/metabase/run_metabase.sh
 ```
 
@@ -167,4 +167,3 @@ analytics/
 ## License
 
 This analytics integration is released under the same MIT license as BLOOM LIMS.
-

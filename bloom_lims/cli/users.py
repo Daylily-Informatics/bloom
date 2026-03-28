@@ -1,4 +1,7 @@
-"""User management commands for the Bloom CLI."""
+"""Bloom-specific user commands.
+
+Generic user CRUD is owned by the TapDB CLI.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +12,6 @@ if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
 
-import subprocess
-
 import typer
 from daylily_tapdb.user_store import get_by_login_or_email
 
@@ -19,11 +20,10 @@ from bloom_lims.auth.services.user_api_tokens import (
     TokenCreateInput,
     UserAPITokenService,
 )
-from bloom_lims.cli.db import _current_env, _runtime_env, _tapdb_base_cmd
 from bloom_lims.db import BLOOMdb3
 
 users_app = typer.Typer(
-    help="User management commands routed through TapDB.", no_args_is_help=True
+    help="Bloom-specific user commands.", no_args_is_help=True
 )
 
 
@@ -31,51 +31,6 @@ class TokenScope(str, Enum):
     internal_ro = "internal_ro"
     internal_rw = "internal_rw"
     admin = "admin"
-
-
-def _run_tapdb_user(args: list[str]) -> None:
-    raise typer.Exit(
-        subprocess.run(
-            _tapdb_base_cmd() + ["user", *args],
-            env=_runtime_env(),
-            check=False,
-        ).returncode
-    )
-
-
-@users_app.command("list")
-def list_users(
-    env_name: str | None = typer.Option(None, "--env", help="TapDB environment name"),
-) -> None:
-    """List application users in the active Bloom namespace."""
-    _run_tapdb_user(["list", (env_name or _current_env())])
-
-
-@users_app.command("add")
-def add_user(
-    env_name: str | None = typer.Option(None, "--env", help="TapDB environment name"),
-    username: str = typer.Option(..., "--username", help="Username / login email"),
-    email: str = typer.Option("", "--email", help="Email address"),
-    name: str = typer.Option("", "--name", help="Display name"),
-    role: str = typer.Option("user", "--role", help="Role name"),
-    password: str = typer.Option("", "--password", help="Optional password"),
-) -> None:
-    """Create a user in the active Bloom namespace."""
-    args = [
-        "add",
-        (env_name or _current_env()),
-        "--username",
-        username,
-        "--role",
-        role,
-    ]
-    if email.strip():
-        args.extend(["--email", email.strip()])
-    if name.strip():
-        args.extend(["--name", name.strip()])
-    if password:
-        args.extend(["--password", password])
-    _run_tapdb_user(args)
 
 
 @users_app.command("issue-token")

@@ -1,10 +1,10 @@
 # Bloom Authentication (Cognito + YAML)
 
-Bloom authentication is Cognito-backed and should be managed through TapDB/`tapdb cognito ...` flows.
+Bloom authentication is Cognito-backed and should be managed through `daycog` for shared Cognito lifecycle plus `tapdb` for namespace-bound config.
 
 ## Key Policy
 
-- Bloom stores the full Cognito runtime contract in `~/.config/bloom/bloom-config.yaml`.
+- Bloom stores the full Cognito runtime contract in `~/.config/bloom/config.yaml`.
 - Service startup should not depend on `COGNITO_*` or daycog env files.
 - Use HTTPS callback and logout URLs everywhere.
 
@@ -24,12 +24,23 @@ export TAPDB_DATABASE_NAME=bloom
 # Show current TapDB context
 python -m daylily_tapdb.cli info
 
-# Bind/setup Cognito for active env/namespace.
-# Bloom requires Cognito app client name: bloom
-python -m daylily_tapdb.cli cognito setup dev --client-name bloom
-# Equivalent Bloom wrapper:
-bloom db auth-setup --port 8912 --region us-east-1
-python -m daylily_tapdb.cli cognito status dev
+# Initialize the TapDB namespace config for Bloom
+python -m daylily_tapdb.cli --client-id bloom --database-name bloom config init \
+  --env dev --db-port dev=5566 --ui-port dev=8912
+
+# Update shared Cognito app/pool state through daycog
+daycog config create-all --pool-name daylily-ursa-users --region us-west-2 --default-client atlas
+
+# Bind the Bloom namespace to the shared Cognito app client
+python -m daylily_tapdb.cli --client-id bloom --database-name bloom config update \
+  --env dev \
+  --cognito-user-pool-id us-west-2_5r8gIqV5P \
+  --cognito-app-client-id 6j2pa8nr9ve19aeuhnb1ocpl2r \
+  --cognito-client-name bloom \
+  --cognito-region us-west-2 \
+  --cognito-domain daylily-ursa-5r8giqv5p.auth.us-west-2.amazoncognito.com \
+  --cognito-callback-url https://localhost:8912/auth/callback \
+  --cognito-logout-url https://localhost:8912/
 ```
 
 ## Callback URL Convention
@@ -61,6 +72,6 @@ tapdb:
 ## Start Bloom
 
 ```bash
-source bloom_activate.sh
+source ./activate
 bloom server start
 ```

@@ -93,7 +93,14 @@ class TestMainCommands:
         result = runner.invoke(cli_app, ["db", "--help"])
         assert result.exit_code == 0
         assert "init" in result.output
+        assert "seed" in result.output
         assert "reset" in result.output
+        assert "start" not in result.output
+        assert "stop" not in result.output
+        assert "status" not in result.output
+        assert "migrate" not in result.output
+        assert "shell" not in result.output
+        assert "auth-setup" not in result.output
 
     def test_quality_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["quality", "--help"])
@@ -104,6 +111,8 @@ class TestMainCommands:
         result = runner.invoke(cli_app, ["users", "--help"])
         assert result.exit_code == 0
         assert "issue-token" in result.output
+        assert "list" not in result.output
+        assert "add" not in result.output
 
     def test_integrations_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["integrations", "--help"])

@@ -91,7 +91,7 @@ Mounted-mode rules:
 Typical local flow:
 
 ```bash
-source bloom_activate.sh
+source ./activate
 pip install -e .
 bloom db build
 bloom server start --foreground
@@ -100,7 +100,7 @@ bloom server start --foreground
 Focused validation commands:
 
 ```bash
-source bloom_activate.sh
+source ./activate
 pytest --no-cov tests/test_api_atlas_bridge.py tests/test_atlas_lookup_resilience.py tests/test_queue_flow.py tests/test_run_resolver.py tests/test_beta_cross_repo_smoke.py
 ruff check bloom_lims tests
 ```

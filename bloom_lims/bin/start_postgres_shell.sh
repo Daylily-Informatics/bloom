@@ -1,5 +1,5 @@
 # source me
-# NOTE: Run 'source bloom_activate.sh' first if not already activated
+# NOTE: Run 'source ./activate' first if not already activated
 
 PGDATA=bloom_lims/database/bloom_lims
 PGUSER=$USER

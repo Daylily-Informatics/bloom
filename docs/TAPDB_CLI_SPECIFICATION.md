@@ -18,7 +18,7 @@ For namespace isolation with multiple apps under one user, prefer:
 ## Activation
 
 ```bash
-source ./tapdb_activate.sh
+source ../../daylily-tapdb/activate
 ```
 
 ## Bootstrap
@@ -54,28 +54,33 @@ python -m daylily_tapdb.cli db data backup dev
 python -m daylily_tapdb.cli db data restore dev
 ```
 
-## Cognito (`tapdb cognito`)
+## Config and Cognito Ownership
 
 ```bash
-python -m daylily_tapdb.cli cognito setup dev
-python -m daylily_tapdb.cli cognito bind dev --pool-id <pool-id>
-python -m daylily_tapdb.cli cognito status dev
-python -m daylily_tapdb.cli cognito add-app dev --app-name bloom --callback-url https://localhost:8912/auth/callback --logout-url https://localhost:8912/
-# Equivalent Bloom wrapper (always app-name=bloom):
-bloom db auth-setup --port 8912 --region us-east-1
-python -m daylily_tapdb.cli cognito add-user dev john@dyly.bio --password TestPass123!
+python -m daylily_tapdb.cli --client-id bloom --database-name bloom config init \
+  --env dev --db-port dev=5566 --ui-port dev=8912
+python -m daylily_tapdb.cli --client-id bloom --database-name bloom config update \
+  --env dev --audit-log-euid-prefix audit.bloom --support-email support@daylilyinformatics.com
+daycog config create-all --pool-name daylily-ursa-users --region us-west-2 --default-client atlas
+python -m daylily_tapdb.cli --client-id bloom --database-name bloom config update \
+  --env dev \
+  --cognito-user-pool-id us-west-2_5r8gIqV5P \
+  --cognito-app-client-id 6j2pa8nr9ve19aeuhnb1ocpl2r \
+  --cognito-client-name bloom \
+  --cognito-region us-west-2 \
+  --cognito-domain daylily-ursa-5r8giqv5p.auth.us-west-2.amazoncognito.com \
+  --cognito-callback-url https://localhost:8912/auth/callback \
+  --cognito-logout-url https://localhost:8912/
 ```
 
 ## Bloom CLI Mapping
 
-Bloom DB commands are wrappers around TapDB:
+Bloom keeps only Bloom-specific DB commands:
 - `bloom db init`
-- `bloom db start`
-- `bloom db stop`
-- `bloom db status`
-- `bloom db migrate`
 - `bloom db seed`
 - `bloom db reset`
+
+Use `tapdb ...` directly for shared runtime/schema/database lifecycle. Use `daycog ...` directly for Cognito pool/app/user lifecycle.
 
 ### Assay Extraction Pipeline Reseed (Destructive)
 

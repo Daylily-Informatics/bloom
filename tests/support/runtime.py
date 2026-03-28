@@ -161,7 +161,7 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     if not tapdb_local_available(env_name=env_name):
         raise RuntimeError(
             "Local TapDB is still unavailable after `bloom db init`. "
-            "Fix the runtime and retry `source bloom_activate.sh && bloom db init`."
+            "Fix the runtime and retry `source ./activate && bloom db init`."
         )
 
     return True

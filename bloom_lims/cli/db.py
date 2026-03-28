@@ -18,11 +18,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from bloom_lims.config import (
-    apply_runtime_environment,
-    get_settings,
-    get_tapdb_db_config,
-)
+from bloom_lims.config import apply_runtime_environment, get_settings
 from bloom_lims.core.template_seed import seed_bloom_templates
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
@@ -146,56 +142,19 @@ def _tapdb_support_email(env_name: str) -> str:
     ).strip()
 
 
-def _tapdb_namespace_config_path(client_id: str, database_name: str) -> Path:
-    env = _runtime_env()
-    explicit_path = (env.get("TAPDB_CONFIG_PATH") or "").strip()
-    if explicit_path:
-        return Path(explicit_path).expanduser()
-    return (
-        Path.home()
-        / ".config"
-        / "tapdb"
-        / client_id
-        / database_name
-        / "tapdb-config.yaml"
+def _update_tapdb_namespace_config(env_name: str) -> None:
+    _run_tapdb(
+        [
+            "config",
+            "update",
+            "--env",
+            env_name,
+            "--audit-log-euid-prefix",
+            _tapdb_audit_log_euid_prefix(env_name),
+            "--support-email",
+            _tapdb_support_email(env_name),
+        ]
     )
-
-
-def _normalize_tapdb_namespace_config(
-    env_name: str, client_id: str, database_name: str
-) -> None:
-    import yaml
-
-    config_path = _tapdb_namespace_config_path(client_id, database_name)
-    if not config_path.exists():
-        return
-
-    with config_path.open(encoding="utf-8") as handle:
-        root = yaml.safe_load(handle) or {}
-    if not isinstance(root, dict):
-        return
-
-    envs = root.get("environments")
-    if not isinstance(envs, dict):
-        return
-
-    env_cfg = envs.get(env_name)
-    if not isinstance(env_cfg, dict):
-        return
-
-    updated = False
-    if not str(env_cfg.get("audit_log_euid_prefix") or "").strip():
-        env_cfg["audit_log_euid_prefix"] = _tapdb_audit_log_euid_prefix(env_name)
-        updated = True
-    if not str(env_cfg.get("support_email") or "").strip():
-        env_cfg["support_email"] = _tapdb_support_email(env_name)
-        updated = True
-    if not updated:
-        return
-
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    with config_path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(root, handle, sort_keys=False)
 
 
 def _run_tapdb(args: list[str], check: bool = True) -> int:
@@ -235,7 +194,7 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
             ]
         )
     _run_tapdb(args)
-    _normalize_tapdb_namespace_config(env_name, client_id, database_name)
+    _update_tapdb_namespace_config(env_name)
 
 
 def _seed_bloom_templates() -> None:
@@ -315,118 +274,12 @@ def db_init(
     _seed_bloom_templates()
 
 
-@db_app.command("auth-setup")
-def db_auth_setup(
-    pool_name: str = typer.Option(
-        "", "--pool-name", help="Optional Cognito pool name override"
-    ),
-    region: str = typer.Option(
-        "us-east-1", "--region", help="AWS region for Cognito setup"
-    ),
-    port: int = typer.Option(8912, "--port", help="Bloom HTTPS port"),
-    domain_prefix: str = typer.Option(
-        "",
-        "--domain-prefix",
-        help="Optional Cognito Hosted UI domain prefix override",
-    ),
-) -> None:
-    """Create/reuse Cognito app client for BLOOM with fixed app name 'bloom'."""
-    env_name = _current_env()
-    callback_url = f"https://localhost:{port}/auth/callback"
-    logout_url = f"https://localhost:{port}/"
-    args = [
-        "cognito",
-        "setup",
-        env_name,
-        "--client-name",
-        "bloom",
-        "--callback-url",
-        callback_url,
-        "--logout-url",
-        logout_url,
-        "--region",
-        region,
-    ]
-    if pool_name.strip():
-        args.extend(["--pool-name", pool_name.strip()])
-    if domain_prefix.strip():
-        args.extend(["--domain-prefix", domain_prefix.strip()])
-
-    console.print(
-        "[cyan]Configuring Cognito for BLOOM[/cyan] "
-        f"(env={env_name}, client-name=bloom, callback={callback_url})"
-    )
-    _run_tapdb(args)
-
-
-@db_app.command("start")
-def db_start() -> None:
-    """Start runtime PostgreSQL service via tapdb."""
-    env_name = _current_env()
-    if env_name in {"dev", "test"}:
-        _run_tapdb(["pg", "start-local", env_name, "--port", _local_pg_port(env_name)])
-    else:
-        _run_tapdb(["pg", "start"])
-
-
-@db_app.command("stop")
-def db_stop() -> None:
-    """Stop runtime PostgreSQL service via tapdb."""
-    env_name = _current_env()
-    if env_name in {"dev", "test"}:
-        _run_tapdb(["pg", "stop-local", env_name])
-    else:
-        _run_tapdb(["pg", "stop"])
-
-
-@db_app.command("status")
-def db_status() -> None:
-    """Show schema/database status via tapdb."""
-    env_name = _current_env()
-    _run_tapdb(["info"])
-    _run_tapdb(["db", "schema", "status", env_name])
-
-
-@db_app.command("migrate")
-def db_migrate(
-    revision: str = typer.Option(
-        "head", "--revision", help="Ignored; tapdb manages migrations"
-    ),
-) -> None:
-    """Run schema migrations via tapdb."""
-    env_name = _current_env()
-    if revision != "head":
-        console.print(
-            "[yellow]Revision argument is ignored; using tapdb managed migrations.[/yellow]"
-        )
-    _ensure_schema_available_for_bloom_root()
-    _run_tapdb(["db", "schema", "migrate", env_name])
-
-
 @db_app.command("seed")
 def db_seed() -> None:
     """Seed template data via tapdb."""
     env_name = _current_env()
     _seed_tapdb_templates(env_name, include_workflow=False, overwrite=False)
     _seed_bloom_templates()
-
-
-@db_app.command("shell")
-def db_shell() -> None:
-    """Show active DB target and open Aurora connection when applicable."""
-    env_name = _current_env()
-    cfg = get_tapdb_db_config(env_name=env_name)
-    console.print(
-        f"[bold]Active TapDB target:[/bold] {cfg['host']}:{cfg['port']}/{cfg['database']}"
-    )
-    if cfg.get("engine_type") == "aurora":
-        _run_tapdb(["aurora", "connect", env_name])
-        return
-
-    console.print(
-        "[yellow]Use `tapdb info` for current context and target details.[/yellow]"
-    )
-    _run_tapdb(["info"])
 
 
 @db_app.command("reset")

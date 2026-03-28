@@ -114,7 +114,7 @@ git clone git@github.com:Daylily-Informatics/bloom.git
 cd bloom
 
 # Activate environment (creates the BLOOM conda env on first run)
-source bloom_activate.sh
+source ./activate
 
 # Initialize and seed the database
 bloom db init
@@ -142,7 +142,7 @@ Bloom is a FastAPI application with both API and server-rendered GUI surfaces.
 Primary entrypoints:
 - App entrypoint: `main.py` (run via `uvicorn main:app`)
 - App factory: `bloom_lims.app:create_app`
-- CLI entrypoint: `bloom` (after `source bloom_activate.sh`)
+- CLI entrypoint: `bloom` (after `source ./activate`)
 
 Primary CLI groups:
 
@@ -314,7 +314,7 @@ MIT
 # Testing
 
 ```bash
-source bloom_activate.sh
+source ./activate
 bloom db init
 pytest
 ```
@@ -338,7 +338,7 @@ ruff check bloom_lims tests
 
 # Dev Tools
 
-All commands assume `source bloom_activate.sh` has been run.
+All commands assume `source ./activate` has been run.
 
 ## Reset and Rebuild the Database (⚠️ destroys all data)
 
