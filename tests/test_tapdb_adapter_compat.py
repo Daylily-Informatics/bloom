@@ -73,7 +73,9 @@ def fake_tapdb(monkeypatch: pytest.MonkeyPatch) -> _FakeTapdbConnection:
         },
     )
     monkeypatch.setattr(tapdb_adapter, "TAPDBConnection", _factory)
-    monkeypatch.setattr(tapdb_adapter, "maybe_install_engine_metrics", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        tapdb_adapter, "maybe_install_engine_metrics", lambda *_args, **_kwargs: None
+    )
     return holder
 
 
@@ -83,9 +85,7 @@ def test_bloomdb3_bootstraps_sessions_via_tapdb_connection(fake_tapdb):
 
     assert conn.get_session_calls == 1
     assert db.session is conn.sessions[0]
-    assert conn.sessions[0].executed[-1][1] == {
-        "username": "pytest@example.com"
-    }
+    assert conn.sessions[0].executed[-1][1] == {"username": "pytest@example.com"}
 
     db.close()
 

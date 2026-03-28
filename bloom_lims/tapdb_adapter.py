@@ -220,7 +220,9 @@ class BLOOMdb3:
             pass
 
         # Legacy arguments remain accepted; TapDB config is authoritative.
-        if any([db_url_prefix != "postgresql://", db_hostname, db_pass, db_user, db_name]):
+        if any(
+            [db_url_prefix != "postgresql://", db_hostname, db_pass, db_user, db_name]
+        ):
             self.logger.warning(
                 "Legacy BLOOMdb3 connection arguments are deprecated and ignored; "
                 "TapDB runtime config is authoritative."
@@ -327,7 +329,9 @@ class BLOOMdb3:
         setattr(self.Base.classes, "file_set_instance", file_instance)
         setattr(self.Base.classes, "file_reference_instance", file_instance)
         setattr(self.Base.classes, "file_set_instance_lineage", file_instance_lineage)
-        setattr(self.Base.classes, "file_reference_instance_lineage", file_instance_lineage)
+        setattr(
+            self.Base.classes, "file_reference_instance_lineage", file_instance_lineage
+        )
 
     def __enter__(self) -> "BLOOMdb3":
         return self
