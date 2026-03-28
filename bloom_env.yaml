@@ -43,7 +43,7 @@ dependencies:
     - daylily-tapdb==3.0.2
     # Optional local editable override for development:
     # - -e ../../daylily/daylily-tapdb
-    - daylily-cognito==0.1.26
+    - daylily-cognito==0.1.28
     # Optional local override for development:
     # - -e ../daylily-cognito
     - zebra_day==2.1.4
