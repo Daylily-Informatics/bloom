@@ -16,15 +16,16 @@ Fixtures:
     - clean_test_data: Cleanup fixture for test data
 """
 
-import os
-import secrets
-import tempfile
-from pathlib import Path
+import logging
+from unittest.mock import MagicMock, patch
 
 import pytest
-import logging
-from typing import Generator, Optional
-from unittest.mock import MagicMock, patch
+
+from tests.support.runtime import (
+    ensure_local_tapdb_ready,
+    ensure_test_runtime_environment,
+    selected_items_need_local_tapdb,
+)
 
 # Configure test logging
 logging.basicConfig(level=logging.WARNING)
@@ -34,90 +35,48 @@ logger = logging.getLogger(__name__)
 # Environment setup for tests
 def pytest_configure(config):
     """Configure pytest environment."""
-    # Enforce TapDB strict namespace mode for tests (v2 config).
-    os.environ.setdefault("TAPDB_CLIENT_ID", "bloom")
-    os.environ.setdefault("TAPDB_DATABASE_NAME", "bloom")
-    os.environ.setdefault("TAPDB_STRICT_NAMESPACE", "1")
+    ensure_test_runtime_environment()
+    config._bloom_needs_local_tapdb = False
 
-    # Provide a deterministic v2 namespaced TapDB config for CI/local runs
-    # so tests do not depend on developer home config.
-    if not (os.environ.get("TAPDB_CONFIG_PATH") or "").strip():
-        local_port = str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566").strip()
-        user = str(os.environ.get("USER") or "postgres").strip()
-        tmp_path = Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
-        tmp_path.write_text(
-            "\n".join(
-                [
-                    "meta:",
-                    "  config_version: 2",
-                    "  client_id: bloom",
-                    "  database_name: bloom",
-                    "environments:",
-                    "  dev:",
-                    "    engine_type: local",
-                    "    host: localhost",
-                    f"    port: \"{local_port}\"",
-                    "    ui_port: \"8912\"",
-                    f"    user: \"{user}\"",
-                    "    password: \"\"",
-                    "    database: \"tapdb_bloom_dev\"",
-                    "    cognito_user_pool_id: \"\"",
-                    "    audit_log_euid_prefix: \"TAG\"",
-                    "    support_email: \"support@dyly.bio\"",
-                    "  test:",
-                    "    engine_type: local",
-                    "    host: localhost",
-                    f"    port: \"{local_port}\"",
-                    "    ui_port: \"8912\"",
-                    f"    user: \"{user}\"",
-                    "    password: \"\"",
-                    "    database: \"tapdb_bloom_test\"",
-                    "    cognito_user_pool_id: \"\"",
-                    "    audit_log_euid_prefix: \"TAG\"",
-                    "    support_email: \"support@dyly.bio\"",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
+
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_db_backed_integration_runtime(pytestconfig):
+    """Provision local TapDB for DB-backed integration suites when needed."""
+    if not getattr(pytestconfig, "_bloom_needs_local_tapdb", False):
+        yield
+        return
+
+    try:
+        ensure_local_tapdb_ready()
+    except Exception as exc:
+        pytest.exit(
+            "BLOOM integration test bootstrap failed. "
+            f"{exc} "
+            "Retry after `source bloom_activate.sh && bloom db init`.",
+            returncode=2,
         )
-        os.chmod(tmp_path, 0o600)
-        os.environ["TAPDB_CONFIG_PATH"] = str(tmp_path)
 
-    # Set test database port if not already set
-    if "PGPORT" not in os.environ:
-        try:
-            from bloom_lims.config import get_tapdb_db_config
-
-            os.environ["PGPORT"] = str(get_tapdb_db_config().get("port") or "5566")
-        except Exception:
-            os.environ["PGPORT"] = "5566"
-
-    # Disable SQL echo during tests unless explicitly enabled
-    if "ECHO_SQL" not in os.environ:
-        os.environ["ECHO_SQL"] = "False"
-
-    # Disable rate limiting during tests to prevent 429 errors
-    os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
+    yield
 
 
 @pytest.fixture(scope="session")
 def bdb():
     """
     Session-scoped database connection fixture.
-    
+
     Creates a single database connection for all tests in the session.
     The connection is automatically closed after all tests complete.
-    
+
     Yields:
         BLOOMdb3: Database connection instance
     """
     from bloom_lims.db import BLOOMdb3
-    
+
     logger.info("Creating test database connection")
     db = BLOOMdb3()
-    
+
     yield db
-    
+
     logger.info("Closing test database connection")
     db.close()
 
@@ -126,15 +85,15 @@ def bdb():
 def bdb_function():
     """
     Function-scoped database connection fixture.
-    
+
     Creates a new database connection for each test function.
     Use this when tests need isolated database state.
-    
+
     Yields:
         BLOOMdb3: Database connection instance
     """
     from bloom_lims.db import BLOOMdb3
-    
+
     db = BLOOMdb3()
     yield db
     db.close()
@@ -144,17 +103,17 @@ def bdb_function():
 def bloom_obj(bdb):
     """
     BloomObj instance fixture.
-    
+
     Creates a BloomObj instance using the session-scoped database connection.
-    
+
     Args:
         bdb: Database connection fixture
-        
+
     Yields:
         BloomObj: BloomObj instance
     """
     from bloom_lims.bobjs import BloomObj
-    
+
     return BloomObj(bdb)
 
 
@@ -183,13 +142,13 @@ def bloom_content(bdb):
 def test_template(bdb, bloom_obj):
     """
     Get a test template for creating instances.
-    
+
     Returns the first available generic_template.
-    
+
     Args:
         bdb: Database connection fixture
         bloom_obj: BloomObj fixture
-        
+
     Returns:
         Template object or None if no templates exist
     """
@@ -201,9 +160,9 @@ def test_template(bdb, bloom_obj):
 def mock_session():
     """
     Mock SQLAlchemy session for unit tests.
-    
+
     Use this when you want to test without database access.
-    
+
     Returns:
         MagicMock: Mocked session object
     """
@@ -217,11 +176,11 @@ def mock_session():
 def clean_cache():
     """
     Clear the global cache before and after test.
-    
+
     Use this when testing cache behavior.
     """
     from bloom_lims.core.cache import cache_clear
-    
+
     cache_clear()
     yield
     cache_clear()
@@ -238,8 +197,8 @@ def api_client():
     Yields:
         TestClient: FastAPI test client
     """
-    from fastapi.testclient import TestClient
     from bloom_lims.main import app
+    from fastapi.testclient import TestClient
 
     return TestClient(app)
 
@@ -287,6 +246,7 @@ def mock_api_auth():
 # Test markers
 def pytest_collection_modifyitems(config, items):
     """Add markers to tests based on their location."""
+    config._bloom_needs_local_tapdb = selected_items_need_local_tapdb(items)
     for item in items:
         # Mark integration tests
         if "integration" in str(item.fspath):

@@ -1,4 +1,4 @@
-"""Information and diagnostic commands for BLOOM CLI."""
+"""Extra config subcommands for the Bloom CLI."""
 
 from __future__ import annotations
 
@@ -6,32 +6,31 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import click
 from rich.console import Console
 from rich.table import Table
+
+if TYPE_CHECKING:
+    from cli_core_yo.registry import CommandRegistry
+    from cli_core_yo.spec import CliSpec
 
 from bloom_lims.config import (
     apply_runtime_environment,
     assert_tapdb_version,
     get_settings,
-    get_tapdb_db_config,
+    get_template_config_path,
+    get_user_config_path,
+    validate_settings,
 )
+from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain.base import BloomObj
 
 console = Console()
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _get_version() -> str:
-    try:
-        from bloom_lims._version import get_version
-
-        return get_version()
-    except ImportError:
-        return "dev"
-
-
-def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess:
+def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
     env = apply_runtime_environment(get_settings())
     runtime = os.environ.copy()
     runtime.setdefault("TAPDB_ENV", env.env)
@@ -42,65 +41,88 @@ def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess:
     runtime.setdefault("AWS_REGION", env.aws_region)
     runtime.setdefault("AWS_DEFAULT_REGION", env.aws_region)
     return subprocess.run(
-        [sys.executable, "-m", "daylily_tapdb.cli"] + args,
+        [sys.executable, "-m", "daylily_tapdb.cli", *args],
         env=runtime,
         capture_output=True,
         text=True,
     )
 
 
-@click.command()
-def version():
-    """Show BLOOM version."""
-    console.print(f"bloom [cyan]{_get_version()}[/cyan]")
+def _shell() -> None:
+    """Open interactive Python shell with BLOOM loaded."""
+    console.print("[cyan]Starting BLOOM interactive shell...[/cyan]")
+    try:
+        import IPython
+
+        bdb = BLOOMdb3()
+        bobj = BloomObj(bdb)
+        settings = get_settings()
+        IPython.start_ipython(
+            argv=[],
+            user_ns={
+                "BLOOMdb3": BLOOMdb3,
+                "BloomObj": BloomObj,
+                "bdb": bdb,
+                "bobj": bobj,
+                "settings": settings,
+            },
+        )
+    except ImportError:
+        import code
+
+        bdb = BLOOMdb3()
+        bobj = BloomObj(bdb)
+        settings = get_settings()
+        code.interact(
+            local={
+                "BLOOMdb3": BLOOMdb3,
+                "BloomObj": BloomObj,
+                "bdb": bdb,
+                "bobj": bobj,
+                "settings": settings,
+            }
+        )
 
 
-@click.command()
-def info():
-    """Show BLOOM configuration and runtime info."""
+def _status() -> None:
+    """Show environment and configuration information."""
     settings = get_settings()
-    ctx = apply_runtime_environment(settings)
-    db_cfg = get_tapdb_db_config()
+    config_file = get_user_config_path()
+    template_file = get_template_config_path()
 
-    table = Table(title="BLOOM LIMS Info")
-    table.add_column("Property", style="cyan")
+    console.print()
+    console.print("[bold blue]Configuration Sources[/bold blue]")
+    if config_file.exists():
+        console.print(f"  [green]●[/green] User config: {config_file}")
+    else:
+        console.print(f"  [dim]○[/dim] User config: {config_file} (not found)")
+    console.print(f"  [green]●[/green] Template: {template_file}")
+    console.print()
+
+    table = Table(title="Effective Configuration")
+    table.add_column("Setting", style="cyan")
     table.add_column("Value")
 
-    table.add_row("Version", _get_version())
-    table.add_row("Python", sys.version.split()[0])
-    table.add_row("Project Root", str(PROJECT_ROOT))
-    table.add_row("Environment", settings.environment)
-    table.add_row("TapDB Env", ctx.env)
-    table.add_row("TapDB Namespace", ctx.database_name)
-    table.add_row("TapDB Target", f"{db_cfg['host']}:{db_cfg['port']}/{db_cfg['database']}")
-    table.add_row("AWS Profile", os.environ.get("AWS_PROFILE", ctx.aws_profile))
-    table.add_row("AWS Region", os.environ.get("AWS_REGION", ctx.aws_region))
+    rows = [
+        ("environment", settings.environment),
+        ("tapdb.env", settings.tapdb.env),
+        ("tapdb.database_name", settings.tapdb.database_name),
+        ("aws.profile", settings.aws.profile),
+        ("aws.region", settings.aws.region),
+        ("auth.cognito_user_pool_id", settings.auth.cognito_user_pool_id or "[dim]not set[/dim]"),
+        ("auth.cognito_client_id", settings.auth.cognito_client_id or "[dim]not set[/dim]"),
+        ("auth.cognito_domain", settings.auth.cognito_domain or "[dim]not set[/dim]"),
+        ("atlas.base_url", settings.atlas.base_url or "[dim]not set[/dim]"),
+        ("dewey.enabled", str(settings.dewey.enabled)),
+    ]
 
-    try:
-        table.add_row("daylily-tapdb", assert_tapdb_version())
-    except Exception as exc:
-        table.add_row("daylily-tapdb", f"[red]invalid[/red] ({exc})")
-
-    conda_env = os.environ.get("CONDA_DEFAULT_ENV", "[dim]not set[/dim]")
-    table.add_row("Conda Env", conda_env)
+    for key, value in rows:
+        table.add_row(key, value)
 
     console.print(table)
 
 
-@click.command()
-def status():
-    """Check DB/runtime status via tapdb."""
-    result = _tapdb_cmd(["db", "schema", "status", apply_runtime_environment(get_settings()).env])
-    if result.returncode == 0:
-        console.print(result.stdout.strip())
-    else:
-        console.print(result.stdout.strip())
-        console.print(result.stderr.strip())
-        raise SystemExit(result.returncode)
-
-
-@click.command()
-def doctor():
+def _doctor() -> None:
     """Verify environment, dependencies, and configuration."""
     console.print("[bold]BLOOM Doctor - Environment Check[/bold]")
     console.print()
@@ -147,10 +169,7 @@ def doctor():
         if result.stderr:
             warnings.append(result.stderr.strip())
 
-    from bloom_lims.config import validate_settings
-
-    for warning in validate_settings():
-        warnings.append(f"Config: {warning}")
+    warnings.extend(f"Config: {warning}" for warning in validate_settings())
 
     console.print()
     if issues:
@@ -166,3 +185,10 @@ def doctor():
 
     if issues:
         raise SystemExit(1)
+
+
+def register(registry: CommandRegistry, spec: CliSpec) -> None:
+    """cli-core-yo plugin: register extra config subcommands."""
+    registry.add_command("config", "shell", _shell, "Open interactive Python shell with BLOOM loaded")
+    registry.add_command("config", "doctor", _doctor, "Verify environment, dependencies, and configuration")
+    registry.add_command("config", "status", _status, "Show environment and configuration status")

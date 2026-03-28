@@ -305,6 +305,62 @@ class BloomObj:
                 pass
             return None
 
+    def _do_action_base(
+        self,
+        euid,
+        action,
+        action_group,
+        action_ds,
+        now_dt=None,
+    ):
+        """Update generic action bookkeeping and record the acting user lineage."""
+        resolved_now_dt = now_dt or get_datetime_string()
+        self.logger.debug(
+            "Completing Action: %s for %s at %s with %s",
+            action,
+            euid,
+            resolved_now_dt,
+            action_ds,
+        )
+        bobj = self.get_by_euid(euid)
+        if "action_groups" not in bobj.json_addl:
+            return bobj
+
+        action_state = bobj.json_addl["action_groups"][action_group]["actions"][action]
+        curr_action_count = int(action_state["action_executed"])
+        new_action_count = curr_action_count + 1
+
+        max_action_count = int(action_state["max_executions"])
+        if max_action_count > 0 and new_action_count >= max_action_count:
+            action_state["action_enabled"] = "0"
+        action_state["action_executed"] = f"{new_action_count}"
+
+        for deactivate_action in action_ds.get("deactivate_actions_when_executed", []):
+            try:
+                bobj.json_addl["action_groups"][action_group]["actions"][deactivate_action][
+                    "action_enabled"
+                ] = "0"
+            except Exception:
+                self.logger.debug(
+                    "Failed to deactivate %s for %s at %s with %s",
+                    deactivate_action,
+                    euid,
+                    resolved_now_dt,
+                    action_ds,
+                )
+
+        action_state["executed_datetime"].append(resolved_now_dt)
+        action_state["action_user"].append(action_ds.get("curr_user", "bloomdborm"))
+
+        flag_modified(bobj, "json_addl")
+        self.session.commit()
+        self.track_user_interaction(
+            euid,
+            relationship_type=f"user_action:{action}",
+            action_ds=action_ds,
+        )
+        return bobj
+
     def _fetch_fedex_tracking_ops_meta(self, tracking_number):
         """Fetch FedEx metadata across carrier-tracking API versions."""
         if not self.track_fedex:

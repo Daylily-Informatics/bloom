@@ -7,7 +7,6 @@ routes that are otherwise easy to miss (because 422s don't exercise code).
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -39,7 +38,7 @@ def _warm_session(client: TestClient) -> None:
 
 def _get_any_template_euid(bdb) -> str:
     GT = bdb.Base.classes.generic_template
-    row = bdb.session.query(GT).filter(GT.is_deleted == False).first()
+    row = bdb.session.query(GT).filter(GT.is_deleted.is_(False)).first()
     assert row is not None
     return row.euid
 
@@ -185,14 +184,15 @@ def test_user_audit_logs_renders(client: TestClient) -> None:
     assert "text/html" in resp.headers.get("content-type", "")
 
 
-def test_create_instance_form_renders(client: TestClient, bdb) -> None:
+def test_create_from_template_executes_handler(client: TestClient, bdb) -> None:
     _warm_session(client)
     template_euid = _get_any_template_euid(bdb)
-    resp = client.get(f"/create_instance/{template_euid}")
-    assert resp.status_code == 410
+    resp = client.get("/create_from_template", params={"euid": template_euid}, follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"].startswith("/euid_details?euid=")
 
 
-def test_file_set_urls_and_admin_template_pages(client: TestClient, bdb) -> None:
+def test_file_set_urls_and_admin_template_routes_are_removed(client: TestClient, bdb) -> None:
     _warm_session(client)
     # Legacy file set GUI routes are removed in Dewey hard-cut mode.
     resp = client.get("/file_set_urls", params={"fs_euid": "FS-NOT-REAL"})
@@ -201,16 +201,20 @@ def test_file_set_urls_and_admin_template_pages(client: TestClient, bdb) -> None
     template_euid = _get_any_template_euid(bdb)
     # Admin template editor was retired.
     resp = client.get("/admin_template", params={"euid": template_euid})
-    assert resp.status_code == 410
+    assert resp.status_code == 404
 
 
-def test_query_by_euids_create_and_download_file_flows(client: TestClient) -> None:
+def test_query_by_euids_and_removed_file_flows(client: TestClient) -> None:
     _warm_session(client)
-    # Legacy file GUI handlers are removed in Dewey hard-cut mode.
+    # The query route is still live; posting bad input should execute the handler
+    # and surface its rendered error page rather than a validation-only 422.
     resp = client.post("/query_by_euids", data={"file_euids": "FX-1"})
-    assert resp.status_code == 200
+    assert resp.status_code == 500
     assert "text/html" in resp.headers.get("content-type", "")
+    assert "Error:" in resp.text
+    assert "FX-1" in resp.text
 
+    # Legacy file GUI handlers are removed in Dewey hard-cut mode.
     resp = client.post(
         "/create_file",
         data={"name": "upload-1"},

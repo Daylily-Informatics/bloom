@@ -175,6 +175,10 @@ jobs:
         run: |
           pytest --no-cov \
             tests/test_config_runtime.py \
+            tests/test_route_coverage_gaps_api.py \
+            tests/test_route_coverage_gaps_gui.py \
+            tests/test_api_v1.py \
+            tests/test_gui_endpoints.py \
             tests/test_api_atlas_bridge.py \
             tests/test_atlas_lookup_resilience.py \
             tests/test_queue_flow.py \

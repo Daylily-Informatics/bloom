@@ -1,17 +1,33 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 from types import SimpleNamespace
 
-from click.testing import CliRunner
+import pytest
+from typer.testing import CliRunner
 
-from bloom_lims.cli import cli
+from bloom_lims.cli import build_app
 
 users_cli = importlib.import_module("bloom_lims.cli.users")
 
 
-def test_issue_token_emits_plaintext_token(monkeypatch) -> None:
-    runner = CliRunner()
+@pytest.fixture
+def runner() -> CliRunner:
+    return CliRunner()
+
+
+@pytest.fixture
+def cli_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    return build_app()
+
+
+def test_issue_token_emits_plaintext_token(
+    runner: CliRunner,
+    cli_app,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     committed: list[str] = []
     closed: list[str] = []
 
@@ -49,7 +65,7 @@ def test_issue_token_emits_plaintext_token(monkeypatch) -> None:
     monkeypatch.setattr(users_cli, "UserAPITokenService", FakeTokenService)
 
     result = runner.invoke(
-        cli,
+        cli_app,
         [
             "users",
             "issue-token",
@@ -69,9 +85,11 @@ def test_issue_token_emits_plaintext_token(monkeypatch) -> None:
     assert closed == ["close"]
 
 
-def test_issue_token_errors_for_unknown_user(monkeypatch) -> None:
-    runner = CliRunner()
-
+def test_issue_token_errors_for_unknown_user(
+    runner: CliRunner,
+    cli_app,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeDB:
         def __init__(self, *args, **kwargs):
             self.session = SimpleNamespace(commit=lambda: None, rollback=lambda: None)
@@ -87,7 +105,7 @@ def test_issue_token_errors_for_unknown_user(monkeypatch) -> None:
     )
 
     result = runner.invoke(
-        cli,
+        cli_app,
         [
             "users",
             "issue-token",

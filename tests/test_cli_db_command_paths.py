@@ -7,9 +7,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from click.testing import CliRunner
+from typer.testing import CliRunner
 
-from bloom_lims.cli import cli as root_cli
+from bloom_lims.cli import build_app
 
 db_commands = importlib.import_module("bloom_lims.cli.db")
 
@@ -17,6 +17,12 @@ db_commands = importlib.import_module("bloom_lims.cli.db")
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
+
+
+@pytest.fixture
+def cli_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    return build_app()
 
 
 def test_tapdb_namespace_config_path_prefers_explicit_env(
@@ -68,6 +74,7 @@ def test_run_tapdb_returns_nonzero_when_check_false(monkeypatch: pytest.MonkeyPa
 
 def test_db_auth_setup_includes_optional_arguments(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
@@ -79,7 +86,7 @@ def test_db_auth_setup_includes_optional_arguments(
     )
 
     result = runner.invoke(
-        root_cli,
+        cli_app,
         [
             "db",
             "auth-setup",
@@ -118,6 +125,7 @@ def test_db_auth_setup_includes_optional_arguments(
 
 def test_db_start_uses_local_pg_for_dev(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
@@ -125,39 +133,42 @@ def test_db_start_uses_local_pg_for_dev(
     monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "7000")
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
-    result = runner.invoke(root_cli, ["db", "start"])
+    result = runner.invoke(cli_app, ["db", "start"])
     assert result.exit_code == 0
     assert calls == [["pg", "start-local", "dev", "--port", "7000"]]
 
 
 def test_db_start_uses_default_pg_for_non_local_env(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr(db_commands, "_current_env", lambda: "prod")
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
-    result = runner.invoke(root_cli, ["db", "start"])
+    result = runner.invoke(cli_app, ["db", "start"])
     assert result.exit_code == 0
     assert calls == [["pg", "start"]]
 
 
 def test_db_status_runs_info_and_schema_status(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr(db_commands, "_current_env", lambda: "test")
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
-    result = runner.invoke(root_cli, ["db", "status"])
+    result = runner.invoke(cli_app, ["db", "status"])
     assert result.exit_code == 0
     assert calls == [["info"], ["db", "schema", "status", "test"]]
 
 
 def test_db_migrate_ignores_non_head_revision(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
@@ -165,7 +176,7 @@ def test_db_migrate_ignores_non_head_revision(
     monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
-    result = runner.invoke(root_cli, ["db", "migrate", "--revision", "abc123"])
+    result = runner.invoke(cli_app, ["db", "migrate", "--revision", "abc123"])
     assert result.exit_code == 0
     assert "ignored" in result.output.lower()
     assert calls == [["db", "schema", "migrate", "dev"]]
@@ -173,6 +184,7 @@ def test_db_migrate_ignores_non_head_revision(
 
 def test_db_seed_calls_tapdb_and_bloom_seeders(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tapdb_seed: list[tuple[str, bool, bool]] = []
@@ -191,7 +203,7 @@ def test_db_seed_calls_tapdb_and_bloom_seeders(
         lambda: bloom_seed_called.__setitem__("value", True),
     )
 
-    result = runner.invoke(root_cli, ["db", "seed"])
+    result = runner.invoke(cli_app, ["db", "seed"])
     assert result.exit_code == 0
     assert tapdb_seed == [("dev", False, False)]
     assert bloom_seed_called["value"] is True
@@ -199,6 +211,7 @@ def test_db_seed_calls_tapdb_and_bloom_seeders(
 
 def test_db_shell_aurora_connects_via_tapdb(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
@@ -215,13 +228,14 @@ def test_db_shell_aurora_connects_via_tapdb(
     )
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
-    result = runner.invoke(root_cli, ["db", "shell"])
+    result = runner.invoke(cli_app, ["db", "shell"])
     assert result.exit_code == 0
     assert calls == [["aurora", "connect", "dev"]]
 
 
 def test_db_shell_non_aurora_shows_info(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
@@ -238,30 +252,32 @@ def test_db_shell_non_aurora_shows_info(
     )
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
-    result = runner.invoke(root_cli, ["db", "shell"])
+    result = runner.invoke(cli_app, ["db", "shell"])
     assert result.exit_code == 0
     assert calls == [["info"]]
 
 
 def test_db_reset_aborts_when_confirmation_declined(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
-    monkeypatch.setattr(db_commands.click, "confirm", lambda _prompt: False)
+    monkeypatch.setattr(db_commands.typer, "confirm", lambda _prompt: False)
     monkeypatch.setattr(
         db_commands,
         "_run_tapdb",
         lambda _args: (_ for _ in ()).throw(AssertionError("should not run")),
     )
 
-    result = runner.invoke(root_cli, ["db", "reset"])
+    result = runner.invoke(cli_app, ["db", "reset"])
     assert result.exit_code == 0
     assert "Aborted" in result.output
 
 
 def test_db_reset_yes_runs_force_reset_and_seed(
     runner: CliRunner,
+    cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tapdb_calls: list[list[str]] = []
@@ -284,7 +300,7 @@ def test_db_reset_yes_runs_force_reset_and_seed(
         lambda: bloom_seed.__setitem__("value", True),
     )
 
-    result = runner.invoke(root_cli, ["db", "reset", "--yes"])
+    result = runner.invoke(cli_app, ["db", "reset", "--yes"])
     assert result.exit_code == 0
     assert tapdb_calls == [
         ["db", "schema", "reset", "dev", "--force"],

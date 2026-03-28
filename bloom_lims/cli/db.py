@@ -2,24 +2,30 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cli_core_yo.registry import CommandRegistry
+    from cli_core_yo.spec import CliSpec
+
 import importlib
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
 
-import click
+import typer
 from rich.console import Console
 
-from bloom_lims.core.template_seed import seed_bloom_templates
 from bloom_lims.config import (
     apply_runtime_environment,
     get_settings,
     get_tapdb_db_config,
 )
+from bloom_lims.core.template_seed import seed_bloom_templates
 
+db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
 _DEFAULT_AUDIT_LOG_EUID_PREFIX = "TAG"
@@ -31,12 +37,11 @@ def _bloom_root() -> Path:
 
 def _resolve_tapdb_schema_source() -> Path | None:
     """Locate tapdb_schema.sql from installed package or local dev checkouts."""
-    candidates: List[Path] = []
+    candidates: list[Path] = []
 
     try:
         tapdb_pkg = importlib.import_module("daylily_tapdb")
         pkg_file = Path(tapdb_pkg.__file__).resolve()
-        # Handle editable/dev installs and wheel installs.
         candidates.extend(
             [
                 pkg_file.parents[1] / "schema" / "tapdb_schema.sql",
@@ -82,12 +87,12 @@ def _ensure_schema_available_for_bloom_root() -> None:
         shutil.copy2(source, target)
 
 
-def _tapdb_base_cmd() -> List[str]:
+def _tapdb_base_cmd() -> list[str]:
     """Run tapdb via module entrypoint to avoid PATH dependency issues."""
     return [sys.executable, "-m", "daylily_tapdb.cli"]
 
 
-def _runtime_env() -> dict:
+def _runtime_env() -> dict[str, str]:
     """Build normalized runtime env for tapdb commands."""
     settings = get_settings()
     ctx = apply_runtime_environment(settings)
@@ -110,11 +115,7 @@ def _current_env() -> str:
 def _local_pg_port(env_name: str) -> str:
     env = _runtime_env()
     scoped_key = f"TAPDB_{env_name.upper()}_PORT"
-    return (
-        env.get(scoped_key)
-        or env.get("BLOOM_TAPDB_LOCAL_PG_PORT")
-        or "5566"
-    ).strip()
+    return (env.get(scoped_key) or env.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566").strip()
 
 
 def _local_ui_port(env_name: str) -> str:
@@ -186,7 +187,7 @@ def _normalize_tapdb_namespace_config(env_name: str, client_id: str, database_na
         yaml.safe_dump(root, handle, sort_keys=False)
 
 
-def _run_tapdb(args: List[str], check: bool = True) -> int:
+def _run_tapdb(args: list[str], check: bool = True) -> int:
     cmd = _tapdb_base_cmd() + args
     env = _runtime_env()
     result = subprocess.run(cmd, env=env)
@@ -249,26 +250,19 @@ def _seed_tapdb_templates(
     args = ["db", "data", "seed", env_name]
     if tapdb_config_dir:
         args.extend(["--config", tapdb_config_dir])
-        console.print(
-            f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}"
-        )
+        console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
     else:
-        console.print(
-            "[cyan]TapDB template seed:[/cyan] using built-in TapDB core config"
-        )
+        console.print("[cyan]TapDB template seed:[/cyan] using built-in TapDB core config")
+    if include_workflow:
+        console.print("[yellow]Workflow overlay seeding is not supported in Bloom.[/yellow]")
     args.append("--overwrite" if overwrite else "--skip-existing")
     _run_tapdb(args)
 
 
-@click.group()
-def db():
-    """Database management commands routed through daylily-tapdb."""
-    pass
-
-
-@db.command("init")
-@click.option("--force", "-f", is_flag=True, help="Force re-initialization")
-def db_init(force: bool):
+@db_app.command("init")
+def db_init(
+    force: bool = typer.Option(False, "--force", "-f", help="Force re-initialization"),
+) -> None:
     """Initialize database/runtime via tapdb orchestration."""
     env_name = _current_env()
     console.print(f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]")
@@ -304,16 +298,17 @@ def db_init(force: bool):
     _seed_bloom_templates()
 
 
-@db.command("auth-setup")
-@click.option("--pool-name", default="", help="Optional Cognito pool name override")
-@click.option("--region", default="us-east-1", help="AWS region for Cognito setup")
-@click.option("--port", type=int, default=8912, show_default=True, help="Bloom HTTPS port")
-@click.option(
-    "--domain-prefix",
-    default="",
-    help="Optional Cognito Hosted UI domain prefix override",
-)
-def db_auth_setup(pool_name: str, region: str, port: int, domain_prefix: str):
+@db_app.command("auth-setup")
+def db_auth_setup(
+    pool_name: str = typer.Option("", "--pool-name", help="Optional Cognito pool name override"),
+    region: str = typer.Option("us-east-1", "--region", help="AWS region for Cognito setup"),
+    port: int = typer.Option(8912, "--port", help="Bloom HTTPS port"),
+    domain_prefix: str = typer.Option(
+        "",
+        "--domain-prefix",
+        help="Optional Cognito Hosted UI domain prefix override",
+    ),
+) -> None:
     """Create/reuse Cognito app client for BLOOM with fixed app name 'bloom'."""
     env_name = _current_env()
     callback_url = f"https://localhost:{port}/auth/callback"
@@ -343,8 +338,8 @@ def db_auth_setup(pool_name: str, region: str, port: int, domain_prefix: str):
     _run_tapdb(args)
 
 
-@db.command("start")
-def db_start():
+@db_app.command("start")
+def db_start() -> None:
     """Start runtime PostgreSQL service via tapdb."""
     env_name = _current_env()
     if env_name in {"dev", "test"}:
@@ -353,8 +348,8 @@ def db_start():
         _run_tapdb(["pg", "start"])
 
 
-@db.command("stop")
-def db_stop():
+@db_app.command("stop")
+def db_stop() -> None:
     """Stop runtime PostgreSQL service via tapdb."""
     env_name = _current_env()
     if env_name in {"dev", "test"}:
@@ -363,17 +358,18 @@ def db_stop():
         _run_tapdb(["pg", "stop"])
 
 
-@db.command("status")
-def db_status():
+@db_app.command("status")
+def db_status() -> None:
     """Show schema/database status via tapdb."""
     env_name = _current_env()
     _run_tapdb(["info"])
     _run_tapdb(["db", "schema", "status", env_name])
 
 
-@db.command("migrate")
-@click.option("--revision", default="head", help="Ignored; tapdb manages migration targets")
-def db_migrate(revision: str):
+@db_app.command("migrate")
+def db_migrate(
+    revision: str = typer.Option("head", "--revision", help="Ignored; tapdb manages migrations"),
+) -> None:
     """Run schema migrations via tapdb."""
     env_name = _current_env()
     if revision != "head":
@@ -382,16 +378,16 @@ def db_migrate(revision: str):
     _run_tapdb(["db", "schema", "migrate", env_name])
 
 
-@db.command("seed")
-def db_seed():
+@db_app.command("seed")
+def db_seed() -> None:
     """Seed template data via tapdb."""
     env_name = _current_env()
     _seed_tapdb_templates(env_name, include_workflow=False, overwrite=False)
     _seed_bloom_templates()
 
 
-@db.command("shell")
-def db_shell():
+@db_app.command("shell")
+def db_shell() -> None:
     """Show active DB target and open Aurora connection when applicable."""
     env_name = _current_env()
     cfg = get_tapdb_db_config(env_name=env_name)
@@ -404,22 +400,26 @@ def db_shell():
     _run_tapdb(["info"])
 
 
-@db.command("reset")
-@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
-def db_reset(yes: bool):
-    """Reset schema/data and rebuild via tapdb (DESTRUCTIVE)."""
+@db_app.command("reset")
+def db_reset(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+) -> None:
+    """Reset schema/data and rebuild via tapdb (destructive)."""
     env_name = _current_env()
 
     if not yes:
-        console.print("[yellow]⚠️  WARNING: This will DROP ALL DATA and rebuild the schema.[/yellow]")
-        if not click.confirm("Are you sure you want to continue?"):
+        console.print("[yellow]WARNING: This will drop all data and rebuild the schema.[/yellow]")
+        if not typer.confirm("Are you sure you want to continue?"):
             console.print("[dim]Aborted.[/dim]")
             return
 
-    args = ["db", "schema", "reset", env_name, "--force"]
     _ensure_schema_available_for_bloom_root()
-    _run_tapdb(args)
-    setup_args = ["db", "setup", env_name, "--force"]
-    _run_tapdb(setup_args)
+    _run_tapdb(["db", "schema", "reset", env_name, "--force"])
+    _run_tapdb(["db", "setup", env_name, "--force"])
     _seed_tapdb_templates(env_name, include_workflow=False, overwrite=True)
     _seed_bloom_templates()
+
+
+def register(registry: CommandRegistry, spec: CliSpec) -> None:
+    """cli-core-yo plugin: register the db command group."""
+    registry.add_typer_app(None, db_app, "db", "Database management commands.")

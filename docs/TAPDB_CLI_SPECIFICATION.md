@@ -84,7 +84,7 @@ For assay extraction queue/action rollouts (HLA 1.2 + Carrier 3.9), use:
 ```bash
 bloom db reset -y
 bloom db seed
-bloom gui
+bloom server start
 ```
 
 Then verify newly seeded assay workflows include queue steps:

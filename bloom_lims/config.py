@@ -12,12 +12,17 @@ import logging
 import os
 import tempfile
 from functools import lru_cache
+from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings.sources import (
+    PydanticBaseSettingsSource,
+    YamlConfigSettingsSource,
+)
 
 from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
 
@@ -26,9 +31,7 @@ logger = logging.getLogger(__name__)
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
-TEMPLATE_CONFIG_FILE = (
-    Path(__file__).parent.parent / "config" / "bloom-config-template.yaml"
-)
+TEMPLATE_CONFIG_FILE = Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
 
 
 def _validate_optional_https_url(value: str, *, field_name: str) -> str:
@@ -51,6 +54,32 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     return result
 
 
+def _load_template_config() -> Dict[str, Any]:
+    """Load the packaged template configuration."""
+    try:
+        import yaml
+    except ImportError:
+        return {}
+
+    try:
+        template_text = (
+            importlib_resources.files("bloom_lims")
+            .joinpath("etc/bloom-config-template.yaml")
+            .read_text(encoding="utf-8")
+        )
+    except Exception as exc:
+        logger.debug("Failed to load packaged template config: %s", exc)
+        return {}
+
+    try:
+        loaded = yaml.safe_load(template_text) or {}
+    except Exception as exc:
+        logger.debug("Failed to parse packaged template config: %s", exc)
+        return {}
+
+    return loaded if isinstance(loaded, dict) else {}
+
+
 def _load_yaml_config() -> Dict[str, Any]:
     """Load and merge template + user YAML config files."""
     try:
@@ -60,27 +89,11 @@ def _load_yaml_config() -> Dict[str, Any]:
 
     config: Dict[str, Any] = {}
 
-    if TEMPLATE_CONFIG_FILE.exists():
-        try:
-            with open(TEMPLATE_CONFIG_FILE, encoding="utf-8") as f:
-                template_config = yaml.safe_load(f) or {}
-                config = template_config
-        except Exception as exc:
-            logger.debug(
-                "Failed to load template config %s: %s",
-                TEMPLATE_CONFIG_FILE,
-                exc,
-            )
+    template_config = _load_template_config()
+    if template_config:
+        config = template_config
 
-    if not USER_CONFIG_DIR.exists():
-        try:
-            USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:
-            logger.debug(
-                "Failed to create user config directory %s: %s",
-                USER_CONFIG_DIR,
-                exc,
-            )
+    _ensure_user_config_dir()
 
     if USER_CONFIG_FILE.exists():
         try:
@@ -95,6 +108,26 @@ def _load_yaml_config() -> Dict[str, Any]:
             )
 
     return config
+
+
+def _ensure_user_config_dir() -> None:
+    """Ensure the user config directory exists when the process can create it."""
+    if USER_CONFIG_DIR.exists():
+        return
+
+    try:
+        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        logger.debug(
+            "Failed to create user config directory %s: %s",
+            USER_CONFIG_DIR,
+            exc,
+        )
+
+
+def _yaml_config_files() -> list[Path]:
+    _ensure_user_config_dir()
+    return [TEMPLATE_CONFIG_FILE, USER_CONFIG_FILE]
 
 
 class TapDBSettings(BaseModel):
@@ -540,99 +573,36 @@ class BloomSettings(BaseSettings):
     cache: CacheSettings = Field(default_factory=CacheSettings)
     constants: BusinessConstants = Field(default_factory=BusinessConstants)
 
-    def __init__(self, **kwargs: Any):
-        yaml_config = _load_yaml_config()
-        merged = _deep_merge(yaml_config, kwargs)
-        super().__init__(**merged)
-        self._apply_environment_overrides()
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+            YamlConfigSettingsSource(
+                settings_cls,
+                yaml_file=_yaml_config_files(),
+                yaml_file_encoding="utf-8",
+                deep_merge=True,
+            ),
+        )
 
-    def _apply_environment_overrides(self) -> None:
-        """Apply selected env overrides after YAML merge.
-
-        YAML values are currently passed as init kwargs, which take precedence
-        over env vars in Pydantic settings resolution. We explicitly apply
-        runtime env overrides for Atlas integration settings so local process
-        configuration can be adjusted without editing config files.
-        """
-        atlas_base_url = os.environ.get("BLOOM_ATLAS__BASE_URL")
-        if atlas_base_url is not None:
-            self.atlas.base_url = _validate_optional_https_url(
-                atlas_base_url,
-                field_name="atlas.base_url",
-            )
-
-        atlas_token = os.environ.get("BLOOM_ATLAS__TOKEN")
-        if atlas_token is not None:
-            self.atlas.token = atlas_token
-
-        atlas_org_id = os.environ.get("BLOOM_ATLAS__ORGANIZATION_ID")
-        if atlas_org_id is not None:
-            self.atlas.organization_id = atlas_org_id
-
-        atlas_timeout = os.environ.get("BLOOM_ATLAS__TIMEOUT_SECONDS")
-        if atlas_timeout is not None:
-            try:
-                self.atlas.timeout_seconds = int(atlas_timeout)
-            except ValueError:
-                pass
-
-        atlas_cache_ttl = os.environ.get("BLOOM_ATLAS__CACHE_TTL_SECONDS")
-        if atlas_cache_ttl is not None:
-            try:
-                self.atlas.cache_ttl_seconds = int(atlas_cache_ttl)
-            except ValueError:
-                pass
-
-        atlas_verify_ssl = os.environ.get("BLOOM_ATLAS__VERIFY_SSL")
-        if atlas_verify_ssl is not None:
-            self.atlas.verify_ssl = str(atlas_verify_ssl).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
-
-        dewey_enabled = os.environ.get("BLOOM_DEWEY__ENABLED")
-        if dewey_enabled is not None:
-            self.dewey.enabled = str(dewey_enabled).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
-
-        dewey_base_url = os.environ.get("BLOOM_DEWEY__BASE_URL")
-        if dewey_base_url is not None:
-            self.dewey.base_url = _validate_optional_https_url(
-                dewey_base_url,
-                field_name="dewey.base_url",
-            )
-
-        dewey_token = os.environ.get("BLOOM_DEWEY__TOKEN")
-        if dewey_token is not None:
-            self.dewey.token = dewey_token
-
-        dewey_timeout = os.environ.get("BLOOM_DEWEY__TIMEOUT_SECONDS")
-        if dewey_timeout is not None:
-            try:
-                self.dewey.timeout_seconds = int(dewey_timeout)
-            except ValueError:
-                pass
-
-        dewey_verify_ssl = os.environ.get("BLOOM_DEWEY__VERIFY_SSL")
-        if dewey_verify_ssl is not None:
-            self.dewey.verify_ssl = str(dewey_verify_ssl).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
-
+    @model_validator(mode="after")
+    def validate_dewey_settings(self) -> "BloomSettings":
         if self.dewey.enabled:
             if not str(self.dewey.base_url or "").strip():
                 raise ValueError("dewey.base_url is required when dewey.enabled=true")
             if not str(self.dewey.token or "").strip():
                 raise ValueError("dewey.token is required when dewey.enabled=true")
+        return self
 
     @field_validator("environment")
     @classmethod
@@ -791,7 +761,7 @@ def validate_settings() -> List[str]:
     if not settings.auth.cognito_user_pool_id:
         warnings.append(
             "Cognito configuration is missing (auth.cognito_user_pool_id). "
-            "Bloom now reads the full Cognito contract from YAML config."
+            "Set it in YAML config or override it with BLOOM_AUTH__COGNITO_USER_POOL_ID."
         )
 
     if not settings.auth.jwt_secret and settings.is_production:
@@ -807,6 +777,43 @@ def validate_settings() -> List[str]:
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
 
     return warnings
+
+
+def validate_config_content(content: str) -> List[str]:
+    """Validate YAML config content without consulting runtime environment."""
+    try:
+        import yaml
+    except ImportError:
+        return ["PyYAML is required to validate configuration"]
+
+    try:
+        parsed = yaml.safe_load(content) or {}
+    except yaml.YAMLError as exc:
+        return [f"YAML parse error: {exc}"]
+
+    if not isinstance(parsed, dict):
+        return ["Root YAML object must be a mapping"]
+
+    merged = _deep_merge(_load_template_config(), parsed)
+
+    try:
+        BloomSettings.model_validate(merged)
+    except Exception as exc:
+        details = getattr(exc, "errors", None)
+        if callable(details):
+            messages: List[str] = []
+            for item in details():
+                location = ".".join(str(part) for part in item.get("loc", ()))
+                message = item.get("msg", str(exc))
+                if location:
+                    messages.append(f"{location}: {message}")
+                else:
+                    messages.append(message)
+            if messages:
+                return messages
+        return [str(exc)]
+
+    return []
 
 
 # Legacy compatibility

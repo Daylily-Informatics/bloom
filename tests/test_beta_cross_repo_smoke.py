@@ -19,8 +19,32 @@ from fastapi.testclient import TestClient
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-ATLAS_ROOT = WORKSPACE_ROOT / "lsmc-atlas"
-URSA_ROOT = WORKSPACE_ROOT / "daylily-ursa"
+
+
+def _resolve_repo_root(*candidates: Path) -> Path | None:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+ATLAS_ROOT = _resolve_repo_root(
+    WORKSPACE_ROOT / "lsmc-atlas",
+    WORKSPACE_ROOT.parent / "lsmc" / "lsmc-atlas",
+    WORKSPACE_ROOT.parent.parent / "lsmc-atlas",
+)
+URSA_ROOT = _resolve_repo_root(
+    WORKSPACE_ROOT / "daylily-ursa",
+    WORKSPACE_ROOT.parent / "daylily-ursa",
+    WORKSPACE_ROOT.parent.parent / "daylily-ursa",
+)
+
+if ATLAS_ROOT is None or URSA_ROOT is None:
+    pytest.skip(
+        "Cross-repo beta smoke requires local Atlas and Ursa checkouts.",
+        allow_module_level=True,
+    )
+
 os.environ.setdefault(
     "DATABASE_URL",
     f"sqlite:///{WORKSPACE_ROOT / '_refactor' / 'atlas_beta_smoke.sqlite'}",
@@ -110,16 +134,22 @@ class SmokeAnalysisStore:
 
     def ingest_analysis(self, **kwargs):
         resolution: RunResolution = kwargs["resolution"]
+        output_bucket = str(kwargs.get("internal_bucket") or "").strip()
+        assert output_bucket
+        tenant_id = getattr(resolution, "tenant_id", None)
+        if tenant_id is None:
+            tenant_id = getattr(resolution, "atlas_tenant_id")
         now = "2026-03-08T00:00:00Z"
         if self.record is None:
             self.record = AnalysisRecord(
                 analysis_euid=_opaque("analysis"),
+                workset_euid=None,
                 run_euid=resolution.run_euid,
                 flowcell_id=resolution.flowcell_id,
                 lane=resolution.lane,
                 library_barcode=resolution.library_barcode,
                 sequenced_library_assignment_euid=resolution.sequenced_library_assignment_euid,
-                atlas_tenant_id=resolution.atlas_tenant_id,
+                tenant_id=tenant_id,
                 atlas_trf_euid=resolution.atlas_trf_euid,
                 atlas_test_euid=resolution.atlas_test_euid,
                 atlas_test_fulfillment_item_euid=resolution.atlas_test_fulfillment_item_euid,
@@ -127,8 +157,9 @@ class SmokeAnalysisStore:
                 state=AnalysisState.INGESTED.value,
                 review_state=ReviewState.PENDING.value,
                 result_status="PENDING",
-                run_folder=f"s3://{kwargs['artifact_bucket']}/{resolution.run_euid}/",
-                artifact_bucket=kwargs["artifact_bucket"],
+                run_folder=f"s3://{output_bucket}/{resolution.run_euid}/",
+                internal_bucket=output_bucket,
+                input_references=list(kwargs.get("input_references") or []),
                 result_payload={},
                 metadata=dict(kwargs.get("metadata") or {}),
                 created_at=now,
@@ -200,6 +231,7 @@ class SmokeAnalysisStore:
 class SmokeDeweyClient:
     def __init__(self) -> None:
         self._seq = 1
+        self._artifacts: dict[str, dict] = {}
 
     def register_artifact(
         self,
@@ -211,10 +243,35 @@ class SmokeDeweyClient:
     ) -> str:
         token = f"AT-SMOKE-{self._seq}"
         self._seq += 1
+        self._artifacts[token] = {
+            "artifact_euid": token,
+            "artifact_type": artifact_type,
+            "storage_uri": storage_uri,
+            "filename": Path(storage_uri).name,
+            "metadata": dict(metadata or {}),
+            "idempotency_key": idempotency_key,
+        }
         return token
 
     def resolve_artifact(self, artifact_euid: str) -> dict:
-        return {"artifact_euid": artifact_euid}
+        return dict(self._artifacts[artifact_euid])
+
+
+class SmokeUrsaAuthProvider:
+    def __init__(self, tenant_id: uuid.UUID) -> None:
+        self.tenant_id = tenant_id
+
+    def resolve_access_token(self, token: str) -> SimpleNamespace:
+        assert token == "atlas-token"
+        return SimpleNamespace(
+            sub="ursa-smoke-user",
+            email="ursa-smoke@example.com",
+            name="Ursa Smoke User",
+            tenant_id=self.tenant_id,
+            roles=["INTERNAL_USER"],
+            user_id="ursa-smoke-user",
+            is_admin=False,
+        )
 
 
 def _build_atlas_intake_app(tenant_id: uuid.UUID) -> FastAPI:
@@ -511,6 +568,12 @@ def test_cross_repo_beta_smoke(monkeypatch):
             assert resolved_body["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
 
             store = SmokeAnalysisStore()
+            dewey_client = SmokeDeweyClient()
+            input_artifact_euid = dewey_client.register_artifact(
+                artifact_type="fastq",
+                storage_uri="s3://beta-analysis-artifacts/input.fastq.gz",
+                metadata={"producer_system": "smoke"},
+            )
             ursa_app = create_ursa_app(
                 store=store,
                 bloom_client=BloomResolverClient(
@@ -523,9 +586,11 @@ def test_cross_repo_beta_smoke(monkeypatch):
                     api_key="atlas-smoke-key",
                     client=atlas_result_client,  # type: ignore[arg-type]
                 ),
-                dewey_client=SmokeDeweyClient(),
+                dewey_client=dewey_client,
+                auth_provider=SmokeUrsaAuthProvider(tenant_id),
                 settings=Settings(
                     ursa_internal_api_key="ursa-smoke-key",
+                    ursa_internal_output_bucket="beta-analysis-artifacts",
                     bloom_base_url="https://testserver",
                     bloom_api_token="bloom-smoke-token",
                     atlas_base_url="https://testserver",
@@ -535,7 +600,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
             with TestClient(ursa_app) as ursa_client:
                 ingest = ursa_client.post(
-                    "/api/analyses/ingest",
+                    "/api/v1/analyses/ingest",
                     headers={
                         "Idempotency-Key": _opaque("idem-ingest"),
                         "X-API-Key": "ursa-smoke-key",
@@ -546,9 +611,11 @@ def test_cross_repo_beta_smoke(monkeypatch):
                         "lane": lane,
                         "library_barcode": library_barcode,
                         "analysis_type": "WGS",
-                        "artifact_bucket": "beta-analysis-artifacts",
-                        "input_files": [
-                            f"s3://beta-analysis-artifacts/{run_body['run_euid']}/reads.fastq.gz"
+                        "input_references": [
+                            {
+                                "reference_type": "artifact_euid",
+                                "value": input_artifact_euid,
+                            }
                         ],
                     },
                 )
@@ -561,31 +628,32 @@ def test_cross_repo_beta_smoke(monkeypatch):
                     ingest_payload["sequenced_library_assignment_euid"]
                     == resolved_body["sequenced_library_assignment_euid"]
                 )
+                result_artifact_euid = dewey_client.register_artifact(
+                    artifact_type="vcf",
+                    storage_uri="s3://beta-analysis-artifacts/result.vcf.gz",
+                    metadata={"producer_system": "smoke"},
+                )
 
                 artifact = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/artifacts",
+                    f"/api/v1/analyses/{analysis_euid}/artifacts",
                     headers={"X-API-Key": "ursa-smoke-key"},
-                    json={
-                        "artifact_type": "vcf",
-                        "storage_uri": "s3://beta-analysis-artifacts/result.vcf.gz",
-                        "filename": "result.vcf.gz",
-                    },
+                    json={"artifact_euid": result_artifact_euid},
                 )
                 assert artifact.status_code == 201, artifact.text
 
                 preapproval = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/return",
+                    f"/api/v1/analyses/{analysis_euid}/return",
                     headers={
+                        "Authorization": "Bearer atlas-token",
                         "Idempotency-Key": _opaque("idem-return-pre"),
-                        "X-API-Key": "ursa-smoke-key",
                     },
                     json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
                 )
                 assert preapproval.status_code == 409, preapproval.text
 
                 review = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/review",
-                    headers={"X-API-Key": "ursa-smoke-key"},
+                    f"/api/v1/analyses/{analysis_euid}/review",
+                    headers={"Authorization": "Bearer atlas-token"},
                     json={
                         "review_state": "APPROVED",
                         "reviewer": "qa-reviewer",
@@ -594,10 +662,10 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 assert review.status_code == 200, review.text
 
                 returned = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/return",
+                    f"/api/v1/analyses/{analysis_euid}/return",
                     headers={
+                        "Authorization": "Bearer atlas-token",
                         "Idempotency-Key": _opaque("idem-return"),
-                        "X-API-Key": "ursa-smoke-key",
                     },
                     json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
                 )

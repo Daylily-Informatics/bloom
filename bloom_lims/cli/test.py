@@ -1,33 +1,40 @@
-"""Atlas-style test command group for the Bloom CLI."""
+"""Testing commands for BLOOM CLI."""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cli_core_yo.registry import CommandRegistry
+    from cli_core_yo.spec import CliSpec
 
 import subprocess
 import sys
 from pathlib import Path
 
-import click
+import typer
+
+test_app = typer.Typer(help="Test execution commands", no_args_is_help=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-@click.group()
-def test():
-    """Test execution commands."""
-
-
-@test.command(
+@test_app.command(
     "run",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
-@click.argument("pytest_args", nargs=-1, type=click.UNPROCESSED)
-def run(pytest_args: tuple[str, ...]):
+def run(ctx: typer.Context) -> None:
     """Run Bloom test suites via pytest."""
-    args = list(pytest_args) or ["tests"]
-    raise SystemExit(
+    args = list(ctx.args) or ["tests"]
+    raise typer.Exit(
         subprocess.run(
             [sys.executable, "-m", "pytest", *args],
             cwd=PROJECT_ROOT,
             check=False,
         ).returncode
     )
+
+
+def register(registry: CommandRegistry, spec: CliSpec) -> None:
+    """cli-core-yo plugin: register the test command group."""
+    registry.add_typer_app(None, test_app, "test", "Test execution commands.")

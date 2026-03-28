@@ -1,83 +1,106 @@
-"""
-BLOOM LIMS Command Line Interface
+"""BLOOM LIMS CLI — built on cli-core-yo."""
 
-Click-based CLI with tab completion support.
+from __future__ import annotations
 
-Usage:
-    bloom --help              Show all available commands
-    bloom db status           Show database status
-    bloom gui                 Start the BLOOM web UI
-    bloom config              Show current configuration
-"""
+import os
+from pathlib import Path
 
-import sys
+from cli_core_yo.app import create_app as _create_app
+from cli_core_yo.app import run
+from cli_core_yo.spec import CliSpec, ConfigSpec, PluginSpec, XdgSpec
 
-import click
-from rich.console import Console
+from bloom_lims.config import (
+    apply_runtime_environment,
+    assert_tapdb_version,
+    get_settings,
+    get_tapdb_db_config,
+    validate_config_content,
+)
 
-from bloom_lims.cli.config_cmd import config, config_validate
-from bloom_lims.cli.db import db
-from bloom_lims.cli.gui import gui, stop
-from bloom_lims.cli.info import doctor, info, status, version
-from bloom_lims.cli.integrations import integrations
-from bloom_lims.cli.quality import quality
-from bloom_lims.cli.server import server
-from bloom_lims.cli.test import test
-from bloom_lims.cli.users import users
-from bloom_lims.cli.utils import logs, shell
-
-console = Console()
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _get_version() -> str:
-    """Get version from _version module."""
+def _validate_bloom_config(content: str) -> list[str]:
+    """Validate Bloom config file contents."""
+    return validate_config_content(content)
+
+
+def _bloom_info_hook() -> list[tuple[str, str]]:
+    """Extra rows for the built-in ``info`` command."""
+    settings = get_settings()
+    ctx = apply_runtime_environment(settings)
+
+    rows: list[tuple[str, str]] = [
+        ("Project Root", str(PROJECT_ROOT)),
+        ("Environment", settings.environment),
+        ("TapDB Env", ctx.env),
+        ("TapDB Namespace", ctx.database_name),
+        ("AWS Profile", os.environ.get("AWS_PROFILE", ctx.aws_profile)),
+        ("AWS Region", os.environ.get("AWS_REGION", ctx.aws_region)),
+        ("Conda Env", os.environ.get("CONDA_DEFAULT_ENV", "(not set)")),
+    ]
+
     try:
-        from bloom_lims._version import get_version
-        return get_version()
-    except ImportError:
-        return "dev"
+        db_cfg = get_tapdb_db_config()
+        rows.append(
+            (
+                "TapDB Target",
+                f"{db_cfg['host']}:{db_cfg['port']}/{db_cfg['database']}",
+            )
+        )
+    except Exception as exc:
+        rows.append(("TapDB Target", f"(unresolved: {exc})"))
+
+    try:
+        rows.append(("daylily-tapdb", assert_tapdb_version()))
+    except Exception as exc:
+        rows.append(("daylily-tapdb", f"invalid ({exc})"))
+
+    from bloom_lims.cli.server import server_status_label
+
+    rows.append(("Dev Server", server_status_label()))
+    return rows
 
 
-@click.group(invoke_without_command=True)
-@click.option('-v', '--verbose', is_flag=True, help='Enable verbose output')
-@click.option('--version', 'show_version', is_flag=True, help='Show version and exit')
-@click.pass_context
-def cli(ctx, verbose, show_version):
-    """BLOOM LIMS - Laboratory Information Management System CLI."""
-    ctx.ensure_object(dict)
-    ctx.obj['verbose'] = verbose
+spec = CliSpec(
+    prog_name="bloom",
+    app_display_name="BLOOM LIMS",
+    dist_name="bloom_lims",
+    root_help="BLOOM LIMS — Development CLI for the laboratory information management system.",
+    xdg=XdgSpec(
+        app_dir_name="bloom",
+    ),
+    config=ConfigSpec(
+        primary_filename="config.yaml",
+        template_resource=("bloom_lims", "etc/bloom-config-template.yaml"),
+        validator=_validate_bloom_config,
+    ),
+    plugins=PluginSpec(
+        explicit=[
+            "bloom_lims.cli.server.register",
+            "bloom_lims.cli.db.register",
+            "bloom_lims.cli.test.register",
+            "bloom_lims.cli.quality.register",
+            "bloom_lims.cli.users.register",
+            "bloom_lims.cli.integrations.register",
+            "bloom_lims.cli.config_extra.register",
+        ],
+    ),
+    info_hooks=[_bloom_info_hook],
+)
 
-    if show_version:
-        console.print(f"bloom [cyan]{_get_version()}[/cyan]")
-        ctx.exit(0)
-
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
-
-
-# Register command groups
-cli.add_command(db)
-cli.add_command(gui)
-cli.add_command(stop)
-cli.add_command(info)
-cli.add_command(status)
-cli.add_command(doctor)
-cli.add_command(version)
-cli.add_command(config)
-cli.add_command(config_validate)
-cli.add_command(server)
-cli.add_command(test)
-cli.add_command(quality)
-cli.add_command(users)
-cli.add_command(integrations)
-cli.add_command(shell)
-cli.add_command(logs)
+def build_app():
+    """Create a fresh Typer app for Bloom."""
+    return _create_app(spec)
 
 
-def main():
-    """Main entry point for BLOOM CLI."""
-    cli()
+app = build_app()
+
+
+def main() -> None:
+    """Main CLI entry point."""
+    raise SystemExit(run(spec))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
