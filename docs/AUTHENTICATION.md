@@ -62,5 +62,5 @@ tapdb:
 
 ```bash
 source bloom_activate.sh
-bloom gui
+bloom server start
 ```

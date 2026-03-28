@@ -19,8 +19,32 @@ from fastapi.testclient import TestClient
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-ATLAS_ROOT = WORKSPACE_ROOT / "lsmc-atlas"
-URSA_ROOT = WORKSPACE_ROOT / "daylily-ursa"
+
+
+def _resolve_repo_root(*candidates: Path) -> Path | None:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+ATLAS_ROOT = _resolve_repo_root(
+    WORKSPACE_ROOT / "lsmc-atlas",
+    WORKSPACE_ROOT.parent / "lsmc" / "lsmc-atlas",
+    WORKSPACE_ROOT.parent.parent / "lsmc-atlas",
+)
+URSA_ROOT = _resolve_repo_root(
+    WORKSPACE_ROOT / "daylily-ursa",
+    WORKSPACE_ROOT.parent / "daylily-ursa",
+    WORKSPACE_ROOT.parent.parent / "daylily-ursa",
+)
+
+if ATLAS_ROOT is None or URSA_ROOT is None:
+    pytest.skip(
+        "Cross-repo beta smoke requires local Atlas and Ursa checkouts.",
+        allow_module_level=True,
+    )
+
 os.environ.setdefault(
     "DATABASE_URL",
     f"sqlite:///{WORKSPACE_ROOT / '_refactor' / 'atlas_beta_smoke.sqlite'}",
@@ -33,6 +57,7 @@ for root in (ATLAS_ROOT, URSA_ROOT):
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.app import create_app as create_bloom_app
+
 try:  # noqa: E402
     from daylib_ursa.analysis_store import (
         AnalysisArtifact,
@@ -110,16 +135,22 @@ class SmokeAnalysisStore:
 
     def ingest_analysis(self, **kwargs):
         resolution: RunResolution = kwargs["resolution"]
+        output_bucket = str(kwargs.get("internal_bucket") or "").strip()
+        assert output_bucket
+        tenant_id = getattr(resolution, "tenant_id", None)
+        if tenant_id is None:
+            tenant_id = getattr(resolution, "atlas_tenant_id")
         now = "2026-03-08T00:00:00Z"
         if self.record is None:
             self.record = AnalysisRecord(
                 analysis_euid=_opaque("analysis"),
+                workset_euid=None,
                 run_euid=resolution.run_euid,
                 flowcell_id=resolution.flowcell_id,
                 lane=resolution.lane,
                 library_barcode=resolution.library_barcode,
                 sequenced_library_assignment_euid=resolution.sequenced_library_assignment_euid,
-                atlas_tenant_id=resolution.atlas_tenant_id,
+                tenant_id=tenant_id,
                 atlas_trf_euid=resolution.atlas_trf_euid,
                 atlas_test_euid=resolution.atlas_test_euid,
                 atlas_test_fulfillment_item_euid=resolution.atlas_test_fulfillment_item_euid,
@@ -127,8 +158,9 @@ class SmokeAnalysisStore:
                 state=AnalysisState.INGESTED.value,
                 review_state=ReviewState.PENDING.value,
                 result_status="PENDING",
-                run_folder=f"s3://{kwargs['artifact_bucket']}/{resolution.run_euid}/",
-                artifact_bucket=kwargs["artifact_bucket"],
+                run_folder=f"s3://{output_bucket}/{resolution.run_euid}/",
+                internal_bucket=output_bucket,
+                input_references=list(kwargs.get("input_references") or []),
                 result_payload={},
                 metadata=dict(kwargs.get("metadata") or {}),
                 created_at=now,
@@ -190,7 +222,9 @@ class SmokeAnalysisStore:
         self.record = replace(
             self.record,
             state=AnalysisState.RETURNED.value,
-            result_status=kwargs["atlas_return"].get("result_status", self.record.result_status),
+            result_status=kwargs["atlas_return"].get(
+                "result_status", self.record.result_status
+            ),
             atlas_return=dict(kwargs["atlas_return"]),
             updated_at="2026-03-08T04:00:00Z",
         )
@@ -200,6 +234,7 @@ class SmokeAnalysisStore:
 class SmokeDeweyClient:
     def __init__(self) -> None:
         self._seq = 1
+        self._artifacts: dict[str, dict] = {}
 
     def register_artifact(
         self,
@@ -211,10 +246,35 @@ class SmokeDeweyClient:
     ) -> str:
         token = f"AT-SMOKE-{self._seq}"
         self._seq += 1
+        self._artifacts[token] = {
+            "artifact_euid": token,
+            "artifact_type": artifact_type,
+            "storage_uri": storage_uri,
+            "filename": Path(storage_uri).name,
+            "metadata": dict(metadata or {}),
+            "idempotency_key": idempotency_key,
+        }
         return token
 
     def resolve_artifact(self, artifact_euid: str) -> dict:
-        return {"artifact_euid": artifact_euid}
+        return dict(self._artifacts[artifact_euid])
+
+
+class SmokeUrsaAuthProvider:
+    def __init__(self, tenant_id: uuid.UUID) -> None:
+        self.tenant_id = tenant_id
+
+    def resolve_access_token(self, token: str) -> SimpleNamespace:
+        assert token == "atlas-token"
+        return SimpleNamespace(
+            sub="ursa-smoke-user",
+            email="ursa-smoke@example.com",
+            name="Ursa Smoke User",
+            tenant_id=self.tenant_id,
+            roles=["INTERNAL_USER"],
+            user_id="ursa-smoke-user",
+            is_admin=False,
+        )
 
 
 def _build_atlas_intake_app(tenant_id: uuid.UUID) -> FastAPI:
@@ -309,7 +369,9 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 trf_status="IN_PROGRESS",
                 test_euids=data.test_euids,
                 fulfillment_item_euids=[fulfillment_item_accept],
-                test_statuses={test_euid: "SPECIMEN_RECEIVED" for test_euid in data.test_euids},
+                test_statuses={
+                    test_euid: "SPECIMEN_RECEIVED" for test_euid in data.test_euids
+                },
                 patient_euid=data.patient_euid,
                 container_euid="CNT-SMOKE",
                 specimen_euid="SP-SMOKE",
@@ -348,264 +410,280 @@ def test_cross_repo_beta_smoke(monkeypatch):
         TestClient(atlas_result_app) as atlas_result_client,
         TestClient(bloom_app) as bloom_client,
     ):
-            for outcome, test_euid in (
-                ("REJECTED", atlas_test_reject),
-                ("HOLD", atlas_test_hold),
-            ):
-                response = atlas_intake_client.post(
-                    "/api/intake/outcomes",
-                    json={
-                        "trf_euid": atlas_trf_euid,
-                        "test_euids": [test_euid],
-                        "patient_euid": patient_euid,
-                        "shipment_euid": shipment_euid,
-                        "outcome": outcome,
-                        "starting_queue": None,
-                    },
-                )
-                assert response.status_code == 200, response.text
-                body = response.json()
-                _assert_no_uuid_keys(body)
-                assert body["accepted"] is False
-                assert body["fulfillment_item_euids"] == []
-
-            accepted_response = atlas_intake_client.post(
+        for outcome, test_euid in (
+            ("REJECTED", atlas_test_reject),
+            ("HOLD", atlas_test_hold),
+        ):
+            response = atlas_intake_client.post(
                 "/api/intake/outcomes",
                 json={
                     "trf_euid": atlas_trf_euid,
-                    "test_euids": [atlas_test_accept],
+                    "test_euids": [test_euid],
                     "patient_euid": patient_euid,
                     "shipment_euid": shipment_euid,
-                    "outcome": "ACCEPTED",
-                    "starting_queue": "extraction_prod",
+                    "outcome": outcome,
+                    "starting_queue": None,
                 },
             )
-            assert accepted_response.status_code == 200, accepted_response.text
-            accepted_body = accepted_response.json()
-            _assert_no_uuid_keys(accepted_body)
-            assert accepted_body["accepted"] is True
-            assert accepted_body["fulfillment_item_euids"] == [fulfillment_item_accept]
+            assert response.status_code == 200, response.text
+            body = response.json()
+            _assert_no_uuid_keys(body)
+            assert body["accepted"] is False
+            assert body["fulfillment_item_euids"] == []
 
-            atlas_context = {
-                "atlas_tenant_id": str(tenant_id),
-                "atlas_trf_euid": atlas_trf_euid,
-                "fulfillment_items": [
+        accepted_response = atlas_intake_client.post(
+            "/api/intake/outcomes",
+            json={
+                "trf_euid": atlas_trf_euid,
+                "test_euids": [atlas_test_accept],
+                "patient_euid": patient_euid,
+                "shipment_euid": shipment_euid,
+                "outcome": "ACCEPTED",
+                "starting_queue": "extraction_prod",
+            },
+        )
+        assert accepted_response.status_code == 200, accepted_response.text
+        accepted_body = accepted_response.json()
+        _assert_no_uuid_keys(accepted_body)
+        assert accepted_body["accepted"] is True
+        assert accepted_body["fulfillment_item_euids"] == [fulfillment_item_accept]
+
+        atlas_context = {
+            "atlas_tenant_id": str(tenant_id),
+            "atlas_trf_euid": atlas_trf_euid,
+            "fulfillment_items": [
+                {
+                    "atlas_test_euid": atlas_test_accept,
+                    "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
+                }
+            ],
+        }
+        material_response = bloom_client.post(
+            "/api/v1/external/atlas/beta/materials",
+            headers={"Idempotency-Key": _opaque("idem-material")},
+            json={
+                "specimen_name": "beta-smoke-whole-blood",
+                "properties": {"source": "cross-repo-smoke"},
+                "atlas_context": atlas_context,
+            },
+        )
+        assert material_response.status_code == 200, material_response.text
+        material = material_response.json()
+        _assert_no_uuid_keys(material)
+        specimen_euid = material["specimen_euid"]
+
+        queued = bloom_client.post(
+            f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{specimen_euid}",
+            headers={"Idempotency-Key": _opaque("idem-queue")},
+            json={"metadata": {"reason": "accepted-material"}},
+        )
+        assert queued.status_code == 200, queued.text
+
+        extraction = bloom_client.post(
+            "/api/v1/external/atlas/beta/extractions",
+            headers={"Idempotency-Key": _opaque("idem-extract")},
+            json={
+                "source_specimen_euid": specimen_euid,
+                "well_name": "A1",
+                "extraction_type": "gdna",
+                "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
+            },
+        )
+        assert extraction.status_code == 200, extraction.text
+        extraction_output_euid = extraction.json()["extraction_output_euid"]
+
+        qc = bloom_client.post(
+            "/api/v1/external/atlas/beta/post-extract-qc",
+            headers={"Idempotency-Key": _opaque("idem-qc")},
+            json={
+                "extraction_output_euid": extraction_output_euid,
+                "passed": True,
+                "next_queue": "ont_lib_prep",
+            },
+        )
+        assert qc.status_code == 200, qc.text
+
+        library_prep = bloom_client.post(
+            "/api/v1/external/atlas/beta/library-prep",
+            headers={"Idempotency-Key": _opaque("idem-libprep")},
+            json={
+                "source_extraction_output_euid": extraction_output_euid,
+                "platform": "ONT",
+            },
+        )
+        assert library_prep.status_code == 200, library_prep.text
+        library_prep_output_euid = library_prep.json()["library_prep_output_euid"]
+
+        pool = bloom_client.post(
+            "/api/v1/external/atlas/beta/pools",
+            headers={"Idempotency-Key": _opaque("idem-pool")},
+            json={
+                "member_euids": [library_prep_output_euid],
+                "platform": "ONT",
+            },
+        )
+        assert pool.status_code == 200, pool.text
+        pool_euid = pool.json()["pool_euid"]
+
+        flowcell_id = "FLOW-BETA-01"
+        lane = "2"
+        library_barcode = "ONT-LIB-01"
+        run = bloom_client.post(
+            "/api/v1/external/atlas/beta/runs",
+            headers={"Idempotency-Key": _opaque("idem-run")},
+            json={
+                "pool_euid": pool_euid,
+                "platform": "ONT",
+                "flowcell_id": flowcell_id,
+                "status": "completed",
+                "assignments": [
                     {
-                        "atlas_test_euid": atlas_test_accept,
-                        "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
+                        "lane": lane,
+                        "library_barcode": library_barcode,
+                        "library_prep_output_euid": library_prep_output_euid,
                     }
                 ],
-            }
-            material_response = bloom_client.post(
-                "/api/v1/external/atlas/beta/materials",
-                headers={"Idempotency-Key": _opaque("idem-material")},
-                json={
-                    "specimen_name": "beta-smoke-whole-blood",
-                    "properties": {"source": "cross-repo-smoke"},
-                    "atlas_context": atlas_context,
+                "artifacts": [
+                    {
+                        "artifact_type": "fastq",
+                        "bucket": "beta-analysis-artifacts",
+                        "filename": "reads.fastq.gz",
+                        "lane": lane,
+                        "library_barcode": library_barcode,
+                        "metadata": {"read_pair": 1},
+                    }
+                ],
+            },
+        )
+        assert run.status_code == 200, run.text
+        run_body = run.json()
+        _assert_no_uuid_keys(run_body)
+
+        resolved = bloom_client.get(
+            f"/api/v1/external/atlas/beta/runs/{run_body['run_euid']}/resolve",
+            params={
+                "flowcell_id": flowcell_id,
+                "lane": lane,
+                "library_barcode": library_barcode,
+            },
+        )
+        assert resolved.status_code == 200, resolved.text
+        resolved_body = resolved.json()
+        _assert_no_uuid_keys(resolved_body)
+        assert (
+            resolved_body["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
+        )
+
+        store = SmokeAnalysisStore()
+        dewey_client = SmokeDeweyClient()
+        input_artifact_euid = dewey_client.register_artifact(
+            artifact_type="fastq",
+            storage_uri="s3://beta-analysis-artifacts/input.fastq.gz",
+            metadata={"producer_system": "smoke"},
+        )
+        ursa_app = create_ursa_app(
+            store=store,
+            bloom_client=BloomResolverClient(
+                base_url="https://testserver",
+                token="bloom-smoke-token",
+                client=bloom_client,  # type: ignore[arg-type]
+            ),
+            atlas_client=AtlasResultClient(
+                base_url="https://testserver",
+                api_key="atlas-smoke-key",
+                client=atlas_result_client,  # type: ignore[arg-type]
+            ),
+            dewey_client=dewey_client,
+            auth_provider=SmokeUrsaAuthProvider(tenant_id),
+            settings=Settings(
+                ursa_internal_api_key="ursa-smoke-key",
+                ursa_internal_output_bucket="beta-analysis-artifacts",
+                bloom_base_url="https://testserver",
+                bloom_api_token="bloom-smoke-token",
+                atlas_base_url="https://testserver",
+                atlas_internal_api_key="atlas-smoke-key",
+            ),
+        )
+
+        with TestClient(ursa_app) as ursa_client:
+            ingest = ursa_client.post(
+                "/api/v1/analyses/ingest",
+                headers={
+                    "Idempotency-Key": _opaque("idem-ingest"),
+                    "X-API-Key": "ursa-smoke-key",
                 },
-            )
-            assert material_response.status_code == 200, material_response.text
-            material = material_response.json()
-            _assert_no_uuid_keys(material)
-            specimen_euid = material["specimen_euid"]
-
-            queued = bloom_client.post(
-                f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{specimen_euid}",
-                headers={"Idempotency-Key": _opaque("idem-queue")},
-                json={"metadata": {"reason": "accepted-material"}},
-            )
-            assert queued.status_code == 200, queued.text
-
-            extraction = bloom_client.post(
-                "/api/v1/external/atlas/beta/extractions",
-                headers={"Idempotency-Key": _opaque("idem-extract")},
                 json={
-                    "source_specimen_euid": specimen_euid,
-                    "well_name": "A1",
-                    "extraction_type": "gdna",
-                    "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
-                },
-            )
-            assert extraction.status_code == 200, extraction.text
-            extraction_output_euid = extraction.json()["extraction_output_euid"]
-
-            qc = bloom_client.post(
-                "/api/v1/external/atlas/beta/post-extract-qc",
-                headers={"Idempotency-Key": _opaque("idem-qc")},
-                json={
-                    "extraction_output_euid": extraction_output_euid,
-                    "passed": True,
-                    "next_queue": "ont_lib_prep",
-                },
-            )
-            assert qc.status_code == 200, qc.text
-
-            library_prep = bloom_client.post(
-                "/api/v1/external/atlas/beta/library-prep",
-                headers={"Idempotency-Key": _opaque("idem-libprep")},
-                json={
-                    "source_extraction_output_euid": extraction_output_euid,
-                    "platform": "ONT",
-                },
-            )
-            assert library_prep.status_code == 200, library_prep.text
-            library_prep_output_euid = library_prep.json()["library_prep_output_euid"]
-
-            pool = bloom_client.post(
-                "/api/v1/external/atlas/beta/pools",
-                headers={"Idempotency-Key": _opaque("idem-pool")},
-                json={
-                    "member_euids": [library_prep_output_euid],
-                    "platform": "ONT",
-                },
-            )
-            assert pool.status_code == 200, pool.text
-            pool_euid = pool.json()["pool_euid"]
-
-            flowcell_id = "FLOW-BETA-01"
-            lane = "2"
-            library_barcode = "ONT-LIB-01"
-            run = bloom_client.post(
-                "/api/v1/external/atlas/beta/runs",
-                headers={"Idempotency-Key": _opaque("idem-run")},
-                json={
-                    "pool_euid": pool_euid,
-                    "platform": "ONT",
-                    "flowcell_id": flowcell_id,
-                    "status": "completed",
-                    "assignments": [
-                        {
-                            "lane": lane,
-                            "library_barcode": library_barcode,
-                            "library_prep_output_euid": library_prep_output_euid,
-                        }
-                    ],
-                    "artifacts": [
-                        {
-                            "artifact_type": "fastq",
-                            "bucket": "beta-analysis-artifacts",
-                            "filename": "reads.fastq.gz",
-                            "lane": lane,
-                            "library_barcode": library_barcode,
-                            "metadata": {"read_pair": 1},
-                        }
-                    ],
-                },
-            )
-            assert run.status_code == 200, run.text
-            run_body = run.json()
-            _assert_no_uuid_keys(run_body)
-
-            resolved = bloom_client.get(
-                f"/api/v1/external/atlas/beta/runs/{run_body['run_euid']}/resolve",
-                params={
+                    "run_euid": run_body["run_euid"],
                     "flowcell_id": flowcell_id,
                     "lane": lane,
                     "library_barcode": library_barcode,
+                    "analysis_type": "WGS",
+                    "input_references": [
+                        {
+                            "reference_type": "artifact_euid",
+                            "value": input_artifact_euid,
+                        }
+                    ],
                 },
             )
-            assert resolved.status_code == 200, resolved.text
-            resolved_body = resolved.json()
-            _assert_no_uuid_keys(resolved_body)
-            assert resolved_body["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
-
-            store = SmokeAnalysisStore()
-            ursa_app = create_ursa_app(
-                store=store,
-                bloom_client=BloomResolverClient(
-                    base_url="https://testserver",
-                    token="bloom-smoke-token",
-                    client=bloom_client,  # type: ignore[arg-type]
-                ),
-                atlas_client=AtlasResultClient(
-                    base_url="https://testserver",
-                    api_key="atlas-smoke-key",
-                    client=atlas_result_client,  # type: ignore[arg-type]
-                ),
-                dewey_client=SmokeDeweyClient(),
-                settings=Settings(
-                    ursa_internal_api_key="ursa-smoke-key",
-                    bloom_base_url="https://testserver",
-                    bloom_api_token="bloom-smoke-token",
-                    atlas_base_url="https://testserver",
-                    atlas_internal_api_key="atlas-smoke-key",
-                ),
+            assert ingest.status_code == 201, ingest.text
+            ingest_payload = ingest.json()
+            _assert_no_uuid_keys(ingest_payload)
+            analysis_euid = ingest_payload["analysis_euid"]
+            assert (
+                ingest_payload["atlas_test_fulfillment_item_euid"]
+                == fulfillment_item_accept
+            )
+            assert (
+                ingest_payload["sequenced_library_assignment_euid"]
+                == resolved_body["sequenced_library_assignment_euid"]
+            )
+            result_artifact_euid = dewey_client.register_artifact(
+                artifact_type="vcf",
+                storage_uri="s3://beta-analysis-artifacts/result.vcf.gz",
+                metadata={"producer_system": "smoke"},
             )
 
-            with TestClient(ursa_app) as ursa_client:
-                ingest = ursa_client.post(
-                    "/api/analyses/ingest",
-                    headers={
-                        "Idempotency-Key": _opaque("idem-ingest"),
-                        "X-API-Key": "ursa-smoke-key",
-                    },
-                    json={
-                        "run_euid": run_body["run_euid"],
-                        "flowcell_id": flowcell_id,
-                        "lane": lane,
-                        "library_barcode": library_barcode,
-                        "analysis_type": "WGS",
-                        "artifact_bucket": "beta-analysis-artifacts",
-                        "input_files": [
-                            f"s3://beta-analysis-artifacts/{run_body['run_euid']}/reads.fastq.gz"
-                        ],
-                    },
-                )
-                assert ingest.status_code == 201, ingest.text
-                ingest_payload = ingest.json()
-                _assert_no_uuid_keys(ingest_payload)
-                analysis_euid = ingest_payload["analysis_euid"]
-                assert ingest_payload["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
-                assert (
-                    ingest_payload["sequenced_library_assignment_euid"]
-                    == resolved_body["sequenced_library_assignment_euid"]
-                )
+            artifact = ursa_client.post(
+                f"/api/v1/analyses/{analysis_euid}/artifacts",
+                headers={"X-API-Key": "ursa-smoke-key"},
+                json={"artifact_euid": result_artifact_euid},
+            )
+            assert artifact.status_code == 201, artifact.text
 
-                artifact = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/artifacts",
-                    headers={"X-API-Key": "ursa-smoke-key"},
-                    json={
-                        "artifact_type": "vcf",
-                        "storage_uri": "s3://beta-analysis-artifacts/result.vcf.gz",
-                        "filename": "result.vcf.gz",
-                    },
-                )
-                assert artifact.status_code == 201, artifact.text
+            preapproval = ursa_client.post(
+                f"/api/v1/analyses/{analysis_euid}/return",
+                headers={
+                    "Authorization": "Bearer atlas-token",
+                    "Idempotency-Key": _opaque("idem-return-pre"),
+                },
+                json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
+            )
+            assert preapproval.status_code == 409, preapproval.text
 
-                preapproval = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/return",
-                    headers={
-                        "Idempotency-Key": _opaque("idem-return-pre"),
-                        "X-API-Key": "ursa-smoke-key",
-                    },
-                    json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
-                )
-                assert preapproval.status_code == 409, preapproval.text
+            review = ursa_client.post(
+                f"/api/v1/analyses/{analysis_euid}/review",
+                headers={"Authorization": "Bearer atlas-token"},
+                json={
+                    "review_state": "APPROVED",
+                    "reviewer": "qa-reviewer",
+                },
+            )
+            assert review.status_code == 200, review.text
 
-                review = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/review",
-                    headers={"X-API-Key": "ursa-smoke-key"},
-                    json={
-                        "review_state": "APPROVED",
-                        "reviewer": "qa-reviewer",
-                    },
-                )
-                assert review.status_code == 200, review.text
-
-                returned = ursa_client.post(
-                    f"/api/analyses/{analysis_euid}/return",
-                    headers={
-                        "Idempotency-Key": _opaque("idem-return"),
-                        "X-API-Key": "ursa-smoke-key",
-                    },
-                    json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
-                )
-                assert returned.status_code == 200, returned.text
-                return_body = returned.json()
-                _assert_no_uuid_keys(return_body)
-                assert return_body["state"] == "RETURNED"
-                assert return_body["review_state"] == "APPROVED"
+            returned = ursa_client.post(
+                f"/api/v1/analyses/{analysis_euid}/return",
+                headers={
+                    "Authorization": "Bearer atlas-token",
+                    "Idempotency-Key": _opaque("idem-return"),
+                },
+                json={"result_status": "COMPLETED", "result_payload": {"variants": []}},
+            )
+            assert returned.status_code == 200, returned.text
+            return_body = returned.json()
+            _assert_no_uuid_keys(return_body)
+            assert return_body["state"] == "RETURNED"
+            assert return_body["review_state"] == "APPROVED"
 
     recorded_request = captured_return["request"]
     assert recorded_request.atlas_tenant_id == str(tenant_id)

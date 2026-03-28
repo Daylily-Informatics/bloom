@@ -120,8 +120,8 @@ source bloom_activate.sh
 bloom db init
 bloom db seed
 
-# Start the web UI (default: http://localhost:8911)
-bloom gui
+# Start the web UI (default: https://localhost:8912)
+bloom server start
 ```
 
 ### Optional: pgAdmin4 Database Admin UI
@@ -148,15 +148,11 @@ Primary CLI groups:
 
 | Command | Description |
 |---|---|
-| `bloom db` | `init, start, stop, status, migrate, seed, shell, reset` |
-| `bloom gui` | Start the BLOOM web UI |
 | `bloom server` | `start, stop, status, logs` |
-| `bloom config` | Show or edit configuration |
-| `bloom info` | Show environment information |
-| `bloom status` | Check service status |
-| `bloom doctor` | Verify environment health |
-| `bloom shell` | Interactive Python shell |
-| `bloom logs` | View service logs |
+| `bloom db` | `init, start, stop, status, migrate, seed, shell, reset` |
+| `bloom config` | `path, init, show, validate, edit, reset, shell, doctor, status` |
+| `bloom info` | Show environment and runtime information |
+| `bloom version` | Show CLI version |
 | `bloom integrations` | Atlas integration management |
 | `bloom quality` | Code quality checks |
 | `bloom test` | Run targeted test suites |
@@ -327,6 +323,10 @@ Focused validation (matches CI):
 ```bash
 pytest --no-cov \
   tests/test_config_runtime.py \
+  tests/test_route_coverage_gaps_api.py \
+  tests/test_route_coverage_gaps_gui.py \
+  tests/test_api_v1.py \
+  tests/test_gui_endpoints.py \
   tests/test_api_atlas_bridge.py \
   tests/test_atlas_lookup_resilience.py \
   tests/test_queue_flow.py \
@@ -352,7 +352,7 @@ bloom db seed
 
 ```bash
 # Via CLI (recommended)
-bloom gui
+bloom server start
 
 # Or directly via uvicorn (dev mode, port 8911)
 uvicorn main:app --reload --port 8911
@@ -364,7 +364,7 @@ bash run_bloomui.sh --mode prod --port 8911
 ## Interactive Python Shell
 
 ```bash
-bloom shell
+bloom config shell
 ```
 
 ## pgAdmin UI
@@ -402,4 +402,3 @@ Given files may be reconstituted on a case-insensitive file system, all file nam
 
 #### Bloom UUIDs and EUIDs Are Safe As File Names
 Per [RFC 4122](https://datatracker.ietf.org/doc/html/rfc4122), UUID uppercase/lowercase are equivalent. Bloom EUIDs use an uppercase prefix followed by integers only.
-

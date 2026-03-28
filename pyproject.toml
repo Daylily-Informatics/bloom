@@ -23,9 +23,9 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
+    "cli-core-yo>=0.2.1",
     "daylily-tapdb==3.0.2",
     "daylily-cognito==0.1.28",
-    "click>=8.0",
     "fastapi>=0.110.0",
     "httpx>=0.27.2",
     "itsdangerous>=2.1.2",
@@ -81,6 +81,9 @@ fallback_version = "0.0.0.dev0"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["bloom_lims*"]
+
+[tool.setuptools.package-data]
+bloom_lims = ["etc/*.yaml"]
 
 # =============================================================================
 # BLOOM Environment Configuration

@@ -399,7 +399,7 @@ Do not rely on `COGNITO_*`, `BLOOM_AUTH__COGNITO_*`, or daycog env files for ser
 
    ```bash
    source bloom_activate.sh
-   bloom gui
+   bloom server start
    ```
 
 4. **Test authentication**:

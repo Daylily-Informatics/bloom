@@ -1,18 +1,28 @@
-"""Atlas-style quality command group for the Bloom CLI."""
+"""Quality commands for BLOOM CLI."""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cli_core_yo.registry import CommandRegistry
+    from cli_core_yo.spec import CliSpec
 
 import subprocess
 import sys
 from pathlib import Path
 
-import click
+import typer
+
+quality_app = typer.Typer(
+    help="Code-quality and validation commands", no_args_is_help=True
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _run(cmd: list[str]) -> None:
-    raise SystemExit(
+    raise typer.Exit(
         subprocess.run(
             cmd,
             cwd=PROJECT_ROOT,
@@ -21,13 +31,8 @@ def _run(cmd: list[str]) -> None:
     )
 
 
-@click.group()
-def quality():
-    """Code-quality and validation commands."""
-
-
-@quality.command("check")
-def check():
+@quality_app.command("check")
+def check() -> None:
     """Run the standard Bloom quality gates."""
     commands = (
         [sys.executable, "-m", "ruff", "check", "bloom_lims", "tests"],
@@ -36,26 +41,29 @@ def check():
     for cmd in commands:
         result = subprocess.run(cmd, cwd=PROJECT_ROOT, check=False)
         if result.returncode != 0:
-            raise SystemExit(result.returncode)
+            raise typer.Exit(result.returncode)
 
 
-@quality.command(
+@quality_app.command(
     "ruff",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
-@click.argument("ruff_args", nargs=-1, type=click.UNPROCESSED)
-def ruff(ruff_args: tuple[str, ...]):
+def ruff(ctx: typer.Context) -> None:
     """Run Ruff with optional extra arguments."""
-    args = list(ruff_args) or ["check", "bloom_lims", "tests"]
+    args = list(ctx.args) or ["check", "bloom_lims", "tests"]
     _run([sys.executable, "-m", "ruff", *args])
 
 
-@quality.command(
+@quality_app.command(
     "bandit",
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
-@click.argument("bandit_args", nargs=-1, type=click.UNPROCESSED)
-def bandit(bandit_args: tuple[str, ...]):
+def bandit(ctx: typer.Context) -> None:
     """Run Bandit with optional extra arguments."""
-    args = list(bandit_args) or ["-c", "pyproject.toml", "-r", "bloom_lims"]
+    args = list(ctx.args) or ["-c", "pyproject.toml", "-r", "bloom_lims"]
     _run([sys.executable, "-m", "bandit", *args])
+
+
+def register(registry: CommandRegistry, spec: CliSpec) -> None:
+    """cli-core-yo plugin: register the quality command group."""
+    registry.add_typer_app(None, quality_app, "quality", "Code-quality commands.")

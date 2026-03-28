@@ -67,22 +67,25 @@ if command -v conda &> /dev/null; then
     fi
 else
     echo -e "  ${_YELLOW}⚠${_NC} Conda not found."
+    return 1
 fi
 
-if [[ -n "${CONDA_PREFIX:-}" ]] && [[ -x "${CONDA_PREFIX}/bin/python" ]]; then
-    _BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
-elif command -v python &> /dev/null; then
-    _BLOOM_PYTHON="$(command -v python)"
+if [[ "${CONDA_DEFAULT_ENV:-}" != "BLOOM" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
+    echo -e "  ${_YELLOW}⚠${_NC} BLOOM conda environment is required."
+    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -f bloom_env.yaml' if needed, then retry 'source bloom_activate.sh'."
+    return 1
 fi
 
-if [[ -n "${_BLOOM_PYTHON}" ]]; then
-    _BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
-    export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
-fi
+_BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
+_BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
+export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
 
-if ! command -v bloom &> /dev/null || ! "${_BLOOM_PYTHON:-python}" -m pip show bloom_lims &> /dev/null 2>&1; then
+if ! command -v bloom &> /dev/null || ! "${_BLOOM_PYTHON}" -m pip show bloom_lims &> /dev/null 2>&1; then
     echo -e "  ${_CYAN}→${_NC} Installing bloom CLI..."
-    "${_BLOOM_PYTHON:-python}" -m pip install -e "$BLOOM_ROOT" -q
+    if ! "${_BLOOM_PYTHON}" -m pip install -e "$BLOOM_ROOT" -q; then
+        echo -e "  ${_YELLOW}⚠${_NC} Failed to install bloom into the BLOOM conda environment."
+        return 1
+    fi
     echo -e "  ${_GREEN}✓${_NC} Installed 'bloom' CLI command"
 else
     echo -e "  ${_GREEN}✓${_NC} 'bloom' CLI already installed"
@@ -109,7 +112,11 @@ export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-5566}"
 export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 _BLOOM_DEFAULT_TAPDB_CONFIG_PATH="$BLOOM_ROOT/config/tapdb-config-${TAPDB_DATABASE_NAME}.yaml"
-export TAPDB_CONFIG_PATH="${TAPDB_CONFIG_PATH:-$_BLOOM_DEFAULT_TAPDB_CONFIG_PATH}"
+if [[ -z "${TAPDB_CONFIG_PATH:-}" ]]; then
+    if [[ -f "$_BLOOM_DEFAULT_TAPDB_CONFIG_PATH" ]]; then
+        export TAPDB_CONFIG_PATH="$_BLOOM_DEFAULT_TAPDB_CONFIG_PATH"
+    fi
+fi
 export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
 export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
 export AWS_REGION="${AWS_REGION:-us-west-2}"
@@ -119,7 +126,11 @@ echo -e "  ${_GREEN}✓${_NC} TAPDB_ENV=${TAPDB_ENV}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_CLIENT_ID=${TAPDB_CLIENT_ID}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DATABASE_NAME=${TAPDB_DATABASE_NAME}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_STRICT_NAMESPACE=${TAPDB_STRICT_NAMESPACE}"
-echo -e "  ${_GREEN}✓${_NC} TAPDB_CONFIG_PATH=${TAPDB_CONFIG_PATH}"
+if [[ -n "${TAPDB_CONFIG_PATH:-}" ]]; then
+    echo -e "  ${_GREEN}✓${_NC} TAPDB_CONFIG_PATH=${TAPDB_CONFIG_PATH}"
+else
+    echo -e "  ${_YELLOW}⚠${_NC} TAPDB_CONFIG_PATH is not set"
+fi
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DEV_PORT=${TAPDB_DEV_PORT}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_TEST_PORT=${TAPDB_TEST_PORT}"
 echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
@@ -127,7 +138,7 @@ echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
 echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
 
 # Validate daylily-tapdb version policy
-python - <<'PY'
+"${_BLOOM_PYTHON}" - <<'PY'
 import importlib.metadata
 
 try:
@@ -173,14 +184,11 @@ echo -e "${_CYAN}BLOOM LIMS environment activated!${_NC}"
 echo ""
 echo "Command groups:"
 echo ""
+echo -e "  ${_CYAN}bloom server${_NC}    start, stop, status, logs"
 echo -e "  ${_CYAN}bloom db${_NC}        init, start, stop, status, migrate, seed, shell, reset"
-echo -e "  ${_CYAN}bloom gui${_NC}       Start the BLOOM web UI"
-echo -e "  ${_CYAN}bloom config${_NC}    Show or edit configuration"
+echo -e "  ${_CYAN}bloom config${_NC}    path, init, show, validate, edit, reset, shell, doctor, status"
 echo -e "  ${_CYAN}bloom info${_NC}      Show environment information"
-echo -e "  ${_CYAN}bloom status${_NC}    Check service status"
-echo -e "  ${_CYAN}bloom doctor${_NC}    Verify environment health"
-echo -e "  ${_CYAN}bloom shell${_NC}     Interactive Python shell"
-echo -e "  ${_CYAN}bloom logs${_NC}      View service logs"
+echo -e "  ${_CYAN}bloom version${_NC}   Show CLI version"
 echo ""
 echo -e "  ${_GREEN}bloom --help${_NC}          Show all available commands"
 echo -e "  ${_GREEN}deactivate_bloom${_NC}      Deactivate this environment"

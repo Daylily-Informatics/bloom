@@ -80,7 +80,7 @@ pytest  # You should get mostly successes, and some warnings (which are fine)
 # Open a tmux session which can be detached and reattached to later.
 tmux new -s bloom
 source bloom_activate.sh
-bloom gui  # or: source run_bloomui.sh (edit gunicorn command for external IP)
+bloom server start  # or: source run_bloomui.sh (edit gunicorn command for external IP)
 # ctrl-b d to detach from the tmux session
 # this will run, logging to stdout.  
 

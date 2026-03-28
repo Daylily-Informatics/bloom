@@ -1,28 +1,30 @@
-"""Atlas-style integrations group for the Bloom CLI."""
+"""External integration commands for the Bloom CLI."""
 
 from __future__ import annotations
 
-import click
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cli_core_yo.registry import CommandRegistry
+    from cli_core_yo.spec import CliSpec
+
+import typer
 from rich.console import Console
 from rich.table import Table
 
 from bloom_lims.config import get_settings
 
+integrations_app = typer.Typer(
+    help="External integration commands.", no_args_is_help=True
+)
+atlas_app = typer.Typer(
+    help="Atlas integration configuration and diagnostics.", no_args_is_help=True
+)
 console = Console()
 
 
-@click.group()
-def integrations():
-    """External integration commands."""
-
-
-@integrations.group()
-def atlas():
-    """Atlas integration configuration and diagnostics."""
-
-
-@atlas.command("show")
-def show_atlas_config():
+@atlas_app.command("show")
+def show_atlas_config() -> None:
     """Display the effective Atlas integration configuration."""
     settings = get_settings()
     table = Table(title="Bloom -> Atlas Integration")
@@ -37,8 +39,8 @@ def show_atlas_config():
     console.print(table)
 
 
-@atlas.command("doctor")
-def doctor_atlas_integration():
+@atlas_app.command("doctor")
+def doctor_atlas_integration() -> None:
     """Report whether Atlas integration settings are usable."""
     settings = get_settings()
     missing: list[str] = []
@@ -51,5 +53,15 @@ def doctor_atlas_integration():
             "[yellow]Atlas integration is partially configured.[/yellow] Missing: "
             + ", ".join(missing)
         )
-        raise SystemExit(1)
+        raise typer.Exit(1)
     console.print("[green]✓[/green] Atlas integration config is present")
+
+
+integrations_app.add_typer(atlas_app, name="atlas")
+
+
+def register(registry: CommandRegistry, spec: CliSpec) -> None:
+    """cli-core-yo plugin: register the integrations command group."""
+    registry.add_typer_app(
+        None, integrations_app, "integrations", "External integration commands."
+    )

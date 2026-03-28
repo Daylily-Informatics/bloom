@@ -7,43 +7,28 @@ for all BLOOM domain objects.
 Extracted from bloom_lims/bobjs.py for better code organization.
 """
 
-import os
 import json
-import re
-import random
-import string
 import logging
-import subprocess
-import socket
-from datetime import datetime, timedelta, date, UTC
-from pathlib import Path
-import urllib.parse
+import os
+import re
 
-import pytz
-import yaml
-import boto3
-import requests
-from botocore.exceptions import NoCredentialsError, PartialCredentialsError
-
+import zebra_day.print_mgr as zdpm
 from sqlalchemy import (
-    and_,
-    desc,
-    text,
-    or_,
-    cast,
-    func,
     DateTime,
-    select,
+    and_,
+    cast,
+    desc,
+    func,
+    or_,
+    text,
 )
 from sqlalchemy.orm.attributes import flag_modified
 
-import zebra_day.print_mgr as zdpm
-
 from bloom_lims.domain.utils import (
     get_datetime_string,
-    generate_random_string,
+)
+from bloom_lims.domain.utils import (
     update_recursive as _update_recursive,
-    unique_non_empty_strings,
 )
 
 # Try to import carrier tracking module (replaced fedex_tracking_day with daylily_carrier_tracking)
@@ -70,7 +55,6 @@ class BloomObj:
         if cfg_printers:
             self._config_printers()
 
-
         # Move the  fedex and zebra stuff outside these objs
         self.track_fedex = None
         if cfg_fedex:
@@ -87,7 +71,7 @@ class BloomObj:
                 self.logger.info(
                     "FedEx tracking disabled; missing FEDEX_API_KEY/FEDEX_SECRET"
                 )
-    
+
         self._bdb = bdb
         self.is_deleted = is_deleted
         self.session = bdb.session
@@ -305,6 +289,62 @@ class BloomObj:
                 pass
             return None
 
+    def _do_action_base(
+        self,
+        euid,
+        action,
+        action_group,
+        action_ds,
+        now_dt=None,
+    ):
+        """Update generic action bookkeeping and record the acting user lineage."""
+        resolved_now_dt = now_dt or get_datetime_string()
+        self.logger.debug(
+            "Completing Action: %s for %s at %s with %s",
+            action,
+            euid,
+            resolved_now_dt,
+            action_ds,
+        )
+        bobj = self.get_by_euid(euid)
+        if "action_groups" not in bobj.json_addl:
+            return bobj
+
+        action_state = bobj.json_addl["action_groups"][action_group]["actions"][action]
+        curr_action_count = int(action_state["action_executed"])
+        new_action_count = curr_action_count + 1
+
+        max_action_count = int(action_state["max_executions"])
+        if max_action_count > 0 and new_action_count >= max_action_count:
+            action_state["action_enabled"] = "0"
+        action_state["action_executed"] = f"{new_action_count}"
+
+        for deactivate_action in action_ds.get("deactivate_actions_when_executed", []):
+            try:
+                bobj.json_addl["action_groups"][action_group]["actions"][
+                    deactivate_action
+                ]["action_enabled"] = "0"
+            except Exception:
+                self.logger.debug(
+                    "Failed to deactivate %s for %s at %s with %s",
+                    deactivate_action,
+                    euid,
+                    resolved_now_dt,
+                    action_ds,
+                )
+
+        action_state["executed_datetime"].append(resolved_now_dt)
+        action_state["action_user"].append(action_ds.get("curr_user", "bloomdborm"))
+
+        flag_modified(bobj, "json_addl")
+        self.session.commit()
+        self.track_user_interaction(
+            euid,
+            relationship_type=f"user_action:{action}",
+            action_ds=action_ds,
+        )
+        return bobj
+
     def _fetch_fedex_tracking_ops_meta(self, tracking_number):
         """Fetch FedEx metadata across carrier-tracking API versions."""
         if not self.track_fedex:
@@ -329,7 +369,6 @@ class BloomObj:
         if isinstance(data, dict):
             return [data]
         return [dict(data)]
-
 
     def _rebuild_printer_json(self, lab="BLOOM"):
         self.zpld.probe_zebra_printers_add_to_printers_json(lab=lab)
@@ -387,8 +426,7 @@ class BloomObj:
         alt_f="",
         print_n=1,
     ):
-
-        bc = self.zpld.print_zpl(
+        self.zpld.print_zpl(
             lab=lab,
             printer_name=printer_name,
             uid_barcode=euid,
@@ -426,7 +464,7 @@ class BloomObj:
         template = self.get_by_euid(template_euid)
 
         if not template:
-            self.logger.debug(f"No template found with euid: " + template_euid)
+            self.logger.debug("No template found with euid: " + template_euid)
             return
 
         is_singleton = (
@@ -508,6 +546,7 @@ class BloomObj:
             )
 
         return parent_instance
+
     # fix naming, instance_type==table_name_prefix
     def create_instances(self, template_euid):
         """
@@ -566,7 +605,11 @@ class BloomObj:
         if all(isinstance(v, str) for v in action_imports.values()):
             flat_actions = {}
             for template_code in action_imports.values():
-                code = template_code if str(template_code).endswith("/") else f"{template_code}/"
+                code = (
+                    template_code
+                    if str(template_code).endswith("/")
+                    else f"{template_code}/"
+                )
                 flat_actions[code] = {}
             normalized_groups = {
                 "core": {
@@ -684,7 +727,7 @@ class BloomObj:
             category="generic",
             parent_type=f"{parent_instance.category}:{parent_instance.type}:{parent_instance.subtype}:{parent_instance.version}",
             child_type=f"{child_instance.category}:{child_instance.type}:{child_instance.subtype}:{child_instance.version}",
-            polymorphic_discriminator=f"generic_instance_lineage",
+            polymorphic_discriminator="generic_instance_lineage",
             relationship_type=relationship_type,
         )
         self.session.add(lineage_record)
@@ -693,7 +736,9 @@ class BloomObj:
 
         return lineage_record
 
-    def create_lineage(self, parent_instance, child_instance, relationship_type: str = "generic"):
+    def create_lineage(
+        self, parent_instance, child_instance, relationship_type: str = "generic"
+    ):
         """
         Backwards-compatible lineage creator.
 
@@ -845,8 +890,8 @@ class BloomObj:
                 f"Multiple {len(combined_result)} templates found for {euid}"
             )
         elif len(combined_result) == 0:
-            self.logger.debug(f"No template found with euid: " + euid)
-            raise Exception(f"No template found with euid: " + euid)
+            self.logger.debug("No template found with euid: " + euid)
+            raise Exception("No template found with euid: " + euid)
         else:
             return combined_result[0]
 
@@ -865,9 +910,7 @@ class BloomObj:
         if type is not None:
             query = query.filter(self.Base.classes.generic_instance.type == type)
         if subtype is not None:
-            query = query.filter(
-                self.Base.classes.generic_instance.subtype == subtype
-            )
+            query = query.filter(self.Base.classes.generic_instance.subtype == subtype)
         if version is not None:
             query = query.filter(self.Base.classes.generic_instance.version == version)
 
@@ -878,20 +921,20 @@ class BloomObj:
         # Execute the query
         return query.all()
 
-
     # should abstract to not assume properties key
-    def get_unique_property_values(self, property_key, category=None, type=None, subtype=None, version=None):
-
+    def get_unique_property_values(
+        self, property_key, category=None, type=None, subtype=None, version=None
+    ):
         json_path = property_key.split("->")
 
         # Start building the query with the base table
-        query = self.session.query(
-            self.Base.classes.generic_instance
-        )
+        query = self.session.query(self.Base.classes.generic_instance)
 
         # Add filters based on the provided arguments
         if category:
-            query = query.filter(self.Base.classes.generic_instance.category == category)
+            query = query.filter(
+                self.Base.classes.generic_instance.category == category
+            )
         if type:
             query = query.filter(self.Base.classes.generic_instance.type == type)
         if subtype:
@@ -903,12 +946,13 @@ class BloomObj:
         query = query.with_entities(
             func.distinct(
                 func.jsonb_extract_path_text(
-                    self.Base.classes.generic_instance.json_addl['properties'], *json_path
+                    self.Base.classes.generic_instance.json_addl["properties"],
+                    *json_path,
                 )
             )
         ).filter(
             func.jsonb_extract_path_text(
-                self.Base.classes.generic_instance.json_addl['properties'], *json_path
+                self.Base.classes.generic_instance.json_addl["properties"], *json_path
             ).isnot(None)
         )
 
@@ -917,9 +961,8 @@ class BloomObj:
 
         # Extract unique values from the query results
         unique_values = [value[0] for value in results if value[0] is not None]
-        
-        return unique_values
 
+        return unique_values
 
     def query_template_by_component_v2(
         self, category=None, type=None, subtype=None, version=None
@@ -935,9 +978,7 @@ class BloomObj:
             query = query.filter(self.Base.classes.generic_template.type == type)
 
         if subtype is not None:
-            query = query.filter(
-                self.Base.classes.generic_template.subtype == subtype
-            )
+            query = query.filter(self.Base.classes.generic_template.subtype == subtype)
         if version is not None:
             query = query.filter(self.Base.classes.generic_template.version == version)
 
@@ -947,7 +988,6 @@ class BloomObj:
         # Execute the query
         return query.all()
 
-   
     def query_user_audit_logs(self, username):
         logging.debug(f"Querying audit log for user: {username}")
 
@@ -980,12 +1020,13 @@ class BloomObj:
 
         logging.debug(f"Executing query: {q}")
 
-        result = self.session.execute(q, {'username': username})
+        result = self.session.execute(q, {"username": username})
         rows = result.fetchall()
 
         logging.debug(f"Query returned {len(rows)} rows")
 
         return rows
+
     # Aggregate Report SQL
     def query_generic_template_stats(self):
         q = text(
@@ -1101,13 +1142,13 @@ class BloomObj:
             JOIN generic_instance child_gi ON gil.child_instance_uid = child_gi.uid
             WHERE NOT child_gi.is_deleted -- Assuming you want to exclude deleted instances
         )
-        SELECT d.euid, 
+        SELECT d.euid,
             d.json_addl -> 'cogs' ->> 'cost' AS cost
         FROM descendants d
-        WHERE d.json_addl ? 'cogs' AND 
-            d.json_addl -> 'cogs' ? 'cost' AND 
+        WHERE d.json_addl ? 'cogs' AND
+            d.json_addl -> 'cogs' ? 'cost' AND
             d.json_addl -> 'cogs' ->> 'cost' <> ''
-        ORDER BY d.created_dt DESC -- Order the final result set        
+        ORDER BY d.created_dt DESC -- Order the final result set
         """
         )
 
@@ -1120,7 +1161,6 @@ class BloomObj:
         return euid_cost_tuples
 
     def query_all_fedex_transit_times_by_ay_euid(self, qx_euid):
-
         query = text(
             """SELECT gi.euid,
         gi.json_addl -> 'properties' -> 'fedex_tracking_data' -> 0 ->> 'Transit_Time_sec' AS transit_time
@@ -1217,15 +1257,14 @@ class BloomObj:
 
         # Execute the query with bound parameters (prevents SQL injection)
         result = self.session.execute(
-            query,
-            {"start_euid": str(start_euid), "depth": int(depth)}
+            query, {"start_euid": str(start_euid), "depth": int(depth)}
         )
         return result
 
-    def create_instance_by_template_components(
-        self, category, type, subtype, version
-    ):
-        templates = self.query_template_by_component_v2(category, type, subtype, version)
+    def create_instance_by_template_components(self, category, type, subtype, version):
+        templates = self.query_template_by_component_v2(
+            category, type, subtype, version
+        )
         if not templates:
             raise Exception(
                 f"Template not found: {category}/{type}/{subtype}/{version}. "
@@ -1291,19 +1330,28 @@ class BloomObj:
         self.session.commit()
 
     def do_action_add_file_to_file_set(self, file_set_euid, action_ds):
-        bfs = BloomFileSet(BLOOMdb3())
+        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain.files import BloomFileSet
+
+        bfs = BloomFileSet(
+            BLOOMdb3(app_username=getattr(self._bdb, "app_username", ""))
+        )
         bfs.add_files_to_file_set(
             euid=file_set_euid, file_euid=[action_ds["captured_data"]["file_euid"]]
         )
 
     def do_action_remove_file_from_file_set(self, file_set_euid, action_ds):
-        bfs = BloomFileSet(BLOOMdb3())
+        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain.files import BloomFileSet
+
+        bfs = BloomFileSet(
+            BLOOMdb3(app_username=getattr(self._bdb, "app_username", ""))
+        )
         bfs.remove_files_from_file_set(
             euid=file_set_euid, file_euid=[action_ds["captured_data"]["file_euid"]]
         )
 
     def do_action_add_relationships(self, euid, action_ds):
-
         euid_obj = self.get_by_euid(euid)
         lineage_to_create = action_ds["captured_data"]["lineage_type_to_create"]
         relationship_type = action_ds["captured_data"]["relationship_type"]
@@ -1375,7 +1423,6 @@ class BloomObj:
         plate_wells = {}
         for lin in plate.parent_of_lineages:
             if lin.child_instance.type == "well":
-
                 well = lin.child_instance
                 content_arr = []
                 for c in well.parent_of_lineages:
@@ -1400,8 +1447,10 @@ class BloomObj:
         return plate_wells
 
     def do_action_download_file(self, euid, action_ds):
+        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain.files import BloomFile
 
-        bf = BloomFile(BLOOMdb3())
+        bf = BloomFile(BLOOMdb3(app_username=getattr(self._bdb, "app_username", "")))
         dl_file = bf.download_file(
             euid=euid,
             include_metadata=(
@@ -1453,7 +1502,7 @@ class BloomObj:
                         self.create_generic_instance_lineage_by_euids(
                             spod[well_name][0].euid, dest_well.child_instance.euid
                         )
-                        if spod[well_name][1] != None:
+                        if spod[well_name][1] is not None:
                             for dwc in dest_well.child_instance.parent_of_lineages:
                                 if dwc.child_instance.category == "content":
                                     self.create_generic_instance_lineage_by_euids(
@@ -1478,12 +1527,13 @@ class BloomObj:
         return wfs
 
     def do_action_move_workset_to_another_queue(self, euid, action_ds):
-
         wfset = self.get_by_euid(euid)
         action_ds["captured_data"]["q_selection"]
 
         # Filter to only get active (non-deleted) lineages
-        active_child_of_lineages = [lin for lin in wfset.child_of_lineages if not lin.is_deleted]
+        active_child_of_lineages = [
+            lin for lin in wfset.child_of_lineages if not lin.is_deleted
+        ]
 
         # EXTRAORDINARILY SLOPPY.  I AM IN A REAL RUSH FOR FEATURES THO :-/
         destination_q = ""
@@ -1497,11 +1547,17 @@ class BloomObj:
 
         # Get active lineages for traversal (filter out deleted ones)
         current_lineage = active_child_of_lineages[0]
-        parent_active_lineages = [lin for lin in current_lineage.parent_instance.child_of_lineages if not lin.is_deleted]
+        parent_active_lineages = [
+            lin
+            for lin in current_lineage.parent_instance.child_of_lineages
+            if not lin.is_deleted
+        ]
 
         if len(parent_active_lineages) == 0:
-            self.logger.exception(f"ERROR: No active parent lineages found")
-            raise Exception(f"ERROR: No active parent lineages found for queue traversal")
+            self.logger.exception("ERROR: No active parent lineages found")
+            raise Exception(
+                "ERROR: No active parent lineages found for queue traversal"
+            )
 
         parent_of_parent = parent_active_lineages[0].parent_instance
         for q in parent_of_parent.parent_of_lineages:
@@ -1515,7 +1571,9 @@ class BloomObj:
                 break
 
         if len(active_child_of_lineages) != 1 or destination_q == "":
-            self.logger.exception(f"ERROR: {action_ds['captured_data']['q_selection']} - active lineages: {len(active_child_of_lineages)}, destination_q found: {destination_q != ''}")
+            self.logger.exception(
+                f"ERROR: {action_ds['captured_data']['q_selection']} - active lineages: {len(active_child_of_lineages)}, destination_q found: {destination_q != ''}"
+            )
             raise Exception(f"ERROR: {action_ds['captured_data']['q_selection']}")
 
         lineage_link = active_child_of_lineages[0]
@@ -1669,19 +1727,7 @@ class BloomObj:
             ctr += 1
         return tot_cost if ctr > 0 else "na"
 
-        # Start with the provided EUID
-        initial_instance = (
-            self.session.query(self.Base.classes.generic_instance)
-            .filter_by(euid=euid)
-            .first()
-        )
-        if initial_instance:
-            return traverse_and_calculate_children_cogs(initial_instance)
-        else:
-            return 0
-
     def get_cogs_to_produce_euid(self, euid):
-
         # Function to fetch and calculate the COGS for a given object
         def calculate_cogs(orm_instance):
             if (
@@ -1698,9 +1744,6 @@ class BloomObj:
             cost = float(orm_instance.json_addl["cogs"]["cost"])
             fractional_cost = float(
                 orm_instance.json_addl["cogs"].get("fractional_cost", 1)
-            )
-            allocation_type = orm_instance.json_addl["cogs"].get(
-                "allocation_type", "single"
             )
 
             active_children = len(
@@ -1738,7 +1781,6 @@ class BloomObj:
         else:
             return 0
 
-
     def search_objs_by_addl_metadata(
         self,
         file_search_criteria,
@@ -1748,46 +1790,57 @@ class BloomObj:
         category=None,
     ):
         query = self.session.query(self.Base.classes.generic_instance)
-        
+
         def create_datetime_filter(key, value, conditions):
-            start_datetime = value.get('start')
-            end_datetime = value.get('end', start_datetime)
+            start_datetime = value.get("start")
+            end_datetime = value.get("end", start_datetime)
             if start_datetime > end_datetime:
-                self.logger.exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
-                raise Exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
-            
+                self.logger.exception(
+                    f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}"
+                )
+                raise Exception(
+                    f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}"
+                )
+
             if start_datetime and end_datetime:
                 json_path = key.split("->")
-                
+
                 non_empty_condition = and_(
-                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path) != '',
-                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path).isnot(None)
+                    func.jsonb_extract_path_text(
+                        self.Base.classes.generic_instance.json_addl, *json_path
+                    )
+                    != "",
+                    func.jsonb_extract_path_text(
+                        self.Base.classes.generic_instance.json_addl, *json_path
+                    ).isnot(None),
                 )
-                
+
                 datetime_condition = cast(
                     func.jsonb_extract_path_text(
                         self.Base.classes.generic_instance.json_addl, *json_path
-                    ), 
-                    DateTime
+                    ),
+                    DateTime,
                 ).between(start_datetime, end_datetime)
-                
+
                 combined_condition = and_(non_empty_condition, datetime_condition)
-                
+
                 conditions.append(combined_condition)
-        
+
         def handle_jsonb_filter(key, value, conditions):
             if isinstance(value, dict):
                 for sub_key, sub_value in value.items():
-                    if sub_key.endswith('_datetime') and isinstance(sub_value, dict):
-                        create_datetime_filter(f"{key}->{sub_key}", sub_value, conditions)
+                    if sub_key.endswith("_datetime") and isinstance(sub_value, dict):
+                        create_datetime_filter(
+                            f"{key}->{sub_key}", sub_value, conditions
+                        )
                     else:
                         if isinstance(sub_value, list):
                             for item in sub_value:
                                 jsonb_filter = {key: {sub_key: item}}
                                 conditions.append(
-                                    self.Base.classes.generic_instance.json_addl.op("@>")(
-                                        json.dumps(jsonb_filter, default=str)
-                                    )
+                                    self.Base.classes.generic_instance.json_addl.op(
+                                        "@>"
+                                    )(json.dumps(jsonb_filter, default=str))
                                 )
                         else:
                             jsonb_filter = {key: {sub_key: sub_value}}
@@ -1842,9 +1895,7 @@ class BloomObj:
             query = query.filter(self.Base.classes.generic_instance.type == type)
 
         if subtype is not None:
-            query = query.filter(
-                self.Base.classes.generic_instance.subtype == subtype
-            )
+            query = query.filter(self.Base.classes.generic_instance.subtype == subtype)
 
         if category is not None:
             query = query.filter(
@@ -1865,38 +1916,49 @@ class BloomObj:
         category=None,
     ):
         query = self.session.query(self.Base.classes.generic_instance)
-        
+
         def create_datetime_filter(key, value, conditions):
-            start_datetime = value.get('start')
-            end_datetime = value.get('end', start_datetime )
+            start_datetime = value.get("start")
+            end_datetime = value.get("end", start_datetime)
             if start_datetime > end_datetime:
-                self.logger.exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
-                raise Exception(f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}")
-            
+                self.logger.exception(
+                    f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}"
+                )
+                raise Exception(
+                    f"ERROR: start_datetime {start_datetime} is greater than end_datetime {end_datetime}"
+                )
+
             if start_datetime and end_datetime:
                 json_path = key.split("->")
-                
+
                 non_empty_condition = and_(
-                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path) != '',
-                    func.jsonb_extract_path_text(self.Base.classes.generic_instance.json_addl, *json_path).isnot(None)
+                    func.jsonb_extract_path_text(
+                        self.Base.classes.generic_instance.json_addl, *json_path
+                    )
+                    != "",
+                    func.jsonb_extract_path_text(
+                        self.Base.classes.generic_instance.json_addl, *json_path
+                    ).isnot(None),
                 )
-                
+
                 datetime_condition = cast(
                     func.jsonb_extract_path_text(
                         self.Base.classes.generic_instance.json_addl, *json_path
-                    ), 
-                    DateTime
+                    ),
+                    DateTime,
                 ).between(start_datetime, end_datetime)
-                
+
                 combined_condition = and_(non_empty_condition, datetime_condition)
-                
+
                 conditions.append(combined_condition)
-            
+
         def handle_jsonb_filter(key, value, conditions):
             if isinstance(value, dict):
                 for sub_key, sub_value in value.items():
-                    if sub_key.endswith('_datetime') and isinstance(sub_value, dict):
-                        create_datetime_filter(f"{key}->{sub_key}", sub_value, conditions)
+                    if sub_key.endswith("_datetime") and isinstance(sub_value, dict):
+                        create_datetime_filter(
+                            f"{key}->{sub_key}", sub_value, conditions
+                        )
                     else:
                         jsonb_filter = {key: {sub_key: sub_value}}
                         conditions.append(
@@ -1941,9 +2003,7 @@ class BloomObj:
             query = query.filter(self.Base.classes.generic_instance.type == type)
 
         if subtype is not None:
-            query = query.filter(
-                self.Base.classes.generic_instance.subtype == subtype
-            )
+            query = query.filter(self.Base.classes.generic_instance.subtype == subtype)
 
         if category is not None:
             query = query.filter(
@@ -1954,7 +2014,6 @@ class BloomObj:
 
         results = query.all()
         return [result.euid for result in results]
-
 
 
 __all__ = [
