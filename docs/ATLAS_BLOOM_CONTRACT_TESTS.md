@@ -91,7 +91,7 @@ def test_webhook_signature_contract():
 ## Run Commands
 
 ```bash
-source /Users/jmajor/projects/daylily/bloom/bloom_activate.sh
+source /Users/jmajor/projects/daylily/bloom/activate
 pytest --no-cov -q tests/test_atlas_workflow_contract.py
 pytest --no-cov -q tests/test_atlas_lookup_resilience.py
 ```

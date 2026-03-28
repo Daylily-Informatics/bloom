@@ -69,7 +69,7 @@ cd ~/projects/git/bloom/
 
 
 # Activate the BLOOM environment and initialize TapDB-managed runtime/database.
-source bloom_activate.sh
+source ./activate
 bloom db init --force
 
 # Test your install
@@ -79,7 +79,7 @@ pytest  # You should get mostly successes, and some warnings (which are fine)
 # The DB is running, we can now start the UI
 # Open a tmux session which can be detached and reattached to later.
 tmux new -s bloom
-source bloom_activate.sh
+source ./activate
 bloom server start  # or: source run_bloomui.sh (edit gunicorn command for external IP)
 # ctrl-b d to detach from the tmux session
 # this will run, logging to stdout.  

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -75,12 +76,16 @@ def create_app() -> FastAPI:
     settings = get_settings()
     _validate_required_config(settings)
     allow_local_domain_access = not settings.is_production
-    app = FastAPI()
 
-    @app.on_event("shutdown")
-    def _shutdown_cleanup() -> None:
-        # Best-effort shutdown to flush/stop metrics writer.
-        stop_all_writers()
+    @asynccontextmanager
+    async def _lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            # Best-effort shutdown to flush/stop metrics writer.
+            stop_all_writers()
+
+    app = FastAPI(lifespan=_lifespan)
 
     # Request attribution context for TapDB-style DB metrics.
     @app.middleware("http")
