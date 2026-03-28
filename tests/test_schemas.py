@@ -51,7 +51,9 @@ class TestBaseSchemas:
         # Valid EUIDs (TapDB/Meridian)
         assert validate_euid(cx1) == cx1
         assert validate_euid(cx123) == cx123
-        assert validate_euid(f"  {wx1000.lower()}  ") == wx1000  # Should uppercase and strip
+        assert (
+            validate_euid(f"  {wx1000.lower()}  ") == wx1000
+        )  # Should uppercase and strip
 
         # Invalid EUIDs
         with pytest.raises(ValueError):
@@ -360,7 +362,9 @@ class TestBloomExceptions:
     Python's built-in LogRecord 'message' attribute.
     """
 
-    @pytest.mark.skip(reason="Logger extra contains 'message' key that conflicts with LogRecord")
+    @pytest.mark.skip(
+        reason="Logger extra contains 'message' key that conflicts with LogRecord"
+    )
     def test_bloom_error_basic(self):
         """Test basic BloomError creation."""
         from bloom_lims.exceptions import BloomError
@@ -368,7 +372,9 @@ class TestBloomExceptions:
         error = BloomError("Test error message")
         assert error.message == "Test error message"
 
-    @pytest.mark.skip(reason="Logger extra contains 'message' key that conflicts with LogRecord")
+    @pytest.mark.skip(
+        reason="Logger extra contains 'message' key that conflicts with LogRecord"
+    )
     def test_validation_error(self):
         """Test ValidationError subclass."""
         from bloom_lims.exceptions import ValidationError
@@ -383,41 +389,49 @@ class TestExceptionImports:
     def test_import_bloom_error(self):
         """Test BloomError can be imported."""
         from bloom_lims.exceptions import BloomError
+
         assert BloomError is not None
 
     def test_import_validation_error(self):
         """Test ValidationError can be imported."""
         from bloom_lims.exceptions import ValidationError
+
         assert ValidationError is not None
 
     def test_import_not_found_error(self):
         """Test NotFoundError can be imported."""
         from bloom_lims.exceptions import NotFoundError
+
         assert NotFoundError is not None
 
     def test_import_database_error(self):
         """Test DatabaseError can be imported."""
         from bloom_lims.exceptions import DatabaseError
+
         assert DatabaseError is not None
 
     def test_import_authentication_error(self):
         """Test AuthenticationError can be imported."""
         from bloom_lims.exceptions import AuthenticationError
+
         assert AuthenticationError is not None
 
     def test_import_authorization_error(self):
         """Test AuthorizationError can be imported."""
         from bloom_lims.exceptions import AuthorizationError
+
         assert AuthorizationError is not None
 
     def test_import_configuration_error(self):
         """Test ConfigurationError can be imported."""
         from bloom_lims.exceptions import ConfigurationError
+
         assert ConfigurationError is not None
 
     def test_import_external_service_error(self):
         """Test ExternalServiceError can be imported."""
         from bloom_lims.exceptions import ExternalServiceError
+
         assert ExternalServiceError is not None
 
 
@@ -427,17 +441,20 @@ class TestDomainWorkflows:
     def test_import_bloom_workflow(self):
         """Test BloomWorkflow import."""
         from bloom_lims.domain.workflows import BloomWorkflow
+
         assert BloomWorkflow is not None
 
     def test_import_bloom_workflow_step(self):
         """Test BloomWorkflowStep import."""
         from bloom_lims.domain.workflows import BloomWorkflowStep
+
         assert BloomWorkflowStep is not None
 
     def test_workflow_inherits_from_bloom_obj(self):
         """Test BloomWorkflow inherits from BloomObj."""
         from bloom_lims.domain.base import BloomObj
         from bloom_lims.domain.workflows import BloomWorkflow
+
         assert issubclass(BloomWorkflow, BloomObj)
 
 
@@ -447,17 +464,20 @@ class TestDomainFiles:
     def test_import_bloom_file(self):
         """Test BloomFile import."""
         from bloom_lims.domain.files import BloomFile
+
         assert BloomFile is not None
 
     def test_import_bloom_file_set(self):
         """Test BloomFileSet import."""
         from bloom_lims.domain.files import BloomFileSet
+
         assert BloomFileSet is not None
 
     def test_file_inherits_from_bloom_obj(self):
         """Test BloomFile inherits from BloomObj."""
         from bloom_lims.domain.base import BloomObj
         from bloom_lims.domain.files import BloomFile
+
         assert issubclass(BloomFile, BloomObj)
 
 
@@ -467,6 +487,7 @@ class TestDomainContainers:
     def test_import_bloom_container(self):
         """Test BloomContainer import."""
         from bloom_lims.domain.containers import BloomContainer
+
         assert BloomContainer is not None
 
 
@@ -476,6 +497,7 @@ class TestDomainContent:
     def test_import_bloom_content(self):
         """Test BloomContent import."""
         from bloom_lims.domain.content import BloomContent
+
         assert BloomContent is not None
 
 
@@ -485,6 +507,7 @@ class TestDomainEquipment:
     def test_import_bloom_equipment(self):
         """Test BloomEquipment import."""
         from bloom_lims.domain.equipment import BloomEquipment
+
         assert BloomEquipment is not None
 
 
@@ -494,37 +517,44 @@ class TestCoreModuleImports:
     def test_import_lru_cache(self):
         """Test LRUCache import."""
         from bloom_lims.core.cache import LRUCache
+
         assert LRUCache is not None
 
     def test_import_cache_entry(self):
         """Test CacheEntry import."""
         from bloom_lims.core.cache import CacheEntry
+
         assert CacheEntry is not None
 
     def test_import_cache_stats(self):
         """Test CacheStats import."""
         from bloom_lims.core.cache import CacheStats
+
         assert CacheStats is not None
 
     def test_import_template_validator(self):
         """Test TemplateValidator import."""
         from bloom_lims.core.template_validation import TemplateValidator
+
         assert TemplateValidator is not None
 
     def test_import_batch_processor(self):
         """Test BatchProcessor import."""
         from bloom_lims.core.batch_operations import BatchProcessor
+
         assert BatchProcessor is not None
 
     def test_import_async_operations(self):
         """Test async operations imports."""
         from bloom_lims.core.async_operations import BackgroundTaskManager, TaskStatus
+
         assert BackgroundTaskManager is not None
         assert TaskStatus is not None
 
     def test_import_task_result(self):
         """Test TaskResult import."""
         from bloom_lims.core.async_operations import TaskResult
+
         assert TaskResult is not None
 
 
@@ -534,26 +564,31 @@ class TestHealthModuleImports:
     def test_import_health_router(self):
         """Test health_router import."""
         from bloom_lims.health import health_router
+
         assert health_router is not None
 
     def test_import_component_health(self):
         """Test ComponentHealth import."""
         from bloom_lims.health import ComponentHealth
+
         assert ComponentHealth is not None
 
     def test_import_health_response(self):
         """Test HealthResponse import."""
         from bloom_lims.health import HealthResponse
+
         assert HealthResponse is not None
 
     def test_import_liveness_response(self):
         """Test LivenessResponse import."""
         from bloom_lims.health import LivenessResponse
+
         assert LivenessResponse is not None
 
     def test_import_readiness_response(self):
         """Test ReadinessResponse import."""
         from bloom_lims.health import ReadinessResponse
+
         assert ReadinessResponse is not None
 
     def test_component_health_model(self):
@@ -561,10 +596,7 @@ class TestHealthModuleImports:
         from bloom_lims.health import ComponentHealth
 
         component = ComponentHealth(
-            name="test",
-            status="healthy",
-            latency_ms=10.5,
-            message="Test component"
+            name="test", status="healthy", latency_ms=10.5, message="Test component"
         )
         assert component.name == "test"
         assert component.status == "healthy"
@@ -576,10 +608,7 @@ class TestHealthModuleImports:
 
         from bloom_lims.health import LivenessResponse
 
-        response = LivenessResponse(
-            status="ok",
-            timestamp=datetime.utcnow()
-        )
+        response = LivenessResponse(status="ok", timestamp=datetime.utcnow())
         assert response.status == "ok"
         assert response.timestamp is not None
 
@@ -603,11 +632,13 @@ class TestDomainBaseImports:
     def test_import_bloom_obj(self):
         """Test BloomObj import."""
         from bloom_lims.domain.base import BloomObj
+
         assert BloomObj is not None
 
     def test_import_db_class(self):
         """Test BLOOMdb3 import."""
         from bloom_lims.db import BLOOMdb3
+
         assert BLOOMdb3 is not None
 
 
@@ -617,6 +648,7 @@ class TestConfigModuleTests:
     def test_import_settings(self):
         """Test get_settings import."""
         from bloom_lims.config import get_settings
+
         assert get_settings is not None
 
     def test_get_settings_returns_settings(self):
@@ -649,6 +681,7 @@ class TestAPIVersioningImports:
     def test_import_versioning(self):
         """Test versioning module import."""
         from bloom_lims.api import versioning
+
         assert versioning is not None
 
 
@@ -658,11 +691,13 @@ class TestRateLimitingImports:
     def test_import_rate_limiting(self):
         """Test rate limiting module import."""
         from bloom_lims.api import rate_limiting
+
         assert rate_limiting is not None
 
     def test_import_rate_limit_middleware(self):
         """Test RateLimitMiddleware import."""
         from bloom_lims.api.rate_limiting import RateLimitMiddleware
+
         assert RateLimitMiddleware is not None
 
 
@@ -672,29 +707,34 @@ class TestDomainBaseImportsExtended:
     def test_import_bloom_obj_class(self):
         """Test BloomObj class import."""
         from bloom_lims.domain.base import BloomObj
+
         assert BloomObj is not None
 
     def test_import_bloomdb3_class(self):
         """Test BLOOMdb3 class import."""
         from bloom_lims.db import BLOOMdb3
+
         assert BLOOMdb3 is not None
 
     def test_bloom_obj_has_get_by_euid(self):
         """Test BloomObj has get_by_euid method."""
         from bloom_lims.domain.base import BloomObj
-        assert hasattr(BloomObj, 'get_by_euid')
+
+        assert hasattr(BloomObj, "get_by_euid")
 
     def test_bloom_obj_does_not_have_uuid_helpers(self):
         """Test BloomObj no longer exposes UUID helper methods."""
         from bloom_lims.domain.base import BloomObj
-        assert not hasattr(BloomObj, 'get')
-        assert not hasattr(BloomObj, 'delete_by_uuid')
-        assert not hasattr(BloomObj, 'create_instances_from_uuid')
+
+        assert not hasattr(BloomObj, "get")
+        assert not hasattr(BloomObj, "delete_by_uuid")
+        assert not hasattr(BloomObj, "create_instances_from_uuid")
 
     def test_bloom_obj_has_create_instance(self):
         """Test BloomObj has create_instance method."""
         from bloom_lims.domain.base import BloomObj
-        assert hasattr(BloomObj, 'create_instance')
+
+        assert hasattr(BloomObj, "create_instance")
 
 
 class TestCoreExceptionsImports:
@@ -703,21 +743,25 @@ class TestCoreExceptionsImports:
     def test_import_bloom_error(self):
         """Test BloomError import."""
         from bloom_lims.core.exceptions import BloomError
+
         assert BloomError is not None
 
     def test_import_bloom_not_found_error(self):
         """Test BloomNotFoundError import."""
         from bloom_lims.core.exceptions import BloomNotFoundError
+
         assert BloomNotFoundError is not None
 
     def test_import_bloom_database_error(self):
         """Test BloomDatabaseError import."""
         from bloom_lims.core.exceptions import BloomDatabaseError
+
         assert BloomDatabaseError is not None
 
     def test_import_bloom_validation_error(self):
         """Test BloomValidationError import."""
         from bloom_lims.core.exceptions import BloomValidationError
+
         assert BloomValidationError is not None
 
 
@@ -727,6 +771,7 @@ class TestTapdbAdapterImports:
     def test_import_tapdb_adapter(self):
         """Test tapdb adapter import."""
         from bloom_lims import tapdb_adapter
+
         assert tapdb_adapter is not None
 
 
@@ -736,6 +781,7 @@ class TestSubjectingImports:
     def test_import_subjecting(self):
         """Test subjecting module import."""
         from bloom_lims import subjecting
+
         assert subjecting is not None
 
 
@@ -745,6 +791,7 @@ class TestDomainObjectSetsImports:
     def test_import_object_sets(self):
         """Test object_sets module import."""
         from bloom_lims.domain import object_sets
+
         assert object_sets is not None
 
 
@@ -754,11 +801,13 @@ class TestBatchOperationsImports:
     def test_import_batch_operations(self):
         """Test batch operations module import."""
         from bloom_lims.core import batch_operations
+
         assert batch_operations is not None
 
     def test_import_batch_processor(self):
         """Test BatchProcessor import."""
         from bloom_lims.core.batch_operations import BatchProcessor
+
         assert BatchProcessor is not None
 
 
@@ -768,6 +817,7 @@ class TestCacheBackendsImports:
     def test_import_cache_backends(self):
         """Test cache backends module import."""
         from bloom_lims.core import cache_backends
+
         assert cache_backends is not None
 
 
@@ -777,6 +827,7 @@ class TestReadReplicasImports:
     def test_import_read_replicas(self):
         """Test read replicas module import."""
         from bloom_lims.core import read_replicas
+
         assert read_replicas is not None
 
 
@@ -786,6 +837,7 @@ class TestLineageImports:
     def test_import_lineage(self):
         """Test lineage module import."""
         from bloom_lims.core import lineage
+
         assert lineage is not None
 
 
@@ -795,6 +847,7 @@ class TestCachedRepositoryImports:
     def test_import_cached_repository(self):
         """Test cached repository module import."""
         from bloom_lims.core import cached_repository
+
         assert cached_repository is not None
 
 
@@ -804,6 +857,7 @@ class TestContainersImports:
     def test_import_core_containers(self):
         """Test core containers module import."""
         from bloom_lims.core import containers
+
         assert containers is not None
 
 
@@ -813,6 +867,7 @@ class TestContentImports:
     def test_import_core_content(self):
         """Test core content module import."""
         from bloom_lims.core import content
+
         assert content is not None
 
 
@@ -822,6 +877,7 @@ class TestCoreWorkflowsImports:
     def test_import_core_workflows(self):
         """Test core workflows module import."""
         from bloom_lims.core import workflows
+
         assert workflows is not None
 
 
@@ -831,4 +887,5 @@ class TestBaseObjectsImports:
     def test_import_base_objects(self):
         """Test base objects module import."""
         from bloom_lims.core import base_objects
+
         assert base_objects is not None

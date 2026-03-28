@@ -88,7 +88,9 @@ class PaginationParams(BloomBaseSchema):
     page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
     page_size: int = Field(default=50, ge=1, le=1000, description="Items per page")
     sort_by: Optional[str] = Field(None, description="Field to sort by")
-    sort_order: str = Field(default="asc", pattern="^(asc|desc)$", description="Sort order")
+    sort_order: str = Field(
+        default="asc", pattern="^(asc|desc)$", description="Sort order"
+    )
 
     @property
     def offset(self) -> int:
@@ -134,7 +136,9 @@ class SuccessResponse(BloomBaseSchema):
     """Standard success response."""
 
     success: bool = Field(default=True, description="Operation success flag")
-    message: str = Field(default="Operation completed successfully", description="Success message")
+    message: str = Field(
+        default="Operation completed successfully", description="Success message"
+    )
     data: Optional[Dict[str, Any]] = Field(None, description="Response data")
 
 
@@ -144,8 +148,12 @@ class ErrorResponse(BloomBaseSchema):
     success: bool = Field(default=False, description="Operation success flag")
     error_code: str = Field(description="Error code for programmatic handling")
     message: str = Field(description="Human-readable error message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    details: Optional[Dict[str, Any]] = Field(
+        None, description="Additional error details"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow, description="Error timestamp"
+    )
 
 
 # =============================================================================
@@ -156,11 +164,15 @@ class ErrorResponse(BloomBaseSchema):
 class DashboardStatsSchema(BloomBaseSchema):
     """Dashboard statistics response schema."""
 
-    queue_runtime_total: int = Field(default=0, description="Total queue runtime objects")
+    queue_runtime_total: int = Field(
+        default=0, description="Total queue runtime objects"
+    )
     queue_runtime_in_progress: int = Field(
         default=0, description="Queue runtime objects in progress"
     )
-    queue_runtime_complete: int = Field(default=0, description="Completed queue runtime objects")
+    queue_runtime_complete: int = Field(
+        default=0, description="Completed queue runtime objects"
+    )
     queue_runtime_exception: int = Field(
         default=0, description="Queue runtime objects with exceptions"
     )
@@ -171,7 +183,9 @@ class DashboardStatsSchema(BloomBaseSchema):
 
     equipment_total: int = Field(default=0, description="Total equipment items")
     equipment_active: int = Field(default=0, description="Active equipment")
-    equipment_maintenance: int = Field(default=0, description="Equipment in maintenance")
+    equipment_maintenance: int = Field(
+        default=0, description="Equipment in maintenance"
+    )
 
     reagents_total: int = Field(default=0, description="Total reagent lots")
     reagents_low_stock: int = Field(default=0, description="Reagents with low stock")
