@@ -15,6 +15,8 @@ from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3, get_parent_lineages
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
+os.environ["MERIDIAN_ENVIRONMENT"] = "production"
+os.environ["MERIDIAN_SANDBOX_PREFIX"] = ""
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import app  # noqa: E402
 
