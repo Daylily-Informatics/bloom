@@ -46,7 +46,7 @@ dependencies:
     - daylily-cognito==0.1.28
     # Optional local override for development:
     # - -e ../daylily-cognito
-    - zebra_day==2.1.4
+    - zebra_day==2.4.4
     - daylily-carrier-tracking==0.5.1
     - black
     - uvicorn==0.28.0

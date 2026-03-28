@@ -93,3 +93,13 @@ def test_bloom_single_app_serves_api_and_tapdb_mount(monkeypatch):
         assert api_response.status_code == 200
         assert tapdb_response.status_code != 404
 
+
+def test_app_shutdown_cleanup_runs(monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setenv("BLOOM_TAPDB_MOUNT_ENABLED", "0")
+    monkeypatch.setattr("bloom_lims.app.stop_all_writers", lambda: calls.append("stop"))
+
+    with TestClient(create_app(), raise_server_exceptions=False):
+        pass
+
+    assert calls == ["stop"]

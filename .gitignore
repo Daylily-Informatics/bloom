@@ -10,7 +10,7 @@ __pycache__/
 *.so
 .env
 
-certs
+certs/
 
 postgres_data/
 
