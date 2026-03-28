@@ -30,7 +30,9 @@ def test_tapdb_namespace_config_path_prefers_explicit_env(
     tmp_path: Path,
 ) -> None:
     explicit = tmp_path / "tapdb-config.yaml"
-    monkeypatch.setattr(db_commands, "_runtime_env", lambda: {"TAPDB_CONFIG_PATH": str(explicit)})
+    monkeypatch.setattr(
+        db_commands, "_runtime_env", lambda: {"TAPDB_CONFIG_PATH": str(explicit)}
+    )
     assert db_commands._tapdb_namespace_config_path("bloom", "bloom") == explicit
 
 
@@ -42,7 +44,9 @@ def test_tapdb_namespace_config_path_defaults_under_home(
     monkeypatch.setattr(db_commands.Path, "home", lambda: tmp_path)
 
     path = db_commands._tapdb_namespace_config_path("bloom", "bloom")
-    assert path == tmp_path / ".config" / "tapdb" / "bloom" / "bloom" / "tapdb-config.yaml"
+    assert (
+        path == tmp_path / ".config" / "tapdb" / "bloom" / "bloom" / "tapdb-config.yaml"
+    )
 
 
 def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,7 +64,9 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
     assert exc.value.code == 7
 
 
-def test_run_tapdb_returns_nonzero_when_check_false(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_tapdb_returns_nonzero_when_check_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(db_commands, "_tapdb_base_cmd", lambda: ["tapdb"])
     monkeypatch.setattr(db_commands, "_runtime_env", lambda: {})
     monkeypatch.setattr(
@@ -173,7 +179,9 @@ def test_db_migrate_ignores_non_head_revision(
 ) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
-    monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+    monkeypatch.setattr(
+        db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
+    )
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: calls.append(args) or 0)
 
     result = runner.invoke(cli_app, ["db", "migrate", "--revision", "abc123"])
@@ -285,8 +293,12 @@ def test_db_reset_yes_runs_force_reset_and_seed(
     bloom_seed = {"value": False}
 
     monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
-    monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
-    monkeypatch.setattr(db_commands, "_run_tapdb", lambda args: tapdb_calls.append(args) or 0)
+    monkeypatch.setattr(
+        db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
+    )
+    monkeypatch.setattr(
+        db_commands, "_run_tapdb", lambda args: tapdb_calls.append(args) or 0
+    )
     monkeypatch.setattr(
         db_commands,
         "_seed_tapdb_templates",

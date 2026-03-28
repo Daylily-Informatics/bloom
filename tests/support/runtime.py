@@ -34,11 +34,17 @@ def tapdb_config_path_needs_bootstrap(path_value: str | None) -> bool:
     return not Path(path_value).expanduser().is_file()
 
 
-def create_temp_tapdb_config(*, local_port: str | None = None, user: str | None = None) -> Path:
+def create_temp_tapdb_config(
+    *, local_port: str | None = None, user: str | None = None
+) -> Path:
     """Create a deterministic local TapDB namespaced config for tests."""
-    resolved_port = str(local_port or os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566").strip()
+    resolved_port = str(
+        local_port or os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566"
+    ).strip()
     resolved_user = str(user or os.environ.get("USER") or "postgres").strip()
-    tmp_path = Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
+    tmp_path = (
+        Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
+    )
     tmp_path.write_text(
         "\n".join(
             [
@@ -50,25 +56,25 @@ def create_temp_tapdb_config(*, local_port: str | None = None, user: str | None 
                 "  dev:",
                 "    engine_type: local",
                 "    host: localhost",
-                f"    port: \"{resolved_port}\"",
-                "    ui_port: \"8912\"",
-                f"    user: \"{resolved_user}\"",
-                "    password: \"\"",
-                "    database: \"tapdb_bloom_dev\"",
-                "    cognito_user_pool_id: \"us-west-2_test-pool\"",
-                "    audit_log_euid_prefix: \"TAG\"",
-                "    support_email: \"support@dyly.bio\"",
+                f'    port: "{resolved_port}"',
+                '    ui_port: "8912"',
+                f'    user: "{resolved_user}"',
+                '    password: ""',
+                '    database: "tapdb_bloom_dev"',
+                '    cognito_user_pool_id: "us-west-2_test-pool"',
+                '    audit_log_euid_prefix: "TAG"',
+                '    support_email: "support@dyly.bio"',
                 "  test:",
                 "    engine_type: local",
                 "    host: localhost",
-                f"    port: \"{resolved_port}\"",
-                "    ui_port: \"8912\"",
-                f"    user: \"{resolved_user}\"",
-                "    password: \"\"",
-                "    database: \"tapdb_bloom_test\"",
-                "    cognito_user_pool_id: \"us-west-2_test-pool\"",
-                "    audit_log_euid_prefix: \"TAG\"",
-                "    support_email: \"support@dyly.bio\"",
+                f'    port: "{resolved_port}"',
+                '    ui_port: "8912"',
+                f'    user: "{resolved_user}"',
+                '    password: ""',
+                '    database: "tapdb_bloom_test"',
+                '    cognito_user_pool_id: "us-west-2_test-pool"',
+                '    audit_log_euid_prefix: "TAG"',
+                '    support_email: "support@dyly.bio"',
                 "",
             ]
         ),
@@ -94,7 +100,9 @@ def ensure_test_runtime_environment() -> Path:
     else:
         config_path = Path(str(current_path)).expanduser()
 
-    os.environ.setdefault("PGPORT", str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566"))
+    os.environ.setdefault(
+        "PGPORT", str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566")
+    )
     os.environ.setdefault("ECHO_SQL", "False")
     os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
     os.environ.setdefault("BLOOM_RATE_LIMIT", "no")

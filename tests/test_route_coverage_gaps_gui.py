@@ -82,12 +82,19 @@ def test_auth_callback_aliases(client: TestClient) -> None:
         "bloom_lims.gui.routes.auth._complete_cognito_login",
         new=AsyncMock(return_value=RedirectResponse(url="/", status_code=303)),
     ):
-        resp = client.post("/auth/callback", json={"access_token": "x", "id_token": "y"}, follow_redirects=False)
+        resp = client.post(
+            "/auth/callback",
+            json={"access_token": "x", "id_token": "y"},
+            follow_redirects=False,
+        )
         assert resp.status_code == 303
 
 
 def test_list_scripts_executes_handler(client: TestClient) -> None:
-    resp = client.get("/list-scripts", params={"directory": str(Path(__file__).resolve().parents[1] / "static")})
+    resp = client.get(
+        "/list-scripts",
+        params={"directory": str(Path(__file__).resolve().parents[1] / "static")},
+    )
     assert resp.status_code == 200, resp.text
     assert "scripts" in resp.json()
 
@@ -107,7 +114,13 @@ def test_cogs_and_node_info_routes(client: TestClient) -> None:
     _warm_session(client)
     created = client.post(
         "/api/v1/object-creation/create",
-        json={"category": "container", "type": "tube", "subtype": "tube-generic-10ml", "version": "1.0", "name": "cogs-tube"},
+        json={
+            "category": "container",
+            "type": "tube",
+            "subtype": "tube-generic-10ml",
+            "version": "1.0",
+            "name": "cogs-tube",
+        },
     ).json()
     euid = created["euid"]
 
@@ -154,13 +167,19 @@ def test_queue_details_renders(client: TestClient) -> None:
 
 def test_legacy_uuid_alias_routes_are_removed(client: TestClient) -> None:
     _warm_session(client)
-    details_resp = client.get("/uuid_details", params={"euid": "CX-REMOVED"}, follow_redirects=False)
+    details_resp = client.get(
+        "/uuid_details", params={"euid": "CX-REMOVED"}, follow_redirects=False
+    )
     assert details_resp.status_code == 404
 
-    restore_resp = client.get("/un_delete_by_uuid", params={"euid": "CX-REMOVED"}, follow_redirects=False)
+    restore_resp = client.get(
+        "/un_delete_by_uuid", params={"euid": "CX-REMOVED"}, follow_redirects=False
+    )
     assert restore_resp.status_code == 404
 
-    uuid_query_resp = client.get("/uuid_details", params={"uuid": "00000000-0000-0000-0000-000000000000"})
+    uuid_query_resp = client.get(
+        "/uuid_details", params={"uuid": "00000000-0000-0000-0000-000000000000"}
+    )
     assert uuid_query_resp.status_code == 404
 
 
@@ -168,7 +187,13 @@ def test_euid_details_page_does_not_emit_uuid_alias_links(client: TestClient) ->
     _warm_session(client)
     obj = client.post(
         "/api/v1/object-creation/create",
-        json={"category": "container", "type": "tube", "subtype": "tube-generic-10ml", "version": "1.0", "name": "alias-guard"},
+        json={
+            "category": "container",
+            "type": "tube",
+            "subtype": "tube-generic-10ml",
+            "version": "1.0",
+            "name": "alias-guard",
+        },
     ).json()
 
     resp = client.get("/euid_details", params={"euid": obj["euid"]})
@@ -187,12 +212,16 @@ def test_user_audit_logs_renders(client: TestClient) -> None:
 def test_create_from_template_executes_handler(client: TestClient, bdb) -> None:
     _warm_session(client)
     template_euid = _get_any_template_euid(bdb)
-    resp = client.get("/create_from_template", params={"euid": template_euid}, follow_redirects=False)
+    resp = client.get(
+        "/create_from_template", params={"euid": template_euid}, follow_redirects=False
+    )
     assert resp.status_code == 303
     assert resp.headers["location"].startswith("/euid_details?euid=")
 
 
-def test_file_set_urls_and_admin_template_routes_are_removed(client: TestClient, bdb) -> None:
+def test_file_set_urls_and_admin_template_routes_are_removed(
+    client: TestClient, bdb
+) -> None:
     _warm_session(client)
     # Legacy file set GUI routes are removed in Dewey hard-cut mode.
     resp = client.get("/file_set_urls", params={"fs_euid": "FS-NOT-REAL"})
@@ -236,5 +265,9 @@ def test_query_by_euids_and_removed_file_flows(client: TestClient) -> None:
     )
     assert resp.status_code == 404
 
-    resp = client.get("/delete_temp_file", params={"filename": "downloaded.txt"}, follow_redirects=False)
+    resp = client.get(
+        "/delete_temp_file",
+        params={"filename": "downloaded.txt"},
+        follow_redirects=False,
+    )
     assert resp.status_code == 404

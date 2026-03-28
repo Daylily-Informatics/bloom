@@ -121,6 +121,7 @@ def bloom_obj(bdb):
 def bloom_container(bdb):
     """BloomContainer instance fixture."""
     from bloom_lims.bobjs import BloomContainer
+
     return BloomContainer(bdb)
 
 
@@ -128,6 +129,7 @@ def bloom_container(bdb):
 def bloom_workflow(bdb):
     """BloomWorkflow instance fixture."""
     from bloom_lims.bobjs import BloomWorkflow
+
     return BloomWorkflow(bdb)
 
 
@@ -135,6 +137,7 @@ def bloom_workflow(bdb):
 def bloom_content(bdb):
     """BloomContent instance fixture."""
     from bloom_lims.bobjs import BloomContent
+
     return BloomContent(bdb)
 
 
@@ -152,7 +155,9 @@ def test_template(bdb, bloom_obj):
     Returns:
         Template object or None if no templates exist
     """
-    templates = bdb.session.query(bloom_obj.Base.classes.generic_template).limit(1).all()
+    templates = (
+        bdb.session.query(bloom_obj.Base.classes.generic_template).limit(1).all()
+    )
     return templates[0] if templates else None
 
 
@@ -239,7 +244,9 @@ def mock_api_auth():
         role="admin",
     )
 
-    with patch("bloom_lims.api.v1.dependencies.require_api_auth", return_value=mock_user):
+    with patch(
+        "bloom_lims.api.v1.dependencies.require_api_auth", return_value=mock_user
+    ):
         yield mock_user
 
 

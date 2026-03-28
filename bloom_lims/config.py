@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 # Config file paths
 USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
 USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
-TEMPLATE_CONFIG_FILE = Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
+TEMPLATE_CONFIG_FILE = (
+    Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
+)
 
 
 def _validate_optional_https_url(value: str, *, field_name: str) -> str:
@@ -265,7 +267,9 @@ class APISettings(BaseModel):
     )
 
     cors_origins: List[str] = Field(
-        default_factory=lambda: [f"https://{item}" for item in APPROVED_WEB_DOMAIN_SUFFIXES],
+        default_factory=lambda: [
+            f"https://{item}" for item in APPROVED_WEB_DOMAIN_SUFFIXES
+        ],
         description="Allowed CORS origins",
     )
     cors_allow_credentials: bool = Field(default=True, description="Allow credentials")
@@ -296,7 +300,9 @@ class DeploymentSettings(BaseModel):
 
     name: str = Field(default="", description="Deployment label")
     color: str = Field(default="#0f766e", description="Deployment banner color")
-    is_production: bool = Field(default=False, description="Hide deployment banner in production")
+    is_production: bool = Field(
+        default=False, description="Hide deployment banner in production"
+    )
 
 
 class AuthSettings(BaseModel):
@@ -386,7 +392,9 @@ class AtlasSettings(BaseModel):
 class DeweySettings(BaseModel):
     """Dewey integration settings."""
 
-    enabled: bool = Field(default=False, description="Enable Bloom -> Dewey artifact registration")
+    enabled: bool = Field(
+        default=False, description="Enable Bloom -> Dewey artifact registration"
+    )
     base_url: str = Field(default="", description="Dewey API base URL")
     token: str = Field(default="", description="Dewey API bearer token")
     timeout_seconds: int = Field(default=10, description="Dewey API timeout seconds")

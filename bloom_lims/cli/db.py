@@ -115,7 +115,9 @@ def _current_env() -> str:
 def _local_pg_port(env_name: str) -> str:
     env = _runtime_env()
     scoped_key = f"TAPDB_{env_name.upper()}_PORT"
-    return (env.get(scoped_key) or env.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566").strip()
+    return (
+        env.get(scoped_key) or env.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566"
+    ).strip()
 
 
 def _local_ui_port(env_name: str) -> str:
@@ -149,10 +151,19 @@ def _tapdb_namespace_config_path(client_id: str, database_name: str) -> Path:
     explicit_path = (env.get("TAPDB_CONFIG_PATH") or "").strip()
     if explicit_path:
         return Path(explicit_path).expanduser()
-    return Path.home() / ".config" / "tapdb" / client_id / database_name / "tapdb-config.yaml"
+    return (
+        Path.home()
+        / ".config"
+        / "tapdb"
+        / client_id
+        / database_name
+        / "tapdb-config.yaml"
+    )
 
 
-def _normalize_tapdb_namespace_config(env_name: str, client_id: str, database_name: str) -> None:
+def _normalize_tapdb_namespace_config(
+    env_name: str, client_id: str, database_name: str
+) -> None:
     import yaml
 
     config_path = _tapdb_namespace_config_path(client_id, database_name)
@@ -252,9 +263,13 @@ def _seed_tapdb_templates(
         args.extend(["--config", tapdb_config_dir])
         console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
     else:
-        console.print("[cyan]TapDB template seed:[/cyan] using built-in TapDB core config")
+        console.print(
+            "[cyan]TapDB template seed:[/cyan] using built-in TapDB core config"
+        )
     if include_workflow:
-        console.print("[yellow]Workflow overlay seeding is not supported in Bloom.[/yellow]")
+        console.print(
+            "[yellow]Workflow overlay seeding is not supported in Bloom.[/yellow]"
+        )
     args.append("--overwrite" if overwrite else "--skip-existing")
     _run_tapdb(args)
 
@@ -265,7 +280,9 @@ def db_init(
 ) -> None:
     """Initialize database/runtime via tapdb orchestration."""
     env_name = _current_env()
-    console.print(f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]")
+    console.print(
+        f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]"
+    )
     _ensure_tapdb_namespace_config(env_name)
 
     if env_name in {"dev", "test"}:
@@ -300,8 +317,12 @@ def db_init(
 
 @db_app.command("auth-setup")
 def db_auth_setup(
-    pool_name: str = typer.Option("", "--pool-name", help="Optional Cognito pool name override"),
-    region: str = typer.Option("us-east-1", "--region", help="AWS region for Cognito setup"),
+    pool_name: str = typer.Option(
+        "", "--pool-name", help="Optional Cognito pool name override"
+    ),
+    region: str = typer.Option(
+        "us-east-1", "--region", help="AWS region for Cognito setup"
+    ),
     port: int = typer.Option(8912, "--port", help="Bloom HTTPS port"),
     domain_prefix: str = typer.Option(
         "",
@@ -368,12 +389,16 @@ def db_status() -> None:
 
 @db_app.command("migrate")
 def db_migrate(
-    revision: str = typer.Option("head", "--revision", help="Ignored; tapdb manages migrations"),
+    revision: str = typer.Option(
+        "head", "--revision", help="Ignored; tapdb manages migrations"
+    ),
 ) -> None:
     """Run schema migrations via tapdb."""
     env_name = _current_env()
     if revision != "head":
-        console.print("[yellow]Revision argument is ignored; using tapdb managed migrations.[/yellow]")
+        console.print(
+            "[yellow]Revision argument is ignored; using tapdb managed migrations.[/yellow]"
+        )
     _ensure_schema_available_for_bloom_root()
     _run_tapdb(["db", "schema", "migrate", env_name])
 
@@ -391,12 +416,16 @@ def db_shell() -> None:
     """Show active DB target and open Aurora connection when applicable."""
     env_name = _current_env()
     cfg = get_tapdb_db_config(env_name=env_name)
-    console.print(f"[bold]Active TapDB target:[/bold] {cfg['host']}:{cfg['port']}/{cfg['database']}")
+    console.print(
+        f"[bold]Active TapDB target:[/bold] {cfg['host']}:{cfg['port']}/{cfg['database']}"
+    )
     if cfg.get("engine_type") == "aurora":
         _run_tapdb(["aurora", "connect", env_name])
         return
 
-    console.print("[yellow]Use `tapdb info` for current context and target details.[/yellow]")
+    console.print(
+        "[yellow]Use `tapdb info` for current context and target details.[/yellow]"
+    )
     _run_tapdb(["info"])
 
 
@@ -408,7 +437,9 @@ def db_reset(
     env_name = _current_env()
 
     if not yes:
-        console.print("[yellow]WARNING: This will drop all data and rebuild the schema.[/yellow]")
+        console.print(
+            "[yellow]WARNING: This will drop all data and rebuild the schema.[/yellow]"
+        )
         if not typer.confirm("Are you sure you want to continue?"):
             console.print("[dim]Aborted.[/dim]")
             return

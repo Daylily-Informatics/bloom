@@ -85,16 +85,24 @@ def server_status_label() -> str:
 
 
 def _runtime_host_and_port(default_port: int, default_host: str) -> tuple[str, int]:
-    host = os.environ.get("BLOOM_RUNTIME__HOST", os.environ.get("BLOOM_HOST", default_host))
-    port = int(os.environ.get("BLOOM_RUNTIME__PORT", os.environ.get("BLOOM_PORT", str(default_port))))
+    host = os.environ.get(
+        "BLOOM_RUNTIME__HOST", os.environ.get("BLOOM_HOST", default_host)
+    )
+    port = int(
+        os.environ.get(
+            "BLOOM_RUNTIME__PORT", os.environ.get("BLOOM_PORT", str(default_port))
+        )
+    )
     return host, port
 
 
 @server_app.command("start")
 def start(
     port: int = typer.Option(8912, "--port", "-p", help="Port to run on"),
-    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
-    reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload for development"),
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),  # nosec B104
+    reload: bool = typer.Option(
+        False, "--reload", "-r", help="Enable auto-reload for development"
+    ),
     background: bool = typer.Option(
         True,
         "--background/--foreground",
@@ -137,17 +145,30 @@ def start(
         console.print("[red]✗[/red] Startup aborted - missing required configuration:")
         for err in preflight_errors:
             console.print(f"   • {err}")
-        console.print("\n   Fix your config ([cyan]bloom config edit[/cyan]) or run [cyan]bloom db init[/cyan].")
+        console.print(
+            "\n   Fix your config ([cyan]bloom config edit[/cyan]) or run [cyan]bloom db init[/cyan]."
+        )
         raise typer.Exit(1)
 
     pid, _ = active_server_pid()
     if pid:
         console.print(f"[yellow]⚠[/yellow] Server already running (PID {pid})")
         console.print(f"   URL: [cyan]{protocol}://{shown_host}:{port}[/cyan]")
-        console.print("   Use [cyan]bloom server stop[/cyan] to stop or [cyan]bloom server logs[/cyan] to view logs")
+        console.print(
+            "   Use [cyan]bloom server stop[/cyan] to stop or [cyan]bloom server logs[/cyan] to view logs"
+        )
         return
 
-    cmd = [sys.executable, "-m", "uvicorn", "main:app", "--host", host, "--port", str(port)]
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "main:app",
+        "--host",
+        host,
+        "--port",
+        str(port),
+    ]
     if reload:
         cmd.append("--reload")
     cmd.extend(["--ssl-keyfile", str(key_file), "--ssl-certfile", str(cert_file)])
@@ -175,7 +196,9 @@ def start(
             console.print(f"[green]✓[/green] Server started (PID {proc.pid})")
             console.print(f"   URL: [cyan]{protocol}://{shown_host}:{port}[/cyan]")
             console.print(f"   Logs: [dim]{log_file}[/dim]")
-            console.print("   Use [cyan]bloom server logs[/cyan] to view logs or [cyan]bloom server stop[/cyan] to stop")
+            console.print(
+                "   Use [cyan]bloom server logs[/cyan] to view logs or [cyan]bloom server stop[/cyan] to stop"
+            )
         return
 
     console.print(f"[cyan]Starting BLOOM UI on {host}:{port}...[/cyan]")
@@ -204,7 +227,7 @@ def stop() -> None:
 def status() -> None:
     """Show BLOOM server runtime status."""
     pid, _ = active_server_pid()
-    host, port = _runtime_host_and_port(8912, "0.0.0.0")
+    host, port = _runtime_host_and_port(8912, "0.0.0.0")  # nosec B104
     shown_host = display_host(host)
     log_file = _latest_server_log()
     if pid:
@@ -221,7 +244,9 @@ def status() -> None:
 def logs(
     lines: int = typer.Option(50, "--lines", "-n", help="Number of lines to show"),
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output"),
-    service: LogService = typer.Option(LogService.all, "--service", "-s", help="Service to show logs for"),
+    service: LogService = typer.Option(
+        LogService.all, "--service", "-s", help="Service to show logs for"
+    ),
 ) -> None:
     """View BLOOM and TapDB operation logs."""
     log_files: list[tuple[str, Path]] = []

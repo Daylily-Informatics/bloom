@@ -89,6 +89,7 @@ spec = CliSpec(
     info_hooks=[_bloom_info_hook],
 )
 
+
 def build_app():
     """Create a fresh Typer app for Bloom."""
     return _create_app(spec)

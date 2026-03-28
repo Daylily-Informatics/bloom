@@ -49,9 +49,13 @@ jobs:
                   payload = json.load(fh)
               base_sha = payload["pull_request"]["base"]["sha"]
               head_sha = payload["pull_request"]["head"]["sha"]
-              files = collect_files(["git", "diff", "--name-only", f"{base_sha}...{head_sha}", "--", "*.py"])
+              files = collect_files(
+                  ["git", "diff", "--diff-filter=ACMRT", "--name-only", f"{base_sha}...{head_sha}", "--", "*.py"]
+              )
               if files is None:
-                  files = collect_files(["git", "diff", "--name-only", f"{base_sha}..{head_sha}", "--", "*.py"])
+                  files = collect_files(
+                      ["git", "diff", "--diff-filter=ACMRT", "--name-only", f"{base_sha}..{head_sha}", "--", "*.py"]
+                  )
               if files is None:
                   files = []
           else:
@@ -61,7 +65,10 @@ jobs:
                   stderr=subprocess.DEVNULL,
               ).returncode == 0
               if has_parent:
-                  files = collect_files(["git", "diff", "--name-only", "HEAD^", "HEAD", "--", "*.py"]) or []
+                  files = (
+                      collect_files(["git", "diff", "--diff-filter=ACMRT", "--name-only", "HEAD^", "HEAD", "--", "*.py"])
+                      or []
+                  )
               else:
                   files = collect_files(["git", "ls-files", "*.py"]) or []
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
@@ -117,9 +124,13 @@ jobs:
                   payload = json.load(fh)
               base_sha = payload["pull_request"]["base"]["sha"]
               head_sha = payload["pull_request"]["head"]["sha"]
-              files = collect_files(["git", "diff", "--name-only", f"{base_sha}...{head_sha}", "--", "*.py"])
+              files = collect_files(
+                  ["git", "diff", "--diff-filter=ACMRT", "--name-only", f"{base_sha}...{head_sha}", "--", "*.py"]
+              )
               if files is None:
-                  files = collect_files(["git", "diff", "--name-only", f"{base_sha}..{head_sha}", "--", "*.py"])
+                  files = collect_files(
+                      ["git", "diff", "--diff-filter=ACMRT", "--name-only", f"{base_sha}..{head_sha}", "--", "*.py"]
+                  )
               if files is None:
                   files = []
           else:
@@ -129,7 +140,10 @@ jobs:
                   stderr=subprocess.DEVNULL,
               ).returncode == 0
               if has_parent:
-                  files = collect_files(["git", "diff", "--name-only", "HEAD^", "HEAD", "--", "*.py"]) or []
+                  files = (
+                      collect_files(["git", "diff", "--diff-filter=ACMRT", "--name-only", "HEAD^", "HEAD", "--", "*.py"])
+                      or []
+                  )
               else:
                   files = collect_files(["git", "ls-files", "*.py"]) or []
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:

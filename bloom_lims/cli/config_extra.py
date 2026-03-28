@@ -109,8 +109,14 @@ def _status() -> None:
         ("tapdb.database_name", settings.tapdb.database_name),
         ("aws.profile", settings.aws.profile),
         ("aws.region", settings.aws.region),
-        ("auth.cognito_user_pool_id", settings.auth.cognito_user_pool_id or "[dim]not set[/dim]"),
-        ("auth.cognito_client_id", settings.auth.cognito_client_id or "[dim]not set[/dim]"),
+        (
+            "auth.cognito_user_pool_id",
+            settings.auth.cognito_user_pool_id or "[dim]not set[/dim]",
+        ),
+        (
+            "auth.cognito_client_id",
+            settings.auth.cognito_client_id or "[dim]not set[/dim]",
+        ),
         ("auth.cognito_domain", settings.auth.cognito_domain or "[dim]not set[/dim]"),
         ("atlas.base_url", settings.atlas.base_url or "[dim]not set[/dim]"),
         ("dewey.enabled", str(settings.dewey.enabled)),
@@ -134,15 +140,21 @@ def _doctor() -> None:
     if py_version >= (3, 12):
         console.print(f"[green]✓[/green] Python {py_version.major}.{py_version.minor}")
     else:
-        issues.append(f"Python 3.12+ required, found {py_version.major}.{py_version.minor}")
-        console.print(f"[red]✗[/red] Python {py_version.major}.{py_version.minor} (3.12+ required)")
+        issues.append(
+            f"Python 3.12+ required, found {py_version.major}.{py_version.minor}"
+        )
+        console.print(
+            f"[red]✗[/red] Python {py_version.major}.{py_version.minor} (3.12+ required)"
+        )
 
     conda_env = os.environ.get("CONDA_DEFAULT_ENV")
     if conda_env == "BLOOM":
         console.print("[green]✓[/green] Conda environment: BLOOM")
     else:
         warnings.append(f"Not in BLOOM conda environment (current: {conda_env})")
-        console.print(f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} (expected: BLOOM)")
+        console.print(
+            f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} (expected: BLOOM)"
+        )
 
     for module_name in ["bloom_lims.db", "bloom_lims.config", "daylily_tapdb"]:
         try:
@@ -189,6 +201,15 @@ def _doctor() -> None:
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register extra config subcommands."""
-    registry.add_command("config", "shell", _shell, "Open interactive Python shell with BLOOM loaded")
-    registry.add_command("config", "doctor", _doctor, "Verify environment, dependencies, and configuration")
-    registry.add_command("config", "status", _status, "Show environment and configuration status")
+    registry.add_command(
+        "config", "shell", _shell, "Open interactive Python shell with BLOOM loaded"
+    )
+    registry.add_command(
+        "config",
+        "doctor",
+        _doctor,
+        "Verify environment, dependencies, and configuration",
+    )
+    registry.add_command(
+        "config", "status", _status, "Show environment and configuration status"
+    )

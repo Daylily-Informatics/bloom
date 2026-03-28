@@ -52,7 +52,9 @@ def test_issue_token_emits_plaintext_token(
             payload = kwargs["payload"]
             assert payload.scope == "admin"
             return SimpleNamespace(
-                token=SimpleNamespace(id="tok-1", token_prefix="blm_deadbeef...", scope="admin"),
+                token=SimpleNamespace(
+                    id="tok-1", token_prefix="blm_deadbeef...", scope="admin"
+                ),
                 plaintext_token="blm_plaintext_demo",
             )
 
@@ -60,7 +62,9 @@ def test_issue_token_emits_plaintext_token(
     monkeypatch.setattr(
         users_cli,
         "get_by_login_or_email",
-        lambda _session, identifier, include_inactive=True: SimpleNamespace(uid=42, username=identifier),
+        lambda _session, identifier, include_inactive=True: SimpleNamespace(
+            uid=42, username=identifier
+        ),
     )
     monkeypatch.setattr(users_cli, "UserAPITokenService", FakeTokenService)
 

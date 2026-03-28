@@ -22,7 +22,9 @@ from bloom_lims.auth.services.user_api_tokens import (
 from bloom_lims.cli.db import _current_env, _runtime_env, _tapdb_base_cmd
 from bloom_lims.db import BLOOMdb3
 
-users_app = typer.Typer(help="User management commands routed through TapDB.", no_args_is_help=True)
+users_app = typer.Typer(
+    help="User management commands routed through TapDB.", no_args_is_help=True
+)
 
 
 class TokenScope(str, Enum):
@@ -79,7 +81,9 @@ def add_user(
 @users_app.command("issue-token")
 def issue_token(
     username: str = typer.Option(..., "--username", help="Username / login email"),
-    token_name: str = typer.Option(..., "--token-name", help="Display name for the token"),
+    token_name: str = typer.Option(
+        ..., "--token-name", help="Display name for the token"
+    ),
     scope: TokenScope = typer.Option(TokenScope.admin, "--scope", help="Token scope"),
     expires_in_days: int = typer.Option(
         30,

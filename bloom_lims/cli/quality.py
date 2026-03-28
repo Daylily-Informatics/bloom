@@ -14,7 +14,9 @@ from pathlib import Path
 
 import typer
 
-quality_app = typer.Typer(help="Code-quality and validation commands", no_args_is_help=True)
+quality_app = typer.Typer(
+    help="Code-quality and validation commands", no_args_is_help=True
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

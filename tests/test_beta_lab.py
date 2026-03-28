@@ -65,7 +65,9 @@ def test_run_resolver_requires_full_key_query_params():
         app.dependency_overrides.pop(require_external_ursa_read, None)
 
 
-def test_material_registration_links_fulfillment_items_on_container_and_patient_on_specimen(bdb):
+def test_material_registration_links_fulfillment_items_on_container_and_patient_on_specimen(
+    bdb,
+):
     def _atlas_rw_user() -> APIUser:
         token = secrets.token_hex(8)
         return APIUser(
@@ -82,7 +84,10 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
     def _atlas_refs(instance):
         refs: list[dict] = []
         for lineage in get_parent_lineages(instance):
-            if lineage.is_deleted or lineage.relationship_type != "has_external_reference":
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != "has_external_reference"
+            ):
                 continue
             child = lineage.child_instance
             if child is None or child.is_deleted:
@@ -116,14 +121,23 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
         material = client.post(
             "/api/v1/external/atlas/beta/materials",
             headers={"Idempotency-Key": f"idem-material-{secrets.token_hex(8)}"},
-            json={"specimen_name": "container-first-link-check", "atlas_context": atlas_context},
+            json={
+                "specimen_name": "container-first-link-check",
+                "atlas_context": atlas_context,
+            },
         )
         assert material.status_code == 200, material.text
         material_body = material.json()
         specimen_euid = material_body["specimen_euid"]
         container_euid = material_body["container_euid"]
-        assert material_body["atlas_context"]["atlas_testkit_euid"] == atlas_context["atlas_testkit_euid"]
-        assert material_body["atlas_context"]["atlas_shipment_euid"] == atlas_context["atlas_shipment_euid"]
+        assert (
+            material_body["atlas_context"]["atlas_testkit_euid"]
+            == atlas_context["atlas_testkit_euid"]
+        )
+        assert (
+            material_body["atlas_context"]["atlas_shipment_euid"]
+            == atlas_context["atlas_shipment_euid"]
+        )
         assert (
             material_body["atlas_context"]["atlas_organization_site_euid"]
             == atlas_context["atlas_organization_site_euid"]
@@ -138,7 +152,8 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
         container_refs = _atlas_refs(container)
         assert any(
             str(ref.get("reference_type")) == "atlas_patient"
-            and str(ref.get("atlas_patient_euid")) == atlas_context["atlas_patient_euid"]
+            and str(ref.get("atlas_patient_euid"))
+            == atlas_context["atlas_patient_euid"]
             for ref in specimen_refs
         )
         assert not any(
@@ -158,12 +173,14 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
         )
         assert any(
             str(ref.get("reference_type")) == "atlas_testkit"
-            and str(ref.get("atlas_testkit_euid")) == atlas_context["atlas_testkit_euid"]
+            and str(ref.get("atlas_testkit_euid"))
+            == atlas_context["atlas_testkit_euid"]
             for ref in container_refs
         )
         assert any(
             str(ref.get("reference_type")) == "atlas_shipment"
-            and str(ref.get("atlas_shipment_euid")) == atlas_context["atlas_shipment_euid"]
+            and str(ref.get("atlas_shipment_euid"))
+            == atlas_context["atlas_shipment_euid"]
             for ref in container_refs
         )
         assert any(
@@ -186,9 +203,9 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
                 "source_specimen_euid": specimen_euid,
                 "well_name": "A1",
                 "extraction_type": "gdna",
-                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
-                    "atlas_test_fulfillment_item_euid"
-                ],
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][
+                    0
+                ]["atlas_test_fulfillment_item_euid"],
             },
         )
         assert extraction.status_code == 200, extraction.text
@@ -214,7 +231,10 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
     def _atlas_refs(instance):
         refs: list[dict] = []
         for lineage in get_parent_lineages(instance):
-            if lineage.is_deleted or lineage.relationship_type != "has_external_reference":
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != "has_external_reference"
+            ):
                 continue
             child = lineage.child_instance
             if child is None or child.is_deleted:
@@ -292,10 +312,13 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         assert any(
             str(ref.get("reference_type")) == "atlas_collection_event"
             and str(ref.get("atlas_collection_event_euid")) == collection_event_euid
-            and str(ref.get("collection_event_snapshot", {}).get("collection_type")) == "venipuncture"
+            and str(ref.get("collection_event_snapshot", {}).get("collection_type"))
+            == "venipuncture"
             for ref in specimen_refs
         )
-        assert not any(str(ref.get("reference_type")) == "atlas_patient" for ref in specimen_refs)
+        assert not any(
+            str(ref.get("reference_type")) == "atlas_patient" for ref in specimen_refs
+        )
 
         patched = client.patch(
             f"/api/v1/external/atlas/beta/specimens/{specimen_body['specimen_euid']}",
@@ -313,15 +336,20 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         )
         assert patched.status_code == 200, patched.text
 
-        updated_specimen_refs = _atlas_refs(bobj.get_by_euid(specimen_body["specimen_euid"]))
+        updated_specimen_refs = _atlas_refs(
+            bobj.get_by_euid(specimen_body["specimen_euid"])
+        )
         assert any(
             str(ref.get("reference_type")) == "atlas_collection_event"
-            and str(ref.get("collection_event_snapshot", {}).get("collection_type")) == "fingerstick"
-            and str(ref.get("collection_event_snapshot", {}).get("expected_name")) == "Pat Ient"
+            and str(ref.get("collection_event_snapshot", {}).get("collection_type"))
+            == "fingerstick"
+            and str(ref.get("collection_event_snapshot", {}).get("expected_name"))
+            == "Pat Ient"
             for ref in updated_specimen_refs
         )
         assert not any(
-            str(ref.get("reference_type")) == "atlas_patient" for ref in updated_specimen_refs
+            str(ref.get("reference_type")) == "atlas_patient"
+            for ref in updated_specimen_refs
         )
     finally:
         client.close()

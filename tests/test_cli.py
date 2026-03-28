@@ -49,7 +49,9 @@ class TestMainCommands:
             ["config-validate"],
         ],
     )
-    def test_removed_root_aliases(self, runner: CliRunner, cli_app, argv: list[str]) -> None:
+    def test_removed_root_aliases(
+        self, runner: CliRunner, cli_app, argv: list[str]
+    ) -> None:
         result = runner.invoke(cli_app, argv)
         assert result.exit_code != 0
         assert "No such command" in result.output
@@ -68,7 +70,17 @@ class TestMainCommands:
     def test_config_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "--help"])
         assert result.exit_code == 0
-        for command in ["path", "init", "show", "validate", "edit", "reset", "shell", "doctor", "status"]:
+        for command in [
+            "path",
+            "init",
+            "show",
+            "validate",
+            "edit",
+            "reset",
+            "shell",
+            "doctor",
+            "status",
+        ]:
             assert command in result.output
 
     def test_server_help(self, runner: CliRunner, cli_app) -> None:
@@ -108,7 +120,9 @@ class TestMainCommands:
 
 
 class TestConfigValidation:
-    def test_config_init_then_validate(self, runner: CliRunner, cli_app, tmp_path: Path) -> None:
+    def test_config_init_then_validate(
+        self, runner: CliRunner, cli_app, tmp_path: Path
+    ) -> None:
         result = runner.invoke(cli_app, ["config", "init"])
         assert result.exit_code == 0
 
@@ -218,7 +232,9 @@ class TestGuiLocalhostPolicy:
             return type("Result", (), {"returncode": 0})()
 
         monkeypatch.setattr(certs_mod.subprocess, "run", fake_run)
-        monkeypatch.setattr(certs_mod.shutil, "which", lambda _: "/usr/local/bin/mkcert")
+        monkeypatch.setattr(
+            certs_mod.shutil, "which", lambda _: "/usr/local/bin/mkcert"
+        )
 
         cert_file, key_file = certs_mod.ensure_certs(certs_dir)
         assert cert_file.exists()

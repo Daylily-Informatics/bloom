@@ -14,8 +14,12 @@ from rich.table import Table
 
 from bloom_lims.config import get_settings
 
-integrations_app = typer.Typer(help="External integration commands.", no_args_is_help=True)
-atlas_app = typer.Typer(help="Atlas integration configuration and diagnostics.", no_args_is_help=True)
+integrations_app = typer.Typer(
+    help="External integration commands.", no_args_is_help=True
+)
+atlas_app = typer.Typer(
+    help="Atlas integration configuration and diagnostics.", no_args_is_help=True
+)
 console = Console()
 
 
@@ -58,4 +62,6 @@ integrations_app.add_typer(atlas_app, name="atlas")
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the integrations command group."""
-    registry.add_typer_app(None, integrations_app, "integrations", "External integration commands.")
+    registry.add_typer_app(
+        None, integrations_app, "integrations", "External integration commands."
+    )
