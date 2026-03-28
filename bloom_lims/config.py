@@ -159,7 +159,7 @@ class TapDBSettings(BaseModel):
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
     min_version: str = Field(
-        default="3.0.3", description="Minimum supported daylily-tapdb"
+        default="3.0.6", description="Minimum supported daylily-tapdb"
     )
     max_version_exclusive: str = Field(
         default="4.0.0",

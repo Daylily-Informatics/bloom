@@ -10,7 +10,7 @@ from typing import Any
 
 from daylily_tapdb.factory import InstanceFactory
 from daylily_tapdb.models.instance import generic_instance
-from daylily_tapdb.models.template import generic_template
+from daylily_tapdb import require_seeded_templates
 from daylily_tapdb.templates import TemplateManager
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -416,74 +416,17 @@ class TapdbGroupRepository:
     def _ensure_templates_bootstrapped(self) -> None:
         if self._templates_bootstrapped:
             return
-        self._ensure_template(
-            template_code=GROUP_TEMPLATE_CODE,
-            template_name="Bloom User Group",
-            instance_prefix=GROUP_PREFIX,
-        )
-        self._ensure_template(
-            template_code=GROUP_REVISION_TEMPLATE_CODE,
-            template_name="Bloom User Group Revision",
-            instance_prefix=GROUP_REVISION_PREFIX,
-        )
-        self._ensure_template(
-            template_code=GROUP_MEMBERSHIP_TEMPLATE_CODE,
-            template_name="Bloom User Group Membership",
-            instance_prefix=GROUP_MEMBERSHIP_PREFIX,
+        require_seeded_templates(
+            self.db,
+            [
+                (GROUP_TEMPLATE_CODE, GROUP_PREFIX),
+                (GROUP_REVISION_TEMPLATE_CODE, GROUP_REVISION_PREFIX),
+                (GROUP_MEMBERSHIP_TEMPLATE_CODE, GROUP_MEMBERSHIP_PREFIX),
+            ],
+            app_name="Bloom",
+            template_manager=self.templates,
         )
         self._templates_bootstrapped = True
-        self.db.flush()
-
-    def _ensure_template(
-        self,
-        *,
-        template_code: str,
-        template_name: str,
-        instance_prefix: str,
-    ) -> generic_template:
-        category, type_name, subtype, version = _parse_template_code(template_code)
-        self._ensure_prefix_sequence(instance_prefix)
-        stmt = (
-            select(generic_template)
-            .where(
-                generic_template.category == category,
-                generic_template.type == type_name,
-                generic_template.subtype == subtype,
-                generic_template.version == version,
-            )
-            .limit(1)
-        )
-        existing = self.db.execute(stmt).scalar_one_or_none()
-        if existing is not None:
-            if existing.is_deleted:
-                existing.is_deleted = False
-            return existing
-
-        template = generic_template(
-            name=template_name,
-            polymorphic_discriminator="generic_template",
-            category=category,
-            type=type_name,
-            subtype=subtype,
-            version=version,
-            instance_prefix=instance_prefix,
-            instance_polymorphic_identity="generic_instance",
-            json_addl={"managed_by": "bloom", "domain": "auth"},
-            bstatus="active",
-            is_singleton=False,
-            is_deleted=False,
-        )
-        self.db.add(template)
-        self.db.flush()
-        self.templates.clear_cache()
-        return template
-
-    def _ensure_prefix_sequence(self, prefix: str) -> None:
-        normalized = prefix.strip().upper()
-        if not re.fullmatch(r"[A-HJ-KMNP-TV-Z]{2,3}", normalized):
-            raise ValueError(f"Invalid TAPDB instance prefix: {prefix!r}")
-        seq_name = f"{normalized.lower()}_instance_seq"
-        self.db.execute(text(f'CREATE SEQUENCE IF NOT EXISTS "{seq_name}"'))
 
     def _props(self, instance: generic_instance) -> dict[str, Any]:
         payload = instance.json_addl or {}

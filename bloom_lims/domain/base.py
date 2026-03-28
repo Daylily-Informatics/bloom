@@ -13,6 +13,7 @@ import os
 import re
 
 import zebra_day.print_mgr as zdpm
+from daylily_tapdb import MissingSeededTemplateError
 from sqlalchemy import (
     DateTime,
     and_,
@@ -128,44 +129,11 @@ class BloomObj:
         )
         if templates:
             return templates[0]
-
-        template = self.Base.classes.generic_template(
-            name="Bloom User",
-            polymorphic_discriminator="generic_template",
-            category="actor",
-            type="user",
-            subtype="bloom-user",
-            version="1.0",
-            instance_prefix="AX",
-            instance_polymorphic_identity="generic_instance",
-            json_addl={
-                "description": "Bloom authenticated user projection",
-                "properties": {
-                    "name": "Bloom User",
-                    "email": "",
-                    "cognito_sub": "",
-                    "comments": "",
-                },
-                "expected_inputs": [],
-                "singleton": "0",
-                "expected_outputs": [],
-                "action_groups": {},
-                "action_imports": {
-                    "core": {
-                        "group_order": "1",
-                        "group_name": "Core Actions",
-                        "actions": {"action/core/*/1.0/": {}},
-                    }
-                },
-                "instantiation_layouts": [],
-            },
-            bstatus="active",
-            is_singleton=False,
-            is_deleted=False,
+        raise MissingSeededTemplateError(
+            "Missing seeded TapDB template 'actor/user/bloom-user/1.0/'. "
+            "Seed the Bloom TapDB JSON template pack through TapDB before "
+            "creating user actor instances."
         )
-        self.session.add(template)
-        self.session.flush()
-        return template
 
     def _upsert_user_actor(self, *, user_id=None, email=None):
         resolved_user_id = str(user_id or "").strip() or None

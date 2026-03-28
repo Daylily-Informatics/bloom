@@ -139,13 +139,12 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
     ]
 
 
-def test_db_seed_calls_tapdb_and_bloom_seeders(
+def test_db_seed_calls_tapdb_template_loader(
     runner: CliRunner,
     cli_app,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tapdb_seed: list[tuple[str, bool, bool]] = []
-    bloom_seed_called = {"value": False}
     monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
     monkeypatch.setattr(
         db_commands,
@@ -154,13 +153,7 @@ def test_db_seed_calls_tapdb_and_bloom_seeders(
             (env_name, include_workflow, overwrite)
         ),
     )
-    monkeypatch.setattr(
-        db_commands,
-        "_seed_bloom_templates",
-        lambda: bloom_seed_called.__setitem__("value", True),
-    )
 
     result = runner.invoke(cli_app, ["db", "seed"])
     assert result.exit_code == 0
     assert tapdb_seed == [("dev", False, False)]
-    assert bloom_seed_called["value"] is True

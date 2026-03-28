@@ -103,7 +103,7 @@ bash Miniconda3-latest-MacOSX-*.sh
 ```
 
 ### AWS Cognito
-Authentication is handled via AWS Cognito. [Follow the Cognito configuration guide](bloom_lims/docs/cognito.md) before starting the server.
+Authentication is handled via AWS Cognito. Use `daycog` for shared pool/app/user lifecycle, then apply Bloom-local config from [bloom_lims/docs/cognito.md](bloom_lims/docs/cognito.md) before starting the server.
 
 ## Quick Start
 _Assumes Conda is installed and Cognito is configured._
@@ -157,6 +157,16 @@ Primary CLI groups:
 | `bloom quality` | Code quality checks |
 | `bloom test` | Run targeted test suites |
 | `bloom users` | User management |
+
+Bloom delegates shared infrastructure ownership:
+
+- use `tapdb` for shared DB/runtime lifecycle
+- use `daycog` for shared Cognito lifecycle
+- use `bloom db ...` only for Bloom-specific overlay seed/reset behavior on top of TapDB
+
+Bloom template definitions are authored as JSON packs under
+`config/tapdb_templates/` and loaded through TapDB during `bloom db init` /
+`bloom db seed`.
 
 ## API Surface
 

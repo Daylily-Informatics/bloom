@@ -40,10 +40,10 @@ dependencies:
   - gunicorn
   - psutil>=5.9.0
   - pip:
-    - daylily-tapdb==3.0.3
+    - daylily-tapdb==3.0.6
     # Optional local editable override for development:
     # - -e ../../daylily/daylily-tapdb
-    - daylily-cognito==0.1.28
+    - daylily-cognito==0.1.30
     # Optional local override for development:
     # - -e ../daylily-cognito
     - zebra_day==2.4.4

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from daylily_tapdb.sequences import ensure_instance_prefix_sequence
+from daylily_tapdb import require_seeded_template
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -187,50 +187,10 @@ class ExecutionQueueActionRecorder:
         return action_record
 
     def _ensure_action_template(self, action_key: str) -> generic_template:
-        ensure_instance_prefix_sequence(self.session, EXECUTION_ACTION_TEMPLATE_PREFIX)
         template_code = f"action/{EXECUTION_ACTION_GROUP}/{action_key}/1.0/"
-        category, type_name, subtype, version = _parse_template_code(template_code)
-        stmt = (
-            select(generic_template)
-            .where(
-                generic_template.category == category,
-                generic_template.type == type_name,
-                generic_template.subtype == subtype,
-                generic_template.version == version,
-            )
-            .limit(1)
+        return require_seeded_template(
+            self.session,
+            template_code,
+            expected_prefix=EXECUTION_ACTION_TEMPLATE_PREFIX,
+            app_name="Bloom",
         )
-        existing = self.session.execute(stmt).scalar_one_or_none()
-        if existing is not None:
-            if existing.is_deleted:
-                existing.is_deleted = False
-            if existing.instance_prefix != EXECUTION_ACTION_TEMPLATE_PREFIX:
-                existing.instance_prefix = EXECUTION_ACTION_TEMPLATE_PREFIX
-            return existing
-
-        template = generic_template(
-            name=_ACTION_TEMPLATE_DEFINITIONS[action_key]["name"],
-            polymorphic_discriminator="action_template",
-            category=category,
-            type=type_name,
-            subtype=subtype,
-            version=version,
-            instance_prefix=EXECUTION_ACTION_TEMPLATE_PREFIX,
-            instance_polymorphic_identity="action_instance",
-            json_addl={
-                "managed_by": "bloom",
-                "domain": EXECUTION_ACTION_GROUP,
-                "action_definition": {
-                    "action_group": EXECUTION_ACTION_GROUP,
-                    "action_key": action_key,
-                    "name": _ACTION_TEMPLATE_DEFINITIONS[action_key]["name"],
-                    "description": _ACTION_TEMPLATE_DEFINITIONS[action_key]["description"],
-                },
-            },
-            bstatus="active",
-            is_singleton=False,
-            is_deleted=False,
-        )
-        self.session.add(template)
-        self.session.flush()
-        return template

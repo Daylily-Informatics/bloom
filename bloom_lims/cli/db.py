@@ -19,7 +19,6 @@ import typer
 from rich.console import Console
 
 from bloom_lims.config import apply_runtime_environment, get_settings
-from bloom_lims.core.template_seed import seed_bloom_templates
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
@@ -197,18 +196,6 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
     _update_tapdb_namespace_config(env_name)
 
 
-def _seed_bloom_templates() -> None:
-    """Seed Bloom legacy template configs into TAPDB generic_template."""
-    summary = seed_bloom_templates()
-    console.print(
-        "[cyan]Bloom template seed:[/cyan] "
-        f"loaded={summary.templates_loaded}, "
-        f"inserted={summary.inserted}, "
-        f"updated={summary.updated}, "
-        f"prefixes={summary.prefixes_ensured}"
-    )
-
-
 def _seed_tapdb_templates(
     env_name: str,
     *,
@@ -217,6 +204,8 @@ def _seed_tapdb_templates(
 ) -> None:
     """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
     tapdb_config_dir = os.environ.get("TAPDB_SEED_CONFIG_PATH", "").strip()
+    if not tapdb_config_dir:
+        tapdb_config_dir = str(_bloom_root() / "config" / "tapdb_templates")
     args = ["db", "data", "seed", env_name]
     if tapdb_config_dir:
         args.extend(["--config", tapdb_config_dir])
@@ -257,7 +246,6 @@ def db_init(
             setup_args.append("--force")
         _run_tapdb(setup_args)
         _seed_tapdb_templates(env_name, overwrite=force)
-        _seed_bloom_templates()
         return
 
     create_args = ["db", "create", env_name]
@@ -271,7 +259,6 @@ def db_init(
         setup_args.append("--force")
     _run_tapdb(setup_args)
     _seed_tapdb_templates(env_name, overwrite=force)
-    _seed_bloom_templates()
 
 
 @db_app.command("seed")
@@ -279,7 +266,6 @@ def db_seed() -> None:
     """Seed template data via tapdb."""
     env_name = _current_env()
     _seed_tapdb_templates(env_name, include_workflow=False, overwrite=False)
-    _seed_bloom_templates()
 
 
 @db_app.command("reset")
@@ -301,7 +287,6 @@ def db_reset(
     _run_tapdb(["db", "schema", "reset", env_name, "--force"])
     _run_tapdb(["db", "setup", env_name, "--force"])
     _seed_tapdb_templates(env_name, include_workflow=False, overwrite=True)
-    _seed_bloom_templates()
 
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
