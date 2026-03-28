@@ -108,6 +108,8 @@ export TAPDB_ENV="${TAPDB_ENV:-dev}"
 export TAPDB_CLIENT_ID="${TAPDB_CLIENT_ID:-bloom}"
 export TAPDB_DATABASE_NAME="${TAPDB_DATABASE_NAME:-bloom}"
 export TAPDB_STRICT_NAMESPACE="${TAPDB_STRICT_NAMESPACE:-1}"
+export MERIDIAN_ENVIRONMENT="${MERIDIAN_ENVIRONMENT:-production}"
+export MERIDIAN_SANDBOX_PREFIX="${MERIDIAN_SANDBOX_PREFIX-}"
 export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-5566}"
 export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
@@ -126,6 +128,8 @@ echo -e "  ${_GREEN}✓${_NC} TAPDB_ENV=${TAPDB_ENV}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_CLIENT_ID=${TAPDB_CLIENT_ID}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_DATABASE_NAME=${TAPDB_DATABASE_NAME}"
 echo -e "  ${_GREEN}✓${_NC} TAPDB_STRICT_NAMESPACE=${TAPDB_STRICT_NAMESPACE}"
+echo -e "  ${_GREEN}✓${_NC} MERIDIAN_ENVIRONMENT=${MERIDIAN_ENVIRONMENT}"
+echo -e "  ${_GREEN}✓${_NC} MERIDIAN_SANDBOX_PREFIX=${MERIDIAN_SANDBOX_PREFIX}"
 if [[ -n "${TAPDB_CONFIG_PATH:-}" ]]; then
     echo -e "  ${_GREEN}✓${_NC} TAPDB_CONFIG_PATH=${TAPDB_CONFIG_PATH}"
 else
@@ -153,8 +157,8 @@ except Exception:
     print("  \033[1;33m⚠\033[0m daylily-tapdb not installed")
     raise SystemExit(0)
 
-if not (Version("3.0.2") <= v < Version("4.0.0")):
-    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [3.0.2, 4.0.0)")
+if not (Version("3.0.3") <= v < Version("4.0.0")):
+    print(f"  \033[1;33m⚠\033[0m daylily-tapdb version {v} outside supported range [3.0.3, 4.0.0)")
 else:
     print(f"  \033[0;32m✓\033[0m daylily-tapdb version {v}")
 PY
@@ -167,6 +171,8 @@ deactivate_bloom() {
     unset TAPDB_CLIENT_ID
     unset TAPDB_DATABASE_NAME
     unset TAPDB_STRICT_NAMESPACE
+    unset MERIDIAN_ENVIRONMENT
+    unset MERIDIAN_SANDBOX_PREFIX
     unset TAPDB_CONFIG_PATH
     unset BLOOM_TAPDB_LOCAL_PG_PORT
     unset TAPDB_DEV_PORT

@@ -162,6 +162,9 @@ jobs:
   test:
     name: Beta Tests
     runs-on: ubuntu-latest
+    env:
+      MERIDIAN_ENVIRONMENT: production
+      MERIDIAN_SANDBOX_PREFIX: ""
     steps:
       - uses: actions/checkout@v4
 

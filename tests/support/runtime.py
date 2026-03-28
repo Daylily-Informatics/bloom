@@ -86,6 +86,8 @@ def create_temp_tapdb_config(
 
 def ensure_test_runtime_environment() -> Path:
     """Prepare deterministic env/config needed for strict app startup in tests."""
+    os.environ.setdefault("MERIDIAN_ENVIRONMENT", "production")
+    os.environ.setdefault("MERIDIAN_SANDBOX_PREFIX", "")
     os.environ.setdefault("TAPDB_CLIENT_ID", "bloom")
     os.environ.setdefault("TAPDB_DATABASE_NAME", "bloom")
     os.environ.setdefault("TAPDB_STRICT_NAMESPACE", "1")

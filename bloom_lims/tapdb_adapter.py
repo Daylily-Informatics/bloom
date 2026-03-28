@@ -12,12 +12,10 @@ import os
 from types import SimpleNamespace
 from typing import Optional
 
-from sqlalchemy import text
-from sqlalchemy.orm import Session, object_session
-
 from daylily_tapdb import TAPDBConnection
 from daylily_tapdb.models.audit import audit_log
-from daylily_tapdb.models.base import Base as TapDBBase, tapdb_core
+from daylily_tapdb.models.base import Base as TapDBBase
+from daylily_tapdb.models.base import tapdb_core
 from daylily_tapdb.models.instance import (
     action_instance,
     actor_instance,
@@ -63,6 +61,8 @@ from daylily_tapdb.models.template import (
     workflow_step_template,
     workflow_template,
 )
+from sqlalchemy import text
+from sqlalchemy.orm import Session, object_session
 
 from bloom_lims.config import get_tapdb_db_config
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
@@ -220,7 +220,9 @@ class BLOOMdb3:
             pass
 
         # Legacy arguments remain accepted; TapDB config is authoritative.
-        if any([db_url_prefix != "postgresql://", db_hostname, db_pass, db_user, db_name]):
+        if any(
+            [db_url_prefix != "postgresql://", db_hostname, db_pass, db_user, db_name]
+        ):
             self.logger.warning(
                 "Legacy BLOOMdb3 connection arguments are deprecated and ignored; "
                 "TapDB runtime config is authoritative."
@@ -259,7 +261,7 @@ class BLOOMdb3:
             # Metrics are best-effort; never block DB init.
             pass
         self._Session = self._conn._Session
-        self.session = self._Session()
+        self.session = self._conn.get_session()
 
         self.Base = _BLOOMBaseProxy()
         self._register_orm_classes()
@@ -327,7 +329,9 @@ class BLOOMdb3:
         setattr(self.Base.classes, "file_set_instance", file_instance)
         setattr(self.Base.classes, "file_reference_instance", file_instance)
         setattr(self.Base.classes, "file_set_instance_lineage", file_instance_lineage)
-        setattr(self.Base.classes, "file_reference_instance_lineage", file_instance_lineage)
+        setattr(
+            self.Base.classes, "file_reference_instance_lineage", file_instance_lineage
+        )
 
     def __enter__(self) -> "BLOOMdb3":
         return self
@@ -342,7 +346,7 @@ class BLOOMdb3:
         return _TransactionContext(self.session)
 
     def new_session(self) -> Session:
-        session = self._Session()
+        session = self._conn.get_session()
         self._set_session_username(session)
         return session
 
