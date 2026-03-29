@@ -434,6 +434,38 @@ async def admin_metrics(request: Request, _auth=Depends(require_auth), limit: in
     return HTMLResponse(content=template.render(context))
 
 
+@router.get("/admin/observability", response_class=HTMLResponse)
+async def admin_observability(request: Request, _auth=Depends(require_auth), limit: int = 25):
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
+    user_data = request.session.get("user_data", {})
+    store = request.app.state.observability
+    obs_projection, obs_snapshot = store.obs_services_snapshot()
+    api_projection, api_families = store.api_health()
+    endpoint_projection, endpoint_payload = store.endpoint_health(offset=0, limit=limit)
+    db_projection, db_payload = store.db_health()
+    auth_projection, auth_payload = store.auth_health()
+
+    template = templates.get_template("modern/admin_observability.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user_data": user_data,
+        "obs_projection": obs_projection.model_dump(),
+        "obs_snapshot": obs_snapshot,
+        "api_projection": api_projection.model_dump(),
+        "api_families": api_families,
+        "endpoint_projection": endpoint_projection.model_dump(),
+        "endpoint_payload": endpoint_payload,
+        "db_projection": db_projection.model_dump(),
+        "db_payload": db_payload,
+        "auth_projection": auth_projection.model_dump(),
+        "auth_payload": auth_payload,
+    }
+    return HTMLResponse(content=template.render(context))
+
+
 @router.post("/admin")
 async def admin_update_preferences(request: Request, _auth=Depends(require_auth)):
     if not _is_admin_session(request):

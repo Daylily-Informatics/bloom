@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from time import monotonic
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +28,8 @@ from bloom_lims.domain_access import (
 from bloom_lims.gui.errors import register_exception_handlers
 from bloom_lims.health import health_router, probe_router
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
+from bloom_lims.observability import BloomObservabilityStore
+from bloom_lims.observability_routes import router as observability_router
 from bloom_lims.tapdb_metrics import (
     request_method_var,
     request_path_var,
@@ -86,6 +90,36 @@ def create_app() -> FastAPI:
             stop_all_writers()
 
     app = FastAPI(lifespan=_lifespan)
+    app.state.observability = BloomObservabilityStore()
+
+    @app.middleware("http")
+    async def _observability_request_context(request, call_next):
+        request.state.request_id = request.headers.get("x-request-id", str(uuid4()))
+        request.state.correlation_id = request.headers.get("x-correlation-id", request.state.request_id)
+        started = monotonic()
+        try:
+            response = await call_next(request)
+        except Exception:
+            route = request.scope.get("route")
+            route_template = getattr(route, "path", "")
+            if route_template:
+                app.state.observability.record_http_request(
+                    method=request.method,
+                    route_template=route_template,
+                    status_code=500,
+                    duration_ms=(monotonic() - started) * 1000,
+                )
+            raise
+        route = request.scope.get("route")
+        route_template = getattr(route, "path", "")
+        if route_template:
+            app.state.observability.record_http_request(
+                method=request.method,
+                route_template=route_template,
+                status_code=response.status_code,
+                duration_ms=(monotonic() - started) * 1000,
+            )
+        return response
 
     # Request attribution context for TapDB-style DB metrics.
     @app.middleware("http")
@@ -136,6 +170,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health_router)
     app.include_router(probe_router)
+    app.include_router(observability_router)
     app.include_router(api_v1_router)
     try:
         from bloom_lims.gui.router import router as gui_router

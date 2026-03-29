@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import importlib
+import subprocess
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from bloom_lims.cli import build_app
+from bloom_lims.cli import config_extra
 
 server_commands = importlib.import_module("bloom_lims.cli.server")
 
@@ -122,6 +125,30 @@ class TestMainCommands:
     def test_config_doctor_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "doctor", "--help"])
         assert result.exit_code == 0
+
+    def test_config_doctor_reports_schema_drift_without_failing(
+        self,
+        runner: CliRunner,
+        cli_app,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fake_tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
+            assert args[:3] == ["db", "schema", "drift-check"]
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=1,
+                stdout=json.dumps({"counts": {"expected": 12, "live": 13}}),
+                stderr="",
+            )
+
+        monkeypatch.setattr(config_extra, "_tapdb_cmd", fake_tapdb_cmd)
+        monkeypatch.setattr(config_extra, "validate_settings", lambda: [])
+        monkeypatch.setattr(config_extra, "assert_tapdb_version", lambda: "3.0.9")
+
+        result = runner.invoke(cli_app, ["config", "doctor"])
+        assert result.exit_code == 0
+        assert "schema drift detected" in result.output.lower()
+        assert "report only" in result.output.lower()
 
     def test_config_shell_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "shell", "--help"])

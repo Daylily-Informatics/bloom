@@ -1,0 +1,191 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Observability - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Observability</h1>
+    <p class="text-muted">Shared local-service health, API, endpoint, DB, and auth views.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Admin</a>
+    <a href="/admin/metrics" class="btn btn-outline btn-sm"><i class="fas fa-chart-line"></i> Raw DB Metrics</a>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="card stat-card">
+    <div class="stat-value">{{ api_families|length }}</div>
+    <div class="stat-label">API Families</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ endpoint_payload.total }}</div>
+    <div class="stat-label">Tracked Routes</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ db_payload.recent|length }}</div>
+    <div class="stat-label">DB Samples</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ auth_payload.recent|length }}</div>
+    <div class="stat-label">Auth Events</div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: var(--spacing-lg);">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-compass"></i> Capability Surface</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Projection:</span> <span class="info-val font-mono">{{ obs_projection.state }}</span></div>
+        <div class="info-row"><span class="info-key">Observed:</span> <span class="info-val font-mono">{{ obs_projection.observed_at }}</span></div>
+      </div>
+      <div class="table-container" style="margin-top: var(--spacing-md);">
+        <table class="table">
+          <thead><tr><th>Path</th><th>Auth</th><th>Kind</th></tr></thead>
+          <tbody>
+            {% for item in obs_snapshot.endpoints %}
+            <tr>
+              <td class="font-mono">{{ item.path }}</td>
+              <td class="font-mono">{{ item.auth }}</td>
+              <td class="font-mono">{{ item.kind }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-shield-halved"></i> Auth Rollup</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Projection:</span> <span class="info-val font-mono">{{ auth_projection.state }}</span></div>
+        <div class="info-row"><span class="info-key">Mode:</span> <span class="info-val font-mono">{{ auth_payload.mode }}</span></div>
+        <div class="info-row"><span class="info-key">Configured:</span> <span class="info-val font-mono">{{ "yes" if auth_payload.cognito_configured else "no" }}</span></div>
+      </div>
+      <pre class="code-block" style="margin-top: var(--spacing-md);">{{ auth_payload.status_counts | tojson }}</pre>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: var(--spacing-lg);">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-wave-square"></i> API Families</h3>
+    </div>
+    <div class="card-body">
+      <div class="table-container">
+        <table class="table">
+          <thead><tr><th>Family</th><th>Count</th><th>p95 ms</th><th>Errors</th></tr></thead>
+          <tbody>
+            {% for item in api_families %}
+            <tr>
+              <td class="font-mono">{{ item.family }}</td>
+              <td class="font-mono">{{ item.request_count }}</td>
+              <td class="font-mono">{{ "%.3f"|format(item.p95_ms) }}</td>
+              <td class="font-mono">{{ item.error_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-database"></i> DB Rollup</h3>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Projection:</span> <span class="info-val font-mono">{{ db_projection.state }}</span></div>
+        <div class="info-row"><span class="info-key">Latest status:</span> <span class="info-val font-mono">{{ db_payload.status }}</span></div>
+        <div class="info-row"><span class="info-key">Metrics enabled:</span> <span class="info-val font-mono">{{ "yes" if db_payload.metrics_enabled else "no" }}</span></div>
+      </div>
+      {% if db_payload.metrics_message %}
+      <div class="text-muted" style="margin-top: var(--spacing-sm);">{{ db_payload.metrics_message }}</div>
+      {% endif %}
+      <div class="table-container" style="margin-top: var(--spacing-md);">
+        <table class="table">
+          <thead><tr><th>Route</th><th>Count</th><th>p95 ms</th><th>Max ms</th></tr></thead>
+          <tbody>
+            {% for row in db_payload.by_path[:10] %}
+            <tr>
+              <td class="font-mono">{{ row.path }}</td>
+              <td class="font-mono">{{ row.count }}</td>
+              <td class="font-mono">{{ "%.3f"|format(row.p95_ms) }}</td>
+              <td class="font-mono">{{ "%.3f"|format(row.max_ms) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-route"></i> Endpoint Rollups</h3>
+  </div>
+  <div class="card-body">
+    <div class="table-container">
+      <table class="table">
+        <thead><tr><th>Method</th><th>Route</th><th>Count</th><th>p95 ms</th><th>Errors</th></tr></thead>
+        <tbody>
+          {% for item in endpoint_payload["items"] %}
+          <tr>
+            <td class="font-mono">{{ item.method }}</td>
+            <td class="font-mono">{{ item.route_template }}</td>
+            <td class="font-mono">{{ item.request_count }}</td>
+            <td class="font-mono">{{ "%.3f"|format(item.p95_ms) }}</td>
+            <td class="font-mono">{{ item.error_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.stat-card {
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-white);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--color-gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: var(--spacing-xs);
+}
+
+.code-block {
+  white-space: pre-wrap;
+  font-family: var(--font-mono, monospace);
+}
+</style>
+{% endblock %}
