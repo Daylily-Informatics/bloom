@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -46,6 +47,29 @@ def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
     )
+
+
+def _tapdb_schema_drift_check(env_name: str) -> tuple[int, dict[str, object], str]:
+    """Run the TapDB schema drift check in report-only mode."""
+    result = _tapdb_cmd(["db", "schema", "drift-check", env_name, "--json", "--no-strict"])
+    payload: dict[str, object] = {}
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except json.JSONDecodeError:
+            payload = {"raw_stdout": result.stdout.strip()}
+    return result.returncode, payload, (result.stderr or "").strip()
+
+
+def _schema_drift_summary(payload: dict[str, object]) -> str:
+    counts = payload.get("counts")
+    if isinstance(counts, dict):
+        expected = counts.get("expected")
+        live = counts.get("live")
+        return f"expected={expected} live={live}"
+    return "drift report available"
 
 
 def _shell() -> None:
@@ -172,14 +196,18 @@ def _doctor() -> None:
         console.print(f"[red]✗[/red] daylily-tapdb version check failed: {exc}")
 
     env_name = apply_runtime_environment(get_settings()).env
-    result = _tapdb_cmd(["db", "schema", "status", env_name])
-    if result.returncode == 0:
-        console.print("[green]✓[/green] TapDB connectivity and schema status")
+    drift_returncode, drift_payload, drift_stderr = _tapdb_schema_drift_check(env_name)
+    if drift_returncode == 0:
+        console.print("[green]✓[/green] TapDB connectivity and schema drift report")
+    elif drift_returncode == 1:
+        summary = _schema_drift_summary(drift_payload)
+        console.print(f"[yellow]⚠[/yellow] TapDB schema drift detected (report only): {summary}")
+        warnings.append(f"TapDB schema drift detected ({summary})")
     else:
-        issues.append("TapDB schema status check failed")
-        console.print("[red]✗[/red] TapDB schema status")
-        if result.stderr:
-            warnings.append(result.stderr.strip())
+        issues.append("TapDB schema drift check failed")
+        console.print("[red]✗[/red] TapDB schema drift check failed")
+        if drift_stderr:
+            warnings.append(drift_stderr)
 
     warnings.extend(f"Config: {warning}" for warning in validate_settings())
 

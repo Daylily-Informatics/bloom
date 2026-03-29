@@ -947,7 +947,10 @@ class TestHealthEndpoints:
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
-        assert "status" in data or isinstance(data, dict)
+        assert data["service"] == "bloom"
+        assert data["contract_version"] == "v3"
+        assert "projection" in data
+        assert "checks" in data
 
     def test_healthz_endpoint(self, client):
         """Test /healthz endpoint."""

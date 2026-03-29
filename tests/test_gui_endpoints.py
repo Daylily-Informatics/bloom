@@ -82,12 +82,25 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "/admin/metrics" in response.text
 
+    def test_admin_includes_observability_link(self, client):
+        """Admin page includes link to observability."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "/admin/observability" in response.text
+
     def test_admin_metrics_returns_html(self, client):
         """TapDB metrics page returns HTML."""
         response = client.get("/admin/metrics")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "TapDB Metrics" in response.text
+
+    def test_admin_observability_returns_html(self, client):
+        """Observability page returns HTML."""
+        response = client.get("/admin/observability")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "Observability" in response.text
 
     def test_admin_preferences_post_redirects(self, client):
         """Test admin preferences form POST succeeds and redirects."""

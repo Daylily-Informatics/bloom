@@ -19,11 +19,13 @@ import psutil
 from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
 from bloom_lims.config import get_settings
+from bloom_lims.observability import build_health_payload
 
 
 logger = logging.getLogger(__name__)
@@ -92,6 +94,7 @@ async def check_database_health() -> ComponentHealth:
                 status="healthy",
                 latency_ms=round(latency, 2),
                 message="PostgreSQL connection successful",
+                details={"query": "SELECT 1", "observed_at": datetime.now(UTC).isoformat()},
             )
         else:
             return ComponentHealth(
@@ -99,6 +102,7 @@ async def check_database_health() -> ComponentHealth:
                 status="unhealthy",
                 latency_ms=round(latency, 2),
                 message="Query returned no result",
+                details={"query": "SELECT 1", "observed_at": datetime.now(UTC).isoformat()},
             )
     except Exception as e:
         latency = (time.time() - start) * 1000
@@ -108,6 +112,7 @@ async def check_database_health() -> ComponentHealth:
             status="unhealthy",
             latency_ms=round(latency, 2),
             message=str(e),
+            details={"observed_at": datetime.now(UTC).isoformat()},
         )
 
 
@@ -144,6 +149,7 @@ async def check_cognito_health() -> ComponentHealth:
                     status="healthy",
                     latency_ms=round(latency, 2),
                     message="Cognito JWKS reachable",
+                    details={"observed_at": datetime.now(UTC).isoformat()},
                 )
             else:
                 return ComponentHealth(
@@ -151,6 +157,7 @@ async def check_cognito_health() -> ComponentHealth:
                     status="degraded",
                     latency_ms=round(latency, 2),
                     message=f"Cognito JWKS returned status {response.status_code}",
+                    details={"observed_at": datetime.now(UTC).isoformat()},
                 )
     except Exception as e:
         latency = (time.time() - start) * 1000
@@ -160,6 +167,7 @@ async def check_cognito_health() -> ComponentHealth:
             status="degraded",
             latency_ms=round(latency, 2),
             message=str(e),
+            details={"observed_at": datetime.now(UTC).isoformat()},
         )
 
 
@@ -180,9 +188,12 @@ def get_system_info() -> Dict[str, Any]:
         return {}
 
 
-@health_router.get("", response_model=HealthResponse)
-@health_router.get("/", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
+@health_router.get("")
+@health_router.get("/")
+async def health_check(
+    request: Request,
+    user: APIUser = Depends(require_api_auth),
+) -> dict:
     """
     Full health check endpoint.
 
@@ -213,15 +224,49 @@ async def health_check() -> HealthResponse:
     else:
         overall_status = "degraded"
 
-    return HealthResponse(
-        status=overall_status,
-        timestamp=datetime.now(UTC),
-        version=settings.api.version,
-        environment=settings.environment,
-        uptime_seconds=round(uptime, 2),
-        components=components,
-        system=get_system_info(),
+    db_payload = {
+        "status": "ok" if db_health.status == "healthy" else "error",
+        "latency_ms": db_health.latency_ms,
+        "detail": db_health.message,
+        "details": db_health.details,
+        "observed_at": (db_health.details or {}).get("observed_at"),
+    }
+    request.app.state.observability.record_db_probe(
+        status=str(db_payload["status"]),
+        latency_ms=float(db_payload["latency_ms"] or 0.0),
+        detail=str(db_payload["detail"] or ""),
     )
+    auth_payload = {
+        "status": "ok" if cognito_health.status == "healthy" else "degraded",
+        "mode": "cognito",
+        "cognito_configured": bool(
+            settings.auth.cognito_domain
+            and settings.auth.cognito_user_pool_id
+            and settings.auth.cognito_client_id
+        ),
+        "observed_at": (cognito_health.details or {}).get("observed_at"),
+        "detail": cognito_health.message,
+    }
+    snapshot = {
+        "status": "ok" if db_payload["status"] == "ok" else "degraded",
+        "checks": {
+            "process": {
+                "status": "ok",
+                "uptime_seconds": round(uptime, 2),
+                "system": get_system_info(),
+            },
+            "database": db_payload,
+            "auth": auth_payload,
+        },
+    }
+    request.app.state.observability.record_auth_event(
+        status="ok",
+        mode=user.auth_source,
+        detail=request.url.path,
+        service_principal=user.auth_source == "legacy_api_key",
+    )
+    projection = request.app.state.observability.projection(observed_at=db_payload.get("observed_at"))
+    return build_health_payload(request, projection=projection, health_snapshot=snapshot)
 
 
 @health_router.get("/live", response_model=LivenessResponse)

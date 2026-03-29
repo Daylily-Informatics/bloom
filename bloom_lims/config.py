@@ -599,7 +599,6 @@ class BloomSettings(BaseSettings):
                 settings_cls,
                 yaml_file=_yaml_config_files(),
                 yaml_file_encoding="utf-8",
-                deep_merge=True,
             ),
         )
 
