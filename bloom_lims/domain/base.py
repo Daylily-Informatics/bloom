@@ -548,7 +548,7 @@ class BloomObj:
         ret_objs[0].append(parent_instance)
 
         # template_json_addl = template.json_addl
-        if "instantiation_layouts" in template.json_addl:
+        if template.json_addl.get("instantiation_layouts"):
             ret_objs = self._process_instantiation_layouts(
                 template.json_addl["instantiation_layouts"],
                 parent_instance,
@@ -653,7 +653,39 @@ class BloomObj:
         # Revisit the lineage set creation, this will not behave as expected if the json templates define more than 1 level deep children.
         ## or is this desireable, and the referenced children should reference thier children... crazy town begins at this level...
         for row in instantiation_layouts:
-            for ds in row:
+            if isinstance(row, dict) and isinstance(row.get("child_templates"), list):
+                relationship_type = str(row.get("relationship_type") or "generic")
+                for child_cfg in row["child_templates"]:
+                    if not isinstance(child_cfg, dict):
+                        continue
+                    layout_str = str(child_cfg.get("template_code") or "").strip()
+                    if not layout_str:
+                        continue
+                    layout_ds = {"json_addl": child_cfg.get("json_addl") or {}}
+                    child_instance = self._create_child_instance(layout_str, layout_ds)
+                    lineage_record = self.Base.classes.generic_instance_lineage(
+                        parent_instance_uid=parent_instance.uid,
+                        child_instance_uid=child_instance.uid,
+                        name=f"{parent_instance.name} :: {child_instance.name}",
+                        type=parent_instance.type,
+                        subtype=parent_instance.subtype,
+                        version=parent_instance.version,
+                        json_addl=parent_instance.json_addl,
+                        bstatus=parent_instance.bstatus,
+                        category=parent_instance.category,
+                        parent_type=parent_instance.polymorphic_discriminator,
+                        child_type=child_instance.polymorphic_discriminator,
+                        polymorphic_discriminator=f"{parent_instance.category}_instance_lineage",
+                        relationship_type=relationship_type,
+                    )
+                    self.session.add(lineage_record)
+                    ret_objs[1].append(child_instance)
+                continue
+
+            row_entries = row if isinstance(row, list) else [row]
+            for ds in row_entries:
+                if not isinstance(ds, dict):
+                    continue
                 for i in ds:
                     layout_str = i
                     layout_ds = ds[i]
