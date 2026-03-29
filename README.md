@@ -168,6 +168,12 @@ Bloom template definitions are authored as JSON packs under
 `config/tapdb_templates/` and loaded through TapDB during `bloom db init` /
 `bloom db seed`.
 
+## Release Tags
+
+Bloom's historical Git release tags use the legacy `v*` format, for example
+`v0.11.12`. Downstream deployment tooling should pin the exact upstream tag
+that exists in the Bloom repo rather than stripping the `v`.
+
 ## API Surface
 
 Canonical prefix: `/api/v1`

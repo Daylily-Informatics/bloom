@@ -30,7 +30,7 @@ def _token_user(groups: list[str]) -> APIUser:
     return APIUser(
         email="token-user@example.com",
         user_id="token-user",
-        roles=["INTERNAL_READ_ONLY"],
+        roles=["READ_ONLY"],
         groups=groups,
         auth_source="token",
     )
@@ -54,7 +54,7 @@ def test_run_resolver_requires_full_key_query_params():
     app.dependency_overrides[require_external_ursa_read] = lambda: APIUser(
         email="resolver-user@example.com",
         user_id="resolver-user",
-        roles=["INTERNAL_READ_ONLY"],
+        roles=["READ_ONLY"],
         groups=[ENABLE_URSA_API_GROUP],
         auth_source="token",
     )
@@ -73,7 +73,7 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
         return APIUser(
             email="atlas-beta@example.com",
             user_id=f"atlas-user-{token}",
-            roles=["INTERNAL_READ_WRITE"],
+            roles=["READ_WRITE"],
             groups=[ENABLE_ATLAS_API_GROUP],
             auth_source="token",
             is_service_account=True,
@@ -220,7 +220,7 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         return APIUser(
             email="atlas-beta@example.com",
             user_id=f"atlas-user-{token}",
-            roles=["INTERNAL_READ_WRITE"],
+            roles=["READ_WRITE"],
             groups=[ENABLE_ATLAS_API_GROUP],
             auth_source="token",
             is_service_account=True,

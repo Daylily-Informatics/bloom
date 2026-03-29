@@ -85,7 +85,7 @@ def _token_user() -> APIUser:
     return APIUser(
         email="atlas-contract@example.com",
         user_id=_opaque("user"),
-        roles=["INTERNAL_READ_WRITE"],
+        roles=["READ_WRITE"],
         auth_source="token",
         is_service_account=True,
         token_scope="internal_rw",

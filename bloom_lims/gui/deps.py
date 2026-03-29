@@ -180,7 +180,8 @@ async def require_auth(request: Request):
         request.session["user_data"] = {
             "email": "john@daylilyinformatics.bio",
             "dag_fnv2": "",
-            "role": "admin",
+            "role": "ADMIN",
+            "roles": ["ADMIN"],
             "display_timezone": DEFAULT_DISPLAY_TIMEZONE,
         }
         return request
@@ -199,7 +200,7 @@ async def require_auth(request: Request):
         raise AuthenticationRequiredException()
 
     if "role" not in request.session["user_data"]:
-        request.session["user_data"]["role"] = "user"
+        request.session["user_data"]["role"] = "READ_WRITE"
 
     return request.session["user_data"]
 
@@ -212,13 +213,13 @@ def _resolve_auth_email(auth: Dict, request: Request) -> str:
 
 def _resolve_auth_role(auth: Dict, request: Request) -> str:
     if isinstance(auth, dict) and auth.get("role"):
-        return str(auth["role"])
-    return str(request.session.get("user_data", {}).get("role", "user"))
+        return str(auth["role"]).strip().upper()
+    return str(request.session.get("user_data", {}).get("role", "READ_WRITE")).strip().upper()
 
 
 def _require_graph_admin(auth: Dict, request: Request) -> None:
     role = _resolve_auth_role(auth, request)
-    if role != "admin":
+    if role != "ADMIN":
         raise HTTPException(status_code=403, detail="Admin role required")
 
 

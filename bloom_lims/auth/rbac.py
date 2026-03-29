@@ -9,8 +9,8 @@ from enum import StrEnum
 class Role(StrEnum):
     """Supported Bloom roles."""
 
-    INTERNAL_READ_ONLY = "INTERNAL_READ_ONLY"
-    INTERNAL_READ_WRITE = "INTERNAL_READ_WRITE"
+    READ_ONLY = "READ_ONLY"
+    READ_WRITE = "READ_WRITE"
     ADMIN = "ADMIN"
 
 
@@ -27,13 +27,19 @@ class Permission(StrEnum):
 API_ACCESS_GROUP = "API_ACCESS"
 ENABLE_ATLAS_API_GROUP = "ENABLE_ATLAS_API"
 ENABLE_URSA_API_GROUP = "ENABLE_URSA_API"
+BLOOM_READONLY_GROUP = "bloom-readonly"
+BLOOM_READWRITE_GROUP = "bloom-readwrite"
+BLOOM_ADMIN_GROUP = "bloom-admin"
+BLOOM_RND_GROUP = "bloom-rnd"
+BLOOM_CLINICAL_GROUP = "bloom-clinical"
+BLOOM_AUDITOR_GROUP = "bloom-auditor"
 
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
-    Role.INTERNAL_READ_ONLY: {
+    Role.READ_ONLY: {
         Permission.BLOOM_READ,
         Permission.TOKEN_SELF_MANAGE,
     },
-    Role.INTERNAL_READ_WRITE: {
+    Role.READ_WRITE: {
         Permission.BLOOM_READ,
         Permission.BLOOM_WRITE,
         Permission.TOKEN_SELF_MANAGE,
@@ -42,18 +48,18 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
 }
 
 ROLE_RANK: dict[Role, int] = {
-    Role.INTERNAL_READ_ONLY: 1,
-    Role.INTERNAL_READ_WRITE: 2,
+    Role.READ_ONLY: 1,
+    Role.READ_WRITE: 2,
     Role.ADMIN: 3,
 }
 
 SCOPE_ROLE_CAP: dict[str, Role] = {
-    "internal_ro": Role.INTERNAL_READ_ONLY,
-    "internal_rw": Role.INTERNAL_READ_WRITE,
+    "internal_ro": Role.READ_ONLY,
+    "internal_rw": Role.READ_WRITE,
     "admin": Role.ADMIN,
 }
 
-DEFAULT_ROLE = Role.INTERNAL_READ_WRITE
+DEFAULT_ROLE = Role.READ_WRITE
 
 
 def _normalize_role(role_value: str | Role | None) -> Role | None:
@@ -67,16 +73,7 @@ def _normalize_role(role_value: str | Role | None) -> Role | None:
     for role in Role:
         if candidate == role.value:
             return role
-    # Backward compatibility aliases used by existing Bloom auth.
-    alias_map = {
-        "user": Role.INTERNAL_READ_WRITE,
-        "service": Role.ADMIN,
-        "admin": Role.ADMIN,
-        "read_only": Role.INTERNAL_READ_ONLY,
-        "read-write": Role.INTERNAL_READ_WRITE,
-        "read_write": Role.INTERNAL_READ_WRITE,
-    }
-    return alias_map.get(candidate.lower())
+    return None
 
 
 def normalize_roles(

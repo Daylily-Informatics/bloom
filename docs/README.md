@@ -8,6 +8,7 @@ This directory mixes current reference docs with historical planning material.
 - [bloom_beta_api_contracts.md](bloom_beta_api_contracts.md): current Bloom beta integration contract
 - [SEARCH_V2.md](SEARCH_V2.md): unified search API and GUI notes
 - [AUTHENTICATION.md](AUTHENTICATION.md): auth behavior and Cognito details
+- [RELEASE_TAG_POLICY.md](RELEASE_TAG_POLICY.md): release tag format and legacy `v*` tag note
 
 ## Historical / Planning Docs
 

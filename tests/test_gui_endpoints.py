@@ -926,7 +926,7 @@ class TestModernUINavigation:
         async def _non_admin_auth(request: Request):
             request.session["user_data"] = {
                 "email": "non-admin@example.com",
-                "role": "user",
+                "role": "READ_WRITE",
                 "dag_fnv2": "",
             }
             return request.session["user_data"]

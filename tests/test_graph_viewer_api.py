@@ -366,7 +366,7 @@ class TestGraphViewerApis:
 
     def test_api_lineage_rejects_non_admin(self, client):
         def _non_admin_auth():
-            return {"email": "john@daylilyinformatics.bio", "role": "user"}
+            return {"email": "john@daylilyinformatics.bio", "role": "READ_WRITE"}
 
         app.dependency_overrides[require_auth] = _non_admin_auth
         try:
@@ -433,7 +433,7 @@ class TestGraphViewerApis:
 
     def test_api_object_delete_rejects_non_admin(self, client):
         def _non_admin_auth():
-            return {"email": "john@daylilyinformatics.bio", "role": "user"}
+            return {"email": "john@daylilyinformatics.bio", "role": "READ_WRITE"}
 
         app.dependency_overrides[require_auth] = _non_admin_auth
         try:

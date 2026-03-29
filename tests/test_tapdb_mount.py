@@ -41,7 +41,7 @@ def test_non_admin_authenticated_user_is_denied(monkeypatch):
     monkeypatch.setattr(
         tapdb_mount,
         "_resolve_bloom_user_data",
-        lambda _scope: {"email": "user@example.com", "role": "user"},
+        lambda _scope: {"email": "user@example.com", "role": "READ_WRITE"},
     )
     with _client() as client:
         response = client.get("/admin/tapdb/login", follow_redirects=False)
@@ -61,7 +61,7 @@ def test_admin_user_can_access_mounted_surface(monkeypatch):
     monkeypatch.setattr(
         tapdb_mount,
         "_resolve_bloom_user_data",
-        lambda _scope: {"email": "admin@example.com", "role": "admin"},
+        lambda _scope: {"email": "admin@example.com", "role": "ADMIN"},
     )
     with _client() as client:
         response = client.get("/admin/tapdb/login", follow_redirects=False)
@@ -73,7 +73,7 @@ def test_tapdb_local_auth_not_required_in_mounted_mode(monkeypatch):
     monkeypatch.setattr(
         tapdb_mount,
         "_resolve_bloom_user_data",
-        lambda _scope: {"email": "admin@example.com", "role": "admin"},
+        lambda _scope: {"email": "admin@example.com", "role": "ADMIN"},
     )
     with _client() as client:
         response = client.get("/admin/tapdb/login", follow_redirects=False)
@@ -85,7 +85,7 @@ def test_bloom_single_app_serves_api_and_tapdb_mount(monkeypatch):
     monkeypatch.setattr(
         tapdb_mount,
         "_resolve_bloom_user_data",
-        lambda _scope: {"email": "admin@example.com", "role": "admin"},
+        lambda _scope: {"email": "admin@example.com", "role": "ADMIN"},
     )
     with _client() as client:
         api_response = client.get("/api/v1/")

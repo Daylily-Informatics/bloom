@@ -241,7 +241,7 @@ def mock_api_auth():
     mock_user = APIUser(
         user_id="test-user-id",
         email="test@example.com",
-        role="admin",
+        role="ADMIN",
     )
 
     with patch(

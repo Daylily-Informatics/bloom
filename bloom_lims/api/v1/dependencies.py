@@ -47,13 +47,13 @@ class APIUser:
         fallback_role = map_legacy_role(role)
         normalized_roles = normalize_roles(roles or ([fallback_role] if fallback_role else []), fallback=fallback_role)
         if not normalized_roles:
-            normalized_roles = [Role.INTERNAL_READ_WRITE.value]
+            normalized_roles = [Role.READ_WRITE.value]
         self.email = email
         self.user_id = user_id or email
         self.roles = normalized_roles
         self.groups = sorted(set(groups or []))
         self.permissions = sorted(set(permissions or effective_permissions(self.roles)))
-        self.role = role or self.roles[0]
+        self.role = self.roles[0]
         self.auth_source = auth_source
         self.is_service_account = is_service_account
         self.token_scope = token_scope
@@ -183,7 +183,7 @@ def _make_user(
     all_groups = sorted(set((groups_hint or []) + resolved_groups))
     if API_ACCESS_GROUP in all_groups and Permission.TOKEN_SELF_MANAGE.value not in permissions:
         permissions = sorted(set(permissions + [Permission.TOKEN_SELF_MANAGE.value]))
-    primary_role = roles[0] if roles else Role.INTERNAL_READ_WRITE.value
+    primary_role = roles[0] if roles else Role.READ_WRITE.value
     return APIUser(
         email=email,
         user_id=user_id or email,
@@ -220,7 +220,7 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             roles=constrained_roles,
             groups=owner_groups,
             permissions=permissions,
-            role=constrained_roles[0] if constrained_roles else Role.INTERNAL_READ_ONLY.value,
+            role=constrained_roles[0] if constrained_roles else Role.READ_ONLY.value,
             auth_source="token",
             is_service_account=True,
             token_scope=token_row.scope,
@@ -292,7 +292,7 @@ async def get_api_user(
         return _make_user(
             email=user_data.get("email", "session-user"),
             user_id=user_data.get("sub"),
-            role_hint=user_data.get("role") or user_data.get("custom:role"),
+            role_hint=user_data.get("role"),
             auth_source="session",
             groups_hint=user_data.get("groups") if isinstance(user_data.get("groups"), list) else [],
         )
@@ -315,7 +315,7 @@ async def get_api_user(
                 return _make_user(
                     email=claims.get("email", "token-user"),
                     user_id=claims.get("sub"),
-                    role_hint=claims.get("custom:role") or claims.get("role"),
+                    role_hint=None,
                     auth_source="cognito",
                     groups_hint=claims.get("cognito:groups")
                     if isinstance(claims.get("cognito:groups"), list)

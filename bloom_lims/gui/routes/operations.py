@@ -66,11 +66,11 @@ class FormField(BaseModel):
 
 def _session_role(request: Request) -> str:
     user_data = request.session.get("user_data", {})
-    return str(user_data.get("role", "user")).strip().lower()
+    return str(user_data.get("role", "READ_WRITE")).strip().upper()
 
 
 def _is_admin_session(request: Request) -> bool:
-    return _session_role(request) == "admin"
+    return _session_role(request) == "ADMIN"
 
 
 def _admin_forbidden_response(request: Request):
@@ -991,7 +991,7 @@ async def euid_details(
 
         subjects_for_object = list_subjects_for_object(bobdb, euid)
 
-        is_admin = user_data.get("role", "user") == "admin"
+        is_admin = str(user_data.get("role", "READ_WRITE")).strip().upper() == "ADMIN"
         action_groups = {}
         if isinstance(obj.json_addl, dict):
             action_groups = _hydrate_dynamic_action_groups(

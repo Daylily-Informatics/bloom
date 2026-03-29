@@ -118,10 +118,15 @@ Bloom auth group/token metadata is persisted in TapDB generic templates:
 - `bloom/auth/user-api-token-usage-log/1.0/`
 
 System groups are automatically bootstrapped on demand:
-- `INTERNAL_READ_ONLY`
-- `INTERNAL_READ_WRITE`
-- `ADMIN`
+- `bloom-readonly`
+- `bloom-readwrite`
+- `bloom-admin`
+- `bloom-rnd`
+- `bloom-clinical`
+- `bloom-auditor`
 - `API_ACCESS`
+- `ENABLE_ATLAS_API`
+- `ENABLE_URSA_API`
 
 To test legacy API key behavior in local development only:
 
