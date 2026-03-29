@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
-from bloom_lims.auth.services.groups import GroupService, map_legacy_role
+from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import _get_request_cognito_auth, get_allowed_domains, get_user_preferences, require_auth
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
@@ -82,7 +82,7 @@ def _resolve_login_roles_and_groups(
         return resolution.roles, resolution.groups, default_user_id
     except Exception as exc:
         logging.warning("Failed to resolve session RBAC for %s: %s", normalized_email, exc)
-        return [fallback or Role.INTERNAL_READ_WRITE.value], [], (normalized_sub or normalized_email)
+        return [fallback or Role.READ_WRITE.value], [], (normalized_sub or normalized_email)
     finally:
         bdb.close()
 
@@ -134,14 +134,13 @@ async def _complete_cognito_login(
                 detail="Email domain not allowed",
             )
 
-    token_role_hint = decoded_token.get("custom:role") or decoded_token.get("role")
     cognito_sub = decoded_token.get("sub")
     roles, groups, resolved_user_id = _resolve_login_roles_and_groups(
         email=primary_email,
         cognito_sub=cognito_sub,
-        fallback_role=token_role_hint,
+        fallback_role=None,
     )
-    primary_role = (roles[0] if roles else map_legacy_role(token_role_hint)).upper()
+    primary_role = (roles[0] if roles else Role.READ_WRITE.value).upper()
 
     user_data = get_user_preferences(primary_email)
     user_data.update(

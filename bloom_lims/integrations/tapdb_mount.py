@@ -73,13 +73,13 @@ def _resolve_bloom_user_data(scope: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _is_admin_user(user_data: dict[str, Any]) -> bool:
-    role = str(user_data.get("role") or "").strip().lower()
-    if role == "admin":
+    role = str(user_data.get("role") or "").strip().upper()
+    if role == "ADMIN":
         return True
     roles = user_data.get("roles")
     if not isinstance(roles, list):
         return False
-    return any(str(item).strip().lower() == "admin" for item in roles)
+    return any(str(item).strip().upper() == "ADMIN" for item in roles)
 
 
 class BloomAdminGuardedASGI:
@@ -155,4 +155,3 @@ def mount_tapdb_admin_subapp(app: FastAPI) -> TapDBMountConfig | None:
     app.mount(config.mount_path, BloomAdminGuardedASGI(tapdb_admin_app), name="tapdb_admin")
     logger.info("Mounted TapDB admin app at %s", config.mount_path)
     return config
-

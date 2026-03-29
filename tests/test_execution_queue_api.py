@@ -30,7 +30,7 @@ def _internal_rw_user() -> APIUser:
     return APIUser(
         email="execution-api@example.com",
         user_id=_opaque("user"),
-        roles=["INTERNAL_READ_WRITE"],
+        roles=["READ_WRITE"],
         auth_source="token",
         token_scope="internal_rw",
         token_id=_opaque("token"),
@@ -41,7 +41,7 @@ def _internal_ro_user() -> APIUser:
     return APIUser(
         email="execution-api-ro@example.com",
         user_id=_opaque("user"),
-        roles=["INTERNAL_READ_ONLY"],
+        roles=["READ_ONLY"],
         auth_source="token",
         token_scope="internal_ro",
         token_id=_opaque("token"),

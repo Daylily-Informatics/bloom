@@ -44,7 +44,7 @@ def test_require_write_blocks_read_only_user():
     user = APIUser(
         email="ro@example.com",
         user_id="ro-user-1",
-        roles=["INTERNAL_READ_ONLY"],
+        roles=["READ_ONLY"],
     )
     with pytest.raises(HTTPException) as exc:
         asyncio.run(require_write(user))
@@ -56,7 +56,7 @@ def test_require_external_token_auth_blocks_non_token_user():
     user = APIUser(
         email="session@example.com",
         user_id="session-user-1",
-        roles=["INTERNAL_READ_WRITE"],
+        roles=["READ_WRITE"],
         auth_source="session",
     )
     with pytest.raises(HTTPException) as exc:

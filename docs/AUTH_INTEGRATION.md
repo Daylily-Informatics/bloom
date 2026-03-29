@@ -5,8 +5,8 @@ This document describes Bloom's token-first external API model and Atlas integra
 ## RBAC Model
 
 Bloom roles:
-- `INTERNAL_READ_ONLY`
-- `INTERNAL_READ_WRITE`
+- `READ_ONLY`
+- `READ_WRITE`
 - `ADMIN`
 
 Bloom permissions:
@@ -17,10 +17,15 @@ Bloom permissions:
 - `token:admin_manage`
 
 System groups:
-- `INTERNAL_READ_ONLY`
-- `INTERNAL_READ_WRITE`
-- `ADMIN`
+- `bloom-readonly`
+- `bloom-readwrite`
+- `bloom-admin`
+- `bloom-rnd`
+- `bloom-clinical`
+- `bloom-auditor`
 - `API_ACCESS`
+- `ENABLE_ATLAS_API`
+- `ENABLE_URSA_API`
 
 `API_ACCESS` gates personal API token self-service. Admin users can always manage tokens.
 

@@ -105,7 +105,7 @@ async def dindex2(
         "start_euid": resolved_start_euid,
         "depth": resolved_depth,
         "merge_ref": merge_ref,
-        "is_admin": user_role == "admin",
+        "is_admin": user_role == "ADMIN",
         "udat": user_data,
     }
     return HTMLResponse(content=template.render(**context))

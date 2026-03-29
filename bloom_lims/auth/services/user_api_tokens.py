@@ -78,12 +78,12 @@ class UserAPITokenService:
 
     @staticmethod
     def allowed_scopes_for_roles(actor_roles: list[str]) -> set[str]:
-        roles = normalize_roles(actor_roles, fallback=Role.INTERNAL_READ_WRITE.value)
+        roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
         if is_admin(roles):
             return {"internal_ro", "internal_rw", "admin"}
-        if Role.INTERNAL_READ_WRITE.value in roles:
+        if Role.READ_WRITE.value in roles:
             return {"internal_ro", "internal_rw"}
-        if Role.INTERNAL_READ_ONLY.value in roles:
+        if Role.READ_ONLY.value in roles:
             return {"internal_ro"}
         return set()
 
@@ -97,7 +97,7 @@ class UserAPITokenService:
         payload: TokenCreateInput,
     ) -> TokenCreateResult:
         self.groups.ensure_system_groups()
-        normalized_roles = normalize_roles(actor_roles, fallback=Role.INTERNAL_READ_WRITE.value)
+        normalized_roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
         group_set = {group.upper() for group in actor_groups}
         actor_is_admin = is_admin(normalized_roles)
         if not actor_is_admin and API_ACCESS_GROUP not in group_set:
@@ -158,7 +158,7 @@ class UserAPITokenService:
         if current is None:
             return None
         token, revision = current
-        roles = normalize_roles(actor_roles, fallback=Role.INTERNAL_READ_WRITE.value)
+        roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
         if token.user_id != actor_user_id and not is_admin(roles):
             raise PermissionError("Cannot revoke another user's token")
 
@@ -269,7 +269,7 @@ class UserAPITokenService:
         if token_result is None:
             return []
         token, _ = token_result
-        roles = normalize_roles(actor_roles, fallback=Role.INTERNAL_READ_WRITE.value)
+        roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
         if token.user_id != actor_user_id and not is_admin(roles):
             raise PermissionError("Cannot view usage for another user's token")
         return self.repo.get_usage_logs(token_id=token_id, limit=max(1, min(limit, 1000)))
@@ -281,6 +281,6 @@ class UserAPITokenService:
     ) -> tuple[list[str], list[str]]:
         owner = self.groups.resolve_user_roles_and_groups(
             user_id=token.user_id,
-            fallback_role=Role.INTERNAL_READ_ONLY.value,
+            fallback_role=Role.READ_ONLY.value,
         )
         return constrain_roles_by_scope(owner.roles, token.scope), owner.groups

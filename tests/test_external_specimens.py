@@ -15,7 +15,7 @@ def _token_user(groups: list[str]) -> APIUser:
     return APIUser(
         email="token-user@example.com",
         user_id="token-user",
-        roles=["INTERNAL_READ_WRITE"],
+        roles=["READ_WRITE"],
         groups=groups,
         auth_source="token",
     )

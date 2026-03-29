@@ -8,6 +8,12 @@ from sqlalchemy.orm import Session
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
+    BLOOM_ADMIN_GROUP,
+    BLOOM_AUDITOR_GROUP,
+    BLOOM_CLINICAL_GROUP,
+    BLOOM_READONLY_GROUP,
+    BLOOM_READWRITE_GROUP,
+    BLOOM_RND_GROUP,
     ENABLE_ATLAS_API_GROUP,
     ENABLE_URSA_API_GROUP,
     Role,
@@ -17,33 +23,29 @@ from bloom_lims.auth.repositories.tapdb.groups import GroupMembershipRecord, Gro
 
 
 SYSTEM_GROUP_CODES = [
-    Role.INTERNAL_READ_ONLY.value,
-    Role.INTERNAL_READ_WRITE.value,
-    Role.ADMIN.value,
+    BLOOM_READONLY_GROUP,
+    BLOOM_READWRITE_GROUP,
+    BLOOM_ADMIN_GROUP,
+    BLOOM_RND_GROUP,
+    BLOOM_CLINICAL_GROUP,
+    BLOOM_AUDITOR_GROUP,
     API_ACCESS_GROUP,
     ENABLE_ATLAS_API_GROUP,
     ENABLE_URSA_API_GROUP,
 ]
 
-LEGACY_ROLE_TO_BLOOM_ROLE = {
-    "admin": Role.ADMIN.value,
-    "service": Role.ADMIN.value,
-    "user": Role.INTERNAL_READ_WRITE.value,
-    "read_only": Role.INTERNAL_READ_ONLY.value,
-    "read-write": Role.INTERNAL_READ_WRITE.value,
-    "read_write": Role.INTERNAL_READ_WRITE.value,
+GROUP_ROLE_MAP = {
+    BLOOM_READONLY_GROUP: Role.READ_ONLY.value,
+    BLOOM_READWRITE_GROUP: Role.READ_WRITE.value,
+    BLOOM_ADMIN_GROUP: Role.ADMIN.value,
 }
 
 
 def map_legacy_role(role_value: str | None) -> str:
-    if role_value is None:
-        return Role.INTERNAL_READ_WRITE.value
-    candidate = str(role_value).strip()
-    if not candidate:
-        return Role.INTERNAL_READ_WRITE.value
+    candidate = str(role_value or "").strip()
     if candidate in {role.value for role in Role}:
         return candidate
-    return LEGACY_ROLE_TO_BLOOM_ROLE.get(candidate.lower(), Role.INTERNAL_READ_WRITE.value)
+    return Role.READ_WRITE.value
 
 
 @dataclass(frozen=True)
@@ -104,6 +106,6 @@ class GroupService:
     ) -> GroupResolution:
         fallback = map_legacy_role(fallback_role)
         groups = self.get_group_codes_for_user(user_id)
-        role_groups = [group for group in groups if group in {role.value for role in Role}]
+        role_groups = [GROUP_ROLE_MAP[group] for group in groups if group in GROUP_ROLE_MAP]
         roles = normalize_roles(role_groups or [fallback], fallback=fallback)
         return GroupResolution(roles=roles, groups=sorted(groups))

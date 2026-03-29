@@ -34,7 +34,7 @@ def _external_rw_user() -> APIUser:
     return APIUser(
         email="atlas-bridge@example.com",
         user_id=_opaque_id("user"),
-        roles=["INTERNAL_READ_WRITE"],
+        roles=["READ_WRITE"],
         groups=[API_ACCESS_GROUP, ENABLE_ATLAS_API_GROUP],
         auth_source="token",
         is_service_account=True,
@@ -47,7 +47,7 @@ def _external_ro_user() -> APIUser:
     return APIUser(
         email="atlas-bridge-ro@example.com",
         user_id=_opaque_id("user"),
-        roles=["INTERNAL_READ_ONLY"],
+        roles=["READ_ONLY"],
         groups=[API_ACCESS_GROUP, ENABLE_ATLAS_API_GROUP],
         auth_source="token",
         is_service_account=True,

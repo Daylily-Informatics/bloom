@@ -28,7 +28,7 @@ def _external_rw_user() -> APIUser:
     return APIUser(
         email="beta-resolver@example.com",
         user_id=f"user-{token}",
-        roles=["INTERNAL_READ_WRITE"],
+        roles=["READ_WRITE"],
         groups=[ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP],
         auth_source="token",
         is_service_account=True,

@@ -2,6 +2,12 @@
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
+    BLOOM_ADMIN_GROUP,
+    BLOOM_AUDITOR_GROUP,
+    BLOOM_CLINICAL_GROUP,
+    BLOOM_READONLY_GROUP,
+    BLOOM_READWRITE_GROUP,
+    BLOOM_RND_GROUP,
     Permission,
     Role,
     can_write,
@@ -15,6 +21,12 @@ from bloom_lims.auth.rbac import (
 
 __all__ = [
     "API_ACCESS_GROUP",
+    "BLOOM_ADMIN_GROUP",
+    "BLOOM_AUDITOR_GROUP",
+    "BLOOM_CLINICAL_GROUP",
+    "BLOOM_READONLY_GROUP",
+    "BLOOM_READWRITE_GROUP",
+    "BLOOM_RND_GROUP",
     "Permission",
     "Role",
     "can_write",
@@ -25,4 +37,3 @@ __all__ = [
     "is_admin",
     "normalize_roles",
 ]
-
