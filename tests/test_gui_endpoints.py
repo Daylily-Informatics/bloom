@@ -88,6 +88,12 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "/admin/observability" in response.text
 
+    def test_admin_includes_anomalies_link(self, client):
+        """Admin page includes link to operational anomalies."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "/admin/anomalies" in response.text
+
     def test_admin_metrics_returns_html(self, client):
         """TapDB metrics page returns HTML."""
         response = client.get("/admin/metrics")
@@ -101,6 +107,18 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "Observability" in response.text
+
+    def test_admin_anomalies_returns_html(self, client):
+        """Anomaly page returns HTML."""
+        from bloom_lims.gui.routes import operations
+        from tests.test_anomalies import _StubBloomDB, _StubRepository
+
+        with patch.object(operations, "BLOOMdb3", _StubBloomDB):
+            with patch.object(operations, "TapdbAnomalyRepository", lambda _session: _StubRepository()):
+                response = client.get("/admin/anomalies")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "Operational Anomalies" in response.text
 
     def test_admin_preferences_post_redirects(self, client):
         """Test admin preferences form POST succeeds and redirects."""

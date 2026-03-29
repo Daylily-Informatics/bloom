@@ -1,0 +1,88 @@
+{% extends "modern/base.html" %}
+{% block title %}Operational Anomalies - BLOOM LIMS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Operational Anomalies</h1>
+    <p class="text-muted">Read-only anomaly records persisted for Bloom operators.</p>
+  </div>
+  <div class="btn-row">
+    <a href="/admin" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Admin</a>
+    <a href="/admin/observability" class="btn btn-outline btn-sm"><i class="fas fa-heart-pulse"></i> Observability</a>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <section class="card">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fas fa-list"></i> Recent Anomalies</h2>
+    </div>
+    <div class="card-body">
+      {% if error_detail %}
+      <p class="text-muted">Anomaly store unavailable: {{ error_detail }}</p>
+      {% endif %}
+      {% if anomalies %}
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Severity</th>
+              <th>Category</th>
+              <th>Summary</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in anomalies %}
+            <tr>
+              <td><a href="/admin/anomalies/{{ item.id }}" class="font-mono">{{ item.id }}</a></td>
+              <td>{{ item.severity }}</td>
+              <td>{{ item.category }}</td>
+              <td>{{ item.summary }}</td>
+              <td>{{ item.occurrence_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted">No anomalies recorded.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fas fa-magnifying-glass"></i> Detail</h2>
+    </div>
+    <div class="card-body">
+      {% if anomaly %}
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">ID</span><span class="info-val font-mono">{{ anomaly.id }}</span></div>
+        <div class="info-row"><span class="info-key">Service</span><span class="info-val">{{ anomaly.service }}</span></div>
+        <div class="info-row"><span class="info-key">Environment</span><span class="info-val">{{ anomaly.environment }}</span></div>
+        <div class="info-row"><span class="info-key">Severity</span><span class="info-val">{{ anomaly.severity }}</span></div>
+        <div class="info-row"><span class="info-key">Category</span><span class="info-val">{{ anomaly.category }}</span></div>
+        <div class="info-row"><span class="info-key">Fingerprint</span><span class="info-val font-mono">{{ anomaly.fingerprint }}</span></div>
+        <div class="info-row"><span class="info-key">First Seen</span><span class="info-val font-mono">{{ anomaly.first_seen_at }}</span></div>
+        <div class="info-row"><span class="info-key">Last Seen</span><span class="info-val font-mono">{{ anomaly.last_seen_at }}</span></div>
+        <div class="info-row"><span class="info-key">Count</span><span class="info-val">{{ anomaly.occurrence_count }}</span></div>
+        <div class="info-row"><span class="info-key">Source View</span><span class="info-val font-mono">{{ anomaly.source_view_url }}</span></div>
+      </div>
+      <div style="margin-top: var(--spacing-md);">
+        <h3 class="section-subtitle">Summary</h3>
+        <p>{{ anomaly.summary }}</p>
+      </div>
+      <div style="margin-top: var(--spacing-md);">
+        <h3 class="section-subtitle">Redacted Context</h3>
+        <pre class="code-block">{{ anomaly.redacted_context | tojson }}</pre>
+      </div>
+      {% else %}
+      <p class="text-muted">Select an anomaly to inspect its redacted details.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

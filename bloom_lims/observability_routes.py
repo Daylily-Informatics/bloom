@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from bloom_lims.anomalies import TapdbAnomalyRepository
 from bloom_lims.api.v1.dependencies import APIUser, get_api_user, require_api_auth
 from bloom_lims.health import check_database_health
 from bloom_lims.observability import (
@@ -15,6 +16,7 @@ from bloom_lims.observability import (
     build_my_health_payload,
     build_obs_services_payload,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 router = APIRouter(tags=["Health"])
@@ -27,6 +29,13 @@ def _record_auth(request: Request, user: APIUser) -> None:
         detail=request.url.path,
         service_principal=user.auth_source == "legacy_api_key",
     )
+
+
+def _anomaly_repository(app_username: str) -> tuple[BLOOMdb3, TapdbAnomalyRepository]:
+    bdb = BLOOMdb3(app_username=app_username)
+    return bdb, TapdbAnomalyRepository(bdb.session)
+
+
 @router.get("/obs_services")
 async def obs_services(
     request: Request,
@@ -80,10 +89,67 @@ async def db_health(
         latency_ms=float(db_component.latency_ms or ((monotonic() - started) * 1000)),
         detail=str(db_component.message or ""),
     )
+    if db_component.status != "healthy":
+        bdb, repository = _anomaly_repository(getattr(user, "email", "") or "observability")
+        try:
+            repository.record_db_probe_failure(
+                detail=str(db_component.message or ""),
+                latency_ms=float(db_component.latency_ms or ((monotonic() - started) * 1000)),
+            )
+        finally:
+            bdb.close()
     projection, payload = request.app.state.observability.db_health()
     if not payload.get("observed_at"):
         payload["observed_at"] = details.get("observed_at")
     return build_db_health_payload(request, projection=projection, db_health=payload)
+
+
+@router.get("/api/anomalies")
+async def list_anomalies(
+    request: Request,
+    user: Annotated[APIUser, Depends(require_api_auth)],
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+) -> dict:
+    _record_auth(request, user)
+    bdb, repository = _anomaly_repository(getattr(user, "email", "") or "api-anomalies")
+    try:
+        items = [record.__dict__ for record in repository.list(skip=offset, limit=limit)]
+        projection = repository.projection()
+    finally:
+        bdb.close()
+    return {
+        "service": "bloom",
+        "contract_version": "v3",
+        "observed_at": projection.observed_at,
+        "projection": projection.model_dump(),
+        "items": items,
+        "count": len(items),
+    }
+
+
+@router.get("/api/anomalies/{anomaly_id}")
+async def get_anomaly(
+    anomaly_id: str,
+    request: Request,
+    user: Annotated[APIUser, Depends(require_api_auth)],
+) -> dict:
+    _record_auth(request, user)
+    bdb, repository = _anomaly_repository(getattr(user, "email", "") or "api-anomalies")
+    try:
+        record = repository.get(anomaly_id)
+        projection = repository.projection()
+    finally:
+        bdb.close()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Anomaly not found")
+    return {
+        "service": "bloom",
+        "contract_version": "v3",
+        "observed_at": projection.observed_at,
+        "projection": projection.model_dump(),
+        "item": record.__dict__,
+    }
 
 
 @router.get("/my_health")
