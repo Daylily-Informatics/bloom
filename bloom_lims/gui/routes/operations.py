@@ -28,6 +28,7 @@ from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from auth.cognito.client import CognitoConfigurationError
+from bloom_lims.anomalies import TapdbAnomalyRepository
 from bloom_lims.bobjs import BloomFile, BloomFileReference, BloomFileSet, BloomObj
 from bloom_lims.bvars import BloomVars
 from bloom_lims.db import BLOOMdb3
@@ -462,6 +463,68 @@ async def admin_observability(request: Request, _auth=Depends(require_auth), lim
         "db_payload": db_payload,
         "auth_projection": auth_projection.model_dump(),
         "auth_payload": auth_payload,
+    }
+    return HTMLResponse(content=template.render(context))
+
+
+@router.get("/admin/anomalies", response_class=HTMLResponse)
+async def admin_anomalies(request: Request, _auth=Depends(require_auth), limit: int = 100):
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
+    user_data = request.session.get("user_data", {})
+    anomalies: list[dict] = []
+    error_detail = ""
+    bdb = BLOOMdb3(app_username=user_data.get("email", "admin-anomalies"))
+    try:
+        anomalies = [record.__dict__ for record in TapdbAnomalyRepository(bdb.session).list(limit=limit)]
+    except Exception as exc:
+        error_detail = str(exc)
+    finally:
+        bdb.close()
+
+    template = templates.get_template("modern/admin_anomalies.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user_data": user_data,
+        "anomaly": None,
+        "anomalies": anomalies,
+        "error_detail": error_detail,
+    }
+    return HTMLResponse(content=template.render(context))
+
+
+@router.get("/admin/anomalies/{anomaly_id}", response_class=HTMLResponse)
+async def admin_anomaly_detail(
+    anomaly_id: str,
+    request: Request,
+    _auth=Depends(require_auth),
+    limit: int = 25,
+):
+    if not _is_admin_session(request):
+        return _admin_forbidden_response(request)
+
+    user_data = request.session.get("user_data", {})
+    anomalies: list[dict] = []
+    anomaly = None
+    bdb = BLOOMdb3(app_username=user_data.get("email", "admin-anomalies"))
+    try:
+        repository = TapdbAnomalyRepository(bdb.session)
+        anomaly = repository.get(anomaly_id)
+        anomalies = [record.__dict__ for record in repository.list(limit=limit)]
+    finally:
+        bdb.close()
+    if anomaly is None:
+        raise HTTPException(status_code=404, detail="Anomaly not found")
+
+    template = templates.get_template("modern/admin_anomalies.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user_data": user_data,
+        "anomaly": anomaly.__dict__,
+        "anomalies": anomalies,
     }
     return HTMLResponse(content=template.render(context))
 

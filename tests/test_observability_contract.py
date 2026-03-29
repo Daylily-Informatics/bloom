@@ -74,9 +74,12 @@ def test_obs_services_uses_canonical_capability_vocabulary() -> None:
         "/api_health": {"auth": "operator_or_service_token", "kind": "api_rollup"},
         "/endpoint_health": {"auth": "operator_or_service_token", "kind": "endpoint_rollup"},
         "/db_health": {"auth": "operator_or_service_token", "kind": "database"},
+        "/api/anomalies": {"auth": "operator_or_service_token", "kind": "anomaly_list"},
+        "/api/anomalies/{anomaly_id}": {"auth": "operator_or_service_token", "kind": "anomaly_detail"},
         "/my_health": {"auth": "authenticated_self", "kind": "self"},
         "/auth_health": {"auth": "operator_or_service_token", "kind": "auth"},
     }
+    assert "bloom.anomalies_v1" in response.json()["extensions"]
 
 
 def test_endpoint_health_uses_route_templates_not_raw_instances() -> None:
