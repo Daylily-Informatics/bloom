@@ -9,8 +9,8 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
-from bloom_lims.config import DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT, DEFAULT_BLOOM_WEB_PORT
 from bloom_lims.cli import build_app
+from bloom_lims.config import DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT, DEFAULT_BLOOM_WEB_PORT
 
 db_commands = importlib.import_module("bloom_lims.cli.db")
 
@@ -181,3 +181,34 @@ def test_db_seed_calls_tapdb_template_loader(
     result = runner.invoke(cli_app, ["db", "seed"])
     assert result.exit_code == 0
     assert tapdb_seed == [("dev", False, False)]
+
+
+@pytest.mark.parametrize(
+    ("force", "expected_args"),
+    [
+        (False, ["db", "schema", "reset", "dev"]),
+        (True, ["db", "schema", "reset", "dev", "--force"]),
+    ],
+)
+def test_db_nuke_calls_tapdb_schema_reset(
+    runner: CliRunner,
+    cli_app,
+    monkeypatch: pytest.MonkeyPatch,
+    force: bool,
+    expected_args: list[str],
+) -> None:
+    calls: list[tuple[list[str], bool]] = []
+    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(
+        db_commands,
+        "_run_tapdb",
+        lambda args, check=True: calls.append((args, check)) or 0,
+    )
+
+    argv = ["db", "nuke"]
+    if force:
+        argv.append("--force")
+
+    result = runner.invoke(cli_app, argv)
+    assert result.exit_code == 0
+    assert calls == [(expected_args, True)]

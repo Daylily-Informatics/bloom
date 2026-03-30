@@ -79,6 +79,9 @@ Bloom keeps only Bloom-specific DB commands:
 - `bloom db init`
 - `bloom db seed`
 - `bloom db reset`
+- `bloom db nuke`
+
+`bloom db nuke` is a delete-only passthrough to `tapdb db schema reset` and does not seed, setup, init pg, or start pg.
 
 Use `tapdb ...` directly for shared runtime/schema/database lifecycle. Use `daycog ...` directly for Cognito pool/app/user lifecycle.
 

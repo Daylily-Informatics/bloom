@@ -12,8 +12,8 @@ from bloom_lims.cli import (
     _enforce_conda_env_contract,
     _strip_skip_conda_env_check_flag,
     build_app,
+    config_extra,
 )
-from bloom_lims.cli import config_extra
 
 server_commands = importlib.import_module("bloom_lims.cli.server")
 
@@ -100,6 +100,7 @@ class TestMainCommands:
         assert "init" in result.output
         assert "seed" in result.output
         assert "reset" in result.output
+        assert "nuke" in result.output
         assert "start" not in result.output
         assert "stop" not in result.output
         assert "status" not in result.output
