@@ -308,6 +308,17 @@ def db_reset(
     _seed_tapdb_templates(env_name, include_workflow=False, overwrite=True)
 
 
+@db_app.command("nuke")
+def db_nuke(
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force destructive schema reset"
+    ),
+) -> None:
+    """Delete schema only via TapDB."""
+    env_name = _current_env()
+    _run_tapdb(["db", "schema", "reset", env_name] + (["--force"] if force else []))
+
+
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the db command group."""
     registry.add_typer_app(None, db_app, "db", "Database management commands.")

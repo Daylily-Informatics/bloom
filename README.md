@@ -53,6 +53,13 @@ bloom server start --port 8912
 
 The supported local workflow is CLI-first and uses Bloom’s own environment/bootstrap path.
 
+Delete-only teardown is also available:
+
+```bash
+bloom db nuke
+bloom db nuke --force
+```
+
 ## Architecture
 
 ### Technology
@@ -118,6 +125,7 @@ Approximate only.
 - Use `bloom ...` as the main operational interface
 - Use `tapdb ...` only for shared DB/runtime work Bloom explicitly delegates
 - Use `daycog ...` only for shared Cognito work Bloom explicitly delegates
+- `bloom db reset` rebuilds after deletion; `bloom db nuke` stops after the destructive schema reset
 
 Useful checks:
 
@@ -130,7 +138,7 @@ pytest -q
 ## Sandboxing
 
 - Safe: docs work, code reading, tests, `bloom --help`, and local-only validation against disposable local runtimes
-- Local-stateful: `bloom db init` and `bloom db seed`
+- Local-stateful: `bloom db init`, `bloom db seed`, `bloom db reset`, and `bloom db nuke`
 - Requires extra care: Cognito lifecycle, external tracking integrations, printer integrations, and any Dayhoff-managed deployed environment flows
 
 ## Current Docs
