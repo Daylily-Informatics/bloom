@@ -35,9 +35,9 @@ SYSTEM_GROUP_CODES = [
 ]
 
 GROUP_ROLE_MAP = {
-    BLOOM_READONLY_GROUP: Role.READ_ONLY.value,
-    BLOOM_READWRITE_GROUP: Role.READ_WRITE.value,
-    BLOOM_ADMIN_GROUP: Role.ADMIN.value,
+    BLOOM_READONLY_GROUP.upper(): Role.READ_ONLY.value,
+    BLOOM_READWRITE_GROUP.upper(): Role.READ_WRITE.value,
+    BLOOM_ADMIN_GROUP.upper(): Role.ADMIN.value,
 }
 
 
@@ -106,6 +106,11 @@ class GroupService:
     ) -> GroupResolution:
         fallback = map_legacy_role(fallback_role)
         groups = self.get_group_codes_for_user(user_id)
-        role_groups = [GROUP_ROLE_MAP[group] for group in groups if group in GROUP_ROLE_MAP]
+        role_groups = []
+        for group in groups:
+            normalized_group = str(group or "").strip().upper()
+            mapped_role = GROUP_ROLE_MAP.get(normalized_group)
+            if mapped_role:
+                role_groups.append(mapped_role)
         roles = normalize_roles(role_groups or [fallback], fallback=fallback)
         return GroupResolution(roles=roles, groups=sorted(groups))

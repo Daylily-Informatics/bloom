@@ -46,7 +46,8 @@ class TestPublicEndpoints:
     def test_login_page(self, client):
         """Test login page returns HTML."""
         response = client.get("/login")
-        assert response.status_code in [200, 401]
+        assert response.status_code == 200
+        assert "#auth-disabled" in response.text
 
     def test_help_page(self, client):
         """Test help page returns HTML."""
@@ -1332,13 +1333,14 @@ class TestOAuthEndpoints:
     def test_oauth_callback_get_without_code(self, client):
         """Test OAuth callback GET without authorization code."""
         response = client.get("/oauth_callback")
-        # Should handle missing code gracefully
-        assert response.status_code in [200, 302, 307, 400, 422]
+        assert response.status_code == 200
+        assert "Processing your login" in response.text
 
     def test_oauth_callback_post_without_code(self, client):
         """Test OAuth callback POST without authorization code."""
         response = client.post("/oauth_callback", json={})
-        assert response.status_code in [200, 302, 307, 400, 422]
+        assert response.status_code == 400
+        assert response.json() == {"detail": "No Cognito tokens provided."}
 
 
 class TestLoginPostEndpoint:
@@ -1347,14 +1349,14 @@ class TestLoginPostEndpoint:
     def test_login_post_without_email(self, client):
         """Test login POST without email."""
         response = client.post("/login", data={})
-        # Should handle missing email
-        assert response.status_code in [200, 302, 307, 400, 422]
+        assert response.status_code == 400
+        assert response.json()["message"].startswith("Direct login is disabled")
 
     def test_login_post_with_email(self, client):
         """Test login POST with email."""
         response = client.post("/login", data={"email": "test@example.com"})
-        # Should redirect to OAuth or handle login
-        assert response.status_code in [200, 302, 307, 400, 422]
+        assert response.status_code == 400
+        assert response.json()["message"].startswith("Direct login is disabled")
 
 
 class TestPlateVisualizationEndpoints:
@@ -1943,12 +1945,14 @@ class TestOAuthEndpoints:
     def test_oauth_callback_get(self, client):
         """Test OAuth callback GET endpoint."""
         response = client.get("/oauth_callback")
-        assert response.status_code in [200, 302, 307, 400, 401, 404, 422, 500]
+        assert response.status_code == 200
+        assert "Processing your login" in response.text
 
     def test_oauth_callback_post(self, client):
         """Test OAuth callback POST endpoint."""
         response = client.post("/oauth_callback", json={})
-        assert response.status_code in [200, 302, 307, 400, 401, 404, 422, 500]
+        assert response.status_code == 400
+        assert response.json() == {"detail": "No Cognito tokens provided."}
 
 
 class TestAdditionalViewEndpoints:

@@ -29,6 +29,7 @@ from rich.console import Console
 
 from bloom_lims.config import (
     apply_runtime_environment,
+    atlas_webhook_secret_warning,
     get_settings,
     get_tapdb_db_config,
 )
@@ -149,6 +150,15 @@ def start(
             "\n   Fix your config ([cyan]bloom config edit[/cyan]) or run [cyan]bloom db init[/cyan]."
         )
         raise typer.Exit(1)
+
+    atlas_secret_warning = atlas_webhook_secret_warning(settings)
+    if atlas_secret_warning:
+        console.print(f"[yellow]⚠[/yellow] {atlas_secret_warning}")
+        console.print(
+            "   Configure it in [cyan]~/.config/bloom/config.yaml[/cyan] under "
+            "[cyan]atlas.webhook_secret[/cyan]."
+        )
+        console.log(atlas_secret_warning)
 
     pid, _ = active_server_pid()
     if pid:

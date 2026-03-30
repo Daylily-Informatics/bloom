@@ -10,6 +10,8 @@ Configuration precedence (highest to lowest):
 import importlib.metadata
 import logging
 import os
+import secrets
+import string
 import tempfile
 from functools import lru_cache
 from importlib import resources as importlib_resources
@@ -755,6 +757,28 @@ def assert_tapdb_version(
     return str(installed)
 
 
+def generate_example_webhook_secret(length: int = 20) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def atlas_webhook_secret_warning(
+    settings: "BloomSettings | None" = None,
+    *,
+    suggested_secret: str | None = None,
+) -> str | None:
+    active_settings = settings or get_settings()
+    if str(active_settings.atlas.webhook_secret or "").strip():
+        return None
+    example = suggested_secret or generate_example_webhook_secret()
+    return (
+        "Atlas webhook signature secret is not configured "
+        "(atlas.webhook_secret is empty). Bloom can still start, but signed Atlas webhook "
+        "delivery and verification will not be safe or interoperable. Set a 20-character "
+        f"alphanumeric secret such as: {example}"
+    )
+
+
 def validate_settings() -> List[str]:
     """Validate settings and return list of warnings/issues."""
     warnings: List[str] = []
@@ -782,6 +806,10 @@ def validate_settings() -> List[str]:
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
+
+    atlas_secret_warning = atlas_webhook_secret_warning(settings)
+    if atlas_secret_warning:
+        warnings.append(atlas_secret_warning)
 
     return warnings
 

@@ -161,7 +161,7 @@ If using Google as an identity provider:
    - **App type**: Select **Public client**
    - **App client name**: `bloom-lims-web`
    - **Client secret**: Select **Don't generate a client secret**
-     > ⚠️ **Important**: Bloom uses the implicit grant flow which does not support client secrets
+     > ⚠️ **Important**: Bloom uses the authorization-code flow and expects the Hosted UI to redirect back to `/auth/callback`
 
 5. **Allowed callback URLs**:
    ```
@@ -176,8 +176,8 @@ If using Google as an identity provider:
 
 7. **Advanced app client settings** (expand this section):
    - **OAuth 2.0 grant types**:
-     - ☑️ **Implicit grant**
-     - ☐ Authorization code grant (not used)
+     - ☐ **Implicit grant**
+     - ☑️ **Authorization code grant**
 
    - **OpenID Connect scopes**:
      - ☑️ **OpenID**
@@ -231,7 +231,7 @@ Click **Edit** under Hosted UI:
 │   ☑️ Google (if configured)                                 │
 │                                                             │
 │ OAuth 2.0 grant types:                                      │
-│   ☑️ Implicit grant                                         │
+│   ☑️ Authorization code grant                               │
 │                                                             │
 │ OpenID Connect scopes:                                      │
 │   ☑️ openid                                                 │
@@ -362,7 +362,7 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
        - "openid"
        - "email"
        - "profile"
-     cognito_allowed_domains: []  # Empty = allow all; or ["yourcompany.com", "partner.org"]
+     cognito_allowed_domains: []  # Empty = block all; list each allowed domain explicitly
    ```
 
 ### YAML-Only Runtime Configuration
@@ -381,7 +381,7 @@ Do not rely on `COGNITO_*`, `BLOOM_AUTH__COGNITO_*`, or daycog env files for ser
 | `auth.cognito_redirect_uri` | ✅ Yes | - | Post-login redirect URL |
 | `auth.cognito_logout_redirect_uri` | ⚠️ Recommended | Same as redirect | Post-logout redirect URL |
 | `auth.cognito_scopes` | ❌ No | `["openid", "email", "profile"]` | OAuth scopes to request |
-| `auth.cognito_allowed_domains` | ❌ No | `[]` (allow all) | Allowed email domains |
+| `auth.cognito_allowed_domains` | ❌ No | `[]` (block all) | Allowed email domains |
 
 ---
 
@@ -455,9 +455,10 @@ sequenceDiagram
     B->>U: Render login page with Cognito URL
     U->>C: Click "Login with Cognito"
     C->>C: User authenticates (email/password or Google)
-    C->>U: Redirect to auth.cognito_redirect_uri with tokens in URL fragment
-    U->>U: JavaScript extracts id_token and access_token
-    U->>B: POST /oauth_callback with tokens
+    C->>U: Redirect to auth.cognito_redirect_uri with authorization code
+    U->>B: GET /auth/callback?code=...
+    B->>C: POST /oauth2/token with code
+    C->>B: Return id_token and access_token
     B->>J: Fetch JWKS public keys
     J->>B: Return public keys
     B->>B: Validate JWT signature and claims
@@ -477,14 +478,15 @@ The authentication is handled by these components:
 
 2. **`main.py`** - Route handlers:
    - `GET /login`: Renders login page with Cognito authorize URL
-   - `POST /oauth_callback`: Validates tokens and creates session
+   - `GET /auth/callback`: Exchanges authorization code and creates session
+   - `POST /oauth_callback`: Legacy fragment-token fallback for Hosted UI responses that arrive with tokens
    - `GET /logout`: Clears session and redirects to Cognito logout
 
 3. **`templates/login.html`** - Login UI:
    - "Login with Cognito" button triggers redirect
 
-4. **`templates/index.html`** - Token handling:
-   - JavaScript extracts tokens from URL fragment
+4. **`/auth/callback` fallback page**:
+   - If Cognito returns fragment tokens instead of `?code=...`, JavaScript extracts them
    - Posts tokens to `/oauth_callback`
 
 ### Session Data Structure
@@ -786,7 +788,8 @@ def validate_token(self, token: str) -> Dict:
 | Endpoint | Description |
 |----------|-------------|
 | `GET /login` | Displays login page with Cognito button |
-| `POST /oauth_callback` | Handles token validation after Cognito redirect |
+| `GET /auth/callback` | Exchanges Cognito authorization code and completes login |
+| `POST /oauth_callback` | Handles legacy fragment-token fallback after Cognito redirect |
 | `GET /logout` | Clears session and redirects to Cognito logout |
 | `GET /user_home` | Shows user profile with Cognito details |
 
