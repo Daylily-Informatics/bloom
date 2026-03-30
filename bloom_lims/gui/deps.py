@@ -190,7 +190,7 @@ async def require_auth(request: Request):
         _get_request_cognito_auth(request)
     except CognitoConfigurationError as exc:
         msg = (
-            "Cognito configuration missing. Check ~/.config/bloom/config.yaml "
+            "Cognito configuration missing. Check ~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml "
             f"or BLOOM_AUTH__* env vars. ({exc})"
         )
         logging.error(msg)

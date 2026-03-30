@@ -332,7 +332,7 @@ For a custom domain like `auth.yourcompany.com`:
 BLOOM uses a YAML-based configuration system. Configuration is loaded from:
 
 1. **Environment variables** (highest priority) — Use `BLOOM_*` prefix with `__` for nesting
-2. **User config file** — `~/.config/bloom/config.yaml`
+2. **User config file** — `~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml`
 3. **Template defaults** — `config/bloom-config-template.yaml`
 
 ### Setting Up Configuration
@@ -340,11 +340,11 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
 1. **Copy the template to your user config directory:**
 
    ```bash
-   mkdir -p ~/.config/bloom
-   cp config/bloom-config-template.yaml ~/.config/bloom/config.yaml
+   mkdir -p ~/.config/bloom-<deployment>
+   cp config/bloom-config-template.yaml ~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml
    ```
 
-2. **Edit `~/.config/bloom/config.yaml`** with your Cognito settings:
+2. **Edit `~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml`** with your Cognito settings:
 
    ```yaml
    # -----------------------------------------------------------------------------
@@ -367,7 +367,7 @@ BLOOM uses a YAML-based configuration system. Configuration is loaded from:
 
 ### YAML-Only Runtime Configuration
 
-Bloom runtime now reads Cognito settings from `~/.config/bloom/bloom-config.yaml`.
+Bloom runtime now reads Cognito settings from `~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml`.
 Do not rely on `COGNITO_*`, `BLOOM_AUTH__COGNITO_*`, or daycog env files for service startup.
 
 ### Configuration Reference

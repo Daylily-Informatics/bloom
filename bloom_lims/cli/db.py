@@ -18,7 +18,12 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from bloom_lims.config import apply_runtime_environment, get_settings
+from bloom_lims.config import (
+    DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
+    DEFAULT_BLOOM_WEB_PORT,
+    apply_runtime_environment,
+    get_settings,
+)
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
@@ -103,6 +108,13 @@ def _runtime_env() -> dict[str, str]:
     return env
 
 
+def _ensure_runtime_config_parent() -> None:
+    config_path = (_runtime_env().get("TAPDB_CONFIG_PATH") or "").strip()
+    if not config_path:
+        return
+    Path(config_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+
+
 def _current_env() -> str:
     return _runtime_env().get("TAPDB_ENV", "dev").strip().lower()
 
@@ -111,14 +123,20 @@ def _local_pg_port(env_name: str) -> str:
     env = _runtime_env()
     scoped_key = f"TAPDB_{env_name.upper()}_PORT"
     return (
-        env.get(scoped_key) or env.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566"
+        env.get(scoped_key)
+        or env.get("BLOOM_TAPDB_LOCAL_PG_PORT")
+        or str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
     ).strip()
 
 
 def _local_ui_port(env_name: str) -> str:
     env = _runtime_env()
     scoped_key = f"TAPDB_{env_name.upper()}_UI_PORT"
-    return (env.get(scoped_key) or env.get("BLOOM_UI_PORT") or "8912").strip()
+    return (
+        env.get(scoped_key)
+        or env.get("BLOOM_UI_PORT")
+        or str(DEFAULT_BLOOM_WEB_PORT)
+    ).strip()
 
 
 def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
@@ -172,6 +190,7 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
     database_name = (env.get("TAPDB_DATABASE_NAME") or "").strip()
     if not client_id or not database_name:
         return
+    _ensure_runtime_config_parent()
 
     args = [
         "config",

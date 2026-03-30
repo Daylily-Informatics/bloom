@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -26,41 +24,21 @@ from bloom_lims.config import (
 )
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
+from bloom_lims.schema_drift import (
+    run_schema_drift_check,
+    write_schema_drift_report,
+)
 
 console = Console()
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
-    env = apply_runtime_environment(get_settings())
-    runtime = os.environ.copy()
-    runtime.setdefault("TAPDB_ENV", env.env)
-    runtime.setdefault("TAPDB_DATABASE_NAME", env.database_name)
-    if env.config_path:
-        runtime.setdefault("TAPDB_CONFIG_PATH", env.config_path)
-    runtime.setdefault("AWS_PROFILE", env.aws_profile)
-    runtime.setdefault("AWS_REGION", env.aws_region)
-    runtime.setdefault("AWS_DEFAULT_REGION", env.aws_region)
-    return subprocess.run(
-        [sys.executable, "-m", "daylily_tapdb.cli", *args],
-        env=runtime,
-        capture_output=True,
-        text=True,
-    )
-
-
 def _tapdb_schema_drift_check(env_name: str) -> tuple[int, dict[str, object], str]:
     """Run the TapDB schema drift check in report-only mode."""
-    result = _tapdb_cmd(["db", "schema", "drift-check", env_name, "--json", "--no-strict"])
-    payload: dict[str, object] = {}
-    if result.stdout.strip():
-        try:
-            parsed = json.loads(result.stdout)
-            if isinstance(parsed, dict):
-                payload = parsed
-        except json.JSONDecodeError:
-            payload = {"raw_stdout": result.stdout.strip()}
-    return result.returncode, payload, (result.stderr or "").strip()
+    result = run_schema_drift_check(env_name)
+    returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(str(result.get("status") or ""), 2)
+    payload = result.get("report")
+    return returncode, payload if isinstance(payload, dict) else {}, str(result.get("stderr") or "")
 
 
 def _schema_drift_summary(payload: dict[str, object]) -> str:
@@ -196,7 +174,16 @@ def _doctor() -> None:
         console.print(f"[red]✗[/red] daylily-tapdb version check failed: {exc}")
 
     env_name = apply_runtime_environment(get_settings()).env
-    drift_returncode, drift_payload, drift_stderr = _tapdb_schema_drift_check(env_name)
+    drift_result = run_schema_drift_check(env_name)
+    write_schema_drift_report(drift_result)
+    drift_returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(
+        str(drift_result.get("status") or ""),
+        2,
+    )
+    drift_payload = drift_result.get("report")
+    if not isinstance(drift_payload, dict):
+        drift_payload = {}
+    drift_stderr = str(drift_result.get("stderr") or "")
     if drift_returncode == 0:
         console.print("[green]✓[/green] TapDB connectivity and schema drift report")
     elif drift_returncode == 1:

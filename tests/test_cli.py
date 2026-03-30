@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import json
 import importlib
-import subprocess
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from bloom_lims.cli import build_app
+from bloom_lims.cli import (
+    _enforce_conda_env_contract,
+    _strip_skip_conda_env_check_flag,
+    build_app,
+)
 from bloom_lims.cli import config_extra
 
 server_commands = importlib.import_module("bloom_lims.cli.server")
@@ -120,7 +122,29 @@ class TestMainCommands:
     def test_integrations_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["integrations", "--help"])
         assert result.exit_code == 0
-        assert "atlas" in result.output
+
+    def test_cli_requires_hyphenated_conda_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM")
+        with pytest.raises(SystemExit, match="deployment-scoped conda environment name with '-'"):
+            _enforce_conda_env_contract(["db", "init"])
+
+    def test_cli_requires_active_conda_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
+        with pytest.raises(
+            SystemExit, match="requires an active deployment-scoped conda environment"
+        ):
+            _enforce_conda_env_contract(["db", "init"])
+
+    def test_cli_accepts_hyphenated_conda_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM-local2")
+        _enforce_conda_env_contract(["db", "init"])
+
+    def test_cli_skip_conda_env_check_flag_is_stripped(self) -> None:
+        args, skip = _strip_skip_conda_env_check_flag(
+            ["--skip-conda-env-check", "db", "init"]
+        )
+        assert skip is True
+        assert args == ["db", "init"]
 
     def test_config_doctor_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "doctor", "--help"])
@@ -131,17 +155,21 @@ class TestMainCommands:
         runner: CliRunner,
         cli_app,
         monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
-        def fake_tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
-            assert args[:3] == ["db", "schema", "drift-check"]
-            return subprocess.CompletedProcess(
-                args=args,
-                returncode=1,
-                stdout=json.dumps({"counts": {"expected": 12, "live": 13}}),
-                stderr="",
-            )
-
-        monkeypatch.setattr(config_extra, "_tapdb_cmd", fake_tapdb_cmd)
+        monkeypatch.setattr(
+            config_extra,
+            "run_schema_drift_check",
+            lambda env_name: {
+                "status": "drift",
+                "checked_at": "2026-03-29T12:00:00+00:00",
+                "environment": env_name,
+                "tool_version": "3.0.9",
+                "summary": "expected=12 live=13",
+                "report": {"counts": {"expected": 12, "live": 13}},
+                "stderr": "",
+            },
+        )
         monkeypatch.setattr(config_extra, "validate_settings", lambda: [])
         monkeypatch.setattr(config_extra, "assert_tapdb_version", lambda: "3.0.9")
 
@@ -149,6 +177,9 @@ class TestMainCommands:
         assert result.exit_code == 0
         assert "schema drift detected" in result.output.lower()
         assert "report only" in result.output.lower()
+        drift_report = tmp_path / ".local" / "state" / "bloom" / "schema_drift.json"
+        assert drift_report.exists()
+        assert "expected=12 live=13" in drift_report.read_text(encoding="utf-8")
 
     def test_config_shell_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "shell", "--help"])
@@ -162,7 +193,7 @@ class TestConfigValidation:
         result = runner.invoke(cli_app, ["config", "init"])
         assert result.exit_code == 0
 
-        config_path = tmp_path / ".config" / "bloom" / "config.yaml"
+        config_path = tmp_path / ".config" / "bloom-local" / "bloom-config-local.yaml"
         assert config_path.exists()
 
         result = runner.invoke(cli_app, ["config", "validate"])
@@ -175,7 +206,7 @@ class TestConfigValidation:
         cli_app,
         tmp_path: Path,
     ) -> None:
-        config_path = tmp_path / ".config" / "bloom" / "config.yaml"
+        config_path = tmp_path / ".config" / "bloom-local" / "bloom-config-local.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text("auth:\n  cognito_user_pool_id: [\n", encoding="utf-8")
 
@@ -189,7 +220,7 @@ class TestConfigValidation:
         cli_app,
         tmp_path: Path,
     ) -> None:
-        config_path = tmp_path / ".config" / "bloom" / "config.yaml"
+        config_path = tmp_path / ".config" / "bloom-local" / "bloom-config-local.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text("environment: invalid\n", encoding="utf-8")
 

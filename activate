@@ -30,6 +30,69 @@ _BLUE='\033[0;34m'
 _CYAN='\033[0;36m'
 _NC='\033[0m'
 _BLOOM_PYTHON=""
+_BLOOM_CONDA_ENV_BASE="BLOOM"
+
+_bloom_truthy() {
+    case "${1:-}" in
+        1|true|TRUE|yes|YES|on|ON) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_bloom_default_web_port() {
+    python -c 'from bloom_lims.config import DEFAULT_BLOOM_WEB_PORT; print(DEFAULT_BLOOM_WEB_PORT)'
+}
+
+_bloom_default_tapdb_local_pg_port() {
+    python -c 'from bloom_lims.config import DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT; print(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)'
+}
+
+_bloom_sanitize_deployment_code() {
+    local raw_value="$1"
+    local sanitized=""
+    sanitized="$(printf '%s' "$raw_value" | LC_ALL=C sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//')"
+    if [[ -z "$sanitized" ]]; then
+        sanitized="local"
+    fi
+    printf '%s\n' "$sanitized"
+}
+
+_bloom_prepare_tapdb_config_path() {
+    local client_id="$1"
+    local namespace="$2"
+    local explicit_path="${TAPDB_CONFIG_PATH:-}"
+    local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    local deployment_code="${BLOOM_DEPLOYMENT_CODE:-${DEPLOYMENT_CODE:-${LSMC_DEPLOYMENT_CODE:-local}}}"
+    local scoped_namespace=""
+    deployment_code="$(_bloom_sanitize_deployment_code "${deployment_code}")"
+    scoped_namespace="${namespace}-${deployment_code}"
+    local user_dir="${xdg_config_home}/tapdb/${client_id}/${scoped_namespace}"
+    local user_path="${user_dir}/tapdb-config.yaml"
+    local repo_template="$BLOOM_ROOT/config/tapdb-config-${namespace}.yaml"
+
+    if [[ -n "$explicit_path" ]]; then
+        printf '%s\n' "$explicit_path"
+        return 0
+    fi
+    if [[ -f "$user_path" ]]; then
+        chmod 600 "$user_path" 2>/dev/null || true
+        printf '%s\n' "$user_path"
+        return 0
+    fi
+    if [[ ! -f "$repo_template" ]]; then
+        printf '%s\n' "$user_path"
+        return 0
+    fi
+    mkdir -p "$user_dir" || return 1
+    cp "$repo_template" "$user_path" || return 1
+    chmod 600 "$user_path" || return 1
+    printf '%s\n' "$user_path"
+}
+
+_bloom_deployment_code="${BLOOM_DEPLOYMENT_CODE:-${DEPLOYMENT_CODE:-${LSMC_DEPLOYMENT_CODE:-local}}}"
+_bloom_deployment_code="$(_bloom_sanitize_deployment_code "${_bloom_deployment_code}")"
+_BLOOM_CONDA_ENV_NAME="${_BLOOM_CONDA_ENV_BASE}-${_bloom_deployment_code}"
+unset _bloom_deployment_code
 
 _bloom_resolve_local_repo() {
     local module_dir="$1"
@@ -71,16 +134,35 @@ raise SystemExit(0 if module_path == repo_root or repo_root in module_path.paren
 PY
 }
 
+_bloom_distribution_is_editable_from_repo() {
+    local dist_name="$1"
+    local repo_root="$2"
+    local editable_location=""
+
+    editable_location="$("${_BLOOM_PYTHON:-python}" -m pip show "$dist_name" 2>/dev/null | awk -F': ' '/^Editable project location:/ {print $2; exit}')"
+    [[ -n "$editable_location" ]] || return 1
+
+    editable_location="$(cd "$editable_location" 2>/dev/null && pwd)"
+    [[ -n "$editable_location" ]] || return 1
+    [[ "$editable_location" == "$repo_root" ]]
+}
+
 _bloom_ensure_editable_repo() {
     local label="$1"
     local module_name="$2"
     local repo_root="$3"
     local extras="${4:-}"
+    local dist_name="${5:-}"
     local install_target=""
     if [[ -z "$repo_root" ]]; then
         return 0
     fi
-    if _bloom_module_is_from_repo "$module_name" "$repo_root"; then
+    if [[ -n "$dist_name" ]]; then
+        if _bloom_distribution_is_editable_from_repo "$dist_name" "$repo_root"; then
+            echo -e "  ${_GREEN}✓${_NC} Using local ${label} checkout: ${repo_root}"
+            return 0
+        fi
+    elif _bloom_module_is_from_repo "$module_name" "$repo_root"; then
         echo -e "  ${_GREEN}✓${_NC} Using local ${label} checkout: ${repo_root}"
         return 0
     fi
@@ -90,14 +172,19 @@ _bloom_ensure_editable_repo() {
         echo -e "  ${_YELLOW}⚠${_NC} Failed to install local ${label} checkout from ${repo_root}"
         return 1
     fi
-    if ! _bloom_module_is_from_repo "$module_name" "$repo_root"; then
+    if [[ -n "$dist_name" ]]; then
+        if ! _bloom_distribution_is_editable_from_repo "$dist_name" "$repo_root"; then
+            echo -e "  ${_YELLOW}⚠${_NC} ${label} is not installed editable from ${repo_root}"
+            return 1
+        fi
+    elif ! _bloom_module_is_from_repo "$module_name" "$repo_root"; then
         echo -e "  ${_YELLOW}⚠${_NC} ${label} still resolves outside ${repo_root}"
         return 1
     fi
     echo -e "  ${_GREEN}✓${_NC} Using local ${label} checkout: ${repo_root}"
 }
 
-echo -e "${_BLUE}Activating BLOOM LIMS environment...${_NC}"
+echo -e "${_BLUE}Activating BLOOM LIMS environment (${_BLOOM_CONDA_ENV_NAME})...${_NC}"
 
 if command -v conda &> /dev/null; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
@@ -108,19 +195,19 @@ if command -v conda &> /dev/null; then
         source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
     fi
 
-    if conda info --envs | grep -q "^BLOOM "; then
-        echo -e "  ${_GREEN}✓${_NC} Activating conda environment: BLOOM"
-        conda activate BLOOM
+    if conda info --envs | grep -Eq "(^|[[:space:]])${_BLOOM_CONDA_ENV_NAME}([[:space:]]|$)"; then
+        echo -e "  ${_GREEN}✓${_NC} Activating conda environment: ${_BLOOM_CONDA_ENV_NAME}"
+        conda activate "${_BLOOM_CONDA_ENV_NAME}"
         if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
             export PATH="$CONDA_PREFIX/bin:$PATH"
         fi
     else
-        echo -e "  ${_YELLOW}⚠${_NC} Conda environment 'BLOOM' not found."
+        echo -e "  ${_YELLOW}⚠${_NC} Conda environment '${_BLOOM_CONDA_ENV_NAME}' not found."
         if [[ -f "$BLOOM_ROOT/bloom_env.yaml" ]]; then
             echo -e "  ${_CYAN}→${_NC} Installing conda environment from bloom_env.yaml..."
-            if conda env create -f "$BLOOM_ROOT/bloom_env.yaml"; then
+            if conda env create -n "${_BLOOM_CONDA_ENV_NAME}" -f "$BLOOM_ROOT/bloom_env.yaml"; then
                 echo -e "  ${_GREEN}✓${_NC} Conda environment created successfully"
-                conda activate BLOOM
+                conda activate "${_BLOOM_CONDA_ENV_NAME}"
                 if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
                     export PATH="$CONDA_PREFIX/bin:$PATH"
                 fi
@@ -136,9 +223,9 @@ else
     return 1
 fi
 
-if [[ "${CONDA_DEFAULT_ENV:-}" != "BLOOM" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
-    echo -e "  ${_YELLOW}⚠${_NC} BLOOM conda environment is required."
-    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -f bloom_env.yaml' if needed, then retry 'source ./activate'."
+if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_CONDA_ENV_NAME}" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
+    echo -e "  ${_YELLOW}⚠${_NC} ${_BLOOM_CONDA_ENV_NAME} conda environment is required."
+    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f bloom_env.yaml' if needed, then retry 'source ./activate'."
     return 1
 fi
 
@@ -146,7 +233,7 @@ _BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
 _BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
 export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
 
-if ! _bloom_ensure_editable_repo "Bloom" "bloom_lims" "$BLOOM_ROOT"; then
+if ! _bloom_ensure_editable_repo "Bloom" "bloom_lims" "$BLOOM_ROOT" "" "bloom_lims"; then
     return 1
 fi
 
@@ -155,8 +242,12 @@ _BLOOM_TAPDB_REPO="$(_bloom_resolve_local_repo \
     "$BLOOM_ROOT/../daylily-tapdb" \
     "$BLOOM_ROOT/../lims_repos/daylily-tapdb"
 )"
-if ! _bloom_ensure_editable_repo "daylily-tapdb" "daylily_tapdb" "${_BLOOM_TAPDB_REPO:-}" "[cli,admin,aurora,dev]"; then
-    return 1
+if _bloom_truthy "${USE_LOCAL_DAYLILY_TAPDB:-0}"; then
+    if ! _bloom_ensure_editable_repo "daylily-tapdb" "daylily_tapdb" "${_BLOOM_TAPDB_REPO:-}" "[cli,admin,aurora,dev]"; then
+        return 1
+    fi
+else
+    echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
 fi
 
 _BLOOM_DAYCOG_REPO="$(_bloom_resolve_local_repo \
@@ -164,8 +255,12 @@ _BLOOM_DAYCOG_REPO="$(_bloom_resolve_local_repo \
     "$BLOOM_ROOT/../daylily-cognito" \
     "$BLOOM_ROOT/../lims_repos/daylily-cognito"
 )"
-if ! _bloom_ensure_editable_repo "daylily-cognito" "daylily_cognito" "${_BLOOM_DAYCOG_REPO:-}"; then
-    return 1
+if _bloom_truthy "${USE_LOCAL_DAYLILY_COGNITO:-0}"; then
+    if ! _bloom_ensure_editable_repo "daylily-cognito" "daylily_cognito" "${_BLOOM_DAYCOG_REPO:-}"; then
+        return 1
+    fi
+else
+    echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-cognito from ${_BLOOM_CONDA_ENV_NAME}"
 fi
 
 _BLOOM_CLI_CORE_REPO="$(_bloom_resolve_local_repo \
@@ -173,8 +268,12 @@ _BLOOM_CLI_CORE_REPO="$(_bloom_resolve_local_repo \
     "$BLOOM_ROOT/../cli-core-yo" \
     "$BLOOM_ROOT/../lims_repos/cli-core-yo"
 )"
-if ! _bloom_ensure_editable_repo "cli-core-yo" "cli_core_yo" "${_BLOOM_CLI_CORE_REPO:-}"; then
-    return 1
+if _bloom_truthy "${USE_LOCAL_CLI_CORE_YO:-0}"; then
+    if ! _bloom_ensure_editable_repo "cli-core-yo" "cli_core_yo" "${_BLOOM_CLI_CORE_REPO:-}"; then
+        return 1
+    fi
+else
+    echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
 fi
 
 if command -v rehash >/dev/null 2>&1; then
@@ -202,14 +301,13 @@ export TAPDB_DATABASE_NAME="${TAPDB_DATABASE_NAME:-bloom}"
 export TAPDB_STRICT_NAMESPACE="${TAPDB_STRICT_NAMESPACE:-1}"
 export MERIDIAN_ENVIRONMENT="${MERIDIAN_ENVIRONMENT:-production}"
 export MERIDIAN_SANDBOX_PREFIX="${MERIDIAN_SANDBOX_PREFIX-}"
-export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-5566}"
+export BLOOM_UI_PORT="${BLOOM_UI_PORT:-$(_bloom_default_web_port)}"
+export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-$(_bloom_default_tapdb_local_pg_port)}"
 export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
 _BLOOM_DEFAULT_TAPDB_CONFIG_PATH="$BLOOM_ROOT/config/tapdb-config-${TAPDB_DATABASE_NAME}.yaml"
 if [[ -z "${TAPDB_CONFIG_PATH:-}" ]]; then
-    if [[ -f "$_BLOOM_DEFAULT_TAPDB_CONFIG_PATH" ]]; then
-        export TAPDB_CONFIG_PATH="$_BLOOM_DEFAULT_TAPDB_CONFIG_PATH"
-    fi
+    export TAPDB_CONFIG_PATH="$(_bloom_prepare_tapdb_config_path "${TAPDB_CLIENT_ID}" "${TAPDB_DATABASE_NAME}")"
 fi
 export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
 export AWS_PROFILE="${AWS_PROFILE:-lsmc}"

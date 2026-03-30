@@ -1,11 +1,11 @@
 # =============================================================================
 # BLOOM LIMS Configuration Template
 # =============================================================================
-# Copy this file to ~/.config/bloom/config.yaml and customize as needed.
+# Copy this file to ~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml and customize as needed.
 #
 # Configuration precedence (highest to lowest):
 #   1. Environment variables (BLOOM_* prefix)
-#   2. User config file (~/.config/bloom/bloom-config.yaml)
+#   2. User config file (~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml)
 #   3. Template defaults (this file)
 #
 # Environment variable format:
@@ -39,7 +39,7 @@ tapdb:
   database_name: "bloom"        # TAPDB_DATABASE_NAME namespace key
   strict_namespace: true        # TAPDB_STRICT_NAMESPACE (requires TapDB v2 namespaced config)
   config_path: ""               # Optional TAPDB_CONFIG_PATH override
-  local_pg_port: 5566           # Default local TapDB PostgreSQL port for dev/test
+  local_pg_port: __BLOOM_TAPDB_LOCAL_PG_PORT__           # Default local TapDB PostgreSQL port for dev/test
   min_version: "3.0.6"         # Required minimum daylily-tapdb version
   max_version_exclusive: "4.0.0"
 
@@ -101,8 +101,8 @@ auth:
   cognito_client_secret: ""
   cognito_region: ""
   cognito_domain: ""
-  cognito_redirect_uri: "https://localhost:8912/auth/callback"
-  cognito_logout_redirect_uri: "https://localhost:8912/"
+  cognito_redirect_uri: "https://localhost:__BLOOM_WEB_PORT__/auth/callback"
+  cognito_logout_redirect_uri: "https://localhost:__BLOOM_WEB_PORT__/"
   cognito_scopes:
     - "openid"
     - "email"

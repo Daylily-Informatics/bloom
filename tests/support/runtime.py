@@ -8,6 +8,11 @@ import socket
 import tempfile
 from pathlib import Path
 
+from bloom_lims.config import (
+    DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
+    DEFAULT_BLOOM_WEB_PORT,
+)
+
 INTEGRATION_TEST_FILES = frozenset(
     {
         "test_api_v1.py",
@@ -22,8 +27,8 @@ TEST_COGNITO_ENV_DEFAULTS = {
     "BLOOM_AUTH__COGNITO_CLIENT_ID": "bloom-test-client",
     "BLOOM_AUTH__COGNITO_DOMAIN": "bloom-test.auth.us-west-2.amazoncognito.com",
     "BLOOM_AUTH__COGNITO_REGION": "us-west-2",
-    "BLOOM_AUTH__COGNITO_REDIRECT_URI": "https://localhost:8912/auth/callback",
-    "BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI": "https://localhost:8912/",
+    "BLOOM_AUTH__COGNITO_REDIRECT_URI": f"https://localhost:{DEFAULT_BLOOM_WEB_PORT}/auth/callback",
+    "BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI": f"https://localhost:{DEFAULT_BLOOM_WEB_PORT}/",
 }
 
 
@@ -39,7 +44,9 @@ def create_temp_tapdb_config(
 ) -> Path:
     """Create a deterministic local TapDB namespaced config for tests."""
     resolved_port = str(
-        local_port or os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566"
+        local_port
+        or os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT")
+        or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
     ).strip()
     resolved_user = str(user or os.environ.get("USER") or "postgres").strip()
     tmp_path = (
@@ -57,7 +64,7 @@ def create_temp_tapdb_config(
                 "    engine_type: local",
                 "    host: localhost",
                 f'    port: "{resolved_port}"',
-                '    ui_port: "8912"',
+                f'    ui_port: "{DEFAULT_BLOOM_WEB_PORT}"',
                 f'    user: "{resolved_user}"',
                 '    password: ""',
                 '    database: "tapdb_bloom_dev"',
@@ -68,7 +75,7 @@ def create_temp_tapdb_config(
                 "    engine_type: local",
                 "    host: localhost",
                 f'    port: "{resolved_port}"',
-                '    ui_port: "8912"',
+                f'    ui_port: "{DEFAULT_BLOOM_WEB_PORT}"',
                 f'    user: "{resolved_user}"',
                 '    password: ""',
                 '    database: "tapdb_bloom_test"',
@@ -103,7 +110,8 @@ def ensure_test_runtime_environment() -> Path:
         config_path = Path(str(current_path)).expanduser()
 
     os.environ.setdefault(
-        "PGPORT", str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or "5566")
+        "PGPORT",
+        str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
     )
     os.environ.setdefault("ECHO_SQL", "False")
     os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
@@ -134,7 +142,11 @@ def tapdb_local_available(*, env_name: str = "dev") -> bool:
 
     config = get_tapdb_db_config(env_name=env_name)
     host = str(config.get("host") or "localhost").strip()
-    port = int(config.get("port") or os.environ.get("PGPORT") or "5566")
+    port = int(
+        config.get("port")
+        or os.environ.get("PGPORT")
+        or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
+    )
 
     try:
         with socket.create_connection((host, port), timeout=1):
