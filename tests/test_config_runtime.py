@@ -7,7 +7,15 @@ import tempfile
 from pathlib import Path
 
 from bloom_lims.app import create_app
-from bloom_lims.config import BloomSettings, StorageSettings, get_settings
+from bloom_lims.config import (
+    DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
+    DEFAULT_BLOOM_WEB_PORT,
+    BloomSettings,
+    StorageSettings,
+    _deployment_scoped_tapdb_config_path,
+    get_settings,
+    get_tapdb_runtime_context,
+)
 from tests.support.runtime import ensure_test_runtime_environment
 
 
@@ -47,7 +55,7 @@ def test_runtime_bootstrap_replaces_missing_tapdb_config_path(
     assert config_path != missing_path
     assert Path(os.environ["TAPDB_CONFIG_PATH"]).exists()
     assert os.environ["PGPORT"] == str(
-        os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT", "5566")
+        os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT", DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
     )
 
 
@@ -65,3 +73,16 @@ def test_strict_app_startup_accepts_synthesized_test_config(
     app = create_app()
 
     assert app.title == "FastAPI"
+
+
+def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
+    monkeypatch.delenv("TAPDB_CONFIG_PATH", raising=False)
+    get_settings.cache_clear()
+
+    settings = BloomSettings()
+    ctx = get_tapdb_runtime_context(settings)
+
+    assert ctx.config_path == _deployment_scoped_tapdb_config_path("bloom", "bloom")
+    assert ctx.config_path.endswith("/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml")

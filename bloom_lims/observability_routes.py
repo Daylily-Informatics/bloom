@@ -28,6 +28,7 @@ def _record_auth(request: Request, user: APIUser) -> None:
         mode=user.auth_source,
         detail=request.url.path,
         service_principal=user.auth_source == "legacy_api_key",
+        principal_email=getattr(user, "email", "") or "",
     )
 
 

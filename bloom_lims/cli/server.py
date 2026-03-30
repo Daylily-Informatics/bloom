@@ -28,6 +28,7 @@ from cli_core_yo.server import (
 from rich.console import Console
 
 from bloom_lims.config import (
+    DEFAULT_BLOOM_WEB_PORT,
     apply_runtime_environment,
     get_settings,
     get_tapdb_db_config,
@@ -98,7 +99,9 @@ def _runtime_host_and_port(default_port: int, default_host: str) -> tuple[str, i
 
 @server_app.command("start")
 def start(
-    port: int = typer.Option(8912, "--port", "-p", help="Port to run on"),
+    port: int = typer.Option(
+        DEFAULT_BLOOM_WEB_PORT, "--port", "-p", help="Port to run on"
+    ),
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),  # nosec B104
     reload: bool = typer.Option(
         False, "--reload", "-r", help="Enable auto-reload for development"
@@ -227,7 +230,7 @@ def stop() -> None:
 def status() -> None:
     """Show BLOOM server runtime status."""
     pid, _ = active_server_pid()
-    host, port = _runtime_host_and_port(8912, "0.0.0.0")  # nosec B104
+    host, port = _runtime_host_and_port(DEFAULT_BLOOM_WEB_PORT, "0.0.0.0")  # nosec B104
     shown_host = display_host(host)
     log_file = _latest_server_log()
     if pid:

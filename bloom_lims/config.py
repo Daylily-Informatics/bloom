@@ -3,13 +3,14 @@ BLOOM LIMS Configuration Management.
 
 Configuration precedence (highest to lowest):
 1. Environment variables (BLOOM_* prefix and TAPDB_* runtime context)
-2. User config file (~/.config/bloom/config.yaml)
+2. User config file (~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml)
 3. Template defaults
 """
 
 import importlib.metadata
 import logging
 import os
+import re
 import tempfile
 from functools import lru_cache
 from importlib import resources as importlib_resources
@@ -28,12 +29,44 @@ from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
-# Config file paths
-USER_CONFIG_DIR = Path.home() / ".config" / "bloom"
-USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
+DEFAULT_BLOOM_WEB_PORT = 8912
+DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT = 5566
+
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
 )
+
+
+def _sanitize_deployment_code(value: str) -> str:
+    cleaned = str(value or "").strip()
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", cleaned)
+    cleaned = cleaned.strip("-")
+    return cleaned or "local"
+
+
+def _resolve_deployment_code() -> str:
+    return _sanitize_deployment_code(
+        os.environ.get("BLOOM_DEPLOYMENT_CODE")
+        or os.environ.get("DEPLOYMENT_CODE")
+        or os.environ.get("LSMC_DEPLOYMENT_CODE")
+        or "local"
+    )
+
+
+def _user_config_dir() -> Path:
+    xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    return xdg_config_home / f"bloom-{_resolve_deployment_code()}"
+
+
+def _user_config_file() -> Path:
+    deployment = _resolve_deployment_code()
+    return _user_config_dir() / f"bloom-config-{deployment}.yaml"
+
+
+def _deployment_scoped_tapdb_config_path(client_id: str, namespace: str) -> str:
+    xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    scoped_namespace = f"{namespace}-{_resolve_deployment_code()}"
+    return str(xdg_config_home / "tapdb" / client_id / scoped_namespace / "tapdb-config.yaml")
 
 
 def _validate_optional_https_url(value: str, *, field_name: str) -> str:
@@ -56,13 +89,7 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     return result
 
 
-def _load_template_config() -> Dict[str, Any]:
-    """Load the packaged template configuration."""
-    try:
-        import yaml
-    except ImportError:
-        return {}
-
+def _load_template_text() -> str:
     try:
         template_text = (
             importlib_resources.files("bloom_lims")
@@ -70,7 +97,25 @@ def _load_template_config() -> Dict[str, Any]:
             .read_text(encoding="utf-8")
         )
     except Exception as exc:
-        logger.debug("Failed to load packaged template config: %s", exc)
+        logger.debug("Failed to load packaged template config text: %s", exc)
+        return ""
+
+    return template_text.replace(
+        "__BLOOM_WEB_PORT__", str(DEFAULT_BLOOM_WEB_PORT)
+    ).replace(
+        "__BLOOM_TAPDB_LOCAL_PG_PORT__", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
+    )
+
+
+def _load_template_config() -> Dict[str, Any]:
+    """Load the packaged template configuration."""
+    try:
+        import yaml
+    except ImportError:
+        return {}
+
+    template_text = _load_template_text()
+    if not template_text:
         return {}
 
     try:
@@ -80,6 +125,24 @@ def _load_template_config() -> Dict[str, Any]:
         return {}
 
     return loaded if isinstance(loaded, dict) else {}
+
+
+def _rendered_template_config_file() -> Path:
+    rendered_path = (
+        Path(tempfile.gettempdir())
+        / f"bloom-config-template-{_resolve_deployment_code()}.yaml"
+    )
+    template_text = _load_template_text()
+    if template_text:
+        try:
+            if (
+                not rendered_path.exists()
+                or rendered_path.read_text(encoding="utf-8") != template_text
+            ):
+                rendered_path.write_text(template_text, encoding="utf-8")
+        except Exception as exc:
+            logger.debug("Failed to materialize rendered template config: %s", exc)
+    return rendered_path
 
 
 def _load_yaml_config() -> Dict[str, Any]:
@@ -97,15 +160,16 @@ def _load_yaml_config() -> Dict[str, Any]:
 
     _ensure_user_config_dir()
 
-    if USER_CONFIG_FILE.exists():
+    user_config_file = _user_config_file()
+    if user_config_file.exists():
         try:
-            with open(USER_CONFIG_FILE, encoding="utf-8") as f:
+            with open(user_config_file, encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
                 config = _deep_merge(config, user_config)
         except Exception as exc:
             logger.debug(
                 "Failed to load user config %s: %s",
-                USER_CONFIG_FILE,
+                user_config_file,
                 exc,
             )
 
@@ -114,22 +178,23 @@ def _load_yaml_config() -> Dict[str, Any]:
 
 def _ensure_user_config_dir() -> None:
     """Ensure the user config directory exists when the process can create it."""
-    if USER_CONFIG_DIR.exists():
+    user_config_dir = _user_config_dir()
+    if user_config_dir.exists():
         return
 
     try:
-        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        user_config_dir.mkdir(parents=True, exist_ok=True)
     except Exception as exc:
         logger.debug(
             "Failed to create user config directory %s: %s",
-            USER_CONFIG_DIR,
+            user_config_dir,
             exc,
         )
 
 
 def _yaml_config_files() -> list[Path]:
     _ensure_user_config_dir()
-    return [TEMPLATE_CONFIG_FILE, USER_CONFIG_FILE]
+    return [_rendered_template_config_file(), _user_config_file()]
 
 
 class TapDBSettings(BaseModel):
@@ -155,7 +220,7 @@ class TapDBSettings(BaseModel):
         description="Optional explicit TAPDB_CONFIG_PATH override",
     )
     local_pg_port: int = Field(
-        default=5566,
+        default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
     min_version: str = Field(
@@ -666,7 +731,12 @@ def get_tapdb_runtime_context(
         ).strip(),
         strict_namespace=strict_namespace,
         config_path=(
-            os.environ.get("TAPDB_CONFIG_PATH") or settings.tapdb.config_path
+            os.environ.get("TAPDB_CONFIG_PATH")
+            or settings.tapdb.config_path
+            or _deployment_scoped_tapdb_config_path(
+                (os.environ.get("TAPDB_CLIENT_ID") or settings.tapdb.client_id).strip(),
+                (os.environ.get("TAPDB_DATABASE_NAME") or settings.tapdb.database_name).strip(),
+            )
         ).strip(),
         aws_profile=(
             os.environ.get("AWS_PROFILE") or settings.aws.profile or "lsmc"
@@ -847,7 +917,7 @@ def get_cognito_config() -> tuple[str, str, str]:
 
 
 def get_user_config_path() -> Path:
-    return USER_CONFIG_FILE
+    return _user_config_file()
 
 
 def get_template_config_path() -> Path:
@@ -856,12 +926,14 @@ def get_template_config_path() -> Path:
 
 def ensure_user_config_exists() -> Path:
     """Ensure user config directory and file exist."""
-    import shutil
+    user_config_dir = _user_config_dir()
+    user_config_file = _user_config_file()
+    if not user_config_dir.exists():
+        user_config_dir.mkdir(parents=True, exist_ok=True)
 
-    if not USER_CONFIG_DIR.exists():
-        USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if not user_config_file.exists():
+        template_text = _load_template_text()
+        if template_text:
+            user_config_file.write_text(template_text, encoding="utf-8")
 
-    if not USER_CONFIG_FILE.exists() and TEMPLATE_CONFIG_FILE.exists():
-        shutil.copy(TEMPLATE_CONFIG_FILE, USER_CONFIG_FILE)
-
-    return USER_CONFIG_FILE
+    return user_config_file

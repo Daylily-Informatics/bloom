@@ -1,11 +1,11 @@
 # =============================================================================
 # BLOOM LIMS Conda Environment Definition
 # =============================================================================
-# Environment Name: BLOOM (all caps - this is intentional!)
+# Environment Name: BLOOM-local (deployment-specific names are preferred)
 #
 # Setup:
-#   conda env create -f bloom_env.yaml
-#   conda activate BLOOM
+#   conda env create -n BLOOM-local -f bloom_env.yaml
+#   conda activate BLOOM-local
 #
 # Update existing environment:
 #   conda env update -f bloom_env.yaml --prune
@@ -14,7 +14,7 @@
 #       See pyproject.toml [tool.bloom] section for more configuration details.
 # =============================================================================
 
-name: BLOOM
+name: BLOOM-local
 
 channels:
   - conda-forge
@@ -40,7 +40,7 @@ dependencies:
   - gunicorn
   - psutil>=5.9.0
   - pip:
-    - daylily-tapdb==3.0.7
+    - daylily-tapdb==3.0.9
     # Optional local editable override for development:
     # - -e ../../daylily/daylily-tapdb
     - daylily-cognito==0.1.30
@@ -69,3 +69,5 @@ dependencies:
     - pytest>=8.0
     - pytest-cov>=4.1.0
     - pytest-asyncio>=0.23.0
+    - playwright>=1.42.0
+    - pytest-playwright>=0.4.4

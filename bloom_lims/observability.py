@@ -14,6 +14,7 @@ from fastapi import Request
 from bloom_lims import __version__
 from bloom_lims.api.v1.dependencies import APIUser
 from bloom_lims.config import get_settings
+from bloom_lims.schema_drift import read_schema_drift_report
 
 
 CONTRACT_VERSION = "v3"
@@ -139,6 +140,45 @@ class BloomObservabilityStore:
         self._auth_status_counts: Counter[str] = Counter()
         self._obs_services_snapshot = self._build_obs_services_snapshot()
 
+    def _configured_service_dependencies(self) -> list[str]:
+        settings = get_settings()
+        configured: list[str] = []
+        if str(settings.atlas.base_url or "").strip():
+            configured.append("atlas")
+        if bool(settings.dewey.enabled) and str(settings.dewey.base_url or "").strip():
+            configured.append("dewey")
+        return configured
+
+    def _managed_services(self) -> list[dict[str, Any]]:
+        base_url = str(os.environ.get("ZEBRA_DAY_BASE_URL", "https://localhost:8118")).strip()
+        auth_mode = str(os.environ.get("ZEBRA_DAY_AUTH_MODE", "none")).strip() or "none"
+        auth_value = "none" if auth_mode == "none" else "bearer_token"
+        endpoints = [
+            {"path": "/healthz", "auth": "none", "kind": "liveness"},
+            {"path": "/readyz", "auth": "none", "kind": "readiness"},
+            {"path": "/health", "auth": auth_value, "kind": "summary"},
+            {"path": "/obs_services", "auth": auth_value, "kind": "discovery"},
+            {"path": "/api_health", "auth": auth_value, "kind": "api_rollup"},
+            {"path": "/endpoint_health", "auth": auth_value, "kind": "endpoint_rollup"},
+            {"path": "/auth_health", "auth": auth_value, "kind": "auth"},
+        ]
+        if auth_mode != "none":
+            endpoints.append({"path": "/my_health", "auth": "authenticated_self", "kind": "self"})
+        return [
+            {
+                "service_id": "zebra_printer",
+                "display_name": "Zebra Printer",
+                "implementation": "zebra_day",
+                "parent_service": "bloom",
+                "base_url": base_url.rstrip("/"),
+                "description": "Zebra printer fleet management and ZPL label printing",
+                "plane": "app-support",
+                "endpoints": endpoints,
+                "auth_mode": auth_mode,
+                "discovery_source": "bloom_managed_service",
+            }
+        ]
+
     def _build_obs_services_snapshot(self) -> dict[str, Any]:
         return {
             "status": "ok",
@@ -164,6 +204,11 @@ class BloomObservabilityStore:
                 "bloom.admin_observability_ui",
                 "bloom.anomalies_v1",
             ],
+            "dependencies": {
+                "configured_services": self._configured_service_dependencies(),
+                "observed_services": [],
+            },
+            "managed_services": self._managed_services(),
             "observed_at": self._started_at,
         }
 
@@ -219,12 +264,14 @@ class BloomObservabilityStore:
         mode: str,
         detail: str,
         service_principal: bool,
+        principal_email: str | None = None,
     ) -> None:
         event = {
             "status": status,
             "mode": mode,
             "detail": str(detail or ""),
             "service_principal": service_principal,
+            "principal_email": str(principal_email or ""),
             "observed_at": _utcnow(),
         }
         with self._lock:
@@ -233,6 +280,13 @@ class BloomObservabilityStore:
 
     def obs_services_snapshot(self) -> tuple[ProjectionMetadata, dict[str, Any]]:
         snapshot = dict(self._obs_services_snapshot)
+        dependencies = snapshot.get("dependencies")
+        if isinstance(dependencies, dict):
+            snapshot["dependencies"] = {
+                "configured_services": list(dependencies.get("configured_services") or []),
+                "observed_services": list(dependencies.get("observed_services") or []),
+            }
+        snapshot["managed_services"] = [dict(item) for item in snapshot.get("managed_services") or []]
         observed_at = str(snapshot.get("observed_at") or self._started_at)
         return self.projection(observed_at=observed_at), snapshot
 
@@ -264,13 +318,16 @@ class BloomObservabilityStore:
     def db_health(self) -> tuple[ProjectionMetadata, dict[str, Any]]:
         from bloom_lims.tapdb_metrics import build_metrics_page_context
 
-        env_name = os.environ.get("TAPDB_ENV", get_settings().tapdb.env)
+        settings = get_settings()
+        env_name = os.environ.get("TAPDB_ENV", settings.tapdb.env)
         metrics_ctx = build_metrics_page_context(env_name, limit=1000)
         summary = dict(metrics_ctx.get("summary") or {})
         latest = self.latest_db_probe()
+        schema_drift = read_schema_drift_report(environment=env_name)
         observed_at = (
             (latest or {}).get("observed_at")
             or str(summary.get("last_seen") or "")
+            or str(schema_drift.get("checked_at") or "")
             or self._started_at
         )
         payload = {
@@ -283,6 +340,7 @@ class BloomObservabilityStore:
             "by_table": list(summary.get("by_table") or [])[:25],
             "metrics_enabled": bool(metrics_ctx.get("metrics_enabled", False)),
             "metrics_message": str(metrics_ctx.get("metrics_message") or ""),
+            "schema_drift": schema_drift,
             "observed_at": observed_at,
         }
         return self.projection(observed_at=observed_at), payload
@@ -294,6 +352,13 @@ class BloomObservabilityStore:
             status_counts = dict(self._auth_status_counts)
         latest = recent[0] if recent else None
         observed_at = str((latest or {}).get("observed_at") or self._started_at)
+        recent_user_count = len(
+            {
+                str(item.get("principal_email") or "").strip().lower()
+                for item in recent
+                if str(item.get("principal_email") or "").strip() and not bool(item.get("service_principal"))
+            }
+        )
         return self.projection(observed_at=observed_at), {
             "status": str((latest or {}).get("status") or "unknown"),
             "mode": str((latest or {}).get("mode") or "unknown"),
@@ -307,6 +372,12 @@ class BloomObservabilityStore:
             "app_client_id_present": bool(settings.auth.cognito_client_id),
             "recent": recent,
             "status_counts": status_counts,
+            "sessions": {
+                "supported": True,
+                "active_session_count": None,
+                "recent_user_count": recent_user_count,
+                "observed_at": observed_at,
+            },
             "observed_at": observed_at,
         }
 
@@ -367,6 +438,11 @@ def build_obs_services_payload(request: Request, *, projection: ProjectionMetada
     )
     payload["endpoints"] = list(snapshot.get("endpoints") or [])
     payload["extensions"] = list(snapshot.get("extensions") or [])
+    payload["dependencies"] = {
+        "configured_services": list((snapshot.get("dependencies") or {}).get("configured_services") or []),
+        "observed_services": list((snapshot.get("dependencies") or {}).get("observed_services") or []),
+    }
+    payload["managed_services"] = list(snapshot.get("managed_services") or [])
     return _with_projection(payload, projection)
 
 
@@ -413,6 +489,7 @@ def build_auth_health_payload(request: Request, *, projection: ProjectionMetadat
         "app_client_id_present": bool(auth_rollup.get("app_client_id_present", False)),
         "recent": list(auth_rollup.get("recent") or []),
         "status_counts": dict(auth_rollup.get("status_counts") or {}),
+        "sessions": dict(auth_rollup.get("sessions") or {}),
     }
     return _with_projection(payload, projection)
 

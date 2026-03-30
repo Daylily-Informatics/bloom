@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
+from bloom_lims.config import DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT, DEFAULT_BLOOM_WEB_PORT
 from bloom_lims.cli import build_app
 
 db_commands = importlib.import_module("bloom_lims.cli.db")
@@ -91,10 +92,11 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
         lambda: {
             "TAPDB_CLIENT_ID": "bloom",
             "TAPDB_DATABASE_NAME": "bloom",
+            "TAPDB_CONFIG_PATH": "/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
         },
     )
-    monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: "5566")
-    monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: "8912")
+    monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT))
+    monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: str(DEFAULT_BLOOM_WEB_PORT))
     monkeypatch.setattr(db_commands, "_tapdb_audit_log_euid_prefix", lambda _env: "TAG")
     monkeypatch.setattr(db_commands, "_tapdb_support_email", lambda _env: "support@example.com")
     monkeypatch.setattr(
@@ -137,6 +139,28 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
             True,
         ),
     ]
+
+
+def test_ensure_tapdb_namespace_config_creates_scoped_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config_path = tmp_path / ".config" / "tapdb" / "bloom" / "bloom-local2" / "tapdb-config.yaml"
+    monkeypatch.setattr(
+        db_commands,
+        "_runtime_env",
+        lambda: {
+            "TAPDB_CLIENT_ID": "bloom",
+            "TAPDB_DATABASE_NAME": "bloom",
+            "TAPDB_CONFIG_PATH": str(config_path),
+        },
+    )
+    monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT))
+    monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: str(DEFAULT_BLOOM_WEB_PORT))
+    monkeypatch.setattr(db_commands, "_tapdb_audit_log_euid_prefix", lambda _env: "TAG")
+    monkeypatch.setattr(db_commands, "_tapdb_support_email", lambda _env: "support@example.com")
+    monkeypatch.setattr(db_commands, "_run_tapdb", lambda *_args, **_kwargs: 0)
+
+    db_commands._ensure_tapdb_namespace_config("dev")
+
+    assert config_path.parent.exists()
 
 
 def test_db_seed_calls_tapdb_template_loader(

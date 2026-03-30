@@ -13,6 +13,7 @@ os.environ["BLOOM_OAUTH"] = "no"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import app
+from bloom_lims.config import get_settings
 from bloom_lims.observability import EndpointRollup, ProjectionMetadata, _percentile
 
 
@@ -82,6 +83,39 @@ def test_obs_services_uses_canonical_capability_vocabulary() -> None:
     assert "bloom.anomalies_v1" in response.json()["extensions"]
 
 
+def test_obs_services_exposes_dependency_metadata() -> None:
+    settings = get_settings()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/obs_services")
+
+    assert response.status_code == 200
+    dependencies = response.json()["dependencies"]
+    assert set(dependencies) == {"configured_services", "observed_services"}
+    assert isinstance(dependencies["configured_services"], list)
+    assert isinstance(dependencies["observed_services"], list)
+    if str(settings.atlas.base_url or "").strip():
+        assert "atlas" in dependencies["configured_services"]
+    assert dependencies["observed_services"] == []
+
+
+def test_obs_services_exposes_managed_zebra_service() -> None:
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/obs_services")
+
+    assert response.status_code == 200
+    managed = response.json()["managed_services"]
+    assert len(managed) == 1
+    zebra = managed[0]
+    assert zebra["service_id"] == "zebra_printer"
+    assert zebra["implementation"] == "zebra_day"
+    assert zebra["parent_service"] == "bloom"
+    assert zebra["base_url"] == "https://localhost:8118"
+    assert zebra["discovery_source"] == "bloom_managed_service"
+    advertised_paths = {item["path"] for item in zebra["endpoints"]}
+    assert "/obs_services" in advertised_paths
+    assert "/db_health" not in advertised_paths
+
+
 def test_endpoint_health_uses_route_templates_not_raw_instances() -> None:
     with TestClient(app, raise_server_exceptions=False) as client:
         client.get("/api/v1/objects/NONEXISTENT_EUID")
@@ -100,6 +134,56 @@ def test_admin_observability_page_renders() -> None:
     assert response.status_code == 200
     assert "Observability" in response.text
     assert "/endpoint_health" in response.text
+    assert "Schema drift" in response.text
+    assert "Configured deps" in response.text
+
+
+def test_auth_health_exposes_session_summary() -> None:
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/auth_health")
+
+    assert response.status_code == 200
+    sessions = response.json()["auth"]["sessions"]
+    assert sessions["supported"] is True
+    assert sessions["active_session_count"] is None
+    assert sessions["recent_user_count"] >= 0
+    assert sessions["observed_at"]
+
+
+def test_db_health_exposes_last_known_schema_drift(monkeypatch) -> None:
+    async def _fake_check_database_health():
+        return SimpleNamespace(
+            status="healthy",
+            latency_ms=4.2,
+            message="ok",
+            details={"observed_at": "2026-03-29T12:00:00+00:00"},
+        )
+
+    monkeypatch.setattr(
+        "bloom_lims.observability_routes.check_database_health",
+        _fake_check_database_health,
+    )
+    monkeypatch.setattr(
+        "bloom_lims.observability.read_schema_drift_report",
+        lambda *, environment: {
+            "status": "drift",
+            "checked_at": "2026-03-29T12:01:00+00:00",
+            "environment": environment,
+            "tool_version": "3.0.9",
+            "summary": "expected=12 live=13",
+            "report": {"counts": {"expected": 12, "live": 13}},
+            "stderr": "",
+        },
+    )
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/db_health")
+
+    assert response.status_code == 200
+    schema_drift = response.json()["database"]["schema_drift"]
+    assert schema_drift["status"] == "drift"
+    assert schema_drift["summary"] == "expected=12 live=13"
+    assert schema_drift["tool_version"] == "3.0.9"
 
 
 def test_observability_helpers_cover_empty_rollups_and_db_fallback(monkeypatch) -> None:

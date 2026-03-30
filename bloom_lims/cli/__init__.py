@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from cli_core_yo.app import create_app as _create_app
@@ -10,6 +11,8 @@ from cli_core_yo.app import run
 from cli_core_yo.spec import CliSpec, ConfigSpec, PluginSpec, XdgSpec
 
 from bloom_lims.config import (
+    _load_template_text,
+    _resolve_deployment_code,
     apply_runtime_environment,
     assert_tapdb_version,
     get_settings,
@@ -68,11 +71,11 @@ spec = CliSpec(
     dist_name="bloom_lims",
     root_help="BLOOM LIMS — Development CLI for the laboratory information management system.",
     xdg=XdgSpec(
-        app_dir_name="bloom",
+        app_dir_name=f"bloom-{_resolve_deployment_code()}",
     ),
     config=ConfigSpec(
-        primary_filename="config.yaml",
-        template_resource=("bloom_lims", "etc/bloom-config-template.yaml"),
+        primary_filename=f"bloom-config-{_resolve_deployment_code()}.yaml",
+        template_bytes=_load_template_text().encode("utf-8"),
         validator=_validate_bloom_config,
     ),
     plugins=PluginSpec(
@@ -97,10 +100,48 @@ def build_app():
 
 app = build_app()
 
+_SKIP_CONDA_ENV_CHECK_FLAG = "--skip-conda-env-check"
+_CONDA_ENV_CHECK_EXEMPT_COMMANDS = frozenset({"version", "info", "help"})
+
+
+def _strip_skip_conda_env_check_flag(args: list[str]) -> tuple[list[str], bool]:
+    filtered = [arg for arg in args if arg != _SKIP_CONDA_ENV_CHECK_FLAG]
+    return filtered, len(filtered) != len(args)
+
+
+def _command_requires_conda_env_check(args: list[str]) -> bool:
+    if not args or "--help" in args or "-h" in args:
+        return False
+    for arg in args:
+        if not arg or arg.startswith("-"):
+            continue
+        return arg not in _CONDA_ENV_CHECK_EXEMPT_COMMANDS
+    return False
+
+
+def _enforce_conda_env_contract(args: list[str]) -> None:
+    if not _command_requires_conda_env_check(args):
+        return
+    active_env = os.environ.get("CONDA_DEFAULT_ENV", "").strip()
+    if not active_env:
+        raise SystemExit(
+            "Bloom CLI requires an active deployment-scoped conda environment. "
+            "Activate an env named like 'BLOOM-local2', or pass "
+            "--skip-conda-env-check to override."
+        )
+    if "-" not in active_env:
+        raise SystemExit(
+            f"Bloom CLI requires a deployment-scoped conda environment name with '-'. "
+            f"Current CONDA_DEFAULT_ENV='{active_env}'. Pass --skip-conda-env-check to override."
+        )
+
 
 def main() -> None:
     """Main CLI entry point."""
-    raise SystemExit(run(spec))
+    args, skip_conda_env_check = _strip_skip_conda_env_check_flag(sys.argv[1:])
+    if not skip_conda_env_check:
+        _enforce_conda_env_contract(args)
+    raise SystemExit(run(spec, args))
 
 
 if __name__ == "__main__":
