@@ -6,8 +6,17 @@ import os
 import tempfile
 from pathlib import Path
 
+import logging
+
 from bloom_lims.app import create_app
-from bloom_lims.config import BloomSettings, StorageSettings, get_settings
+from bloom_lims.config import (
+    BloomSettings,
+    StorageSettings,
+    atlas_webhook_secret_warning,
+    generate_example_webhook_secret,
+    get_settings,
+    validate_settings,
+)
 from tests.support.runtime import ensure_test_runtime_environment
 
 
@@ -65,3 +74,38 @@ def test_strict_app_startup_accepts_synthesized_test_config(
     app = create_app()
 
     assert app.title == "FastAPI"
+
+
+def test_generate_example_webhook_secret_is_20_char_alphanumeric():
+    secret = generate_example_webhook_secret()
+    assert len(secret) == 20
+    assert secret.isalnum()
+
+
+def test_validate_settings_warns_when_atlas_webhook_secret_missing(monkeypatch):
+    monkeypatch.setenv("BLOOM_ATLAS__WEBHOOK_SECRET", "")
+    get_settings.cache_clear()
+
+    warnings = validate_settings()
+
+    assert any("Atlas webhook signature secret is not configured" in warning for warning in warnings)
+    assert any("20-character alphanumeric secret" in warning for warning in warnings)
+
+
+def test_create_app_logs_atlas_webhook_secret_warning(monkeypatch, tmp_path: Path, caplog):
+    monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
+    monkeypatch.setenv(
+        "TAPDB_CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
+    )
+    monkeypatch.setenv("BLOOM_ATLAS__WEBHOOK_SECRET", "")
+
+    ensure_test_runtime_environment()
+    get_settings.cache_clear()
+    caplog.set_level(logging.WARNING)
+
+    create_app()
+
+    assert any(
+        "Atlas webhook signature secret is not configured" in message
+        for message in caplog.messages
+    )

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -30,6 +31,19 @@ def test_from_settings_uses_yaml_only_configuration():
     assert auth.config.redirect_uri == "https://localhost:8912/auth/callback"
     assert auth.config.logout_redirect_uri == "https://localhost:8912/"
     assert auth.config.domain == "bloom.auth.us-east-1.amazoncognito.com"
+
+
+def test_authorize_url_uses_authorization_code_flow():
+    auth = CognitoAuth.from_settings(_auth_settings())
+
+    parsed = urlparse(auth.config.authorize_url)
+    query = parse_qs(parsed.query)
+
+    assert parsed.path == "/oauth2/authorize"
+    assert query["response_type"] == ["code"]
+    assert query["redirect_uri"] == ["https://localhost:8912/auth/callback"]
+    assert query["scope"] == ["openid email profile"]
+
 
 def test_from_settings_rejects_missing_yaml_values():
     with pytest.raises(CognitoConfigurationError) as exc:

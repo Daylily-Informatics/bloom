@@ -19,7 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
-from bloom_lims.config import get_settings
+from bloom_lims.config import atlas_webhook_secret_warning, get_settings
 from bloom_lims.domain_access import (
     build_allowed_origin_regex,
     build_trusted_hosts,
@@ -79,6 +79,9 @@ def _validate_required_config(settings) -> None:
 def create_app() -> FastAPI:
     settings = get_settings()
     _validate_required_config(settings)
+    atlas_secret_warning = atlas_webhook_secret_warning(settings)
+    if atlas_secret_warning:
+        logging.getLogger(__name__).warning(atlas_secret_warning)
     allow_local_domain_access = not settings.is_production
 
     @asynccontextmanager

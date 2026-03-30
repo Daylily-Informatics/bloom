@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
-from bloom_lims.auth.services.groups import GroupService
+from bloom_lims.auth.services.groups import GroupService, map_legacy_role
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import _get_request_cognito_auth, get_allowed_domains, get_user_preferences, require_auth
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
@@ -17,6 +17,10 @@ from bloom_lims.gui.jinja import templates
 
 
 router = APIRouter()
+
+
+class SessionBootstrapError(RuntimeError):
+    """Raised when Bloom cannot establish the post-login session context."""
 
 
 @router.get("/login", include_in_schema=False)
@@ -49,6 +53,11 @@ def _login_error_redirect(error_message: str) -> RedirectResponse:
     return RedirectResponse(url=f"/login?error={quote(msg)}", status_code=303)
 
 
+def _callback_error_response(error_message: str, *, status_code: int) -> JSONResponse:
+    msg = (error_message or "authentication_failed").strip()
+    return JSONResponse(content={"detail": msg}, status_code=status_code)
+
+
 def _resolve_login_roles_and_groups(
     *,
     email: str,
@@ -57,10 +66,10 @@ def _resolve_login_roles_and_groups(
 ) -> tuple[list[str], list[str], str]:
     normalized_email = str(email or "").strip()
     normalized_sub = str(cognito_sub or "").strip()
-    fallback = map_legacy_role(fallback_role)
-
-    bdb = BLOOMdb3(app_username=normalized_email or "cognito-login")
+    bdb = None
     try:
+        fallback = map_legacy_role(fallback_role)
+        bdb = BLOOMdb3(app_username=normalized_email or "cognito-login")
         service = GroupService(bdb.session)
         service.ensure_system_groups()
 
@@ -82,9 +91,12 @@ def _resolve_login_roles_and_groups(
         return resolution.roles, resolution.groups, default_user_id
     except Exception as exc:
         logging.warning("Failed to resolve session RBAC for %s: %s", normalized_email, exc)
-        return [fallback or Role.READ_WRITE.value], [], (normalized_sub or normalized_email)
+        raise SessionBootstrapError(
+            "Bloom could not initialize your local access profile. Please try signing in again."
+        ) from exc
     finally:
-        bdb.close()
+        if bdb is not None:
+            bdb.close()
 
 
 async def _complete_cognito_login(
@@ -135,11 +147,17 @@ async def _complete_cognito_login(
             )
 
     cognito_sub = decoded_token.get("sub")
-    roles, groups, resolved_user_id = _resolve_login_roles_and_groups(
-        email=primary_email,
-        cognito_sub=cognito_sub,
-        fallback_role=None,
-    )
+    try:
+        roles, groups, resolved_user_id = _resolve_login_roles_and_groups(
+            email=primary_email,
+            cognito_sub=cognito_sub,
+            fallback_role=None,
+        )
+    except SessionBootstrapError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     primary_role = (roles[0] if roles else Role.READ_WRITE.value).upper()
 
     user_data = get_user_preferences(primary_email)
@@ -186,6 +204,9 @@ async def oauth_callback_get(request: Request):
         except CognitoTokenError as exc:
             logging.error("Authorization code exchange failed: %s", exc)
             return _login_error_redirect(str(exc))
+        except Exception:
+            logging.exception("Unhandled error completing Cognito callback")
+            return _login_error_redirect("Unable to complete login. Please try again.")
 
     html_content = """<!DOCTYPE html>
 <html>
@@ -232,14 +253,30 @@ async def oauth_callback_get(request: Request):
 
 @router.post("/oauth_callback")
 async def oauth_callback(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        logging.exception("Invalid Cognito callback payload")
+        return _callback_error_response(
+            "Invalid callback payload",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     access_token = body.get("access_token") or body.get("accessToken")
     id_token = body.get("id_token")
-    return await _complete_cognito_login(
-        request,
-        id_token=id_token,
-        access_token=access_token,
-    )
+    try:
+        return await _complete_cognito_login(
+            request,
+            id_token=id_token,
+            access_token=access_token,
+        )
+    except HTTPException as exc:
+        return _callback_error_response(str(exc.detail), status_code=exc.status_code)
+    except Exception:
+        logging.exception("Unhandled error completing Cognito callback")
+        return _callback_error_response(
+            "Unable to complete login. Please try again.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
 
 @router.get("/auth/callback")
