@@ -16,7 +16,7 @@ def perform_login(page: Page, *, base_url: str, email: str, password: str) -> No
 
 def perform_logout(page: Page, *, base_url: str) -> None:
     page.goto(f"{base_url}/logout")
-    page.wait_for_url(f"{base_url}/**", timeout=30000)
+    page.wait_for_load_state("domcontentloaded")
 
 
 def assert_authenticated_page(page: Page) -> None:
