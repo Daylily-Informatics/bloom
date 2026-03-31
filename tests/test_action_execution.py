@@ -174,3 +174,22 @@ def test_execute_action_surfaces_dispatcher_errors(monkeypatch):
 
     assert exc.value.status_code == 400
     assert "No handler for action" in exc.value.detail
+
+
+def test_build_action_ds_prefers_label_zpl_style_preference():
+    action_ds = action_exec._build_action_ds(
+        {"captured_data": {}},
+        {},
+        actor_email="user@example.com",
+        actor_user_id="user-1",
+        user_preferences={
+            "print_lab": "BLOOM",
+            "printer_name": "printer-1",
+            "label_style": "legacy-style",
+            "label_zpl_style": "tapdb-style",
+        },
+    )
+
+    assert action_ds["printer_name"] == "printer-1"
+    assert action_ds["label_style"] == "tapdb-style"
+    assert action_ds["label_zpl_style"] == "tapdb-style"

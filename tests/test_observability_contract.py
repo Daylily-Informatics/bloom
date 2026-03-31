@@ -98,28 +98,19 @@ def test_obs_services_exposes_dependency_metadata() -> None:
     assert dependencies["observed_services"] == []
 
 
-def test_obs_services_exposes_managed_zebra_service() -> None:
+def test_obs_services_does_not_expose_managed_zebra_service() -> None:
     with TestClient(app, raise_server_exceptions=False) as client:
         response = client.get("/obs_services")
 
     assert response.status_code == 200
     managed = response.json()["managed_services"]
-    assert len(managed) == 1
-    zebra = managed[0]
-    assert zebra["service_id"] == "zebra_printer"
-    assert zebra["implementation"] == "zebra_day"
-    assert zebra["parent_service"] == "bloom"
-    assert zebra["base_url"] == "https://localhost:8118"
-    assert zebra["discovery_source"] == "bloom_managed_service"
-    advertised_paths = {item["path"] for item in zebra["endpoints"]}
-    assert "/obs_services" in advertised_paths
-    assert "/db_health" not in advertised_paths
+    assert managed == []
 
 
 def test_endpoint_health_uses_route_templates_not_raw_instances() -> None:
     with TestClient(app, raise_server_exceptions=False) as client:
         client.get("/api/v1/objects/NONEXISTENT_EUID")
-        response = client.get("/endpoint_health")
+        response = client.get("/endpoint_health?limit=200")
 
     assert response.status_code == 200
     route_templates = {item["route_template"] for item in response.json()["items"]}

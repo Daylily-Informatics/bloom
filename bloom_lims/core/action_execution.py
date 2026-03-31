@@ -319,8 +319,11 @@ def _build_action_ds(
     action_ds["curr_user_id"] = actor_user_id
     action_ds["lab"] = prefs.get("print_lab", "BLOOM")
     action_ds["printer_name"] = prefs.get("printer_name", "")
-    action_ds["label_style"] = prefs.get("label_style", "")
-    action_ds["label_zpl_style"] = prefs.get("label_style", "")
+    resolved_label_style = prefs.get("label_zpl_style", "") or prefs.get(
+        "label_style", ""
+    )
+    action_ds["label_style"] = resolved_label_style
+    action_ds["label_zpl_style"] = resolved_label_style
     action_ds["alt_a"] = prefs.get("alt_a", "")
     action_ds["alt_b"] = prefs.get("alt_b", "")
     action_ds["alt_c"] = prefs.get("alt_c", "")

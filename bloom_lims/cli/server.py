@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
 
+import json
 import os
 import subprocess
 import sys
@@ -16,7 +17,7 @@ import time
 from pathlib import Path
 
 import typer
-from cli_core_yo.certs import ensure_certs
+from cli_core_yo.certs import resolve_https_certs, shared_dayhoff_certs_dir
 from cli_core_yo.server import (
     display_host,
     latest_log,
@@ -40,6 +41,7 @@ console = Console()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TAPDB_LOG_DIR = Path.home() / ".config" / "tapdb" / "logs"
+SERVER_META_FILE = "server-meta.json"
 
 
 class LogService(str, Enum):
@@ -66,7 +68,12 @@ def _pid_file() -> Path:
     return _state_dir() / "server.pid"
 
 
+def _runtime_meta_file() -> Path:
+    return _state_dir() / SERVER_META_FILE
+
+
 def _ensure_dir() -> None:
+    _state_dir().mkdir(parents=True, exist_ok=True)
     _log_dir().mkdir(parents=True, exist_ok=True)
 
 
@@ -83,7 +90,7 @@ def server_status_label() -> str:
     pid, _ = active_server_pid()
     if pid is None:
         return "Stopped"
-    return f"Running (PID {pid})"
+    return f"Running ({_runtime_scheme().upper()}, PID {pid})"
 
 
 def _runtime_host_and_port(default_port: int, default_host: str) -> tuple[str, int]:
@@ -96,6 +103,43 @@ def _runtime_host_and_port(default_port: int, default_host: str) -> tuple[str, i
         )
     )
     return host, port
+
+
+def _deployment_shared_certs_dir() -> Path:
+    from bloom_lims.config import _resolve_deployment_code
+
+    return shared_dayhoff_certs_dir(_resolve_deployment_code())
+
+
+def _write_runtime_meta(*, ssl_enabled: bool) -> None:
+    _runtime_meta_file().write_text(
+        json.dumps({"ssl_enabled": ssl_enabled}, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def _read_runtime_meta() -> dict[str, object]:
+    meta_file = _runtime_meta_file()
+    if not meta_file.exists():
+        return {}
+    try:
+        payload = json.loads(meta_file.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _clear_runtime_meta() -> None:
+    _runtime_meta_file().unlink(missing_ok=True)
+
+
+def _runtime_scheme() -> str:
+    meta = _read_runtime_meta()
+    if str(meta.get("ssl_enabled")).lower() in {"false", "0", "no"}:
+        return "http"
+    if str(meta.get("ssl_enabled")).lower() in {"true", "1", "yes"}:
+        return "https"
+    return "https"
 
 
 @server_app.command("start")
@@ -113,13 +157,33 @@ def start(
         "-b/-f",
         help="Run in background",
     ),
+    ssl: bool = typer.Option(
+        True,
+        "--ssl/--no-ssl",
+        help="Serve over HTTPS with deployment-scoped certs",
+    ),
+    cert: str | None = typer.Option(None, "--cert", help="TLS certificate file"),
+    key: str | None = typer.Option(None, "--key", help="TLS private key file"),
 ) -> None:
     """Start the BLOOM web UI."""
     _ensure_dir()
     host, port = _runtime_host_and_port(port, host)
     shown_host = display_host(host)
-    protocol = "https"
-    cert_file, key_file = ensure_certs(PROJECT_ROOT / "certs")
+    if not ssl and (cert or key):
+        console.print("[red]✗[/red] --cert and --key require HTTPS; omit them with --no-ssl")
+        raise typer.Exit(1)
+
+    protocol = "https" if ssl else "http"
+    cert_file = key_file = None
+    if ssl:
+        resolved = resolve_https_certs(
+            cert_path=cert,
+            key_path=key,
+            shared_certs_dir=_deployment_shared_certs_dir(),
+            fallback_certs_dir=PROJECT_ROOT / "certs",
+        )
+        cert_file = resolved.cert_path
+        key_file = resolved.key_path
 
     try:
         settings = get_settings()
@@ -184,10 +248,12 @@ def start(
     ]
     if reload:
         cmd.append("--reload")
-    cmd.extend(["--ssl-keyfile", str(key_file), "--ssl-certfile", str(cert_file)])
+    if ssl and cert_file and key_file:
+        cmd.extend(["--ssl-keyfile", str(key_file), "--ssl-certfile", str(cert_file)])
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    _write_runtime_meta(ssl_enabled=ssl)
 
     if background:
         log_file = new_log_path(_log_dir())
@@ -202,6 +268,7 @@ def start(
             )
             time.sleep(2)
             if proc.poll() is not None:
+                _clear_runtime_meta()
                 console.print("[red]✗[/red] Server failed to start. Check logs:")
                 console.print(f"   [dim]{log_file}[/dim]")
                 raise typer.Exit(1)
@@ -221,6 +288,9 @@ def start(
         subprocess.run(cmd, env=env, cwd=PROJECT_ROOT)
     except KeyboardInterrupt:
         console.print("\n[yellow]⚠[/yellow] Server stopped")
+    except Exception:
+        _clear_runtime_meta()
+        raise
 
 
 @server_app.command("stop")
@@ -228,6 +298,7 @@ def stop() -> None:
     """Stop the BLOOM web UI."""
     stopped, msg = stop_pid(_pid_file())
     if stopped:
+        _clear_runtime_meta()
         console.print(f"[green]✓[/green] {msg}")
     elif "Permission" in msg:
         console.print(f"[red]✗[/red] {msg}")
@@ -245,7 +316,7 @@ def status() -> None:
     log_file = _latest_server_log()
     if pid:
         console.print(f"[green]●[/green] Server is [green]running[/green] (PID {pid})")
-        console.print(f"   URL: [cyan]https://{shown_host}:{port}[/cyan]")
+        console.print(f"   URL: [cyan]{_runtime_scheme()}://{shown_host}:{port}[/cyan]")
         if log_file:
             console.print(f"   Logs: [dim]{log_file}[/dim]")
         return

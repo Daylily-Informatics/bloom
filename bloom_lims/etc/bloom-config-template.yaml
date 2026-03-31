@@ -164,6 +164,15 @@ dewey:
   verify_ssl: true
 
 # -----------------------------------------------------------------------------
+# zebra_day Integration
+# -----------------------------------------------------------------------------
+zebra_day:
+  base_url: ""                  # e.g., https://zebra-day.example.org
+  token: ""                     # Bearer token used for zebra_day shared printer/config APIs
+  timeout_seconds: 10
+  verify_ssl: true
+
+# -----------------------------------------------------------------------------
 # Logging Configuration
 # -----------------------------------------------------------------------------
 logging:

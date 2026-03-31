@@ -10,9 +10,6 @@ import json
 import logging
 import os
 import random
-import shutil
-import subprocess
-import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -49,6 +46,7 @@ from bloom_lims.gui.deps import (
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
 from bloom_lims.gui.jinja import templates
 from bloom_lims.graph_support import resolve_external_refs_for_object
+from bloom_lims.integrations.zebra_day import ZebraDayService
 
 
 router = APIRouter()
@@ -79,70 +77,6 @@ def _admin_forbidden_response(request: Request):
     if "application/json" in accepts:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return RedirectResponse(url="/user_home?admin_required=1", status_code=303)
-
-
-def _zebra_command_status() -> tuple[str, str]:
-    """Return zebra service status and command output summary."""
-    zday_path = shutil.which("zday")
-    if not zday_path:
-        return "unknown", "zday command not available"
-
-    try:
-        status_result = subprocess.run(
-            [zday_path, "gui", "status"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=10,
-        )
-    except Exception as exc:  # pragma: no cover - defensive
-        return "unknown", str(exc)
-
-    combined = f"{status_result.stdout or ''}\n{status_result.stderr or ''}".strip()
-    lower = combined.lower()
-    if "not running" in lower:
-        return "stopped", combined
-    if "running" in lower:
-        return "running", combined
-    return "unknown", combined
-
-
-def _try_start_zebra_background() -> tuple[str, str]:
-    """Attempt to start zebra service in non-blocking mode."""
-    zday_path = shutil.which("zday")
-    if zday_path:
-        start_result = subprocess.run(
-            [zday_path, "gui", "start", "--background", "--port", "8118"],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=20,
-        )
-        if start_result.returncode != 0:
-            err = (start_result.stderr or start_result.stdout or "").strip()
-            return "start_failed", err or "zday gui start returned non-zero exit code"
-
-        for _ in range(5):
-            status, details = _zebra_command_status()
-            if status == "running":
-                return "started", details
-            time.sleep(0.4)
-        return "launch_failed", "zebra service start command completed but running status was not observed"
-
-    legacy_path = shutil.which("zday_start")
-    if not legacy_path:
-        return "command_not_found", "Neither zday nor zday_start command is available"
-
-    try:
-        subprocess.Popen(  # noqa: S603,S607
-            [legacy_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-        return "started", "zday_start launched in background"
-    except Exception as exc:  # pragma: no cover - defensive
-        return "launch_failed", str(exc)
 
 
 def get_well_color(quant_value):
@@ -288,24 +222,11 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     dest_section = {"section": dest}
 
     user_data = request.session.get("user_data", {})
-
-    bobdb = BloomObj(
-        BLOOMdb3(app_username=request.session["user_data"]["email"]),
-        cfg_printers=True,
-        cfg_fedex=True,
-    )
-
-    if "print_lab" in user_data:
-        bobdb.get_lab_printers(user_data["print_lab"])
+    zebra_service = ZebraDayService()
 
     csss = ["/static/modern/css/bloom_modern.css"]
 
-    printer_info = {
-        "print_lab": bobdb.printer_labs,
-        "printer_name": bobdb.site_printers,
-        "label_zpl_style": bobdb.zpl_label_styles,
-        "style_css": csss,
-    }
+    printer_info = zebra_service.build_printer_preferences(user_data.get("print_lab"))
     printer_info["style_css"] = csss
 
     from bloom_lims._version import get_version
@@ -320,9 +241,9 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         zebra_version = importlib.metadata.version("zebra_day")
         dependency_info["zebra_day"] = {
             "version": zebra_version,
-            "admin_url": "https://localhost:8118/",
+            "admin_url": zebra_service.admin_url,
             "description": "Zebra printer fleet management and ZPL label printing",
-            "status": "available",
+            "status": "configured" if zebra_service.is_configured else "not_configured",
         }
     except importlib.metadata.PackageNotFoundError:
         dependency_info["zebra_day"] = {
@@ -411,9 +332,6 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "atlas_webhook_secret_configured": bool(atlas_webhook_secret.strip()),
         "tapdb_metrics_summary": tapdb_metrics_summary,
         "saved": request.query_params.get("saved") == "1",
-        "zebra_started": request.query_params.get("zebra_started") == "1",
-        "zebra_running": request.query_params.get("zebra_running") == "1",
-        "zebra_error": request.query_params.get("zebra_error", ""),
     }
     return HTMLResponse(content=template.render(context))
 
@@ -556,42 +474,6 @@ async def admin_update_preferences(request: Request, _auth=Depends(require_auth)
         return {"status": "success", "updated_keys": updated_keys}
 
     return RedirectResponse(url="/admin?saved=1", status_code=303)
-
-
-@router.post("/admin/zebra/start")
-async def admin_start_zebra_service(request: Request, _auth=Depends(require_auth)):
-    if not _is_admin_session(request):
-        return _admin_forbidden_response(request)
-
-    """Launch zebra_day service using non-blocking CLI commands."""
-    accepts = request.headers.get("accept", "").lower()
-    status_before, _ = _zebra_command_status()
-    if status_before == "running":
-        if "application/json" in accepts:
-            return {
-                "status": "success",
-                "state": "already_running",
-                "message": "zebra_day service is already running",
-            }
-        return RedirectResponse(url="/admin?zebra_running=1", status_code=303)
-
-    start_state, details = _try_start_zebra_background()
-    if start_state in {"command_not_found", "launch_failed", "start_failed"}:
-        logging.error("Failed to start zebra_day service (%s): %s", start_state, details)
-        if "application/json" in accepts:
-            return JSONResponse(
-                status_code=503 if start_state == "command_not_found" else 500,
-                content={"status": "error", "detail": details, "error_code": start_state},
-            )
-        return RedirectResponse(url=f"/admin?zebra_error={start_state}", status_code=303)
-
-    if "application/json" in accepts:
-        return {
-            "status": "success",
-            "state": "started",
-            "message": "zebra_day service start requested in background mode",
-        }
-    return RedirectResponse(url="/admin?zebra_started=1", status_code=303)
 
 
 @router.post("/update_preference")
@@ -1203,18 +1085,14 @@ async def user_home(request: Request):
 
     user_data = request.session.get("user_data", {})
     session_data = request.session.get("session_data", {})
+    if not user_data:
+        return RedirectResponse(url="/login")
+
     user_data["display_timezone"] = normalize_display_timezone(
         user_data.get("display_timezone"),
     )
 
-    if not user_data:
-        return RedirectResponse(url="/login")
-
-    bobdb = BloomObj(
-        BLOOMdb3(app_username=user_data.get("email", "anonymous")),
-        cfg_printers=True,
-        cfg_fedex=True,
-    )
+    zebra_service = ZebraDayService()
 
     skins_directory = Path("static/modern/css")
     if skins_directory.exists():
@@ -1227,15 +1105,8 @@ async def user_home(request: Request):
 
     dest_section = request.query_params.get("dest_section", "")
 
-    if "print_lab" in user_data:
-        bobdb.get_lab_printers(user_data["print_lab"])
-
-    printer_info = {
-        "print_lab": bobdb.printer_labs,
-        "printer_name": bobdb.site_printers,
-        "label_zpl_style": bobdb.zpl_label_styles,
-        "style_css": css_files,
-    }
+    printer_info = zebra_service.build_printer_preferences(user_data.get("print_lab"))
+    printer_info["style_css"] = css_files
 
     from bloom_lims._version import get_version
     import importlib.metadata

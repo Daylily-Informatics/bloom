@@ -482,6 +482,27 @@ class DeweySettings(BaseModel):
         return self
 
 
+class ZebraDaySettings(BaseModel):
+    """zebra_day integration settings."""
+
+    base_url: str = Field(default="", description="zebra_day API base URL")
+    token: str = Field(default="", description="zebra_day internal API bearer token")
+    timeout_seconds: int = Field(default=10, description="zebra_day API timeout seconds")
+    verify_ssl: bool = Field(
+        default=True, description="Verify zebra_day TLS certificates"
+    )
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return ""
+        if not normalized.startswith(("https://", "http://")):
+            raise ValueError("zebra_day.base_url must use an absolute http:// or https:// URL")
+        return normalized.rstrip("/")
+
+
 class LoggingSettings(BaseModel):
     """Logging configuration."""
 
@@ -640,6 +661,7 @@ class BloomSettings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     atlas: AtlasSettings = Field(default_factory=AtlasSettings)
     dewey: DeweySettings = Field(default_factory=DeweySettings)
+    zebra_day: ZebraDaySettings = Field(default_factory=ZebraDaySettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
     ui: UISettings = Field(default_factory=UISettings)
     deployment: DeploymentSettings = Field(default_factory=DeploymentSettings)

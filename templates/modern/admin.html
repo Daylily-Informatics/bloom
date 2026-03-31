@@ -21,43 +21,6 @@
 </div>
 {% endif %}
 
-{% if zebra_started %}
-<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-success);">
-  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
-    <i class="fas fa-check-circle" style="color: var(--color-success);"></i>
-    <span>zebra_day start command launched in background mode.</span>
-  </div>
-</div>
-{% endif %}
-
-{% if zebra_running %}
-<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-info);">
-  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
-    <i class="fas fa-info-circle" style="color: var(--color-info);"></i>
-    <span>zebra_day service is already running.</span>
-  </div>
-</div>
-{% endif %}
-
-{% if zebra_error %}
-<div class="card" style="margin-bottom: var(--spacing-md); border-color: var(--color-warning);">
-  <div class="card-body" style="display: flex; align-items: center; gap: var(--spacing-sm);">
-    <i class="fas fa-exclamation-triangle" style="color: var(--color-warning);"></i>
-    <span>
-      {% if zebra_error == "command_not_found" %}
-      Could not find <code>zday</code> or <code>zday_start</code> on this host.
-      {% elif zebra_error == "launch_failed" %}
-      Failed to launch zebra_day service in background mode.
-      {% elif zebra_error == "start_failed" %}
-      zebra_day service start command returned an error.
-      {% else %}
-      zebra_day service start failed.
-      {% endif %}
-    </span>
-  </div>
-</div>
-{% endif %}
-
 <div class="grid grid-2">
   <!-- User Preferences -->
   <div class="card">
@@ -78,8 +41,8 @@
         <div class="form-group">
           <label class="form-label">Default Printer</label>
           <select class="form-select" name="printer_name">
-            {% for printer in printer_info.get('printer_name', []) %}
-            <option value="{{ printer }}" {% if user_data.get('printer_name') == printer %}selected{% endif %}>{{ printer }}</option>
+            {% for printer in printer_info.get('printer_options', []) %}
+            <option value="{{ printer.value }}" {% if user_data.get('printer_name') == printer.value %}selected{% endif %}>{{ printer.label }}</option>
             {% endfor %}
           </select>
         </div>
@@ -332,7 +295,7 @@
     <div class="card-header">
       <h3 class="card-title">
         <i class="fas fa-print"></i> zebra_day
-        <span class="badge {% if dependency_info.zebra_day.status == 'available' %}badge-success{% else %}badge-warning{% endif %}">
+        <span class="badge {% if dependency_info.zebra_day.status in ['available', 'configured'] %}badge-success{% else %}badge-warning{% endif %}">
           {{ dependency_info.zebra_day.version }}
         </span>
       </h3>
@@ -344,12 +307,11 @@
         <a href="{{ dependency_info.zebra_day.admin_url }}" target="_blank" class="btn btn-outline btn-sm">
           <i class="fas fa-external-link-alt"></i> Open Admin Interface
         </a>
-        <form action="/admin/zebra/start" method="POST" style="display: inline;">
-          <button type="submit" class="btn btn-primary btn-sm">
-            <i class="fas fa-play"></i> Start Zebra Service
-          </button>
-        </form>
         <span class="text-sm text-muted">Port 8118</span>
+      </div>
+      {% else %}
+      <div class="integration-actions">
+        <span class="text-sm text-muted">Configure <code>zebra_day.base_url</code> to enable shared printer settings.</span>
       </div>
       {% endif %}
     </div>

@@ -36,6 +36,28 @@ class _FakeCognitoAuth:
         }
 
 
+class _MappedCognitoAuth:
+    def __init__(self, payloads: dict[str, dict]):
+        self._payloads = payloads
+        self._token_payloads = {}
+        self.config = SimpleNamespace(logout_url="/")
+        for payload in payloads.values():
+            for token_key in ("id_token", "access_token"):
+                token = str(payload.get(token_key) or "").strip()
+                if token:
+                    self._token_payloads[token] = payload
+
+    def exchange_authorization_code(self, code: str) -> dict:
+        payload = self._payloads.get(code)
+        assert payload is not None
+        return dict(payload)
+
+    def validate_token(self, token: str) -> dict:
+        payload = self._token_payloads.get(token)
+        assert payload is not None
+        return dict(payload)
+
+
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(main.app, raise_server_exceptions=False)
@@ -195,3 +217,80 @@ def test_empty_allowed_domain_config_blocks_all(monkeypatch: pytest.MonkeyPatch)
     from bloom_lims.gui.deps import get_allowed_domains
 
     assert get_allowed_domains() == ["__BLOCK_ALL__"]
+
+
+def test_multiple_gui_clients_keep_distinct_sessions(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BLOOM_OAUTH", "yes")
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: _MappedCognitoAuth(
+            {
+                "alice-1": {
+                    "id_token": "id-token-alice-1",
+                    "access_token": "access-token-alice-1",
+                    "email": "alice@lsmc.com",
+                    "sub": "alice-sub",
+                    "name": "Alice",
+                    "cognito:username": "alice@lsmc.com",
+                },
+                "alice-2": {
+                    "id_token": "id-token-alice-2",
+                    "access_token": "access-token-alice-2",
+                    "email": "alice@lsmc.com",
+                    "sub": "alice-sub",
+                    "name": "Alice",
+                    "cognito:username": "alice@lsmc.com",
+                },
+                "bob-1": {
+                    "id_token": "id-token-bob-1",
+                    "access_token": "access-token-bob-1",
+                    "email": "bob@lsmc.com",
+                    "sub": "bob-sub",
+                    "name": "Bob",
+                    "cognito:username": "bob@lsmc.com",
+                },
+            }
+        ),
+    )
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"])
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._resolve_login_roles_and_groups",
+        lambda **kwargs: (["READ_WRITE"], [], kwargs.get("cognito_sub") or kwargs.get("email")),
+    )
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_user_preferences",
+        lambda email: {"email": email, "display_timezone": "UTC"},
+    )
+
+    alice_1 = TestClient(main.app, raise_server_exceptions=False)
+    alice_2 = TestClient(main.app, raise_server_exceptions=False)
+    bob = TestClient(main.app, raise_server_exceptions=False)
+
+    try:
+        for client, code, expected_email in [
+            (alice_1, "alice-1", "alice@lsmc.com"),
+            (alice_2, "alice-2", "alice@lsmc.com"),
+            (bob, "bob-1", "bob@lsmc.com"),
+        ]:
+            response = client.get(f"/auth/callback?code={code}", follow_redirects=False)
+            assert response.status_code == 303
+            home = client.get("/user_home")
+            assert home.status_code == 200
+            assert expected_email in home.text
+
+        logout = alice_1.get("/logout", follow_redirects=False)
+        assert logout.status_code == 303
+
+        alice_2_home = alice_2.get("/user_home")
+        bob_home = bob.get("/user_home")
+        alice_1_home = alice_1.get("/user_home", follow_redirects=False)
+
+        assert alice_2_home.status_code == 200
+        assert "alice@lsmc.com" in alice_2_home.text
+        assert bob_home.status_code == 200
+        assert "bob@lsmc.com" in bob_home.text
+        assert alice_1_home.status_code in {302, 303, 307}
+    finally:
+        alice_1.close()
+        alice_2.close()
+        bob.close()

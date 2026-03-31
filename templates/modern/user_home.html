@@ -62,8 +62,8 @@
       <div class="form-group">
         <label class="form-label" for="printer_name">Default Printer</label>
         <select id="printer_name" class="form-select" onchange="updatePreferenceAndReload('printer_name', this.value)">
-          {% for option in printer_info.get('printer_name', []) %}
-          <option value="{{ option }}" {% if user_data.get('printer_name') == option %}selected{% endif %}>{{ option }}</option>
+          {% for option in printer_info.get('printer_options', []) %}
+          <option value="{{ option.value }}" {% if user_data.get('printer_name') == option.value %}selected{% endif %}>{{ option.label }}</option>
           {% endfor %}
         </select>
       </div>

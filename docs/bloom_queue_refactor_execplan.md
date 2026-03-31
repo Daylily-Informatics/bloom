@@ -36,10 +36,10 @@ This document tracks the final Bloom beta-completion pass for:
    - add Atlas/Ursa enablement panels in admin GUI
    - enforce Atlas/Ursa groups on external API routes
 
-5. **Zebra service reliability**
-   - prefer `zday gui start --background`
-   - check running state deterministically (`already running`, `started`, `failed`)
-   - fallback to background `zday_start` only when needed
+5. **zebra_day service integration**
+   - consume shared printer and label-profile state through the zebra_day API
+   - stop Bloom-owned process management for zebra_day
+   - submit print jobs through zebra_day instead of direct local printer access
 
 ## Beta Acceptance Checks
 
@@ -51,7 +51,7 @@ This document tracks the final Bloom beta-completion pass for:
   - add API users with deterministic feedback
   - issue a token for a selected API user
   - enable Atlas/Ursa API group access
-- Zebra start reports deterministic outcomes in both HTML redirect and JSON modes.
+- Bloom admin links to zebra_day but does not start or manage the process.
 
 ## Breaking Changes
 

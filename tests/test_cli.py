@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -14,6 +16,7 @@ from bloom_lims.cli import (
     build_app,
     config_extra,
 )
+from cli_core_yo.certs import ResolvedHttpsCerts
 
 server_commands = importlib.import_module("bloom_lims.cli.server")
 
@@ -275,6 +278,136 @@ class TestServerState:
         assert result.exit_code == 0
         assert "Dev Server" in result.output
         assert "321" in result.output
+
+
+class TestServerTlsBehavior:
+    def _fake_settings(self):
+        return SimpleNamespace(
+            host="0.0.0.0",
+            port=8912,
+            environment="development",
+            auth=SimpleNamespace(
+                cognito_user_pool_id="pool",
+                cognito_client_id="client",
+                cognito_domain="bloom.auth.us-east-1.amazoncognito.com",
+                cognito_redirect_uri="https://localhost:8912/auth/callback",
+                cognito_logout_redirect_uri="https://localhost:8912/",
+            ),
+            atlas=SimpleNamespace(webhook_secret="secret"),
+        )
+
+    def _patch_startup_dependencies(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake_settings = self._fake_settings()
+        monkeypatch.setattr(server_commands, "get_settings", lambda: fake_settings)
+        monkeypatch.setattr(server_commands, "apply_runtime_environment", lambda settings: settings)
+        monkeypatch.setattr(server_commands, "atlas_webhook_secret_warning", lambda _settings: None)
+        monkeypatch.setattr(
+            server_commands,
+            "get_tapdb_db_config",
+            lambda: {"host": "localhost", "port": 5432, "database": "bloom"},
+        )
+
+    def test_server_start_uses_shared_dayhoff_certs_and_reports_https(
+        self,
+        runner: CliRunner,
+        cli_app,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        self._patch_startup_dependencies(monkeypatch)
+
+        calls: dict[str, object] = {}
+        cert_pair = ResolvedHttpsCerts(
+            cert_path=tmp_path / "shared" / "cert.pem",
+            key_path=tmp_path / "shared" / "key.pem",
+            source="shared-state",
+        )
+
+        def fake_resolve_https_certs(**kwargs):
+            calls["resolve_kwargs"] = kwargs
+            cert_pair.cert_path.parent.mkdir(parents=True, exist_ok=True)
+            cert_pair.cert_path.write_text("cert", encoding="utf-8")
+            cert_pair.key_path.write_text("key", encoding="utf-8")
+            return cert_pair
+
+        def fake_run(cmd, **kwargs):
+            calls["cmd"] = cmd
+            calls["cwd"] = kwargs.get("cwd")
+            calls["env"] = kwargs.get("env")
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(server_commands, "resolve_https_certs", fake_resolve_https_certs)
+        monkeypatch.setattr(server_commands.subprocess, "run", fake_run)
+
+        result = runner.invoke(cli_app, ["server", "start", "--foreground"])
+
+        assert result.exit_code == 0, result.output
+        assert "https://localhost:8912" in result.output
+        assert calls["resolve_kwargs"]["shared_certs_dir"] == server_commands._deployment_shared_certs_dir()
+        assert calls["resolve_kwargs"]["fallback_certs_dir"] == server_commands.PROJECT_ROOT / "certs"
+        assert "--ssl-certfile" in calls["cmd"]
+        assert str(cert_pair.cert_path) in calls["cmd"]
+        assert "--ssl-keyfile" in calls["cmd"]
+        assert str(cert_pair.key_path) in calls["cmd"]
+        assert json.loads(server_commands._runtime_meta_file().read_text(encoding="utf-8")) == {
+            "ssl_enabled": True
+        }
+
+    def test_server_start_no_ssl_skips_cert_resolution_and_reports_http(
+        self,
+        runner: CliRunner,
+        cli_app,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._patch_startup_dependencies(monkeypatch)
+
+        resolve_called = False
+        calls: dict[str, object] = {}
+
+        def fake_resolve_https_certs(**_kwargs):
+            nonlocal resolve_called
+            resolve_called = True
+            raise AssertionError("resolve_https_certs should not be called for --no-ssl")
+
+        def fake_run(cmd, **kwargs):
+            calls["cmd"] = cmd
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(server_commands, "resolve_https_certs", fake_resolve_https_certs)
+        monkeypatch.setattr(server_commands.subprocess, "run", fake_run)
+
+        result = runner.invoke(cli_app, ["server", "start", "--foreground", "--no-ssl"])
+
+        assert result.exit_code == 0, result.output
+        assert "http://localhost:8912" in result.output
+        assert resolve_called is False
+        assert "--ssl-certfile" not in calls["cmd"]
+        assert "--ssl-keyfile" not in calls["cmd"]
+        assert json.loads(server_commands._runtime_meta_file().read_text(encoding="utf-8")) == {
+            "ssl_enabled": False
+        }
+
+    def test_server_status_uses_runtime_meta_scheme(
+        self,
+        runner: CliRunner,
+        cli_app,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        state_dir = tmp_path / ".local" / "state" / "bloom"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "server.pid").write_text("321", encoding="utf-8")
+        (state_dir / "server-meta.json").write_text(
+            json.dumps({"ssl_enabled": False}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(server_commands.os, "kill", lambda pid, sig: None)
+
+        result = runner.invoke(cli_app, ["server", "status"])
+
+        assert result.exit_code == 0
+        assert "http://localhost:8912" in result.output
+        assert "Running (HTTP, PID 321)" in server_commands.server_status_label()
 
 
 class TestGuiLocalhostPolicy:
