@@ -1085,12 +1085,12 @@ async def user_home(request: Request):
 
     user_data = request.session.get("user_data", {})
     session_data = request.session.get("session_data", {})
+    if not user_data:
+        return RedirectResponse(url="/login")
+
     user_data["display_timezone"] = normalize_display_timezone(
         user_data.get("display_timezone"),
     )
-
-    if not user_data:
-        return RedirectResponse(url="/login")
 
     zebra_service = ZebraDayService()
 

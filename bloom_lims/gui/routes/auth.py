@@ -315,7 +315,6 @@ async def logout(request: Request, response: Response):
             logging.error("Cognito configuration missing during logout: %s", exc)
 
         request.session.clear()
-        response.delete_cookie("session", path="/")
         logging.info("User session cleared.")
     except Exception as exc:
         logging.error("Error during logout: %s", exc)
@@ -324,4 +323,6 @@ async def logout(request: Request, response: Response):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
-    return RedirectResponse(url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER)
+    logout_response = RedirectResponse(url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER)
+    logout_response.delete_cookie("session", path="/")
+    return logout_response
