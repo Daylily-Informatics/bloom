@@ -363,6 +363,10 @@ class TestServerTlsBehavior:
             "ssl_enabled": True
         }
 
+    def test_server_uses_shared_cli_core_cert_resolver(self) -> None:
+        assert server_commands.resolve_https_certs.__module__ == "cli_core_yo.certs"
+        assert server_commands.shared_dayhoff_certs_dir.__module__ == "cli_core_yo.certs"
+
     def test_server_start_no_ssl_skips_cert_resolution_and_reports_http(
         self,
         runner: CliRunner,
