@@ -398,7 +398,7 @@ Do not rely on `COGNITO_*`, `BLOOM_AUTH__COGNITO_*`, or daycog env files for ser
 3. **Activate the environment and start the application**:
 
    ```bash
-   source ./activate
+   source ./activate <deploy-name>
    bloom server start
    ```
 

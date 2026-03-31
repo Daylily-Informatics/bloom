@@ -5,7 +5,7 @@
 Always start by activating the repo environment:
 
 ```bash
-source ./activate
+source ./activate <deploy-name>
 ```
 
 ## Command Ownership
@@ -23,7 +23,7 @@ source ./activate
 
 ## Bloom Examples
 
-- Start with `source ./activate`
+- Start with `source ./activate <deploy-name>`
 - Use `bloom db init`
 - Use `bloom db seed`
 - Use `bloom server start --port 8912`

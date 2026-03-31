@@ -41,7 +41,7 @@ TEMPLATE_CONFIG_FILE = (
 
 def _sanitize_deployment_code(value: str) -> str:
     cleaned = str(value or "").strip()
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", cleaned)
+    cleaned = re.sub(r"[^A-Za-z0-9-]+", "-", cleaned)
     cleaned = cleaned.strip("-")
     return cleaned or "local"
 
