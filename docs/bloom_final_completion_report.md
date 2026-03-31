@@ -55,23 +55,23 @@ Yes. Archival workflow/workset code remains in-repo but is isolated from mounted
 
 Executed exactly as requested:
 
-- `source ./activate >/dev/null 2>&1 && pytest tests/test_api_v1.py tests/test_gui_endpoints.py`
+- `source ./activate <deploy-name> >/dev/null 2>&1 && pytest tests/test_api_v1.py tests/test_gui_endpoints.py`
   - Functional result: `338 passed, 28 skipped`
   - Exit code non-zero due coverage gate (`fail_under=39`, total `30.96%`).
-- `source ./activate >/dev/null 2>&1 && pytest tests/test_action_execution.py`
+- `source ./activate <deploy-name> >/dev/null 2>&1 && pytest tests/test_action_execution.py`
   - Functional result: `2 passed`
   - Exit code non-zero due coverage gate (`7.99%`).
-- `source ./activate >/dev/null 2>&1 && pytest tests/test_admin_auth.py tests/test_user_api_tokens.py`
+- `source ./activate <deploy-name> >/dev/null 2>&1 && pytest tests/test_admin_auth.py tests/test_user_api_tokens.py`
   - Functional result: `4 passed`
   - Exit code non-zero due coverage gate (`23.19%`).
-- `source ./activate >/dev/null 2>&1 && pytest tests/test_external_specimens.py tests/test_beta_lab.py`
+- `source ./activate <deploy-name> >/dev/null 2>&1 && pytest tests/test_external_specimens.py tests/test_beta_lab.py`
   - Functional result: `5 passed`
   - Exit code non-zero due coverage gate (`20.93%`).
-- `source ./activate >/dev/null 2>&1 && pytest tests/test_operations_routes.py -k zebra`
+- `source ./activate <deploy-name> >/dev/null 2>&1 && pytest tests/test_operations_routes.py -k zebra`
   - Functional result: `2 passed, 2 deselected`
   - Exit code non-zero due coverage gate (`20.68%`).
 
 Additional check run:
 
-- `source ./activate >/dev/null 2>&1 && ruff check bloom_lims tests`
+- `source ./activate <deploy-name> >/dev/null 2>&1 && ruff check bloom_lims tests`
   - Non-green due large pre-existing repo baseline violations.

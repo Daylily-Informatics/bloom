@@ -45,7 +45,7 @@ flowchart LR
 ### Quickstart
 
 ```bash
-source ./activate
+source ./activate <deploy-name>
 bloom db init
 bloom db seed
 bloom server start --port 8912
@@ -121,7 +121,7 @@ Approximate only.
 
 ## Development Notes
 
-- Canonical local entry path: `source ./activate`
+- Canonical local entry path: `source ./activate <deploy-name>`
 - Use `bloom ...` as the main operational interface
 - Use `tapdb ...` only for shared DB/runtime work Bloom explicitly delegates
 - Use `daycog ...` only for shared Cognito work Bloom explicitly delegates
@@ -130,7 +130,7 @@ Approximate only.
 Useful checks:
 
 ```bash
-source ./activate
+source ./activate <deploy-name>
 bloom --help
 pytest -q
 ```

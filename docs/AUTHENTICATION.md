@@ -72,6 +72,6 @@ tapdb:
 ## Start Bloom
 
 ```bash
-source ./activate
+source ./activate <deploy-name>
 bloom server start
 ```

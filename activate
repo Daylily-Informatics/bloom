@@ -5,7 +5,7 @@
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "Error: This script must be sourced, not executed."
-    echo "Usage: source ./activate"
+    echo "Usage: source ./activate <deploy-name>"
     exit 1
 fi
 
@@ -50,11 +50,19 @@ _bloom_default_tapdb_local_pg_port() {
 _bloom_sanitize_deployment_code() {
     local raw_value="$1"
     local sanitized=""
-    sanitized="$(printf '%s' "$raw_value" | LC_ALL=C sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//')"
+    sanitized="$(printf '%s' "$raw_value" | LC_ALL=C sed -E 's/[^A-Za-z0-9-]+/-/g; s/^-+//; s/-+$//')"
     if [[ -z "$sanitized" ]]; then
         sanitized="local"
     fi
     printf '%s\n' "$sanitized"
+}
+
+_bloom_validate_deploy_name() {
+    local deploy_name="$1"
+    if [[ ! "$deploy_name" =~ ^[A-Za-z0-9-]{2,8}$ ]]; then
+        echo -e "  ${_YELLOW}⚠${_NC} deploy-name must match ^[A-Za-z0-9-]{2,8}$"
+        return 1
+    fi
 }
 
 _bloom_prepare_tapdb_config_path() {
@@ -89,8 +97,19 @@ _bloom_prepare_tapdb_config_path() {
     printf '%s\n' "$user_path"
 }
 
-_bloom_deployment_code="${BLOOM_DEPLOYMENT_CODE:-${DEPLOYMENT_CODE:-${LSMC_DEPLOYMENT_CODE:-local}}}"
-_bloom_deployment_code="$(_bloom_sanitize_deployment_code "${_bloom_deployment_code}")"
+if [[ "$#" -ne 1 ]]; then
+    echo -e "  ${_YELLOW}⚠${_NC} Bloom activation requires exactly one positional deploy-name."
+    echo "Usage: source ./activate <deploy-name>"
+    return 1
+fi
+
+_bloom_deployment_code="$1"
+if ! _bloom_validate_deploy_name "${_bloom_deployment_code}"; then
+    return 1
+fi
+export BLOOM_DEPLOYMENT_CODE="${_bloom_deployment_code}"
+export DEPLOYMENT_CODE="${_bloom_deployment_code}"
+export LSMC_DEPLOYMENT_CODE="${_bloom_deployment_code}"
 _BLOOM_CONDA_ENV_NAME="${_BLOOM_CONDA_ENV_BASE}-${_bloom_deployment_code}"
 unset _bloom_deployment_code
 
@@ -225,7 +244,7 @@ fi
 
 if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_CONDA_ENV_NAME}" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
     echo -e "  ${_YELLOW}⚠${_NC} ${_BLOOM_CONDA_ENV_NAME} conda environment is required."
-    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f bloom_env.yaml' if needed, then retry 'source ./activate'."
+    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f bloom_env.yaml' if needed, then retry 'source ./activate <deploy-name>'."
     return 1
 fi
 
@@ -335,6 +354,9 @@ export BLOOM_ROOT
 
 deactivate_bloom() {
     unset BLOOM_ROOT
+    unset BLOOM_DEPLOYMENT_CODE
+    unset DEPLOYMENT_CODE
+    unset LSMC_DEPLOYMENT_CODE
     unset TAPDB_ENV
     unset TAPDB_CLIENT_ID
     unset TAPDB_DATABASE_NAME
@@ -346,7 +368,7 @@ deactivate_bloom() {
     unset TAPDB_DEV_PORT
     unset TAPDB_TEST_PORT
     unset BLOOM_COGNITO_APP_NAME
-    if [[ "$CONDA_DEFAULT_ENV" == "BLOOM" ]]; then
+    if [[ "${CONDA_DEFAULT_ENV:-}" == "${_BLOOM_CONDA_ENV_NAME}" ]]; then
         conda deactivate 2>/dev/null
     fi
     echo "BLOOM LIMS environment deactivated."

@@ -51,7 +51,7 @@ docker-compose up -d
 
 ```bash
 # If using conda, Metabase can run alongside BLOOM
-source ./activate
+source ./activate <deploy-name>
 ./analytics/metabase/run_metabase.sh
 ```
 
