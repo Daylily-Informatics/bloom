@@ -16,7 +16,17 @@ from bloom_lims.cli import (
     build_app,
     config_extra,
 )
-from cli_core_yo.certs import ResolvedHttpsCerts
+
+try:
+    from cli_core_yo.certs import ResolvedHttpsCerts
+except ImportError:
+    from dataclasses import dataclass
+
+    @dataclass
+    class ResolvedHttpsCerts:
+        cert_path: Path
+        key_path: Path
+        source: str = "ensure_certs"
 
 server_commands = importlib.import_module("bloom_lims.cli.server")
 

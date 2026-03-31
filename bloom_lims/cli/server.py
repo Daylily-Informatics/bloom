@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -17,7 +18,6 @@ import time
 from pathlib import Path
 
 import typer
-from cli_core_yo.certs import resolve_https_certs, shared_dayhoff_certs_dir
 from cli_core_yo.server import (
     display_host,
     latest_log,
@@ -27,6 +27,43 @@ from cli_core_yo.server import (
     write_pid,
 )
 from rich.console import Console
+
+try:
+    from cli_core_yo.certs import resolve_https_certs, shared_dayhoff_certs_dir
+except ImportError:
+    from cli_core_yo.certs import ensure_certs
+
+    @dataclass
+    class _CompatResolvedHttpsCerts:
+        cert_path: Path
+        key_path: Path
+        source: str = "ensure_certs"
+
+    def shared_dayhoff_certs_dir(deployment_code: str) -> Path:
+        return Path.home() / ".config" / "dayhoff" / "certs" / deployment_code
+
+    def resolve_https_certs(
+        *,
+        cert_path: str | None = None,
+        key_path: str | None = None,
+        shared_certs_dir: Path | None = None,
+        fallback_certs_dir: Path | None = None,
+        hosts: tuple[str, ...] | None = None,
+    ) -> _CompatResolvedHttpsCerts:
+        del hosts
+        if cert_path and key_path:
+            return _CompatResolvedHttpsCerts(
+                cert_path=Path(cert_path),
+                key_path=Path(key_path),
+                source="explicit",
+            )
+        cert_dir = Path(shared_certs_dir or fallback_certs_dir or (Path.home() / ".config" / "bloom" / "certs"))
+        cert_file, key_file = ensure_certs(cert_dir)
+        return _CompatResolvedHttpsCerts(
+            cert_path=Path(cert_file),
+            key_path=Path(key_file),
+            source="ensure_certs",
+        )
 
 from bloom_lims.config import (
     DEFAULT_BLOOM_WEB_PORT,
