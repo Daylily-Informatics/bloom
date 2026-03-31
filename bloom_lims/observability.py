@@ -147,37 +147,12 @@ class BloomObservabilityStore:
             configured.append("atlas")
         if bool(settings.dewey.enabled) and str(settings.dewey.base_url or "").strip():
             configured.append("dewey")
+        if str(settings.zebra_day.base_url or "").strip():
+            configured.append("zebra_day")
         return configured
 
     def _managed_services(self) -> list[dict[str, Any]]:
-        base_url = str(os.environ.get("ZEBRA_DAY_BASE_URL", "https://localhost:8118")).strip()
-        auth_mode = str(os.environ.get("ZEBRA_DAY_AUTH_MODE", "none")).strip() or "none"
-        auth_value = "none" if auth_mode == "none" else "bearer_token"
-        endpoints = [
-            {"path": "/healthz", "auth": "none", "kind": "liveness"},
-            {"path": "/readyz", "auth": "none", "kind": "readiness"},
-            {"path": "/health", "auth": auth_value, "kind": "summary"},
-            {"path": "/obs_services", "auth": auth_value, "kind": "discovery"},
-            {"path": "/api_health", "auth": auth_value, "kind": "api_rollup"},
-            {"path": "/endpoint_health", "auth": auth_value, "kind": "endpoint_rollup"},
-            {"path": "/auth_health", "auth": auth_value, "kind": "auth"},
-        ]
-        if auth_mode != "none":
-            endpoints.append({"path": "/my_health", "auth": "authenticated_self", "kind": "self"})
-        return [
-            {
-                "service_id": "zebra_printer",
-                "display_name": "Zebra Printer",
-                "implementation": "zebra_day",
-                "parent_service": "bloom",
-                "base_url": base_url.rstrip("/"),
-                "description": "Zebra printer fleet management and ZPL label printing",
-                "plane": "app-support",
-                "endpoints": endpoints,
-                "auth_mode": auth_mode,
-                "discovery_source": "bloom_managed_service",
-            }
-        ]
+        return []
 
     def _build_obs_services_snapshot(self) -> dict[str, Any]:
         return {

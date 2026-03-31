@@ -142,17 +142,11 @@ class TestMainGUIEndpoints:
         assert response.status_code == 200
         assert "Preferences saved." in response.text
 
-    def test_admin_start_zebra_service_redirects_on_success(self, client):
-        """Test zebra start action launches command and redirects with success flag."""
-        with patch("bloom_lims.gui.routes.operations._zebra_command_status", return_value=("stopped", "stopped")):
-            with patch(
-                "bloom_lims.gui.routes.operations._try_start_zebra_background",
-                return_value=("started", "ok"),
-            ):
-                response = client.post("/admin/zebra/start", follow_redirects=False)
-
-        assert response.status_code == 303
-        assert response.headers.get("location") == "/admin?zebra_started=1"
+    def test_admin_does_not_expose_zebra_start_control(self, client):
+        """Admin page does not manage zebra_day process lifecycle anymore."""
+        response = client.get("/admin")
+        assert response.status_code == 200
+        assert "Start Zebra Service" not in response.text
 
     def test_update_preference_persists_display_timezone(self, client):
         """Display timezone preference writes through shared preference persistence."""
@@ -694,7 +688,6 @@ class TestAdminDependencyInfo:
         content = response.text
         assert "zebra_day" in content
         assert "Zebra printer" in content.lower() or "printer" in content.lower()
-        assert "https://localhost:8118/" in content
 
     def test_admin_shows_carrier_tracking(self, client):
         """Test admin page shows carrier tracking integration."""

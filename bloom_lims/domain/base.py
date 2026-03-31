@@ -12,7 +12,6 @@ import logging
 import os
 import re
 
-import zebra_day.print_mgr as zdpm
 from daylily_tapdb import MissingSeededTemplateError
 from sqlalchemy import (
     DateTime,
@@ -51,8 +50,12 @@ class BloomObj:
         self.logger = logging.getLogger(__name__ + ".BloomObj")
         self.logger.debug("Instantiating BloomObj")
 
-        # Zebra Day Print Manager
-        self.zpld = zdpm.zpl()
+        self.printer_labs = []
+        self.selected_lab = ""
+        self.site_printers = []
+        self.printer_options = []
+        self.zpl_label_styles = []
+        self.selected_label_style = "tube_2inX1in"
         if cfg_printers:
             self._config_printers()
 
@@ -338,47 +341,31 @@ class BloomObj:
             return [data]
         return [dict(data)]
 
-    def _rebuild_printer_json(self, lab="BLOOM"):
-        self.zpld.probe_zebra_printers_add_to_printers_json(lab=lab)
-        self.zpld.save_printer_json(self.zpld.printers_filename.split("zebra_day")[-1])
-        self._config_printers()
-
     def _config_printers(self):
-        if len(self.zpld.printers["labs"].keys()) == 0:
-            self.logger.warning(
-                "No printers found, attempting to rebuild printer json\n\n"
-            )
-            self.logger.warning(
-                'This may take a few minutes, lab code will be set to "BLOOM" ... please sit tight...\n\n'
-            )
-            self._rebuild_printer_json()
+        from bloom_lims.integrations.zebra_day import ZebraDayService
 
-        self.printer_labs = self.zpld.printers["labs"].keys()
-        self.selected_lab = sorted(self.printer_labs)[0]
-        self.site_printers = self.zpld.printers["labs"][self.selected_lab].keys()
-        _zpl_label_styles = []
-        for zpl_f in os.listdir(
-            os.path.dirname(self.zpld.printers_filename) + "/label_styles/"
-        ):
-            if zpl_f.endswith(".zpl"):
-                _zpl_label_styles.append(zpl_f.removesuffix(".zpl"))
-        self.zpl_label_styles = sorted(_zpl_label_styles)
-        self.selected_label_style = "tube_2inX1in"
+        printer_info = ZebraDayService().build_printer_preferences()
+        self.printer_labs = list(printer_info.get("print_lab", []))
+        self.selected_lab = str(printer_info.get("selected_lab", "") or "")
+        self.printer_options = list(printer_info.get("printer_options", []))
+        self.site_printers = [item["value"] for item in self.printer_options]
+        self.zpl_label_styles = list(printer_info.get("label_zpl_style", []))
+        self.selected_label_style = (
+            self.zpl_label_styles[0] if self.zpl_label_styles else "tube_2inX1in"
+        )
 
     def set_printers_lab(self, lab):
         self.selected_lab = lab
 
     def get_lab_printers(self, lab):
-        self.selected_lab = lab
-        try:
-            self.site_printers = self.zpld.printers["labs"][self.selected_lab].keys()
-        except Exception as e:
-            self.logger.error(f"Error getting printers for lab {lab}")
-            self.logger.error(e)
-            self.logger.error(
-                "\n\n\nAttempting to rebuild printer json !!! THIS WILL TAKE TIME !!!\n\n\n"
-            )
-            self._rebuild_printer_json()
+        from bloom_lims.integrations.zebra_day import ZebraDayService
+
+        printer_info = ZebraDayService().build_printer_preferences(lab)
+        self.selected_lab = str(printer_info.get("selected_lab", "") or "")
+        self.printer_labs = list(printer_info.get("print_lab", []))
+        self.printer_options = list(printer_info.get("printer_options", []))
+        self.site_printers = [item["value"] for item in self.printer_options]
+        self.zpl_label_styles = list(printer_info.get("label_zpl_style", []))
 
     def print_label(
         self,
@@ -394,10 +381,12 @@ class BloomObj:
         alt_f="",
         print_n=1,
     ):
-        self.zpld.print_zpl(
+        from bloom_lims.integrations.zebra_day import ZebraDayService
+
+        ZebraDayService().submit_print_job(
             lab=lab,
-            printer_name=printer_name,
-            uid_barcode=euid,
+            printer_id=printer_name,
+            euid=euid,
             alt_a=alt_a,
             alt_b=alt_b,
             alt_c=alt_c,
@@ -405,7 +394,6 @@ class BloomObj:
             alt_e=alt_e,
             alt_f=alt_f,
             label_zpl_style=label_zpl_style,
-            client_ip="pkg",
             print_n=print_n,
         )
 
@@ -1603,7 +1591,9 @@ class BloomObj:
 
         lab = action_ds.get("lab", "")
         printer_name = action_ds.get("printer_name", "")
-        label_zpl_style = action_ds.get("label_style", "")
+        label_zpl_style = action_ds.get("label_zpl_style", "") or action_ds.get(
+            "label_style", ""
+        )
         alt_a = (
             action_ds.get("alt_a", "")
             if not PGLOBAL
