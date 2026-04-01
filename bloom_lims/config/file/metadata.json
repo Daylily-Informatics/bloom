@@ -1,8 +1,8 @@
 {
   "euid_prefixes": {
-    "default": "BFL",
-    "file": "BFL",
-    "file_set": "BFL",
-    "shared_ref": "BFL"
+    "default": "BFX",
+    "file": "BFX",
+    "file_set": "BFX",
+    "shared_ref": "BFX"
   }
 }

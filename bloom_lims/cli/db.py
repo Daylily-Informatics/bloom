@@ -28,16 +28,31 @@ from bloom_lims.config import (
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_DEFAULT_AUDIT_LOG_EUID_PREFIX = "BBL"
+_DEFAULT_AUDIT_LOG_EUID_PREFIX = "BGX"
+_DEFAULT_TAPDB_CLIENT_ID = "bloom"
+_DEFAULT_TAPDB_DATABASE_NAME = "bloom"
+_DEFAULT_TAPDB_EUID_CLIENT_CODE = "B"
 
 
 def _bloom_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _is_dayhoff_artifact_path(path: Path) -> bool:
+    return ".dayhoff/local" in str(path)
+
+
 def _resolve_tapdb_schema_source() -> Path | None:
     """Locate tapdb_schema.sql from installed package or local dev checkouts."""
     candidates: list[Path] = []
+
+    root = _bloom_root()
+    candidates.extend(
+        [
+            root.parent / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
+            root.parent / "daylily" / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
+        ]
+    )
 
     try:
         tapdb_pkg = importlib.import_module("daylily_tapdb")
@@ -51,16 +66,8 @@ def _resolve_tapdb_schema_source() -> Path | None:
     except Exception:
         pass
 
-    root = _bloom_root()
-    candidates.extend(
-        [
-            root.parent / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-            root.parent / "daylily" / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-        ]
-    )
-
     for candidate in candidates:
-        if candidate.exists():
+        if candidate.exists() and not _is_dayhoff_artifact_path(candidate):
             return candidate
     return None
 
@@ -182,6 +189,12 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
     args = [
         "config",
         "init",
+        "--client-id",
+        _DEFAULT_TAPDB_CLIENT_ID,
+        "--database-name",
+        _DEFAULT_TAPDB_DATABASE_NAME,
+        "--euid-client-code",
+        _DEFAULT_TAPDB_EUID_CLIENT_CODE,
         "--env",
         env_name,
     ]
