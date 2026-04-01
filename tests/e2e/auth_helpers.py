@@ -15,7 +15,7 @@ def perform_login(page: Page, *, base_url: str, email: str, password: str) -> No
 
 
 def perform_logout(page: Page, *, base_url: str) -> None:
-    page.goto(f"{base_url}/logout")
+    page.goto(f"{base_url}/auth/logout")
     page.wait_for_load_state("domcontentloaded")
 
 

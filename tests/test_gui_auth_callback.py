@@ -278,7 +278,7 @@ def test_multiple_gui_clients_keep_distinct_sessions(monkeypatch: pytest.MonkeyP
             assert home.status_code == 200
             assert expected_email in home.text
 
-        logout = alice_1.get("/logout", follow_redirects=False)
+        logout = alice_1.get("/auth/logout", follow_redirects=False)
         assert logout.status_code == 303
 
         alice_2_home = alice_2.get("/user_home")

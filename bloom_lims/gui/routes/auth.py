@@ -23,10 +23,19 @@ class SessionBootstrapError(RuntimeError):
     """Raised when Bloom cannot establish the post-login session context."""
 
 
+def _next_path(raw_value: str | None) -> str:
+    value = str(raw_value or "").strip()
+    return value if value.startswith("/") else "/"
+
+
 @router.get("/login", include_in_schema=False)
-async def get_login_page(request: Request):
+async def get_login_page(request: Request, next: str = "/"):
     user_data = request.session.get("user_data", {})
     auth_error = request.query_params.get("error")
+    next_path = _next_path(next)
+
+    if user_data.get("email") or user_data.get("user_id") or user_data.get("sub"):
+        return RedirectResponse(url=next_path, status_code=303)
 
     if os.environ.get("BLOOM_OAUTH", "yes") == "no":
         cognito_login_url = "#auth-disabled"
@@ -42,10 +51,21 @@ async def get_login_page(request: Request):
         "request": request,
         "udat": user_data,
         "cognito_login_url": cognito_login_url,
+        "auth_primary_href": f"/auth/login?next={quote(next_path, safe='/')}",
         "auth_error": auth_error,
         "version": "1.0.0",
     }
     return HTMLResponse(content=template.render(context))
+
+
+@router.get("/auth/login", include_in_schema=False)
+async def auth_login(request: Request, next: str = "/"):
+    try:
+        request.session["bloom_post_auth_redirect"] = _next_path(next)
+        cognito = _get_request_cognito_auth(request)
+        return RedirectResponse(url=cognito.config.authorize_url, status_code=303)
+    except CognitoConfigurationError as exc:
+        raise MissingCognitoEnvVarsException(str(exc)) from exc
 
 
 def _login_error_redirect(error_message: str) -> RedirectResponse:
@@ -176,8 +196,8 @@ async def _complete_cognito_login(
         }
     )
     request.session["user_data"] = user_data
-
-    return RedirectResponse(url="/", status_code=303)
+    redirect_to = _next_path(request.session.pop("bloom_post_auth_redirect", "/"))
+    return RedirectResponse(url=redirect_to, status_code=303)
 
 
 @router.get("/oauth_callback")
@@ -289,6 +309,20 @@ async def auth_callback(request: Request):
     return await oauth_callback(request)
 
 
+@router.get("/auth/error", include_in_schema=False)
+async def auth_error(request: Request, reason: str = "authentication_failed", next: str = "/"):
+    template = templates.get_template("modern/login.html")
+    context = {
+        "request": request,
+        "udat": request.session.get("user_data", {}),
+        "cognito_login_url": "#auth-error",
+        "auth_primary_href": f"/auth/login?next={quote(_next_path(next), safe='/')}",
+        "auth_error": reason,
+        "version": "1.0.0",
+    }
+    return HTMLResponse(content=template.render(context), status_code=403)
+
+
 @router.post("/login", include_in_schema=False)
 async def login(_: Request, __: Response, email: str = Form(None)):
     if not email:
@@ -303,12 +337,11 @@ async def login(_: Request, __: Response, email: str = Form(None)):
     )
 
 
-@router.get("/logout")
-async def logout(request: Request, response: Response):
+async def _logout_response(request: Request, response: Response):
     try:
         logging.warning("Logging out user: clearing session data")
 
-        cognito_logout_url = "/"
+        cognito_logout_url = "/login"
         try:
             cognito_logout_url = _get_request_cognito_auth(request).config.logout_url
         except CognitoConfigurationError as exc:
@@ -326,3 +359,18 @@ async def logout(request: Request, response: Response):
     logout_response = RedirectResponse(url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER)
     logout_response.delete_cookie("session", path="/")
     return logout_response
+
+
+@router.get("/auth/logout", include_in_schema=False)
+async def auth_logout_get(request: Request, response: Response):
+    return await _logout_response(request, response)
+
+
+@router.post("/auth/logout", include_in_schema=False)
+async def auth_logout_post(request: Request, response: Response):
+    return await _logout_response(request, response)
+
+
+@router.get("/logout")
+async def logout(request: Request, response: Response):
+    return await _logout_response(request, response)

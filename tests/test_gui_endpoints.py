@@ -47,7 +47,7 @@ class TestPublicEndpoints:
         """Test login page returns HTML."""
         response = client.get("/login")
         assert response.status_code == 200
-        assert "#auth-disabled" in response.text
+        assert 'href="/auth/login' in response.text
 
     def test_help_page(self, client):
         """Test help page returns HTML."""
@@ -889,7 +889,7 @@ class TestLoginLogoutButtonDisplay:
 
         # The dashboard passes 'udat' to the template
         # Should show logout, not login
-        assert 'href="/logout"' in content
+        assert 'href="/auth/logout"' in content
         assert 'fa-sign-out-alt' in content  # Logout icon
 
     def test_create_object_shows_logout_with_user(self, client):
@@ -900,7 +900,7 @@ class TestLoginLogoutButtonDisplay:
 
         # The create_object route passes both 'user' and 'user_data'
         # Should show logout, not login
-        assert 'href="/logout"' in content
+        assert 'href="/auth/logout"' in content
 
     def test_search_page_shows_logout(self, client):
         """Test search page shows logout button for authenticated users."""
@@ -909,7 +909,7 @@ class TestLoginLogoutButtonDisplay:
         content = response.text
 
         # Should show logout button
-        assert 'href="/logout"' in content
+        assert 'href="/auth/logout"' in content
 
     def test_admin_page_shows_logout(self, client):
         """Test admin page shows logout button for authenticated users."""
@@ -918,7 +918,7 @@ class TestLoginLogoutButtonDisplay:
         content = response.text
 
         # Should show logout button
-        assert 'href="/logout"' in content
+        assert 'href="/auth/logout"' in content
 
     def test_assays_page_shows_logout(self, client):
         """Unmounted assays page no longer renders authenticated HTML."""
@@ -1315,7 +1315,7 @@ class TestLogoutEndpoint:
 
     def test_logout_redirects(self, client):
         """Test logout endpoint redirects."""
-        response = client.get("/logout", follow_redirects=False)
+        response = client.get("/auth/logout", follow_redirects=False)
         # Should redirect to login or home
         assert response.status_code in [200, 302, 303, 307]
 

@@ -89,11 +89,11 @@
         <div class="header-actions">
             {% if current_user and current_user.email %}
             <a href="/user_home" class="text-sm text-muted">{{ current_user.email }}</a>
-            <a href="/logout" class="btn btn-outline btn-sm">
+            <a href="/auth/logout" class="btn btn-outline btn-sm">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </a>
             {% else %}
-            <a href="/login" class="btn btn-primary btn-sm">
+            <a href="/auth/login" class="btn btn-primary btn-sm">
                 <i class="fas fa-sign-in-alt"></i> Login
             </a>
             {% endif %}

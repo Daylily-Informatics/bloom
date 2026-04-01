@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - BLOOM LIMS</title>
+  <title>{{ 'Access Review' if auth_error else 'Login' }} - BLOOM LIMS</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   
   <!-- Fonts -->
@@ -127,32 +127,39 @@
   <div class="bloom-stripe-bar"></div>
   
   <div class="login-page">
-    <div class="login-container">
-      <div class="login-header">
-        <div class="login-logo">
-          <i class="fas fa-spa"></i>
-          BLOOM
+    <div class="login-container" style="max-width: 980px;">
+      <div class="login-card" style="display: grid; gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="login-header" style="margin-bottom: 0; text-align: left;">
+          <div class="login-logo">
+            <i class="fas fa-spa"></i>
+            BLOOM
+          </div>
+          <p class="login-subtitle">{{ "Access Review" if auth_error else "Authentication Required" }}</p>
+          <h1 style="margin: 0.75rem 0 0; font-size: 2.6rem;">{{ "This account could not complete sign-in." if auth_error else "BLOOM Laboratory Access" }}</h1>
+          <p class="login-subtitle" style="margin-top: 0.9rem; max-width: 52ch;">
+            Laboratory information management access is provisioned per deployment and user role.
+          </p>
         </div>
-        <p class="login-subtitle">Laboratory Information Management System</p>
+        <div class="login-card" style="margin: 0; background: rgba(17, 24, 39, 0.65); border: 1px solid rgba(148, 163, 184, 0.2);">
+          {% if auth_error %}
+          <div class="alert alert-error" style="margin-bottom: 1rem;">
+            <i class="fas fa-triangle-exclamation"></i>
+            {{ auth_error }}
+          </div>
+          {% endif %}
+          <p class="login-subtitle" style="text-transform: uppercase; letter-spacing: 0.12em;">
+            {{ "Sign-in was blocked" if auth_error else "Access" }}
+          </p>
+          <h2 style="margin: 0.4rem 0 0.75rem; font-size: 1.8rem;">{{ "Return to Sign In" if auth_error else "Sign in with AWS Cognito" }}</h2>
+          <p class="login-info" style="margin-top: 0; text-align: left;">
+            <i class="fas fa-lock"></i> Secure authentication via AWS Cognito
+          </p>
+          <a href="{{ auth_primary_href | default('/auth/login') }}" class="btn btn-primary login-btn">
+            <i class="fas fa-sign-in-alt"></i>
+            {{ "Return to Sign In" if auth_error else "Sign in with AWS Cognito" }}
+          </a>
+        </div>
       </div>
-      
-      <div class="login-card">
-        {% if auth_error %}
-        <div class="alert alert-error" style="margin-bottom: 1rem;">
-          <i class="fas fa-triangle-exclamation"></i>
-          Authentication failed: {{ auth_error }}
-        </div>
-        {% endif %}
-        <a href="{{ cognito_login_url }}" class="btn btn-primary login-btn">
-          <i class="fas fa-sign-in-alt"></i>
-          Sign in with AWS Cognito
-        </a>
-        
-        <div class="login-info">
-          <p><i class="fas fa-lock"></i> Secure authentication via AWS Cognito</p>
-        </div>
-      </div>
-      
       <div class="login-footer">
         <p>BLOOM LIMS v{{ version | default('1.0.0') }}</p>
       </div>
