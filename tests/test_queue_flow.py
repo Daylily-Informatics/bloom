@@ -272,10 +272,10 @@ def test_beta_queue_flow_end_to_end():
         library_container_euid = library_body["library_container_euid"]
         library_plate_euid = library_body["library_plate_euid"]
         library_well_euid = library_body["library_well_euid"]
-        assert library_material_euid.startswith("MX-")
-        assert library_container_euid.startswith("CX-")
-        assert library_plate_euid.startswith("CX-")
-        assert library_well_euid.startswith("CWX-")
+        assert library_material_euid.startswith("BCT-")
+        assert library_container_euid.startswith("BCN-")
+        assert library_plate_euid.startswith("BCN-")
+        assert library_well_euid.startswith("BCN-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",

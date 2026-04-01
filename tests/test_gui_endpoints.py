@@ -356,7 +356,7 @@ class TestDAGEndpoints:
         assert "text/html" in response.headers["content-type"]
 
     def test_dindex2_bootstraps_external_merge_ref(self, client):
-        response = client.get("/dindex2?start_euid=CX-1&merge_ref=2")
+        response = client.get("/dindex2?start_euid=BCN-1&merge_ref=2")
         assert response.status_code == 200
         assert '"defaultMergeRef": 2' in response.text
 

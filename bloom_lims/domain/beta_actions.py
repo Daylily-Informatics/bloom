@@ -16,7 +16,7 @@ from bloom_lims.tapdb_adapter import (
 )
 
 BETA_ACTION_GROUP = "beta_lab"
-BETA_ACTION_TEMPLATE_PREFIX = "BXA"
+BETA_ACTION_TEMPLATE_PREFIX = "BAC"
 
 _ACTION_TEMPLATE_DEFINITIONS: dict[str, dict[str, Any]] = {
     "register_accepted_material": {

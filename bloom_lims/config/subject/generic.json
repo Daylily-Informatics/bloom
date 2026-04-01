@@ -33,7 +33,7 @@
           "type": "string"
         }
       },
-      "description": "Decision scope for an accession (ACC / TRX / intake bundle).",
+      "description": "Decision scope for an accession (ACC / BTR / intake bundle).",
       "expected_inputs": [],
       "expected_outputs": [],
       "instantiation_layouts": [],

@@ -572,7 +572,7 @@ class TestGraphDataValidation:
         euid_pattern = re.compile(r'^[A-Z]{2,3}[1-9][0-9]*$')
 
         valid_euids = ["CX1", "CX123", "WX1000", "MRX42"]
-        invalid_euids = ["CX01", "cx1", "C1", "CX-123"]
+        invalid_euids = ["CX01", "cx1", "C1", "BCN-123"]
 
         for euid in valid_euids:
             assert euid_pattern.match(euid), f"{euid} should be valid"
@@ -748,7 +748,7 @@ class TestBatchOperations:
     def test_batch_filter_performance(self):
         """Test that batch filtering is more efficient."""
         # Simulate node filtering
-        nodes = [{"id": f"CX{i}", "edges": i % 5} for i in range(100)]
+        nodes = [{"id": f"BCN{i}", "edges": i % 5} for i in range(100)]
         threshold = 2
 
         # Batch approach: filter once, apply to all

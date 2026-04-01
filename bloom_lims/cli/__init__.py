@@ -38,6 +38,7 @@ def _bloom_info_hook() -> list[tuple[str, str]]:
         ("Environment", settings.environment),
         ("TapDB Env", ctx.env),
         ("TapDB Namespace", ctx.database_name),
+        ("TapDB Config", ctx.config_path or "(derived)"),
         ("AWS Profile", os.environ.get("AWS_PROFILE", ctx.aws_profile)),
         ("AWS Region", os.environ.get("AWS_REGION", ctx.aws_region)),
         ("Conda Env", os.environ.get("CONDA_DEFAULT_ENV", "(not set)")),

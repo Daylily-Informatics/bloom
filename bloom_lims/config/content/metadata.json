@@ -1,7 +1,7 @@
 {
   "euid_prefixes": {
-    "default": "MX",
-    "reagent": "MRX",
-    "control": "MCX"
+    "default": "BCT",
+    "reagent": "BCT",
+    "control": "BCT"
   }
 }

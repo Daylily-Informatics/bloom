@@ -642,7 +642,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
         assert library_prep.status_code == 200, library_prep.text
         lib_output_euid = library_prep.json()["library_prep_output_euid"]
         library_material_euid = library_prep.json()["library_material_euid"]
-        assert library_material_euid.startswith("MX-")
+        assert library_material_euid.startswith("BCT-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",

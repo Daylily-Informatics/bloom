@@ -25,7 +25,7 @@ def validate_euid(value: str) -> str:
     Bloom EUIDs are TapDB/Meridian identifiers, validated using TapDB's
     reference implementation (`daylily_tapdb.euid.validate_euid`).
 
-    Examples: GT-2HP, GX-8J, CX-35, AY-46
+    Examples: GT-2HP, GX-8J, BCN-35, BWF-46
 
     Args:
         value: The EUID string to validate

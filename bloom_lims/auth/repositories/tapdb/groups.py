@@ -27,9 +27,9 @@ GROUP_TEMPLATE_CODE = "bloom/auth/user-group/1.0/"
 GROUP_REVISION_TEMPLATE_CODE = "bloom/auth/user-group-revision/1.0/"
 GROUP_MEMBERSHIP_TEMPLATE_CODE = "bloom/auth/user-group-membership/1.0/"
 
-GROUP_PREFIX = "BGP"
-GROUP_REVISION_PREFIX = "BGR"
-GROUP_MEMBERSHIP_PREFIX = "BGM"
+GROUP_PREFIX = "BBL"
+GROUP_REVISION_PREFIX = "BBL"
+GROUP_MEMBERSHIP_PREFIX = "BBL"
 
 
 def _parse_template_code(template_code: str) -> tuple[str, str, str, str]:

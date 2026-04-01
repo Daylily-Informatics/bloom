@@ -114,10 +114,10 @@ def test_atlas_client_container_trf_context_sends_tenant_header(monkeypatch):
 
     monkeypatch.setattr(atlas_client_mod.requests, "get", fake_get)
     client = AtlasClient(base_url="https://atlas.example.org", token="tok")
-    payload = client.get_container_trf_context("CX-55", "00000000-0000-0000-0000-000000000001")
+    payload = client.get_container_trf_context("BCN-55", "00000000-0000-0000-0000-000000000001")
 
     assert payload["tenant_id"] == "tid"
-    assert captured["url"].endswith("/api/integrations/bloom/v1/lookups/containers/CX-55/trf-context")
+    assert captured["url"].endswith("/api/integrations/bloom/v1/lookups/containers/BCN-55/trf-context")
     assert captured["headers"]["X-Atlas-Tenant-Id"] == "00000000-0000-0000-0000-000000000001"
 
 

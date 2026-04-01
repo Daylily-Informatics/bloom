@@ -5,55 +5,18 @@
 -- unique identifiers with BLOOM-specific prefixes.
 -- Each sequence corresponds to an euid_prefix defined in bloom_lims/config/*/metadata.json.
 --
--- Format: <prefix><sequence_number> e.g., CX1, CX2, ...
+-- Format: <prefix><sequence_number> e.g., BCN1, BCN2, ...
 
--- Container prefixes
-CREATE SEQUENCE IF NOT EXISTS cx_instance_seq;   -- default container
-CREATE SEQUENCE IF NOT EXISTS cwx_instance_seq;  -- well
-
--- Content prefixes
-CREATE SEQUENCE IF NOT EXISTS mx_instance_seq;   -- default content
-CREATE SEQUENCE IF NOT EXISTS mrx_instance_seq;  -- reagent
-CREATE SEQUENCE IF NOT EXISTS mcx_instance_seq;  -- control
-
--- Equipment prefixes
-CREATE SEQUENCE IF NOT EXISTS em_instance_seq;   -- default equipment (EM = Equipment/Machine)
-CREATE SEQUENCE IF NOT EXISTS ex_instance_seq;   -- legacy equipment prefix (deprecated)
-
--- Workflow prefixes
-CREATE SEQUENCE IF NOT EXISTS wx_instance_seq;   -- default workflow
-CREATE SEQUENCE IF NOT EXISTS ay_instance_seq;   -- assay
-
--- Workflow Step prefixes
-CREATE SEQUENCE IF NOT EXISTS wsx_instance_seq;  -- default workflow step
-CREATE SEQUENCE IF NOT EXISTS qx_instance_seq;   -- queue
-
--- Data prefixes
-CREATE SEQUENCE IF NOT EXISTS dat_instance_seq;  -- default data (DAT prefix from metadata.json)
-CREATE SEQUENCE IF NOT EXISTS dx_instance_seq;   -- legacy data prefix (deprecated)
-
--- Test Requisition prefixes
-CREATE SEQUENCE IF NOT EXISTS trx_instance_seq;  -- default test requisition
-
--- Actor prefixes
-CREATE SEQUENCE IF NOT EXISTS ax_instance_seq;   -- default actor
-
--- Action prefixes
-CREATE SEQUENCE IF NOT EXISTS xx_instance_seq;   -- default action
-
--- File prefixes
-CREATE SEQUENCE IF NOT EXISTS fg_instance_seq;   -- default file (generic)
-CREATE SEQUENCE IF NOT EXISTS fn_instance_seq;   -- file (FN prefix)
-CREATE SEQUENCE IF NOT EXISTS fs_instance_seq;   -- file_set
-CREATE SEQUENCE IF NOT EXISTS fx_instance_seq;   -- shared_ref
-
--- Subject prefixes
-CREATE SEQUENCE IF NOT EXISTS sx_instance_seq;   -- default subject
-
--- Health Event prefixes
-CREATE SEQUENCE IF NOT EXISTS hev_instance_seq;  -- default health event (HEV prefix from metadata.json)
-CREATE SEQUENCE IF NOT EXISTS ev_instance_seq;   -- legacy health event prefix (deprecated)
-
--- Generic prefixes
-CREATE SEQUENCE IF NOT EXISTS gx_instance_seq;   -- default generic
-
+CREATE SEQUENCE IF NOT EXISTS bac_instance_seq;  -- action
+CREATE SEQUENCE IF NOT EXISTS bar_instance_seq;  -- actor
+CREATE SEQUENCE IF NOT EXISTS bbl_instance_seq;  -- bloom
+CREATE SEQUENCE IF NOT EXISTS bcn_instance_seq;  -- container
+CREATE SEQUENCE IF NOT EXISTS bct_instance_seq;  -- content
+CREATE SEQUENCE IF NOT EXISTS bdt_instance_seq;  -- data
+CREATE SEQUENCE IF NOT EXISTS beq_instance_seq;  -- equipment
+CREATE SEQUENCE IF NOT EXISTS bfl_instance_seq;  -- file
+CREATE SEQUENCE IF NOT EXISTS bhe_instance_seq;  -- health_event
+CREATE SEQUENCE IF NOT EXISTS bsj_instance_seq;  -- subject
+CREATE SEQUENCE IF NOT EXISTS btr_instance_seq;  -- test_requisition
+CREATE SEQUENCE IF NOT EXISTS bwf_instance_seq;  -- workflow
+CREATE SEQUENCE IF NOT EXISTS bws_instance_seq;  -- workflow_step

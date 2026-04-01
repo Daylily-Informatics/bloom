@@ -100,13 +100,13 @@ def test_list_scripts_executes_handler(client: TestClient) -> None:
 
 
 def test_legacy_graph_alias_routes_are_removed(client: TestClient) -> None:
-    resp = client.get("/dag", params={"start_euid": "CX-1"}, follow_redirects=False)
+    resp = client.get("/dag", params={"start_euid": "BCN-1"}, follow_redirects=False)
     assert resp.status_code == 404
 
     resp = client.get("/dag_explorer", follow_redirects=False)
     assert resp.status_code == 404
 
-    resp = client.get("/graph", params={"start_euid": "CX-1"}, follow_redirects=False)
+    resp = client.get("/graph", params={"start_euid": "BCN-1"}, follow_redirects=False)
     assert resp.status_code == 404
 
 
@@ -142,7 +142,7 @@ def test_plate_routes_with_and_without_valid_plate(client: TestClient) -> None:
     _warm_session(client)
 
     # plate_carosel2 is retired from modern GUI.
-    resp = client.get("/plate_carosel2", params={"plate_euid": "CX-NOT-REAL"})
+    resp = client.get("/plate_carosel2", params={"plate_euid": "BCN-NOT-REAL"})
     assert resp.status_code == 404
 
     # plate_visualization: create a real plate with wells
@@ -168,12 +168,12 @@ def test_queue_details_renders(client: TestClient) -> None:
 def test_legacy_uuid_alias_routes_are_removed(client: TestClient) -> None:
     _warm_session(client)
     details_resp = client.get(
-        "/uuid_details", params={"euid": "CX-REMOVED"}, follow_redirects=False
+        "/uuid_details", params={"euid": "BCN-REMOVED"}, follow_redirects=False
     )
     assert details_resp.status_code == 404
 
     restore_resp = client.get(
-        "/un_delete_by_uuid", params={"euid": "CX-REMOVED"}, follow_redirects=False
+        "/un_delete_by_uuid", params={"euid": "BCN-REMOVED"}, follow_redirects=False
     )
     assert restore_resp.status_code == 404
 
@@ -224,7 +224,7 @@ def test_file_set_urls_and_admin_template_routes_are_removed(
 ) -> None:
     _warm_session(client)
     # Legacy file set GUI routes are removed in Dewey hard-cut mode.
-    resp = client.get("/file_set_urls", params={"fs_euid": "FS-NOT-REAL"})
+    resp = client.get("/file_set_urls", params={"fs_euid": "BFL-NOT-REAL"})
     assert resp.status_code == 404
 
     template_euid = _get_any_template_euid(bdb)
@@ -237,11 +237,11 @@ def test_query_by_euids_and_removed_file_flows(client: TestClient) -> None:
     _warm_session(client)
     # The query route is still live; posting bad input should execute the handler
     # and surface its rendered error page rather than a validation-only 422.
-    resp = client.post("/query_by_euids", data={"file_euids": "FX-1"})
+    resp = client.post("/query_by_euids", data={"file_euids": "BFL-1"})
     assert resp.status_code == 500
     assert "text/html" in resp.headers.get("content-type", "")
     assert "Error:" in resp.text
-    assert "FX-1" in resp.text
+    assert "BFL-1" in resp.text
 
     # Legacy file GUI handlers are removed in Dewey hard-cut mode.
     resp = client.post(
@@ -257,7 +257,7 @@ def test_query_by_euids_and_removed_file_flows(client: TestClient) -> None:
     resp = client.post(
         "/download_file",
         data={
-            "euid": "FX-1",
+            "euid": "BFL-1",
             "download_type": "flat",
             "create_metadata_file": "no",
             "ret_json": "1",

@@ -2,7 +2,7 @@
 BLOOM LIMS Configuration Management.
 
 Configuration precedence (highest to lowest):
-1. Environment variables (BLOOM_* prefix and TAPDB_* runtime context)
+1. Environment variables (BLOOM_* prefix)
 2. User config file (~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml)
 3. Template defaults
 """
@@ -207,19 +207,19 @@ class TapDBSettings(BaseModel):
     )
     client_id: str = Field(
         default="bloom",
-        description="TapDB client namespace key (TAPDB_CLIENT_ID)",
+        description="TapDB client namespace key for Bloom runtime config",
     )
     database_name: str = Field(
         default="bloom",
-        description="TapDB database namespace key (TAPDB_DATABASE_NAME)",
+        description="TapDB database namespace key for Bloom runtime config",
     )
     strict_namespace: bool = Field(
         default=True,
-        description="Enable strict namespace mode (TAPDB_STRICT_NAMESPACE=1 requires v2 namespaced config)",
+        description="Enable strict namespace mode for namespaced TapDB config",
     )
     config_path: str = Field(
         default="",
-        description="Optional explicit TAPDB_CONFIG_PATH override",
+        description="Optional explicit TapDB config path override",
     )
     local_pg_port: int = Field(
         default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
@@ -739,70 +739,31 @@ def get_settings() -> BloomSettings:
 def get_tapdb_runtime_context(
     settings: Optional[BloomSettings] = None,
 ) -> TapDBRuntimeContext:
-    """Resolve active TapDB runtime context from env + config."""
+    """Resolve active TapDB runtime context from Bloom config."""
     settings = settings or get_settings()
-    raw_strict = os.environ.get("TAPDB_STRICT_NAMESPACE")
-    strict_namespace = settings.tapdb.strict_namespace
-    if raw_strict is not None and str(raw_strict).strip():
-        strict_namespace = str(raw_strict).strip().lower() in {"1", "true", "yes", "on"}
     return TapDBRuntimeContext(
-        env=(os.environ.get("TAPDB_ENV") or settings.tapdb.env).strip().lower(),
-        client_id=(
-            os.environ.get("TAPDB_CLIENT_ID") or settings.tapdb.client_id
-        ).strip(),
-        database_name=(
-            os.environ.get("TAPDB_DATABASE_NAME") or settings.tapdb.database_name
-        ).strip(),
-        strict_namespace=strict_namespace,
+        env=settings.tapdb.env.strip().lower(),
+        client_id=settings.tapdb.client_id.strip(),
+        database_name=settings.tapdb.database_name.strip(),
+        strict_namespace=settings.tapdb.strict_namespace,
         config_path=(
-            os.environ.get("TAPDB_CONFIG_PATH")
-            or settings.tapdb.config_path
+            settings.tapdb.config_path
             or _deployment_scoped_tapdb_config_path(
-                (os.environ.get("TAPDB_CLIENT_ID") or settings.tapdb.client_id).strip(),
-                (os.environ.get("TAPDB_DATABASE_NAME") or settings.tapdb.database_name).strip(),
+                settings.tapdb.client_id.strip(),
+                settings.tapdb.database_name.strip(),
             )
         ).strip(),
-        aws_profile=(
-            os.environ.get("AWS_PROFILE") or settings.aws.profile or "lsmc"
-        ).strip(),
-        aws_region=(
-            os.environ.get("AWS_REGION")
-            or os.environ.get("AWS_DEFAULT_REGION")
-            or settings.aws.region
-            or "us-west-2"
-        ).strip(),
+        aws_profile=(settings.aws.profile or "lsmc").strip(),
+        aws_region=(settings.aws.region or "us-west-2").strip(),
     )
 
 
 def apply_runtime_environment(
     settings: Optional[BloomSettings] = None,
 ) -> TapDBRuntimeContext:
-    """Apply normalized TAPDB/AWS runtime environment variables."""
+    """Return normalized Bloom runtime context without mutating TAPDB env."""
     settings = settings or get_settings()
     ctx = get_tapdb_runtime_context(settings=settings)
-
-    os.environ.setdefault("TAPDB_ENV", ctx.env)
-    os.environ.setdefault("TAPDB_CLIENT_ID", ctx.client_id)
-    os.environ.setdefault("TAPDB_DATABASE_NAME", ctx.database_name)
-    os.environ.setdefault(
-        "TAPDB_STRICT_NAMESPACE", "1" if ctx.strict_namespace else "0"
-    )
-    if ctx.config_path:
-        os.environ.setdefault("TAPDB_CONFIG_PATH", ctx.config_path)
-
-    # Bloom-local TapDB dev/test should default to a non-standard port so it
-    # can coexist with other local PostgreSQL services on 5432.
-    local_pg_port = str(
-        os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or settings.tapdb.local_pg_port
-    )
-    os.environ.setdefault("BLOOM_TAPDB_LOCAL_PG_PORT", local_pg_port)
-    os.environ.setdefault("TAPDB_DEV_PORT", local_pg_port)
-    os.environ.setdefault("TAPDB_TEST_PORT", local_pg_port)
-
-    os.environ.setdefault("AWS_PROFILE", ctx.aws_profile)
-    os.environ.setdefault("AWS_REGION", ctx.aws_region)
-    os.environ.setdefault("AWS_DEFAULT_REGION", ctx.aws_region)
-
     return ctx
 
 
@@ -815,16 +776,16 @@ def get_tapdb_db_config(
     settings = get_settings()
     ctx = apply_runtime_environment(settings)
 
-    if database_name:
-        os.environ["TAPDB_DATABASE_NAME"] = database_name
-    if config_path:
-        os.environ["TAPDB_CONFIG_PATH"] = config_path
-
     target_env = (env_name or ctx.env).strip().lower()
 
     from daylily_tapdb.cli.db_config import get_db_config_for_env
 
-    return get_db_config_for_env(target_env)
+    return get_db_config_for_env(
+        target_env,
+        config_path=(config_path or ctx.config_path or None),
+        client_id=ctx.client_id,
+        database_name=(database_name or ctx.database_name),
+    )
 
 
 def assert_tapdb_version(

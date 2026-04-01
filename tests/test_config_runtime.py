@@ -51,16 +51,16 @@ def test_runtime_bootstrap_replaces_missing_tapdb_config_path(
     monkeypatch, tmp_path: Path
 ):
     missing_path = tmp_path / "missing-tapdb-config.yaml"
-    monkeypatch.setenv("TAPDB_CONFIG_PATH", str(missing_path))
-    monkeypatch.delenv("PGPORT", raising=False)
+    monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(missing_path))
+    monkeypatch.delenv("BLOOM_TAPDB__LOCAL_PG_PORT", raising=False)
 
     config_path = ensure_test_runtime_environment()
 
     assert config_path.exists()
     assert config_path != missing_path
-    assert Path(os.environ["TAPDB_CONFIG_PATH"]).exists()
-    assert os.environ["PGPORT"] == str(
-        os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT", DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
+    assert Path(os.environ["BLOOM_TAPDB__CONFIG_PATH"]).exists()
+    assert os.environ["BLOOM_TAPDB__LOCAL_PG_PORT"] == str(
+        os.environ.get("BLOOM_TAPDB__LOCAL_PG_PORT", DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
     )
 
 
@@ -69,7 +69,7 @@ def test_strict_app_startup_accepts_synthesized_test_config(
 ):
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv(
-        "TAPDB_CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
+        "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
     )
 
     ensure_test_runtime_environment()
@@ -99,7 +99,7 @@ def test_validate_settings_warns_when_atlas_webhook_secret_missing(monkeypatch):
 def test_create_app_logs_atlas_webhook_secret_warning(monkeypatch, tmp_path: Path, caplog):
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv(
-        "TAPDB_CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
+        "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
     )
     monkeypatch.setenv("BLOOM_ATLAS__WEBHOOK_SECRET", "")
 
@@ -118,7 +118,7 @@ def test_create_app_logs_atlas_webhook_secret_warning(monkeypatch, tmp_path: Pat
 def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
-    monkeypatch.delenv("TAPDB_CONFIG_PATH", raising=False)
+    monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
     get_settings.cache_clear()
 
     settings = BloomSettings()
