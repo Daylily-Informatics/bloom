@@ -56,7 +56,7 @@ def create_temp_tapdb_config(
         "\n".join(
             [
                 "meta:",
-                "  config_version: 2",
+                "  config_version: 3",
                 "  client_id: bloom",
                 "  database_name: bloom",
                 "  euid_client_code: B",

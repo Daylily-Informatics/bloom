@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from time import monotonic
 from typing import Annotated
 
@@ -20,6 +21,7 @@ from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 router = APIRouter(tags=["Health"])
+logger = logging.getLogger(__name__)
 
 
 def _record_auth(request: Request, user: APIUser) -> None:
@@ -91,14 +93,17 @@ async def db_health(
         detail=str(db_component.message or ""),
     )
     if db_component.status != "healthy":
-        bdb, repository = _anomaly_repository(getattr(user, "email", "") or "observability")
         try:
-            repository.record_db_probe_failure(
-                detail=str(db_component.message or ""),
-                latency_ms=float(db_component.latency_ms or ((monotonic() - started) * 1000)),
-            )
-        finally:
-            bdb.close()
+            bdb, repository = _anomaly_repository(getattr(user, "email", "") or "observability")
+            try:
+                repository.record_db_probe_failure(
+                    detail=str(db_component.message or ""),
+                    latency_ms=float(db_component.latency_ms or ((monotonic() - started) * 1000)),
+                )
+            finally:
+                bdb.close()
+        except Exception as exc:
+            logger.warning("Failed to record db probe anomaly: %s", exc)
     projection, payload = request.app.state.observability.db_health()
     if not payload.get("observed_at"):
         payload["observed_at"] = details.get("observed_at")

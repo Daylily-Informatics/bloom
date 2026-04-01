@@ -14,13 +14,11 @@ Bloom no longer implements an in-repo backup subsystem.
 export AWS_PROFILE=lsmc
 export AWS_REGION=us-west-2
 export AWS_DEFAULT_REGION=us-west-2
-export TAPDB_ENV=dev
-export TAPDB_DATABASE_NAME=bloom
 ```
 
 ## Examples
 
 ```bash
-python -m daylily_tapdb.cli db data backup dev
-python -m daylily_tapdb.cli db data restore dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db data backup dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db data restore dev
 ```

@@ -30,6 +30,14 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(db_commands, "_tapdb_base_cmd", lambda: ["tapdb"])
     monkeypatch.setattr(db_commands, "_runtime_env", lambda: {})
     monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            config_path="/tmp/bloom-tapdb.yaml",
+            env="dev",
+        ),
+    )
+    monkeypatch.setattr(
         db_commands.subprocess,
         "run",
         lambda *_args, **_kwargs: SimpleNamespace(returncode=7),
@@ -44,6 +52,14 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
 def test_run_tapdb_returns_nonzero_when_check_false(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(db_commands, "_tapdb_base_cmd", lambda: ["tapdb"])
     monkeypatch.setattr(db_commands, "_runtime_env", lambda: {})
+    monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            config_path="/tmp/bloom-tapdb.yaml",
+            env="dev",
+        ),
+    )
     monkeypatch.setattr(
         db_commands.subprocess,
         "run",
@@ -115,10 +131,6 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
             [
                 "config",
                 "init",
-                "--client-id",
-                "bloom",
-                "--database-name",
-                "bloom",
                 "--env",
                 "dev",
                 "--db-port",

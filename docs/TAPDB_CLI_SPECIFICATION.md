@@ -5,15 +5,13 @@ This document defines the TapDB command surface Bloom relies on.
 ## Required Context
 
 ```bash
-export TAPDB_ENV=dev
-export TAPDB_DATABASE_NAME=bloom
 export AWS_PROFILE=lsmc
 export AWS_REGION=us-west-2
 export AWS_DEFAULT_REGION=us-west-2
 ```
 
 For namespace isolation with multiple apps under one user, prefer:
-- `~/.config/tapdb/tapdb-config-bloom.yaml`
+- `~/.config/tapdb/bloom/bloom/tapdb-config.yaml`
 
 ## Activation
 
@@ -25,44 +23,44 @@ source ../../daylily-tapdb/activate
 
 ```bash
 # local postgres runtime + schema + seed path
-python -m daylily_tapdb.cli bootstrap local --no-gui
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev bootstrap local --no-gui
 
 # aurora bootstrap path
-python -m daylily_tapdb.cli bootstrap aurora --cluster <cluster-id> --region us-west-2 --no-gui
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env prod bootstrap aurora --cluster <cluster-id> --region us-west-2 --no-gui
 ```
 
 ## PostgreSQL Runtime (`tapdb pg`)
 
 ```bash
-python -m daylily_tapdb.cli pg init dev
-python -m daylily_tapdb.cli pg start-local dev
-python -m daylily_tapdb.cli pg stop-local dev
-python -m daylily_tapdb.cli pg status
-python -m daylily_tapdb.cli pg logs
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev pg init dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev pg start-local dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev pg stop-local dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev pg status
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev pg logs
 ```
 
 ## Database/Schema/Data (`tapdb db`)
 
 ```bash
-python -m daylily_tapdb.cli db create dev
-python -m daylily_tapdb.cli db setup dev
-python -m daylily_tapdb.cli db schema status dev
-python -m daylily_tapdb.cli db schema migrate dev
-python -m daylily_tapdb.cli db schema reset dev --force
-python -m daylily_tapdb.cli db data seed dev
-python -m daylily_tapdb.cli db data backup dev
-python -m daylily_tapdb.cli db data restore dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db create dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db setup dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db schema status dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db schema migrate dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db schema reset dev --force
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db data seed dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db data backup dev
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db data restore dev
 ```
 
 ## Config and Cognito Ownership
 
 ```bash
-python -m daylily_tapdb.cli --client-id bloom --database-name bloom config init \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config init \
   --env dev --db-port dev=5566 --ui-port dev=8912
-python -m daylily_tapdb.cli --client-id bloom --database-name bloom config update \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config update \
   --env dev --audit-log-euid-prefix audit.bloom --support-email support@daylilyinformatics.com
 daycog config create-all --pool-name daylily-ursa-users --region us-west-2 --default-client atlas
-python -m daylily_tapdb.cli --client-id bloom --database-name bloom config update \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config update \
   --env dev \
   --cognito-user-pool-id us-west-2_5r8gIqV5P \
   --cognito-app-client-id 6j2pa8nr9ve19aeuhnb1ocpl2r \

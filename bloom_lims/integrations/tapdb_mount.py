@@ -13,6 +13,7 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse, RedirectResponse
 
 logger = logging.getLogger(__name__)
+_BLOOM_TAPDB_SCOPE_USER_KEY = "bloom_tapdb_user"
 
 ASGIReceive = Callable[[], Awaitable[dict[str, Any]]]
 ASGISend = Callable[[dict[str, Any]], Awaitable[None]]
@@ -82,6 +83,35 @@ def _is_admin_user(user_data: dict[str, Any]) -> bool:
     return any(str(item).strip().upper() == "ADMIN" for item in roles)
 
 
+def _tapdb_admin_user_from_bloom_user_data(user_data: dict[str, Any]) -> dict[str, Any]:
+    email = str(user_data.get("email") or "").strip().lower()
+    display_name = str(user_data.get("display_name") or user_data.get("name") or email).strip()
+    return {
+        "uid": 0,
+        "username": email,
+        "email": email,
+        "display_name": display_name or email,
+        "role": "admin" if _is_admin_user(user_data) else "user",
+        "is_active": True,
+        "require_password_change": False,
+    }
+
+
+def _configure_embedded_tapdb_auth(admin_main_module: Any, admin_auth_module: Any) -> None:
+    if getattr(admin_main_module, "_bloom_embedded_auth_configured", False):
+        return
+
+    async def _get_current_user(request: Any) -> dict[str, Any] | None:
+        user = request.scope.get(_BLOOM_TAPDB_SCOPE_USER_KEY)
+        if isinstance(user, dict) and str(user.get("email") or "").strip():
+            return user
+        return None
+
+    admin_auth_module.get_current_user = _get_current_user
+    admin_main_module.get_current_user = _get_current_user
+    setattr(admin_main_module, "_bloom_embedded_auth_configured", True)
+
+
 class BloomAdminGuardedASGI:
     """ASGI guard that enforces Bloom admin checks before forwarding."""
 
@@ -121,16 +151,21 @@ class BloomAdminGuardedASGI:
             await response(scope, receive, send)
             return
 
-        await self._inner_app(scope, receive, send)
+        forward_scope = dict(scope)
+        forward_scope[_BLOOM_TAPDB_SCOPE_USER_KEY] = _tapdb_admin_user_from_bloom_user_data(
+            user_data
+        )
+        await self._inner_app(forward_scope, receive, send)
 
 
 def _load_tapdb_admin_app() -> ASGIApp:
-    os.environ["TAPDB_ADMIN_DISABLE_AUTH"] = "1"
     try:
         module = importlib.import_module("admin.main")
+        auth_module = importlib.import_module("admin.auth")
     except Exception as exc:  # pragma: no cover - exercised by startup failure paths
         raise RuntimeError("Failed importing TapDB admin FastAPI app") from exc
 
+    _configure_embedded_tapdb_auth(module, auth_module)
     tapdb_admin_app = getattr(module, "app", None)
     if tapdb_admin_app is None:
         raise RuntimeError("TapDB admin module does not expose FastAPI app")

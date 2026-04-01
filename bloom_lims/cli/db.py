@@ -121,24 +121,18 @@ def _local_pg_port(env_name: str) -> str:
 
 
 def _local_ui_port(env_name: str) -> str:
-    return (
-        os.environ.get("BLOOM_UI_PORT")
-        or str(DEFAULT_BLOOM_WEB_PORT)
-    ).strip()
+    _ = env_name
+    return str(DEFAULT_BLOOM_WEB_PORT).strip()
 
 
 def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
-    return (
-        os.environ.get("BLOOM_TAPDB_AUDIT_LOG_EUID_PREFIX")
-        or _DEFAULT_AUDIT_LOG_EUID_PREFIX
-    ).strip()
+    _ = env_name
+    return _DEFAULT_AUDIT_LOG_EUID_PREFIX
 
 
 def _tapdb_support_email(env_name: str) -> str:
-    return (
-        os.environ.get("BLOOM_UI__SUPPORT_EMAIL")
-        or get_settings().ui.support_email
-    ).strip()
+    _ = env_name
+    return get_settings().ui.support_email.strip()
 
 
 def _update_tapdb_namespace_config(env_name: str) -> None:
@@ -158,16 +152,18 @@ def _update_tapdb_namespace_config(env_name: str) -> None:
 
 def _run_tapdb(args: list[str], check: bool = True) -> int:
     ctx = apply_runtime_environment(get_settings())
+    config_path = str(ctx.config_path or "").strip()
+    if not config_path:
+        raise RuntimeError(
+            "TapDB config path is required. Resolve it via Bloom settings and pass it explicitly "
+            "to TapDB with --config."
+        )
     cmd = _tapdb_base_cmd() + [
-        "--client-id",
-        ctx.client_id,
-        "--database-name",
-        ctx.database_name,
+        "--config",
+        config_path,
         "--env",
         ctx.env,
     ]
-    if ctx.config_path:
-        cmd.extend(["--config", ctx.config_path])
     cmd.extend(args)
     env = _runtime_env()
     result = subprocess.run(cmd, env=env)
@@ -179,19 +175,13 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
 def _ensure_tapdb_namespace_config(env_name: str) -> None:
     """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
     ctx = apply_runtime_environment(get_settings())
-    client_id = ctx.client_id.strip()
-    database_name = ctx.database_name.strip()
-    if not client_id or not database_name:
+    if not str(ctx.config_path or "").strip():
         return
     _ensure_runtime_config_parent()
 
     args = [
         "config",
         "init",
-        "--client-id",
-        client_id,
-        "--database-name",
-        database_name,
         "--env",
         env_name,
     ]
@@ -215,9 +205,7 @@ def _seed_tapdb_templates(
     overwrite: bool = False,
 ) -> None:
     """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
-    tapdb_config_dir = os.environ.get("BLOOM_TAPDB_SEED_CONFIG_PATH", "").strip()
-    if not tapdb_config_dir:
-        tapdb_config_dir = str(_bloom_root() / "config" / "tapdb_templates")
+    tapdb_config_dir = str(_bloom_root() / "config" / "tapdb_templates")
     args = ["db", "data", "seed", env_name]
     if tapdb_config_dir:
         args.extend(["--config", tapdb_config_dir])

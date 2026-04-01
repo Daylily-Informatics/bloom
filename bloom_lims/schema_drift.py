@@ -46,15 +46,12 @@ def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
         sys.executable,
         "-m",
         "daylily_tapdb.cli",
-        "--client-id",
-        env.client_id,
-        "--database-name",
-        env.database_name,
         "--env",
         env.env,
     ]
-    if env.config_path:
-        cmd.extend(["--config", env.config_path])
+    if not str(env.config_path or "").strip():
+        raise RuntimeError("TapDB schema drift checks require an explicit config path.")
+    cmd.extend(["--config", env.config_path])
     cmd.extend(args)
     return subprocess.run(
         cmd,

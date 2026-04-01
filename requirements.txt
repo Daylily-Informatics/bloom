@@ -4,7 +4,7 @@ pytest
 ipython
 psycopg2
 jinja2~=3.1.2
-zebra_day==3.0.0
+zebra_day==3.2.0
 fedex_tracking_day==0.2.8
 setuptools~=51.1.0
 SQLAlchemy~=2.0.19

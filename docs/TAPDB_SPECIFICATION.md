@@ -1284,14 +1284,11 @@ class TAPDBConnection:
         Initialize database connection.
 
         Args:
-            connection_string: PostgreSQL connection string.
-                              Falls back to TAPDB_DATABASE_URL env var.
+            connection_string: PostgreSQL connection string provided explicitly
+                              by the caller or resolved from TapDB config.
             echo: Enable SQLAlchemy query logging.
         """
-        self.connection_string = connection_string or os.environ.get(
-            'TAPDB_DATABASE_URL',
-            'postgresql://localhost/tapdb'
-        )
+        self.connection_string = connection_string or 'postgresql://localhost/tapdb'
         self.engine = create_engine(self.connection_string, echo=echo)
         self.SessionLocal = sessionmaker(bind=self.engine)
         self._session: Optional[Session] = None
@@ -2468,8 +2465,8 @@ CREATE SEQUENCE xx_instance_seq;           -- XX (action)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `TAPDB_DATABASE_URL` | PostgreSQL connection string | `postgresql://localhost/tapdb` |
-| `TAPDB_CONFIG_PATH` | Path to template configuration | `./config` |
+| Explicit DB URL argument | PostgreSQL connection string | `postgresql://localhost/tapdb` |
+| Explicit config path | Path to template configuration | `./config` |
 | `TAPDB_ECHO_SQL` | Enable SQL query logging | `false` |
 | `TAPDB_POOL_SIZE` | Connection pool size | `5` |
 | `TAPDB_MAX_OVERFLOW` | Max overflow connections | `10` |
@@ -2484,8 +2481,8 @@ from daylily_tapdb import TAPDBConnection, TemplateManager, InstanceFactory
 from daylily_tapdb.models import generic_instance, container_instance
 
 # Initialize
-db = TAPDBConnection(os.environ['DATABASE_URL'])
-templates = TemplateManager(db, Path('./config'))
+db = TAPDBConnection("postgresql://localhost/tapdb")
+templates = TemplateManager(db, Path("./config"))
 factory = InstanceFactory(db, templates)
 
 # Create objects
@@ -2691,11 +2688,9 @@ from daylily_tapdb import TAPDBConnection
 @pytest.fixture(scope="session")
 def db_connection():
     """Provide database connection for integration tests."""
-    db_url = os.environ.get(
-        'TAPDB_TEST_DATABASE_URL',
+    conn = TAPDBConnection(
         'postgresql://tapdb:tapdb_test_password@localhost:5432/tapdb_test'
     )
-    conn = TAPDBConnection(db_url)
 
     # Apply schema (including triggers)
     conn.apply_schema()

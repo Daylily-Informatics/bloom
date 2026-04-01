@@ -14,25 +14,23 @@ Bloom authentication is Cognito-backed and should be managed through `daycog` fo
 export AWS_PROFILE=lsmc
 export AWS_REGION=us-west-2
 export AWS_DEFAULT_REGION=us-west-2
-export TAPDB_ENV=dev
-export TAPDB_DATABASE_NAME=bloom
 ```
 
 ## Configure Cognito (via TapDB)
 
 ```bash
 # Show current TapDB context
-python -m daylily_tapdb.cli info
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev info
 
 # Initialize the TapDB namespace config for Bloom
-python -m daylily_tapdb.cli --client-id bloom --database-name bloom config init \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config init \
   --env dev --db-port dev=5566 --ui-port dev=8912
 
 # Update shared Cognito app/pool state through daycog
 daycog config create-all --pool-name daylily-ursa-users --region us-west-2 --default-client atlas
 
 # Bind the Bloom namespace to the shared Cognito app client
-python -m daylily_tapdb.cli --client-id bloom --database-name bloom config update \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config update \
   --env dev \
   --cognito-user-pool-id us-west-2_5r8gIqV5P \
   --cognito-app-client-id 6j2pa8nr9ve19aeuhnb1ocpl2r \
@@ -66,7 +64,9 @@ auth:
 
 tapdb:
   env: dev
+  client_id: bloom
   database_name: bloom
+  config_path: ~/.config/tapdb/bloom/bloom/tapdb-config.yaml
 ```
 
 ## Start Bloom
