@@ -26,9 +26,9 @@ TOKEN_TEMPLATE_CODE = "bloom/auth/user-api-token/1.0/"
 TOKEN_REVISION_TEMPLATE_CODE = "bloom/auth/user-api-token-revision/1.0/"
 TOKEN_USAGE_LOG_TEMPLATE_CODE = "bloom/auth/user-api-token-usage-log/1.0/"
 
-TOKEN_PREFIX = "BBL"
-TOKEN_REVISION_PREFIX = "BBL"
-TOKEN_USAGE_PREFIX = "BBL"
+TOKEN_PREFIX = "BBX"
+TOKEN_REVISION_PREFIX = "BBX"
+TOKEN_USAGE_PREFIX = "BBX"
 
 
 def _parse_template_code(template_code: str) -> tuple[str, str, str, str]:

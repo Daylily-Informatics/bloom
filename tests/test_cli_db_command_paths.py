@@ -181,6 +181,28 @@ def test_ensure_tapdb_namespace_config_creates_scoped_parent(monkeypatch: pytest
     assert config_path.parent.exists()
 
 
+def test_resolve_tapdb_schema_source_skips_dayhoff_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    sibling_schema = tmp_path / "daylily-tapdb" / "schema" / "tapdb_schema.sql"
+    sibling_schema.parent.mkdir(parents=True, exist_ok=True)
+    sibling_schema.write_text("-- sibling schema\n", encoding="utf-8")
+
+    artifact_pkg = tmp_path / ".dayhoff" / "local" / "lsmc5" / "repos" / "daylily-tapdb" / "daylily_tapdb" / "__init__.py"
+    artifact_pkg.parent.mkdir(parents=True, exist_ok=True)
+    artifact_pkg.write_text("# artifact package\n", encoding="utf-8")
+
+    monkeypatch.setattr(db_commands, "_bloom_root", lambda: tmp_path / "bloom")
+    monkeypatch.setattr(
+        db_commands.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(__file__=str(artifact_pkg)),
+    )
+
+    assert db_commands._resolve_tapdb_schema_source() == sibling_schema
+
+
 def test_db_seed_calls_tapdb_template_loader(
     runner: CliRunner,
     cli_app,

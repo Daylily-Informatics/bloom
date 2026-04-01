@@ -148,6 +148,22 @@ raise SystemExit(0 if module_path == repo_root or repo_root in module_path.paren
 PY
 }
 
+_bloom_module_is_from_dayhoff_artifact() {
+    local module_name="$1"
+    "${_BLOOM_PYTHON:-python}" - "$module_name" <<'PY' >/dev/null 2>&1
+import importlib
+import pathlib
+import sys
+
+module = importlib.import_module(sys.argv[1])
+module_file = getattr(module, "__file__", "")
+if not module_file:
+    raise SystemExit(1)
+module_path = pathlib.Path(module_file).resolve()
+raise SystemExit(0 if ".dayhoff/local" in str(module_path) else 1)
+PY
+}
+
 _bloom_distribution_is_editable_from_repo() {
     local dist_name="$1"
     local repo_root="$2"
@@ -256,7 +272,12 @@ _BLOOM_TAPDB_REPO="$(_bloom_resolve_local_repo \
     "$BLOOM_ROOT/../daylily-tapdb" \
     "$BLOOM_ROOT/../lims_repos/daylily-tapdb"
 )"
-if _bloom_truthy "${USE_LOCAL_DAYLILY_TAPDB:-0}"; then
+if _bloom_distribution_is_editable_from_repo "daylily-tapdb" "${_BLOOM_TAPDB_REPO:-}"; then
+    echo -e "  ${_GREEN}✓${_NC} Using local daylily-tapdb checkout: ${_BLOOM_TAPDB_REPO}"
+elif _bloom_truthy "${USE_LOCAL_DAYLILY_TAPDB:-0}" || _bloom_module_is_from_dayhoff_artifact "daylily_tapdb"; then
+    if ! _bloom_truthy "${USE_LOCAL_DAYLILY_TAPDB:-0}"; then
+        echo -e "  ${_CYAN}→${_NC} Rebinding daylily-tapdb from stale Dayhoff artifact to local source checkout..."
+    fi
     if ! _bloom_ensure_editable_repo "daylily-tapdb" "daylily_tapdb" "${_BLOOM_TAPDB_REPO:-}" "[cli,admin,aurora,dev]"; then
         return 1
     fi
