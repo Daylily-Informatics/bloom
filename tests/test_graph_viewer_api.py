@@ -52,7 +52,7 @@ class _FakeExternalRef:
         return {"ref_index": ref_index, **self.payload}
 
 
-def _fake_bobj_for_object_detail(euid: str = "CX-TEST"):
+def _fake_bobj_for_object_detail(euid: str = "BCN-TEST"):
     fake_instance = _FakeInstance()
     fake_instance.uid = 101
     fake_instance.euid = euid
@@ -177,7 +177,7 @@ class TestGraphViewerApis:
         fake_bobj = MagicMock()
         fake_bobj.fetch_graph_data_by_node_depth.return_value = [
             (
-                "CX-1",  # euid
+                "BCN-1",  # euid
                 None,
                 "Sample Tube",
                 "tube",  # type
@@ -186,13 +186,13 @@ class TestGraphViewerApis:
                 "1.0",  # version
                 None,
                 "LN-1",  # lineage_euid
-                "WX-1",  # parent
-                "CX-1",  # child
+                "BWF-1",  # parent
+                "BCN-1",  # child
                 "generic",  # relationship_type
             )
         ]
 
-        nodes, _edges = _build_graph_elements_for_start(fake_bobj, "CX-1", 3)
+        nodes, _edges = _build_graph_elements_for_start(fake_bobj, "BCN-1", 3)
         assert nodes
         node_data = nodes[0]["data"]
         assert node_data["type"] == "tube"
@@ -236,15 +236,15 @@ class TestGraphViewerApis:
         assert payload["elements"]["edges"] == []
 
     def test_api_object_detail_returns_payload(self, client):
-        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_bobj = _fake_bobj_for_object_detail("BCN-TEST")
         with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
             "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
         ):
-            response = client.get("/api/object/CX-TEST")
+            response = client.get("/api/object/BCN-TEST")
 
         assert response.status_code == 200
         payload = response.json()
-        assert payload["euid"] == "CX-TEST"
+        assert payload["euid"] == "BCN-TEST"
         assert payload["category"] == "container"
         assert payload["type"] == "instance"
         assert "uuid" not in payload
@@ -252,7 +252,7 @@ class TestGraphViewerApis:
         assert "b_sub_type" not in payload
 
     def test_api_object_detail_includes_external_refs(self, client):
-        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_bobj = _fake_bobj_for_object_detail("BCN-TEST")
         refs = [
             _FakeExternalRef(
                 label="atlas:patient:AT-PAT-1",
@@ -269,7 +269,7 @@ class TestGraphViewerApis:
             "bloom_lims.graph_support.resolve_external_refs_for_object",
             return_value=refs,
         ):
-            response = client.get("/api/object/CX-TEST")
+            response = client.get("/api/object/BCN-TEST")
 
         assert response.status_code == 200
         payload = response.json()
@@ -286,7 +286,7 @@ class TestGraphViewerApis:
         ]
 
     def test_api_external_graph_namespaces_remote_graph(self, client):
-        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_bobj = _fake_bobj_for_object_detail("BCN-TEST")
         fake_ref = SimpleNamespace(
             root_euid="AT-PAT-1",
             tenant_id="atlas-tenant-1",
@@ -313,7 +313,7 @@ class TestGraphViewerApis:
             "bloom_lims.gui.routes.graph.AtlasService",
             return_value=fake_service,
         ):
-            response = client.get("/api/graph/external?source_euid=CX-TEST&ref_index=0&depth=3")
+            response = client.get("/api/graph/external?source_euid=BCN-TEST&ref_index=0&depth=3")
 
         assert response.status_code == 200
         body = response.json()
@@ -322,7 +322,7 @@ class TestGraphViewerApis:
         assert body["elements"]["edges"][-1]["data"]["is_external_bridge"] is True
 
     def test_api_external_graph_object_proxies_remote_detail(self, client):
-        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_bobj = _fake_bobj_for_object_detail("BCN-TEST")
         fake_ref = SimpleNamespace(
             root_euid="AT-PAT-1",
             tenant_id="atlas-tenant-1",
@@ -345,22 +345,22 @@ class TestGraphViewerApis:
             return_value=fake_service,
         ):
             response = client.get(
-                "/api/graph/external/object?source_euid=CX-TEST&ref_index=0&euid=AT-PAT-1"
+                "/api/graph/external/object?source_euid=BCN-TEST&ref_index=0&euid=AT-PAT-1"
             )
 
         assert response.status_code == 200
         assert response.json()["euid"] == "AT-PAT-1"
 
     def test_get_node_info_returns_payload_without_uuid(self, client):
-        fake_bobj = _fake_bobj_for_object_detail("CX-TEST")
+        fake_bobj = _fake_bobj_for_object_detail("BCN-TEST")
         with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
             "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
         ):
-            response = client.get("/get_node_info?euid=CX-TEST")
+            response = client.get("/get_node_info?euid=BCN-TEST")
 
         assert response.status_code == 200
         payload = response.json()
-        assert payload["euid"] == "CX-TEST"
+        assert payload["euid"] == "BCN-TEST"
         assert payload["name"] == "Test Container"
         assert "uuid" not in payload
 

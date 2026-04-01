@@ -88,16 +88,19 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
     calls: list[tuple[list[str], bool]] = []
     monkeypatch.setattr(
         db_commands,
-        "_runtime_env",
-        lambda: {
-            "TAPDB_CLIENT_ID": "bloom",
-            "TAPDB_DATABASE_NAME": "bloom",
-            "TAPDB_CONFIG_PATH": "/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
-        },
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            client_id="bloom",
+            database_name="bloom",
+            config_path="/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
+            env="dev",
+            aws_profile="lsmc",
+            aws_region="us-west-2",
+        ),
     )
     monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT))
     monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: str(DEFAULT_BLOOM_WEB_PORT))
-    monkeypatch.setattr(db_commands, "_tapdb_audit_log_euid_prefix", lambda _env: "TAG")
+    monkeypatch.setattr(db_commands, "_tapdb_audit_log_euid_prefix", lambda _env: "BBL")
     monkeypatch.setattr(db_commands, "_tapdb_support_email", lambda _env: "support@example.com")
     monkeypatch.setattr(
         db_commands,
@@ -132,7 +135,7 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
                 "--env",
                 "dev",
                 "--audit-log-euid-prefix",
-                "TAG",
+                "BBL",
                 "--support-email",
                 "support@example.com",
             ],
@@ -145,16 +148,19 @@ def test_ensure_tapdb_namespace_config_creates_scoped_parent(monkeypatch: pytest
     config_path = tmp_path / ".config" / "tapdb" / "bloom" / "bloom-local2" / "tapdb-config.yaml"
     monkeypatch.setattr(
         db_commands,
-        "_runtime_env",
-        lambda: {
-            "TAPDB_CLIENT_ID": "bloom",
-            "TAPDB_DATABASE_NAME": "bloom",
-            "TAPDB_CONFIG_PATH": str(config_path),
-        },
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            client_id="bloom",
+            database_name="bloom",
+            config_path=str(config_path),
+            env="dev",
+            aws_profile="lsmc",
+            aws_region="us-west-2",
+        ),
     )
     monkeypatch.setattr(db_commands, "_local_pg_port", lambda _env: str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT))
     monkeypatch.setattr(db_commands, "_local_ui_port", lambda _env: str(DEFAULT_BLOOM_WEB_PORT))
-    monkeypatch.setattr(db_commands, "_tapdb_audit_log_euid_prefix", lambda _env: "TAG")
+    monkeypatch.setattr(db_commands, "_tapdb_audit_log_euid_prefix", lambda _env: "BBL")
     monkeypatch.setattr(db_commands, "_tapdb_support_email", lambda _env: "support@example.com")
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda *_args, **_kwargs: 0)
 

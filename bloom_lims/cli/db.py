@@ -28,7 +28,7 @@ from bloom_lims.config import (
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_DEFAULT_AUDIT_LOG_EUID_PREFIX = "TAG"
+_DEFAULT_AUDIT_LOG_EUID_PREFIX = "BBL"
 
 
 def _bloom_root() -> Path:
@@ -98,63 +98,45 @@ def _runtime_env() -> dict[str, str]:
     ctx = apply_runtime_environment(settings)
 
     env = os.environ.copy()
-    env.setdefault("TAPDB_ENV", ctx.env)
-    env.setdefault("TAPDB_DATABASE_NAME", ctx.database_name)
-    if ctx.config_path:
-        env.setdefault("TAPDB_CONFIG_PATH", ctx.config_path)
-    env.setdefault("AWS_PROFILE", ctx.aws_profile)
-    env.setdefault("AWS_REGION", ctx.aws_region)
-    env.setdefault("AWS_DEFAULT_REGION", ctx.aws_region)
+    env["AWS_PROFILE"] = ctx.aws_profile
+    env["AWS_REGION"] = ctx.aws_region
+    env["AWS_DEFAULT_REGION"] = ctx.aws_region
     return env
 
 
 def _ensure_runtime_config_parent() -> None:
-    config_path = (_runtime_env().get("TAPDB_CONFIG_PATH") or "").strip()
+    config_path = (apply_runtime_environment(get_settings()).config_path or "").strip()
     if not config_path:
         return
     Path(config_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
 
 def _current_env() -> str:
-    return _runtime_env().get("TAPDB_ENV", "dev").strip().lower()
+    return apply_runtime_environment(get_settings()).env
 
 
 def _local_pg_port(env_name: str) -> str:
-    env = _runtime_env()
-    scoped_key = f"TAPDB_{env_name.upper()}_PORT"
-    return (
-        env.get(scoped_key)
-        or env.get("BLOOM_TAPDB_LOCAL_PG_PORT")
-        or str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
-    ).strip()
+    settings = get_settings()
+    return str(settings.tapdb.local_pg_port or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT).strip()
 
 
 def _local_ui_port(env_name: str) -> str:
-    env = _runtime_env()
-    scoped_key = f"TAPDB_{env_name.upper()}_UI_PORT"
     return (
-        env.get(scoped_key)
-        or env.get("BLOOM_UI_PORT")
+        os.environ.get("BLOOM_UI_PORT")
         or str(DEFAULT_BLOOM_WEB_PORT)
     ).strip()
 
 
 def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
-    env = _runtime_env()
-    scoped_key = f"TAPDB_{env_name.upper()}_AUDIT_LOG_EUID_PREFIX"
     return (
-        env.get(scoped_key)
-        or env.get("BLOOM_TAPDB_AUDIT_LOG_EUID_PREFIX")
+        os.environ.get("BLOOM_TAPDB_AUDIT_LOG_EUID_PREFIX")
         or _DEFAULT_AUDIT_LOG_EUID_PREFIX
     ).strip()
 
 
 def _tapdb_support_email(env_name: str) -> str:
-    env = _runtime_env()
-    scoped_key = f"TAPDB_{env_name.upper()}_SUPPORT_EMAIL"
     return (
-        env.get(scoped_key)
-        or env.get("BLOOM_UI__SUPPORT_EMAIL")
+        os.environ.get("BLOOM_UI__SUPPORT_EMAIL")
         or get_settings().ui.support_email
     ).strip()
 
@@ -175,7 +157,18 @@ def _update_tapdb_namespace_config(env_name: str) -> None:
 
 
 def _run_tapdb(args: list[str], check: bool = True) -> int:
-    cmd = _tapdb_base_cmd() + args
+    ctx = apply_runtime_environment(get_settings())
+    cmd = _tapdb_base_cmd() + [
+        "--client-id",
+        ctx.client_id,
+        "--database-name",
+        ctx.database_name,
+        "--env",
+        ctx.env,
+    ]
+    if ctx.config_path:
+        cmd.extend(["--config", ctx.config_path])
+    cmd.extend(args)
     env = _runtime_env()
     result = subprocess.run(cmd, env=env)
     if check and result.returncode != 0:
@@ -185,9 +178,9 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
 
 def _ensure_tapdb_namespace_config(env_name: str) -> None:
     """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
-    env = _runtime_env()
-    client_id = (env.get("TAPDB_CLIENT_ID") or "").strip()
-    database_name = (env.get("TAPDB_DATABASE_NAME") or "").strip()
+    ctx = apply_runtime_environment(get_settings())
+    client_id = ctx.client_id.strip()
+    database_name = ctx.database_name.strip()
     if not client_id or not database_name:
         return
     _ensure_runtime_config_parent()
@@ -222,7 +215,7 @@ def _seed_tapdb_templates(
     overwrite: bool = False,
 ) -> None:
     """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
-    tapdb_config_dir = os.environ.get("TAPDB_SEED_CONFIG_PATH", "").strip()
+    tapdb_config_dir = os.environ.get("BLOOM_TAPDB_SEED_CONFIG_PATH", "").strip()
     if not tapdb_config_dir:
         tapdb_config_dir = str(_bloom_root() / "config" / "tapdb_templates")
     args = ["db", "data", "seed", env_name]

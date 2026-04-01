@@ -1,6 +1,6 @@
 {
   "euid_prefixes": {
-    "default": "WSX",
-    "queue": "QX"
+    "default": "BWS",
+    "queue": "BWS"
   }
 }

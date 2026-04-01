@@ -294,7 +294,7 @@ class BloomObservabilityStore:
         from bloom_lims.tapdb_metrics import build_metrics_page_context
 
         settings = get_settings()
-        env_name = os.environ.get("TAPDB_ENV", settings.tapdb.env)
+        env_name = settings.tapdb.env
         metrics_ctx = build_metrics_page_context(env_name, limit=1000)
         summary = dict(metrics_ctx.get("summary") or {})
         latest = self.latest_db_probe()

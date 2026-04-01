@@ -68,7 +68,6 @@ _bloom_validate_deploy_name() {
 _bloom_prepare_tapdb_config_path() {
     local client_id="$1"
     local namespace="$2"
-    local explicit_path="${TAPDB_CONFIG_PATH:-}"
     local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
     local deployment_code="${BLOOM_DEPLOYMENT_CODE:-${DEPLOYMENT_CODE:-${LSMC_DEPLOYMENT_CODE:-local}}}"
     local scoped_namespace=""
@@ -78,10 +77,6 @@ _bloom_prepare_tapdb_config_path() {
     local user_path="${user_dir}/tapdb-config.yaml"
     local repo_template="$BLOOM_ROOT/config/tapdb-config-${namespace}.yaml"
 
-    if [[ -n "$explicit_path" ]]; then
-        printf '%s\n' "$explicit_path"
-        return 0
-    fi
     if [[ -f "$user_path" ]]; then
         chmod 600 "$user_path" 2>/dev/null || true
         printf '%s\n' "$user_path"
@@ -314,38 +309,34 @@ if [[ "$-" == *i* ]]; then
 fi
 
 # TapDB/AWS runtime defaults for BLOOM
-export TAPDB_ENV="${TAPDB_ENV:-dev}"
-export TAPDB_CLIENT_ID="${TAPDB_CLIENT_ID:-bloom}"
-export TAPDB_DATABASE_NAME="${TAPDB_DATABASE_NAME:-bloom}"
-export TAPDB_STRICT_NAMESPACE="${TAPDB_STRICT_NAMESPACE:-1}"
+_BLOOM_TAPDB_ENV="dev"
+_BLOOM_TAPDB_CLIENT_ID="bloom"
+_BLOOM_TAPDB_DATABASE_NAME="bloom"
 export MERIDIAN_ENVIRONMENT="${MERIDIAN_ENVIRONMENT:-production}"
 export MERIDIAN_SANDBOX_PREFIX="${MERIDIAN_SANDBOX_PREFIX-}"
 export BLOOM_UI_PORT="${BLOOM_UI_PORT:-$(_bloom_default_web_port)}"
 export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-$(_bloom_default_tapdb_local_pg_port)}"
-export TAPDB_DEV_PORT="${TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
-export TAPDB_TEST_PORT="${TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
-_BLOOM_DEFAULT_TAPDB_CONFIG_PATH="$BLOOM_ROOT/config/tapdb-config-${TAPDB_DATABASE_NAME}.yaml"
-if [[ -z "${TAPDB_CONFIG_PATH:-}" ]]; then
-    export TAPDB_CONFIG_PATH="$(_bloom_prepare_tapdb_config_path "${TAPDB_CLIENT_ID}" "${TAPDB_DATABASE_NAME}")"
-fi
+export BLOOM_TAPDB_DEV_PORT="${BLOOM_TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
+export BLOOM_TAPDB_TEST_PORT="${BLOOM_TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
+_BLOOM_DEFAULT_TAPDB_CONFIG_PATH="$BLOOM_ROOT/config/tapdb-config-${_BLOOM_TAPDB_DATABASE_NAME}.yaml"
+_BLOOM_TAPDB_CONFIG_PATH="$(_bloom_prepare_tapdb_config_path "${_BLOOM_TAPDB_CLIENT_ID}" "${_BLOOM_TAPDB_DATABASE_NAME}")"
 export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
 export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
 export AWS_REGION="${AWS_REGION:-us-west-2}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-$AWS_REGION}"
 
-echo -e "  ${_GREEN}✓${_NC} TAPDB_ENV=${TAPDB_ENV}"
-echo -e "  ${_GREEN}✓${_NC} TAPDB_CLIENT_ID=${TAPDB_CLIENT_ID}"
-echo -e "  ${_GREEN}✓${_NC} TAPDB_DATABASE_NAME=${TAPDB_DATABASE_NAME}"
-echo -e "  ${_GREEN}✓${_NC} TAPDB_STRICT_NAMESPACE=${TAPDB_STRICT_NAMESPACE}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB env=${_BLOOM_TAPDB_ENV}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB client=${_BLOOM_TAPDB_CLIENT_ID}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB namespace=${_BLOOM_TAPDB_DATABASE_NAME}"
 echo -e "  ${_GREEN}✓${_NC} MERIDIAN_ENVIRONMENT=${MERIDIAN_ENVIRONMENT}"
 echo -e "  ${_GREEN}✓${_NC} MERIDIAN_SANDBOX_PREFIX=${MERIDIAN_SANDBOX_PREFIX}"
-if [[ -n "${TAPDB_CONFIG_PATH:-}" ]]; then
-    echo -e "  ${_GREEN}✓${_NC} TAPDB_CONFIG_PATH=${TAPDB_CONFIG_PATH}"
+if [[ -n "${_BLOOM_TAPDB_CONFIG_PATH:-}" ]]; then
+    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB config path=${_BLOOM_TAPDB_CONFIG_PATH}"
 else
-    echo -e "  ${_YELLOW}⚠${_NC} TAPDB_CONFIG_PATH is not set"
+    echo -e "  ${_YELLOW}⚠${_NC} Bloom TapDB config path is not set"
 fi
-echo -e "  ${_GREEN}✓${_NC} TAPDB_DEV_PORT=${TAPDB_DEV_PORT}"
-echo -e "  ${_GREEN}✓${_NC} TAPDB_TEST_PORT=${TAPDB_TEST_PORT}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB dev port=${BLOOM_TAPDB_DEV_PORT}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB test port=${BLOOM_TAPDB_TEST_PORT}"
 echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
 echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
 echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
@@ -357,16 +348,11 @@ deactivate_bloom() {
     unset BLOOM_DEPLOYMENT_CODE
     unset DEPLOYMENT_CODE
     unset LSMC_DEPLOYMENT_CODE
-    unset TAPDB_ENV
-    unset TAPDB_CLIENT_ID
-    unset TAPDB_DATABASE_NAME
-    unset TAPDB_STRICT_NAMESPACE
     unset MERIDIAN_ENVIRONMENT
     unset MERIDIAN_SANDBOX_PREFIX
-    unset TAPDB_CONFIG_PATH
     unset BLOOM_TAPDB_LOCAL_PG_PORT
-    unset TAPDB_DEV_PORT
-    unset TAPDB_TEST_PORT
+    unset BLOOM_TAPDB_DEV_PORT
+    unset BLOOM_TAPDB_TEST_PORT
     unset BLOOM_COGNITO_APP_NAME
     if [[ "${CONDA_DEFAULT_ENV:-}" == "${_BLOOM_CONDA_ENV_NAME}" ]]; then
         conda deactivate 2>/dev/null

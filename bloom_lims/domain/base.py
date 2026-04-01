@@ -1262,7 +1262,7 @@ class BloomObj:
 
     # Is this too special casey? Belong lower?
     def create_container_with_content(self, cx_quad_tup, mx_quad_tup):
-        """ie CX=container, MX=content (material)
+        """ie BCN=container, BCT=content (material)
         ("content", "control", "giab-HG002", "1.0"),
         ("container", "tube", "tube-generic-10ml", "1.0")
         """

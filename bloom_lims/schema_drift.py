@@ -39,15 +39,25 @@ def tapdb_tool_version() -> str:
 def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
     env = apply_runtime_environment(get_settings())
     runtime = os.environ.copy()
-    runtime.setdefault("TAPDB_ENV", env.env)
-    runtime.setdefault("TAPDB_DATABASE_NAME", env.database_name)
+    runtime["AWS_PROFILE"] = env.aws_profile
+    runtime["AWS_REGION"] = env.aws_region
+    runtime["AWS_DEFAULT_REGION"] = env.aws_region
+    cmd = [
+        sys.executable,
+        "-m",
+        "daylily_tapdb.cli",
+        "--client-id",
+        env.client_id,
+        "--database-name",
+        env.database_name,
+        "--env",
+        env.env,
+    ]
     if env.config_path:
-        runtime.setdefault("TAPDB_CONFIG_PATH", env.config_path)
-    runtime.setdefault("AWS_PROFILE", env.aws_profile)
-    runtime.setdefault("AWS_REGION", env.aws_region)
-    runtime.setdefault("AWS_DEFAULT_REGION", env.aws_region)
+        cmd.extend(["--config", env.config_path])
+    cmd.extend(args)
     return subprocess.run(
-        [sys.executable, "-m", "daylily_tapdb.cli", *args],
+        cmd,
         env=runtime,
         capture_output=True,
         text=True,

@@ -20,7 +20,7 @@ class TestValidateEuid:
     """Tests for validate_euid function.
 
     BLOOM EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
-    - PREFIX: 2-3 uppercase letters identifying object type (e.g., CX, WX, MRX)
+    - PREFIX: 2-3 uppercase letters identifying object type (e.g., BCN, BWF, BCT)
     - SEQUENCE_NUMBER: Integer with NO leading zeros
 
     Valid examples: CX1, CX123, WX1000, MRX42, CWX5

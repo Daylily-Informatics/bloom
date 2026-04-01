@@ -312,10 +312,9 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         atlas_webhook_secret = ""
 
     from bloom_lims.tapdb_metrics import build_metrics_page_context
+    from bloom_lims.config import get_settings
 
-    tapdb_metrics_summary = build_metrics_page_context(
-        os.environ.get("TAPDB_ENV", "dev"), limit=1000
-    )
+    tapdb_metrics_summary = build_metrics_page_context(get_settings().tapdb.env, limit=1000)
 
     template = templates.get_template("modern/admin.html")
     context = {
@@ -342,11 +341,10 @@ async def admin_metrics(request: Request, _auth=Depends(require_auth), limit: in
         return _admin_forbidden_response(request)
 
     from bloom_lims.tapdb_metrics import build_metrics_page_context
+    from bloom_lims.config import get_settings
 
     user_data = request.session.get("user_data", {})
-    metrics_ctx = build_metrics_page_context(
-        os.environ.get("TAPDB_ENV", "dev"), limit=limit
-    )
+    metrics_ctx = build_metrics_page_context(get_settings().tapdb.env, limit=limit)
 
     template = templates.get_template("modern/admin_metrics.html")
     context = {"request": request, "udat": user_data, "user_data": user_data, **metrics_ctx}

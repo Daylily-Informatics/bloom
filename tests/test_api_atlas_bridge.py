@@ -62,8 +62,8 @@ def _payload() -> dict:
         "status": "IN_PROGRESS",
         "occurred_at": "2026-03-03T01:00:00Z",
         "reason": "Lab processing started",
-        "container_euid": "CX-RT",
-        "specimen_euid": "MX-B4",
+        "container_euid": "BCN-RT",
+        "specimen_euid": "BCT-B4",
         "metadata": {"source": "bloom", "workflow": "wgs"},
     }
 

@@ -36,7 +36,7 @@ class TestBaseSchemas:
         """Test EUID validation function.
 
         BLOOM uses TapDB/Meridian EUIDs:
-        - Production: PREFIX-BODYCHECK (e.g. CX-19, GT-13)
+        - Production: PREFIX-BODYCHECK (e.g. BCN-19, GT-13)
         - BODY is Crockford Base32 (no leading zeros)
         - CHECK is MOD32 checksum
         """
@@ -44,9 +44,9 @@ class TestBaseSchemas:
 
         from bloom_lims.schemas import validate_euid
 
-        cx1 = format_euid("CX", 1)
-        cx123 = format_euid("CX", 123)
-        wx1000 = format_euid("WX", 1000)
+        cx1 = format_euid("BCN", 1)
+        cx123 = format_euid("BCN", 123)
+        wx1000 = format_euid("BWF", 1000)
 
         # Valid EUIDs (TapDB/Meridian)
         assert validate_euid(cx1) == cx1
@@ -63,7 +63,7 @@ class TestBaseSchemas:
         with pytest.raises(ValueError):
             validate_euid("CX1")  # Missing dash+checksum segment
         with pytest.raises(ValueError):
-            validate_euid("CX-01")  # Leading zeros not allowed in BODY
+            validate_euid("BCN-01")  # Leading zeros not allowed in BODY
 
         # Bad checksum
         bad_checksum = cx1[:-1] + ("0" if cx1[-1] != "0" else "1")
@@ -71,7 +71,7 @@ class TestBaseSchemas:
             validate_euid(bad_checksum)
 
         # Sandbox EUIDs are not accepted by Bloom's public schema validators
-        sandbox = format_euid("CX", 1, sandbox="X")
+        sandbox = format_euid("BCN", 1, sandbox="X")
         with pytest.raises(ValueError):
             validate_euid(sandbox)
 
@@ -83,9 +83,9 @@ class TestBaseSchemas:
 
         from bloom_lims.schemas import validate_euid
 
-        sandbox = format_euid("CX", 1, sandbox="S")
-        wrong_prefix = format_euid("CX", 1, sandbox="T")
-        production = format_euid("CX", 1)
+        sandbox = format_euid("BCN", 1, sandbox="S")
+        wrong_prefix = format_euid("BCN", 1, sandbox="T")
+        production = format_euid("BCN", 1)
 
         assert validate_euid(sandbox) == sandbox
         with pytest.raises(ValueError):

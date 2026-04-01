@@ -33,7 +33,7 @@ TEST_COGNITO_ENV_DEFAULTS = {
 
 
 def tapdb_config_path_needs_bootstrap(path_value: str | None) -> bool:
-    """Return True when the current TAPDB_CONFIG_PATH should be replaced for tests."""
+    """Return True when the configured Bloom TapDB config path should be replaced for tests."""
     if not str(path_value or "").strip():
         return True
     return not Path(path_value).expanduser().is_file()
@@ -59,6 +59,7 @@ def create_temp_tapdb_config(
                 "  config_version: 2",
                 "  client_id: bloom",
                 "  database_name: bloom",
+                "  euid_client_code: B",
                 "environments:",
                 "  dev:",
                 "    engine_type: local",
@@ -69,7 +70,7 @@ def create_temp_tapdb_config(
                 '    password: ""',
                 '    database: "tapdb_bloom_dev"',
                 '    cognito_user_pool_id: "us-west-2_test-pool"',
-                '    audit_log_euid_prefix: "TAG"',
+                '    audit_log_euid_prefix: "BGX"',
                 '    support_email: "support@dyly.bio"',
                 "  test:",
                 "    engine_type: local",
@@ -80,7 +81,7 @@ def create_temp_tapdb_config(
                 '    password: ""',
                 '    database: "tapdb_bloom_test"',
                 '    cognito_user_pool_id: "us-west-2_test-pool"',
-                '    audit_log_euid_prefix: "TAG"',
+                '    audit_log_euid_prefix: "BGX"',
                 '    support_email: "support@dyly.bio"',
                 "",
             ]
@@ -92,27 +93,26 @@ def create_temp_tapdb_config(
 
 
 def ensure_test_runtime_environment() -> Path:
-    """Prepare deterministic env/config needed for strict app startup in tests."""
+    """Prepare deterministic Bloom config needed for strict app startup in tests."""
     os.environ.setdefault("MERIDIAN_ENVIRONMENT", "production")
     os.environ.setdefault("MERIDIAN_SANDBOX_PREFIX", "")
-    os.environ.setdefault("TAPDB_CLIENT_ID", "bloom")
-    os.environ.setdefault("TAPDB_DATABASE_NAME", "bloom")
-    os.environ.setdefault("TAPDB_STRICT_NAMESPACE", "1")
+    os.environ.setdefault("BLOOM_TAPDB__CLIENT_ID", "bloom")
+    os.environ.setdefault("BLOOM_TAPDB__DATABASE_NAME", "bloom")
+    os.environ.setdefault("BLOOM_TAPDB__STRICT_NAMESPACE", "1")
+    os.environ.setdefault(
+        "BLOOM_TAPDB__LOCAL_PG_PORT", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
+    )
 
     for key, value in TEST_COGNITO_ENV_DEFAULTS.items():
         os.environ.setdefault(key, value)
 
-    current_path = os.environ.get("TAPDB_CONFIG_PATH")
+    current_path = os.environ.get("BLOOM_TAPDB__CONFIG_PATH")
     if tapdb_config_path_needs_bootstrap(current_path):
         config_path = create_temp_tapdb_config()
-        os.environ["TAPDB_CONFIG_PATH"] = str(config_path)
+        os.environ["BLOOM_TAPDB__CONFIG_PATH"] = str(config_path)
     else:
         config_path = Path(str(current_path)).expanduser()
 
-    os.environ.setdefault(
-        "PGPORT",
-        str(os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT") or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
-    )
     os.environ.setdefault("ECHO_SQL", "False")
     os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
     os.environ.setdefault("BLOOM_RATE_LIMIT", "no")
@@ -144,7 +144,7 @@ def tapdb_local_available(*, env_name: str = "dev") -> bool:
     host = str(config.get("host") or "localhost").strip()
     port = int(
         config.get("port")
-        or os.environ.get("PGPORT")
+        or os.environ.get("BLOOM_TAPDB__LOCAL_PG_PORT")
         or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
     )
 

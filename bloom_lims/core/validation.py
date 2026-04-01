@@ -55,7 +55,7 @@ def validate_euid(value: Any, field_name: str = "euid") -> bool:
     Validate an EUID (Enterprise Unique Identifier).
 
     BLOOM EUIDs follow the pattern: PREFIX + SEQUENCE_NUMBER
-    - PREFIX: 2-3 uppercase letters identifying object type (e.g., CX, WX, MRX)
+    - PREFIX: 2-3 uppercase letters identifying object type (e.g., BCN, BWF, BCT)
     - SEQUENCE_NUMBER: Integer with NO leading zeros (critical LIMS design principle)
 
     Examples: CX1, CX123, WX1000, MRX42, CWX5

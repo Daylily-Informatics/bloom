@@ -1,6 +1,6 @@
 {
   "euid_prefixes": {
-    "default": "CX",
-    "well": "CWX"
+    "default": "BCN",
+    "well": "BCN"
   }
 }
