@@ -4,18 +4,13 @@ This module is adapted from the TapDB GUI implementation so Bloom can:
 1) collect per-query latency metrics via SQLAlchemy Engine events
 2) render the same metrics context as TapDB's `/admin/metrics`
 
-Configuration (same semantics as TapDB GUI):
-- `TAPDB_DB_METRICS=1|0` to force enable/disable.
-  - Default: enabled for non-pytest runs, disabled under pytest.
-- `TAPDB_DB_METRICS_DIR` to override root metrics directory.
-
-Metrics are best-effort and may be dropped under load to avoid impacting
-request latency.
+Metrics settings come from the explicit TapDB config selected by Bloom's
+service config. Metrics are best-effort and may be dropped under load to
+avoid impacting request latency.
 """
 
 from __future__ import annotations
 
-import os
 import queue
 import re
 import sys
@@ -30,11 +25,8 @@ from typing import Iterable, Optional
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-try:
-    # TapDB v2 config resolver (optional; we fall back if unavailable/misconfigured).
-    from daylily_tapdb.cli.context import resolve_context
-except Exception:  # pragma: no cover
-    resolve_context = None
+from bloom_lims.config import apply_runtime_environment, get_settings
+from daylily_tapdb.cli.db_config import get_admin_settings_for_env
 
 
 request_path_var: ContextVar[str] = ContextVar("tapdb_request_path", default="")
@@ -66,31 +58,27 @@ def _parse_bool(value: object, *, default: bool) -> bool:
     return default
 
 
-def _env_int(name: str, default: int) -> int:
-    raw = (os.environ.get(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        return default
+def _resolved_bloom_runtime(env_name: str | None = None) -> tuple[str, Path, dict[str, object]]:
+    ctx = apply_runtime_environment(get_settings())
+    resolved_env = str(env_name or ctx.env).strip().lower() or ctx.env
+    config_path = Path(ctx.config_path).expanduser().resolve()
+    admin_settings = get_admin_settings_for_env(
+        resolved_env,
+        config_path=config_path,
+        client_id=ctx.client_id,
+        database_name=ctx.database_name,
+        allow_namespace_fallback=False,
+    )
+    return resolved_env, config_path, admin_settings
 
 
-def _env_float(name: str, default: float) -> float:
-    raw = (os.environ.get(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
-
-
-def metrics_enabled() -> bool:
-    # Mirror TapDB GUI: default enabled for real runs, disabled under pytest unless forced.
+def metrics_enabled(env_name: str | None = None) -> bool:
+    enabled = _resolved_bloom_runtime(env_name)[2].get("metrics_enabled")
+    if isinstance(enabled, bool):
+        return enabled
     if "pytest" in sys.modules:
-        return _parse_bool(os.environ.get("TAPDB_DB_METRICS"), default=False)
-    return _parse_bool(os.environ.get("TAPDB_DB_METRICS"), default=True)
+        return False
+    return True
 
 
 def _sanitize_tsv(value: object) -> str:
@@ -134,23 +122,8 @@ def _extract_table_hint(statement: str, op: str) -> str:
 
 
 def _metrics_root_dir(env_name: str) -> Path:
-    env = (env_name or "dev").strip().lower()
-    override = (os.environ.get("TAPDB_DB_METRICS_DIR") or "").strip()
-    if override:
-        return Path(override).expanduser() / env
-
-    if resolve_context is not None:
-        try:
-            ctx = resolve_context(require_keys=False, env_name=env)
-        except Exception:
-            ctx = None
-        if ctx is not None:
-            try:
-                return ctx.runtime_dir(env) / "metrics"
-            except Exception:
-                pass
-
-    return Path.home() / ".config" / "tapdb" / "_legacy" / env / "metrics"
+    resolved_env, config_path, _admin_settings = _resolved_bloom_runtime(env_name)
+    return config_path.parent / resolved_env / "metrics"
 
 
 def two_week_period_start_utc(now_utc: datetime) -> datetime:
@@ -208,8 +181,9 @@ class MetricsRow:
 class TSVMetricsWriter:
     def __init__(self, env_name: str):
         self._env_name = (env_name or "dev").strip().lower()
-        self._queue_max = _env_int("TAPDB_DB_METRICS_QUEUE_MAX", 20000)
-        self._flush_secs = _env_float("TAPDB_DB_METRICS_FLUSH_SECS", 1.0)
+        admin_settings = _resolved_bloom_runtime(self._env_name)[2]
+        self._queue_max = int(admin_settings.get("metrics_queue_max", 20000))
+        self._flush_secs = float(admin_settings.get("metrics_flush_seconds", 1.0))
         self._queue: queue.Queue[str] = queue.Queue(maxsize=self._queue_max)
         self._dropped = 0
         self._dropped_lock = threading.Lock()
@@ -538,4 +512,3 @@ def build_metrics_page_context(env_name: str, *, limit: int = 5000) -> dict:
         "dropped_count": dropped,
         "summary": summary,
     }
-

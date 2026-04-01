@@ -17,8 +17,8 @@
 
 ## How TapDB-Local Auth Is Bypassed
 
-- Bloom sets `TAPDB_ADMIN_DISABLE_AUTH=1` before importing `admin.main.app`.
-- This disables TapDB-local auth flow for mounted mode in the Bloom process.
+- Bloom wires an explicit mounted-user resolver into the embedded TapDB app.
+- This bypasses TapDB-local auth flow for mounted mode without injecting `TAPDB_ADMIN_*`.
 - Result: Bloom auth/session is the sole gate for mounted TapDB access.
 
 ## Remaining Caveats
@@ -26,4 +26,3 @@
 - If mount is enabled and TapDB admin app fails to import/initialize, Bloom startup fails fast.
 - Mounted mode assumes Bloom session middleware is active for mounted requests.
 - Standalone TapDB behavior is unchanged when run outside Bloom.
-

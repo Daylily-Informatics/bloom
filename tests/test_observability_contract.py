@@ -177,6 +177,35 @@ def test_db_health_exposes_last_known_schema_drift(monkeypatch) -> None:
     assert schema_drift["tool_version"] == "3.0.9"
 
 
+def test_db_health_returns_payload_when_anomaly_recording_fails(monkeypatch) -> None:
+    async def _fake_check_database_health():
+        return SimpleNamespace(
+            status="unhealthy",
+            latency_ms=7.5,
+            message="db down",
+            details={"observed_at": "2026-03-29T12:02:00+00:00"},
+        )
+
+    monkeypatch.setattr(
+        "bloom_lims.observability_routes.check_database_health",
+        _fake_check_database_health,
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("cannot connect to anomaly store")
+
+    monkeypatch.setattr("bloom_lims.observability_routes._anomaly_repository", _boom)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/db_health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["database"]["status"] == "error"
+    assert payload["database"]["latest"]["detail"] == "db down"
+    assert payload["database"]["observed_at"]
+
+
 def test_observability_helpers_cover_empty_rollups_and_db_fallback(monkeypatch) -> None:
     assert _percentile([], 0.95) == 0.0
 

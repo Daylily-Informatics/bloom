@@ -45,8 +45,8 @@ Auth behavior for mounted path:
 - API/XHR-style denied access -> JSON `401`/`403`
 
 TapDB-local auth in mounted mode:
-- Bloom sets `TAPDB_ADMIN_DISABLE_AUTH=1` before loading TapDB admin app
-- TapDB login flow is bypassed for mounted requests
+- Bloom injects an explicit mounted-user identity into the embedded TapDB app
+- TapDB login flow is bypassed for mounted requests without mutating `TAPDB_ADMIN_*`
 - standalone TapDB usage remains unchanged outside Bloom
 
 ## API Tokens

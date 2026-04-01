@@ -315,10 +315,9 @@ _BLOOM_TAPDB_DATABASE_NAME="bloom"
 export MERIDIAN_ENVIRONMENT="${MERIDIAN_ENVIRONMENT:-production}"
 export MERIDIAN_SANDBOX_PREFIX="${MERIDIAN_SANDBOX_PREFIX-}"
 export BLOOM_UI_PORT="${BLOOM_UI_PORT:-$(_bloom_default_web_port)}"
-export BLOOM_TAPDB_LOCAL_PG_PORT="${BLOOM_TAPDB_LOCAL_PG_PORT:-$(_bloom_default_tapdb_local_pg_port)}"
-export BLOOM_TAPDB_DEV_PORT="${BLOOM_TAPDB_DEV_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
-export BLOOM_TAPDB_TEST_PORT="${BLOOM_TAPDB_TEST_PORT:-$BLOOM_TAPDB_LOCAL_PG_PORT}"
-_BLOOM_DEFAULT_TAPDB_CONFIG_PATH="$BLOOM_ROOT/config/tapdb-config-${_BLOOM_TAPDB_DATABASE_NAME}.yaml"
+_BLOOM_TAPDB_LOCAL_PG_PORT="$(_bloom_default_tapdb_local_pg_port)"
+_BLOOM_TAPDB_DEV_PORT="${_BLOOM_TAPDB_LOCAL_PG_PORT}"
+_BLOOM_TAPDB_TEST_PORT="${_BLOOM_TAPDB_LOCAL_PG_PORT}"
 _BLOOM_TAPDB_CONFIG_PATH="$(_bloom_prepare_tapdb_config_path "${_BLOOM_TAPDB_CLIENT_ID}" "${_BLOOM_TAPDB_DATABASE_NAME}")"
 export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
 export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
@@ -335,8 +334,8 @@ if [[ -n "${_BLOOM_TAPDB_CONFIG_PATH:-}" ]]; then
 else
     echo -e "  ${_YELLOW}⚠${_NC} Bloom TapDB config path is not set"
 fi
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB dev port=${BLOOM_TAPDB_DEV_PORT}"
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB test port=${BLOOM_TAPDB_TEST_PORT}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB dev port=${_BLOOM_TAPDB_DEV_PORT}"
+echo -e "  ${_GREEN}✓${_NC} Bloom TapDB test port=${_BLOOM_TAPDB_TEST_PORT}"
 echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
 echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
 echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
@@ -350,9 +349,6 @@ deactivate_bloom() {
     unset LSMC_DEPLOYMENT_CODE
     unset MERIDIAN_ENVIRONMENT
     unset MERIDIAN_SANDBOX_PREFIX
-    unset BLOOM_TAPDB_LOCAL_PG_PORT
-    unset BLOOM_TAPDB_DEV_PORT
-    unset BLOOM_TAPDB_TEST_PORT
     unset BLOOM_COGNITO_APP_NAME
     if [[ "${CONDA_DEFAULT_ENV:-}" == "${_BLOOM_CONDA_ENV_NAME}" ]]; then
         conda deactivate 2>/dev/null

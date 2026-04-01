@@ -8,9 +8,9 @@
 #   2. User config file (~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml)
 #   3. Template defaults (this file)
 #
-# Environment variable format:
-#   - Simple: BLOOM_DEBUG=true
-#   - Nested: BLOOM_TAPDB__ENV=dev
+# Prefer editing the deployment YAML file directly. Environment overrides remain
+# available for non-TapDB settings, but TapDB runtime selection should be driven
+# by the config file plus explicit `--config` / `--env` at the TapDB CLI layer.
 # =============================================================================
 
 # AWS SETTINGS

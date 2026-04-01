@@ -8,9 +8,9 @@
 #   2. User config file (~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml)
 #   3. Template defaults (this file)
 #
-# Environment variable format:
-#   - Simple: BLOOM_DEBUG=true
-#   - Nested: BLOOM_TAPDB__ENV=dev
+# Prefer editing the deployment YAML file directly. Environment overrides remain
+# available for non-TapDB settings, but TapDB runtime selection should be driven
+# by the config file plus explicit `--config` / `--env` at the TapDB CLI layer.
 # =============================================================================
 
 # AWS SETTINGS
@@ -35,10 +35,10 @@ ui:
 # -----------------------------------------------------------------------------
 tapdb:
   env: "dev"                    # dev, test, prod
-  client_id: "bloom"            # TAPDB_CLIENT_ID namespace key
-  database_name: "bloom"        # TAPDB_DATABASE_NAME namespace key
-  strict_namespace: true        # TAPDB_STRICT_NAMESPACE (requires TapDB v2 namespaced config)
-  config_path: ""               # Optional TAPDB_CONFIG_PATH override
+  client_id: "bloom"            # TapDB client namespace key stored in config
+  database_name: "bloom"        # TapDB database namespace stored in config
+  strict_namespace: true        # Require namespaced TapDB config semantics
+  config_path: ""               # Optional explicit TapDB config path
   local_pg_port: __BLOOM_TAPDB_LOCAL_PG_PORT__           # Default local TapDB PostgreSQL port for dev/test
   min_version: "3.0.6"         # Required minimum daylily-tapdb version
   max_version_exclusive: "4.0.0"
