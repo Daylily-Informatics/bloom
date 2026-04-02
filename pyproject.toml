@@ -41,7 +41,7 @@ dependencies = [
     "sqlalchemy>=2.0.23",
     "starlette>=0.35.1",
     "uvicorn>=0.28.0",
-    "zebra-day==3.4.0",
+    "zebra-day==3.2.0",
     "daylily-carrier-tracking==0.5.1",
 ]
 classifiers = [
