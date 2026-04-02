@@ -15,7 +15,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
@@ -26,6 +25,7 @@ from bloom_lims.domain_access import (
     is_allowed_origin,
 )
 from bloom_lims.gui.errors import register_exception_handlers
+from bloom_lims.gui.web_session import setup_bloom_session_middleware
 from bloom_lims.health import health_router, probe_router
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
 from bloom_lims.observability import BloomObservabilityStore
@@ -162,7 +162,7 @@ def create_app() -> FastAPI:
             return PlainTextResponse("Origin not allowed", status_code=403)
         return await call_next(request)
 
-    app.add_middleware(SessionMiddleware, secret_key="your-secret-key")
+    setup_bloom_session_middleware(app)
 
     mount_tapdb_admin_subapp(app)
 

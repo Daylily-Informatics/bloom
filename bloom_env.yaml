@@ -41,13 +41,13 @@ dependencies:
   - psutil>=5.9.0
   - pip:
     - cli-core-yo>=0.5.0
-    - daylily-tapdb==3.2.0
+    - daylily-tapdb==3.2.1
     # Optional local editable override for development:
     # - -e ../../daylily/daylily-tapdb
-    - daylily-cognito==0.3.0
+    - daylily-cognito==0.4.0
     # Optional local override for development:
     # - -e ../daylily-cognito
-    - zebra_day==3.2.0
+    - zebra_day==3.5.1
     - daylily-carrier-tracking==0.5.1
     - black
     - uvicorn==0.28.0

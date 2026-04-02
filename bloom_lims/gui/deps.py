@@ -17,6 +17,7 @@ from auth.cognito.client import (
 
 from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
 from bloom_lims.gui.errors import AuthenticationRequiredException, MissingCognitoEnvVarsException
+from bloom_lims.gui.web_session import load_bloom_user_data
 
 DEFAULT_DISPLAY_TIMEZONE = "UTC"
 
@@ -196,13 +197,14 @@ async def require_auth(request: Request):
         logging.error(msg)
         raise MissingCognitoEnvVarsException(msg)
 
-    if "user_data" not in request.session:
+    user_data = load_bloom_user_data(request)
+    if not user_data:
         raise AuthenticationRequiredException()
 
-    if "role" not in request.session["user_data"]:
-        request.session["user_data"]["role"] = "READ_WRITE"
+    if "role" not in user_data:
+        user_data["role"] = "READ_WRITE"
 
-    return request.session["user_data"]
+    return user_data
 
 
 def _resolve_auth_email(auth: Dict, request: Request) -> str:
