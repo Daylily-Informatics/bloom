@@ -39,7 +39,6 @@
       "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {},
-        "test_requisition_obj": {},
         "action_name": "Remove Container",
         "method_name": "do_action_remove_container_from",
         "action_executed": "0",
@@ -73,7 +72,6 @@
       "action_definition": {
         "child_workflow_step_obj": {},
         "child_container_obj": {},
-        "test_requisition_obj": {},
         "action_name": "Download Inventory TSV",
         "method_name": "do_action_generate_inventory_tsv",
         "action_executed": "0",

@@ -8,7 +8,6 @@ daylily-tapdb while exposing BLOOM-compatible ORM class wiring.
 from __future__ import annotations
 
 import logging
-import os
 from types import SimpleNamespace
 from typing import Optional
 
@@ -27,7 +26,6 @@ from daylily_tapdb.models.instance import (
     generic_instance,
     health_event_instance,
     subject_instance,
-    test_requisition_instance,
     workflow_instance,
     workflow_step_instance,
 )
@@ -42,7 +40,6 @@ from daylily_tapdb.models.lineage import (
     generic_instance_lineage,
     health_event_instance_lineage,
     subject_instance_lineage,
-    test_requisition_instance_lineage,
     workflow_instance_lineage,
     workflow_step_instance_lineage,
 )
@@ -57,7 +54,6 @@ from daylily_tapdb.models.template import (
     generic_template,
     health_event_template,
     subject_template,
-    test_requisition_template,
     workflow_step_template,
     workflow_template,
 )
@@ -256,9 +252,7 @@ class BLOOMdb3:
         try:
             from bloom_lims.config import get_settings
 
-            maybe_install_engine_metrics(
-                self.engine, env_name=get_settings().tapdb.env
-            )
+            maybe_install_engine_metrics(self.engine, env_name=get_settings().tapdb.env)
         except Exception:
             # Metrics are best-effort; never block DB init.
             pass
@@ -290,7 +284,6 @@ class BLOOMdb3:
             content_template,
             equipment_template,
             data_template,
-            test_requisition_template,
             actor_template,
             action_template,
             health_event_template,
@@ -302,7 +295,6 @@ class BLOOMdb3:
             content_instance,
             equipment_instance,
             data_instance,
-            test_requisition_instance,
             actor_instance,
             action_instance,
             health_event_instance,
@@ -314,7 +306,6 @@ class BLOOMdb3:
             content_instance_lineage,
             equipment_instance_lineage,
             data_instance_lineage,
-            test_requisition_instance_lineage,
             actor_instance_lineage,
             action_instance_lineage,
             health_event_instance_lineage,
@@ -375,7 +366,6 @@ __all__ = [
     "content_template",
     "equipment_template",
     "data_template",
-    "test_requisition_template",
     "actor_template",
     "action_template",
     "health_event_template",
@@ -387,7 +377,6 @@ __all__ = [
     "content_instance",
     "equipment_instance",
     "data_instance",
-    "test_requisition_instance",
     "actor_instance",
     "action_instance",
     "health_event_instance",
@@ -399,7 +388,6 @@ __all__ = [
     "content_instance_lineage",
     "equipment_instance_lineage",
     "data_instance_lineage",
-    "test_requisition_instance_lineage",
     "actor_instance_lineage",
     "action_instance_lineage",
     "health_event_instance_lineage",

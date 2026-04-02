@@ -21,11 +21,11 @@ Environment Variables:
                                   (useful for testing and CI environments)
 """
 
+import logging
 import os
 import time
-import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import wraps
 from threading import Lock
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
@@ -34,12 +34,23 @@ from bloom_lims.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
+
+DEFAULT_EXCLUDE_PATHS = [
+    "/health",
+    "/health/live",
+    "/health/ready",
+    # Atlas talks to these endpoints with an API key as a trusted service client.
+    # Applying the generic per-IP middleware limiter here blocks legitimate
+    # internal workflows like high-volume tube/specimen creation.
+    "/api/v1/external/atlas/",
+]
 
 
 @dataclass
 class RateLimitConfig:
     """Configuration for rate limiting."""
+
     requests_per_minute: int = 60
     requests_per_hour: int = 1000
     burst_size: int = 10
@@ -49,6 +60,7 @@ class RateLimitConfig:
 @dataclass
 class ClientBucket:
     """Token bucket for a single client."""
+
     tokens: float
     last_update: float
     requests_minute: int = 0
@@ -60,13 +72,13 @@ class ClientBucket:
 class RateLimiter:
     """
     Token bucket rate limiter with per-client tracking.
-    
+
     Implements a sliding window rate limiting algorithm that tracks:
     - Requests per minute (short-term limit)
     - Requests per hour (long-term limit)
     - Burst capacity (allow short bursts above limit)
     """
-    
+
     def __init__(
         self,
         requests_per_minute: int = 60,
@@ -76,7 +88,7 @@ class RateLimiter:
     ):
         """
         Initialize rate limiter.
-        
+
         Args:
             requests_per_minute: Max requests per minute per client
             requests_per_hour: Max requests per hour per client
@@ -87,7 +99,7 @@ class RateLimiter:
         self.requests_per_hour = requests_per_hour
         self.burst_size = burst_size
         self.enabled = enabled
-        
+
         self._buckets: Dict[str, ClientBucket] = defaultdict(
             lambda: ClientBucket(
                 tokens=burst_size,
@@ -97,46 +109,46 @@ class RateLimiter:
             )
         )
         self._lock = Lock()
-        
+
         # Load from settings if available
         settings = get_settings()
-        if hasattr(settings, 'api') and hasattr(settings.api, 'rate_limit_per_minute'):
+        if hasattr(settings, "api") and hasattr(settings.api, "rate_limit_per_minute"):
             self.requests_per_minute = settings.api.rate_limit_per_minute
-    
+
     def is_allowed(self, client_id: str) -> Tuple[bool, Dict[str, Any]]:
         """
         Check if request from client is allowed.
-        
+
         Args:
             client_id: Unique client identifier (e.g., IP address, user ID)
-            
+
         Returns:
             Tuple of (allowed, info_dict)
         """
         if not self.enabled:
             return True, {"rate_limited": False}
-        
+
         with self._lock:
             now = time.time()
             bucket = self._buckets[client_id]
-            
+
             # Refill tokens (1 token per second up to max)
             elapsed = now - bucket.last_update
             bucket.tokens = min(
                 self.burst_size,
-                bucket.tokens + elapsed * (self.requests_per_minute / 60)
+                bucket.tokens + elapsed * (self.requests_per_minute / 60),
             )
             bucket.last_update = now
-            
+
             # Reset counters if window expired
             if now - bucket.minute_start > 60:
                 bucket.requests_minute = 0
                 bucket.minute_start = now
-            
+
             if now - bucket.hour_start > 3600:
                 bucket.requests_hour = 0
                 bucket.hour_start = now
-            
+
             # Check limits
             info = {
                 "rate_limited": False,
@@ -146,21 +158,21 @@ class RateLimiter:
                 "limit_minute": self.requests_per_minute,
                 "limit_hour": self.requests_per_hour,
             }
-            
+
             # Check hourly limit
             if bucket.requests_hour >= self.requests_per_hour:
                 info["rate_limited"] = True
                 info["retry_after"] = int(3600 - (now - bucket.hour_start))
                 info["reason"] = "hourly_limit_exceeded"
                 return False, info
-            
+
             # Check minute limit (with burst tolerance)
             if bucket.requests_minute >= self.requests_per_minute and bucket.tokens < 1:
                 info["rate_limited"] = True
                 info["retry_after"] = int(60 - (now - bucket.minute_start))
                 info["reason"] = "minute_limit_exceeded"
                 return False, info
-            
+
             # Consume token and increment counters
             bucket.tokens -= 1
             bucket.requests_minute += 1
@@ -189,7 +201,7 @@ class RateLimiter:
                     "requests_per_minute": self.requests_per_minute,
                     "requests_per_hour": self.requests_per_hour,
                     "burst_size": self.burst_size,
-                }
+                },
             }
 
     def reset(self, client_id: Optional[str] = None) -> None:
@@ -230,6 +242,7 @@ def rate_limit(
         def api_endpoint(request):
             pass
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -241,9 +254,9 @@ def rate_limit(
             elif args:
                 # Try to get client IP from request object
                 request = args[0]
-                if hasattr(request, 'client'):
-                    client_id = str(getattr(request.client, 'host', 'unknown'))
-                elif hasattr(request, 'remote_addr'):
+                if hasattr(request, "client"):
+                    client_id = str(getattr(request.client, "host", "unknown"))
+                elif hasattr(request, "remote_addr"):
                     client_id = request.remote_addr
                 else:
                     client_id = "default"
@@ -259,6 +272,7 @@ def rate_limit(
                 )
                 # Raise or return appropriate response
                 from bloom_lims.core.exceptions import BloomError
+
                 raise BloomError(
                     f"Rate limit exceeded. Retry after {info.get('retry_after', 60)} seconds",
                     error_code="RATE_LIMIT_EXCEEDED",
@@ -267,6 +281,7 @@ def rate_limit(
             return func(*args, **kwargs)
 
         return wrapper  # type: ignore
+
     return decorator
 
 
@@ -301,7 +316,7 @@ class RateLimitMiddleware:
             requests_per_minute=requests_per_minute,
             requests_per_hour=requests_per_hour,
         )
-        self.exclude_paths = exclude_paths or ["/health", "/health/live", "/health/ready"]
+        self.exclude_paths = list(exclude_paths or DEFAULT_EXCLUDE_PATHS)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -333,19 +348,22 @@ class RateLimitMiddleware:
                 f'"retry_after": {info.get("retry_after", 60)}}}'
             ).encode()
 
-            await send({
-                "type": "http.response.start",
-                "status": 429,
-                "headers": [
-                    [b"content-type", b"application/json"],
-                    [b"retry-after", str(info.get("retry_after", 60)).encode()],
-                ],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": response_body,
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 429,
+                    "headers": [
+                        [b"content-type", b"application/json"],
+                        [b"retry-after", str(info.get("retry_after", 60)).encode()],
+                    ],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": response_body,
+                }
+            )
             return
 
         await self.app(scope, receive, send)
-

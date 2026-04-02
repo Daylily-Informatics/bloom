@@ -9,10 +9,10 @@ Provides automated validation for JSON templates including:
 
 Usage:
     from bloom_lims.core.template_validation import TemplateValidator
-    
+
     validator = TemplateValidator()
     result = validator.validate_all()
-    
+
     if result.errors:
         print(f"Found {len(result.errors)} errors")
 """
@@ -22,7 +22,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from bloom_lims.config import get_settings
 
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValidationResult:
     """Result of template validation."""
+
     valid: bool = True
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -42,6 +43,7 @@ class ValidationResult:
 @dataclass
 class TemplateDefinition:
     """Parsed template definition."""
+
     file_path: Path
     category: str
     type: str
@@ -55,27 +57,36 @@ class TemplateDefinition:
 class TemplateValidator:
     """
     Validates BLOOM LIMS JSON template files.
-    
+
     Performs comprehensive validation including schema checks,
     reference validation, and dependency analysis.
     """
-    
+
     # Valid categories (formerly super_types)
     VALID_CATEGORIES = {
-        "workflow", "workflow_step", "container", "content",
-        "equipment", "data", "test_requisition", "actor",
-        "action", "file", "health_event", "generic", "subject"
+        "workflow",
+        "workflow_step",
+        "container",
+        "content",
+        "equipment",
+        "data",
+        "actor",
+        "action",
+        "file",
+        "health_event",
+        "generic",
+        "subject",
     }
     # Backward compatibility alias
     VALID_SUPER_TYPES = VALID_CATEGORIES
-    
+
     # Required fields for different template types
     REQUIRED_FIELDS = {
         "action": ["action_definition"],
         "workflow": ["action_imports"],
         "workflow_step": ["action_imports"],
     }
-    
+
     # Template reference pattern
     REFERENCE_PATTERN = re.compile(
         r"^([a-z_]+)/([a-z0-9_\-*]+)/([a-z0-9_\-*]+)/([0-9.*]+)/?$"
@@ -87,58 +98,58 @@ class TemplateValidator:
     ACTION_TEMPLATE_CODE_PATTERN = re.compile(
         r"^action/[a-z0-9_-]+/[a-z0-9_-]+/[0-9]+(?:\.[0-9]+)*$"
     )
-    
+
     def __init__(self, config_path: Optional[Path] = None):
         """
         Initialize validator.
-        
+
         Args:
             config_path: Path to config directory (defaults to bloom_lims/config)
         """
         self._settings = get_settings()
-        
+
         if config_path is None:
             self._config_path = Path(__file__).parent.parent / "config"
         else:
             self._config_path = config_path
-        
+
         self._templates: Dict[str, TemplateDefinition] = {}
         self._action_references: Set[str] = set()
-    
+
     def validate_all(self) -> ValidationResult:
         """
         Validate all templates in the config directory.
-        
+
         Returns:
             ValidationResult with errors and warnings
         """
         result = ValidationResult()
-        
+
         if not self._config_path.exists():
             result.valid = False
             result.errors.append(f"Config directory not found: {self._config_path}")
             return result
-        
+
         # First pass: Load and parse all templates
         self._load_templates(result)
-        
+
         # Second pass: Validate references
         self._validate_references(result)
-        
+
         # Third pass: Check for circular dependencies
         self._check_circular_dependencies(result)
-        
+
         result.valid = len(result.errors) == 0
         return result
-    
+
     def _load_templates(self, result: ValidationResult) -> None:
         """Load and parse all template files."""
         for json_file in self._config_path.rglob("*.json"):
             if json_file.name == "metadata.json":
                 continue
-            
+
             result.files_checked += 1
-            
+
             try:
                 with open(json_file) as f:
                     data = json.load(f)
@@ -158,10 +169,14 @@ class TemplateValidator:
                         result.templates_checked += 1
 
                         self._validate_template_structure(
-                            json_file, category, type_name, version,
-                            template_data, result
+                            json_file,
+                            category,
+                            type_name,
+                            version,
+                            template_data,
+                            result,
                         )
-                        
+
             except json.JSONDecodeError as e:
                 result.errors.append(f"{json_file}: Invalid JSON - {e}")
             except Exception as e:
@@ -174,7 +189,7 @@ class TemplateValidator:
         type_name: str,
         version: str,
         data: Dict[str, Any],
-        result: ValidationResult
+        result: ValidationResult,
     ) -> None:
         """Validate individual template structure."""
         template_id = f"{category}/{type_name}/{version}"
@@ -231,7 +246,7 @@ class TemplateValidator:
         file_path: Path,
         template_id: str,
         action_imports: Dict[str, Any],
-        result: ValidationResult
+        result: ValidationResult,
     ) -> None:
         """Validate action_imports structure."""
         if not isinstance(action_imports, dict):
@@ -241,9 +256,9 @@ class TemplateValidator:
             return
 
         for action_key, template_code in action_imports.items():
-            if not isinstance(action_key, str) or not self.ACTION_IMPORT_KEY_PATTERN.match(
-                action_key
-            ):
+            if not isinstance(
+                action_key, str
+            ) or not self.ACTION_IMPORT_KEY_PATTERN.match(action_key):
                 result.errors.append(
                     f"{file_path}: {template_id} action_imports key '{action_key}' "
                     "must be snake_case (^[a-z][a-z0-9_]*$)"
@@ -295,7 +310,7 @@ class TemplateValidator:
         file_path: Path,
         template_id: str,
         layouts: List[Any],
-        result: ValidationResult
+        result: ValidationResult,
     ) -> None:
         """Validate instantiation_layouts structure."""
         if not isinstance(layouts, list):
@@ -314,7 +329,9 @@ class TemplateValidator:
         """Validate all cross-references between templates."""
         for ref in self._action_references:
             if not self._is_valid_reference(ref):
-                result.warnings.append(f"Action reference '{ref}' may be invalid pattern")
+                result.warnings.append(
+                    f"Action reference '{ref}' may be invalid pattern"
+                )
 
     def _is_valid_reference(self, ref: str) -> bool:
         """Check if a template reference is valid."""
