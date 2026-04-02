@@ -1362,7 +1362,9 @@ class TestOAuthEndpoints:
         """Test OAuth callback GET without authorization code."""
         response = client.get("/oauth_callback", follow_redirects=False)
         assert response.status_code == 303
-        assert response.headers["location"].startswith("/auth/error?reason=missing_code")
+        assert response.headers["location"].startswith(
+            "/auth/error?reason=missing_code"
+        )
 
     def test_oauth_callback_post_without_code(self, client):
         """Test OAuth callback POST without authorization code."""
@@ -1990,7 +1992,9 @@ class TestOAuthEndpointsV2:
         """Test OAuth callback GET endpoint."""
         response = client.get("/oauth_callback", follow_redirects=False)
         assert response.status_code == 303
-        assert response.headers["location"].startswith("/auth/error?reason=missing_code")
+        assert response.headers["location"].startswith(
+            "/auth/error?reason=missing_code"
+        )
 
     def test_oauth_callback_post(self, client):
         """Test OAuth callback POST endpoint."""

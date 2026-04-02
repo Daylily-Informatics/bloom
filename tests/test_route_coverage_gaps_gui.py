@@ -27,7 +27,9 @@ import main
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(main.app, raise_server_exceptions=False, base_url="https://testserver")
+    return TestClient(
+        main.app, raise_server_exceptions=False, base_url="https://testserver"
+    )
 
 
 def _warm_session(client: TestClient) -> None:
