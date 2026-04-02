@@ -357,7 +357,10 @@ class TestDAGEndpoints:
     def test_dindex2_bootstraps_external_merge_ref(self, client):
         response = client.get("/dindex2?start_euid=BCN-1&merge_ref=2")
         assert response.status_code == 200
-        assert "defaultMergeRef: 2" in response.text or '"defaultMergeRef": 2' in response.text
+        assert (
+            "defaultMergeRef: 2" in response.text
+            or '"defaultMergeRef": 2' in response.text
+        )
 
     def test_get_dagv2_requires_euid(self, client):
         """Test get_dagv2 requires euid parameter."""
