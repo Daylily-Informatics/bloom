@@ -31,12 +31,38 @@ _CYAN='\033[0;36m'
 _NC='\033[0m'
 _BLOOM_PYTHON=""
 _BLOOM_CONDA_ENV_BASE="BLOOM"
+_BLOOM_LEGACY_REBIND_VARS=(
+    USE_LOCAL_DAYLILY_TAPDB
+    USE_LOCAL_DAYLILY_COGNITO
+    USE_LOCAL_CLI_CORE_YO
+)
 
-_bloom_truthy() {
-    case "${1:-}" in
-        1|true|TRUE|yes|YES|on|ON) return 0 ;;
-        *) return 1 ;;
-    esac
+_bloom_reject_legacy_local_rebind_env() {
+    local var_name=""
+    local var_value=""
+    for var_name in "${_BLOOM_LEGACY_REBIND_VARS[@]}"; do
+        var_value="$(eval "printf '%s' \"\${${var_name}:-}\"")"
+        if [[ -n "$var_value" ]]; then
+            echo -e "  ${_YELLOW}⚠${_NC} ${var_name} is no longer supported."
+            echo -e "  ${_CYAN}→${_NC} Bloom activation now requires packaged dependencies from ${_BLOOM_CONDA_ENV_NAME:-the active conda environment}."
+            return 1
+        fi
+    done
+}
+
+_bloom_require_python_import() {
+    local module_name="$1"
+    local package_name="$2"
+    if ! "${_BLOOM_PYTHON:-python}" - "$module_name" <<'PY' >/dev/null 2>&1
+import importlib
+import sys
+
+importlib.import_module(sys.argv[1])
+PY
+    then
+        echo -e "  ${_YELLOW}⚠${_NC} Missing packaged dependency: ${package_name}"
+        return 1
+    fi
 }
 
 _bloom_default_web_port() {
@@ -108,27 +134,9 @@ export LSMC_DEPLOYMENT_CODE="${_bloom_deployment_code}"
 _BLOOM_CONDA_ENV_NAME="${_BLOOM_CONDA_ENV_BASE}-${_bloom_deployment_code}"
 unset _bloom_deployment_code
 
-_bloom_resolve_local_repo() {
-    local module_dir="$1"
-    shift
-    local candidate=""
-    local candidate_path=""
-    local fallback=""
-    for candidate in "$@"; do
-        [[ -d "$candidate" ]] || continue
-        candidate_path="$(cd "$candidate" 2>/dev/null && pwd)"
-        [[ -n "$candidate_path" ]] || continue
-        [[ -d "${candidate_path}/${module_dir}" ]] || continue
-        if [[ -d "${candidate_path}/.git" ]]; then
-            printf '%s\n' "$candidate_path"
-            return 0
-        fi
-        if [[ -z "$fallback" ]]; then
-            fallback="$candidate_path"
-        fi
-    done
-    [[ -n "$fallback" ]] && printf '%s\n' "$fallback"
-}
+if ! _bloom_reject_legacy_local_rebind_env; then
+    return 1
+fi
 
 _bloom_module_is_from_repo() {
     local module_name="$1"
@@ -145,22 +153,6 @@ if not module_file:
     raise SystemExit(1)
 module_path = pathlib.Path(module_file).resolve()
 raise SystemExit(0 if module_path == repo_root or repo_root in module_path.parents else 1)
-PY
-}
-
-_bloom_module_is_from_dayhoff_artifact() {
-    local module_name="$1"
-    "${_BLOOM_PYTHON:-python}" - "$module_name" <<'PY' >/dev/null 2>&1
-import importlib
-import pathlib
-import sys
-
-module = importlib.import_module(sys.argv[1])
-module_file = getattr(module, "__file__", "")
-if not module_file:
-    raise SystemExit(1)
-module_path = pathlib.Path(module_file).resolve()
-raise SystemExit(0 if ".dayhoff/local" in str(module_path) else 1)
 PY
 }
 
@@ -267,49 +259,13 @@ if ! _bloom_ensure_editable_repo "Bloom" "bloom_lims" "$BLOOM_ROOT" "" "bloom_li
     return 1
 fi
 
-_BLOOM_TAPDB_REPO="$(_bloom_resolve_local_repo \
-    daylily_tapdb \
-    "$BLOOM_ROOT/../daylily-tapdb" \
-    "$BLOOM_ROOT/../lims_repos/daylily-tapdb"
-)"
-if _bloom_distribution_is_editable_from_repo "daylily-tapdb" "${_BLOOM_TAPDB_REPO:-}"; then
-    echo -e "  ${_GREEN}✓${_NC} Using local daylily-tapdb checkout: ${_BLOOM_TAPDB_REPO}"
-elif _bloom_truthy "${USE_LOCAL_DAYLILY_TAPDB:-0}" || _bloom_module_is_from_dayhoff_artifact "daylily_tapdb"; then
-    if ! _bloom_truthy "${USE_LOCAL_DAYLILY_TAPDB:-0}"; then
-        echo -e "  ${_CYAN}→${_NC} Rebinding daylily-tapdb from stale Dayhoff artifact to local source checkout..."
-    fi
-    if ! _bloom_ensure_editable_repo "daylily-tapdb" "daylily_tapdb" "${_BLOOM_TAPDB_REPO:-}" "[cli,admin,aurora,dev]"; then
-        return 1
-    fi
-else
-    echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
-fi
+echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
+echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-cognito from ${_BLOOM_CONDA_ENV_NAME}"
+echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
 
-_BLOOM_DAYCOG_REPO="$(_bloom_resolve_local_repo \
-    daylily_cognito \
-    "$BLOOM_ROOT/../daylily-cognito" \
-    "$BLOOM_ROOT/../lims_repos/daylily-cognito"
-)"
-if _bloom_truthy "${USE_LOCAL_DAYLILY_COGNITO:-0}"; then
-    if ! _bloom_ensure_editable_repo "daylily-cognito" "daylily_cognito" "${_BLOOM_DAYCOG_REPO:-}"; then
-        return 1
-    fi
-else
-    echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-cognito from ${_BLOOM_CONDA_ENV_NAME}"
-fi
-
-_BLOOM_CLI_CORE_REPO="$(_bloom_resolve_local_repo \
-    cli_core_yo \
-    "$BLOOM_ROOT/../cli-core-yo" \
-    "$BLOOM_ROOT/../lims_repos/cli-core-yo"
-)"
-if _bloom_truthy "${USE_LOCAL_CLI_CORE_YO:-0}"; then
-    if ! _bloom_ensure_editable_repo "cli-core-yo" "cli_core_yo" "${_BLOOM_CLI_CORE_REPO:-}"; then
-        return 1
-    fi
-else
-    echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
-fi
+_bloom_require_python_import "daylily_tapdb" "daylily-tapdb" || return 1
+_bloom_require_python_import "daylily_cognito" "daylily-cognito" || return 1
+_bloom_require_python_import "cli_core_yo" "cli-core-yo" || return 1
 
 if command -v rehash >/dev/null 2>&1; then
     rehash
