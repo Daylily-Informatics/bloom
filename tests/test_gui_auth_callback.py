@@ -13,7 +13,6 @@ os.environ.setdefault("BLOOM_DEV_AUTH_BYPASS", "true")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main
-from auth.cognito.client import CognitoTokenError
 from bloom_lims.gui.routes.auth import SessionBootstrapError
 from bloom_lims.gui.web_session import _normalize_user_data
 
