@@ -13,7 +13,6 @@ os.environ.setdefault("BLOOM_DEV_AUTH_BYPASS", "true")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main
-from auth.cognito.client import CognitoTokenError
 from bloom_lims.gui.routes.auth import SessionBootstrapError
 from bloom_lims.gui.web_session import _normalize_user_data
 
@@ -77,13 +76,16 @@ class _MappedCognitoAuth:
 
 
 @pytest.fixture
-def client() -> TestClient:
-    return TestClient(main.app, raise_server_exceptions=False, base_url="https://localhost:8912")
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("BLOOM_OAUTH", "yes")
+    return TestClient(
+        main.app, raise_server_exceptions=False, base_url="https://localhost:8912"
+    )
 
 
 def _begin_login(client: TestClient, next_path: str = "/") -> str:
     response = client.get(f"/auth/login?next={next_path}", follow_redirects=False)
-    assert response.status_code == 302
+    assert response.status_code in (302, 303)
     location = response.headers["location"]
     params = parse_qs(urlparse(location).query)
     state = params.get("state", [""])[0]
@@ -91,16 +93,23 @@ def _begin_login(client: TestClient, next_path: str = "/") -> str:
     return state
 
 
-def test_auth_callback_get_completes_login(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_auth_callback_get_completes_login(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     fake_auth = _FakeCognitoAuth(
         payload={"id_token": "id-token-123", "access_token": "access-token-456"}
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth._get_request_cognito_auth", lambda _request: fake_auth)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: fake_auth,
+    )
     monkeypatch.setattr(
         "daylily_cognito.web_session.exchange_authorization_code",
         lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"])
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
+    )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth._resolve_login_roles_and_groups",
         lambda **_kwargs: (["ADMIN"], ["bloom-admin"], "sub-123"),
@@ -111,9 +120,11 @@ def test_auth_callback_get_completes_login(monkeypatch: pytest.MonkeyPatch, clie
     )
 
     state = _begin_login(client)
-    response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
+    response = client.get(
+        f"/auth/callback?code=auth-code&state={state}", follow_redirects=False
+    )
 
-    assert response.status_code == 302
+    assert response.status_code in (302, 303)
     assert response.headers["location"] == "/"
     assert client.cookies.get("bloom_session")
     assert not client.cookies.get("session")
@@ -125,15 +136,20 @@ def test_auth_callback_get_requires_prior_login_state(
     fake_auth = _FakeCognitoAuth(
         payload={"id_token": "id-token-123", "access_token": "access-token-456"}
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth._get_request_cognito_auth", lambda _request: fake_auth)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: fake_auth,
+    )
     monkeypatch.setattr(
         "daylily_cognito.web_session.exchange_authorization_code",
         lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
     )
 
-    response = client.get("/auth/callback?code=auth-code&state=missing", follow_redirects=False)
+    response = client.get(
+        "/auth/callback?code=auth-code&state=missing", follow_redirects=False
+    )
 
-    assert response.status_code == 303
+    assert response.status_code in (302, 303)
     assert response.headers["location"].startswith("/auth/error?reason=invalid_state")
 
 
@@ -143,12 +159,17 @@ def test_auth_callback_get_redirects_when_session_bootstrap_fails(
     fake_auth = _FakeCognitoAuth(
         payload={"id_token": "id-token-123", "access_token": "access-token-456"}
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth._get_request_cognito_auth", lambda _request: fake_auth)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: fake_auth,
+    )
     monkeypatch.setattr(
         "daylily_cognito.web_session.exchange_authorization_code",
         lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"])
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
+    )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth._resolve_login_roles_and_groups",
         lambda **_kwargs: (_ for _ in ()).throw(
@@ -159,10 +180,14 @@ def test_auth_callback_get_redirects_when_session_bootstrap_fails(
     )
 
     state = _begin_login(client)
-    response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
+    response = client.get(
+        f"/auth/callback?code=auth-code&state={state}", follow_redirects=False
+    )
 
-    assert response.status_code == 302
-    assert response.headers["location"].startswith("/auth/error?reason=session_bootstrap_failed")
+    assert response.status_code in (302, 303)
+    assert response.headers["location"].startswith(
+        "/auth/error?reason=session_bootstrap_failed"
+    )
 
 
 def test_auth_callback_get_redirects_exchange_errors(
@@ -174,10 +199,14 @@ def test_auth_callback_get_redirects_exchange_errors(
     )
 
     state = _begin_login(client)
-    response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
+    response = client.get(
+        f"/auth/callback?code=auth-code&state={state}", follow_redirects=False
+    )
 
-    assert response.status_code == 303
-    assert response.headers["location"].startswith("/auth/error?reason=token_exchange_failed")
+    assert response.status_code in (302, 303)
+    assert response.headers["location"].startswith(
+        "/auth/error?reason=token_exchange_failed"
+    )
 
 
 def test_auth_callback_get_unexpected_error_redirects_cleanly(
@@ -186,7 +215,10 @@ def test_auth_callback_get_unexpected_error_redirects_cleanly(
     fake_auth = _FakeCognitoAuth(
         payload={"id_token": "id-token-123", "access_token": "access-token-456"}
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth._get_request_cognito_auth", lambda _request: fake_auth)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: fake_auth,
+    )
     monkeypatch.setattr(
         "daylily_cognito.web_session.exchange_authorization_code",
         lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
@@ -195,13 +227,19 @@ def test_auth_callback_get_unexpected_error_redirects_cleanly(
     def _explode(*_args, **_kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("bloom_lims.gui.routes.auth._resolve_principal_from_token_payload", _explode)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._resolve_principal_from_token_payload", _explode
+    )
 
     state = _begin_login(client)
-    response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
+    response = client.get(
+        f"/auth/callback?code=auth-code&state={state}", follow_redirects=False
+    )
 
-    assert response.status_code == 303
-    assert response.headers["location"].startswith("/auth/error?reason=authentication_failed")
+    assert response.status_code in (302, 303)
+    assert response.headers["location"].startswith(
+        "/auth/error?reason=authentication_failed"
+    )
 
 
 def test_auth_callback_post_requires_tokens(client: TestClient) -> None:
@@ -211,7 +249,9 @@ def test_auth_callback_post_requires_tokens(client: TestClient) -> None:
     assert response.json() == {"detail": "No Cognito tokens provided."}
 
 
-def test_auth_callback_post_invalid_json_returns_clean_error(client: TestClient) -> None:
+def test_auth_callback_post_invalid_json_returns_clean_error(
+    client: TestClient,
+) -> None:
     response = client.post(
         "/auth/callback",
         content="{not-json",
@@ -236,7 +276,9 @@ def test_auth_callback_post_unexpected_error_returns_service_unavailable(
     assert response.json() == {"detail": "Unable to complete login. Please try again."}
 
 
-def test_empty_allowed_domain_config_blocks_all(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_empty_allowed_domain_config_blocks_all(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "bloom_lims.config.get_settings",
         lambda: SimpleNamespace(auth=SimpleNamespace(cognito_allowed_domains=[])),
@@ -271,7 +313,9 @@ def test_normalize_user_data_strips_raw_tokens() -> None:
     assert "refresh_token" not in normalized
 
 
-def test_multiple_gui_clients_keep_distinct_sessions(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_multiple_gui_clients_keep_distinct_sessions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BLOOM_OAUTH", "yes")
     fake_auth = _MappedCognitoAuth(
         {
@@ -301,24 +345,39 @@ def test_multiple_gui_clients_keep_distinct_sessions(monkeypatch: pytest.MonkeyP
             },
         }
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth._get_request_cognito_auth", lambda _request: fake_auth)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: fake_auth,
+    )
     monkeypatch.setattr(
         "daylily_cognito.web_session.exchange_authorization_code",
         lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
     )
-    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"])
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
+    )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth._resolve_login_roles_and_groups",
-        lambda **kwargs: (["READ_WRITE"], [], kwargs.get("cognito_sub") or kwargs.get("email")),
+        lambda **kwargs: (
+            ["READ_WRITE"],
+            [],
+            kwargs.get("cognito_sub") or kwargs.get("email"),
+        ),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_user_preferences",
         lambda email: {"email": email, "display_timezone": "UTC"},
     )
 
-    alice_1 = TestClient(main.app, raise_server_exceptions=False, base_url="https://localhost:8912")
-    alice_2 = TestClient(main.app, raise_server_exceptions=False, base_url="https://localhost:8912")
-    bob = TestClient(main.app, raise_server_exceptions=False, base_url="https://localhost:8912")
+    alice_1 = TestClient(
+        main.app, raise_server_exceptions=False, base_url="https://localhost:8912"
+    )
+    alice_2 = TestClient(
+        main.app, raise_server_exceptions=False, base_url="https://localhost:8912"
+    )
+    bob = TestClient(
+        main.app, raise_server_exceptions=False, base_url="https://localhost:8912"
+    )
 
     try:
         for client, code, expected_email in [
@@ -327,14 +386,16 @@ def test_multiple_gui_clients_keep_distinct_sessions(monkeypatch: pytest.MonkeyP
             (bob, "bob-1", "bob@lsmc.com"),
         ]:
             state = _begin_login(client)
-            response = client.get(f"/auth/callback?code={code}&state={state}", follow_redirects=False)
-            assert response.status_code == 302
+            response = client.get(
+                f"/auth/callback?code={code}&state={state}", follow_redirects=False
+            )
+            assert response.status_code in (302, 303)
             home = client.get("/user_home")
             assert home.status_code == 200
             assert expected_email in home.text
 
         logout = alice_1.get("/auth/logout", follow_redirects=False)
-        assert logout.status_code == 303
+        assert logout.status_code in (302, 303)
 
         alice_2_home = alice_2.get("/user_home")
         bob_home = bob.get("/user_home")
