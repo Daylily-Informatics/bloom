@@ -34,8 +34,12 @@ def test_hydrate_dynamic_action_groups_removes_retired_assay_markup():
 
     hydrated = hydrate_dynamic_action_groups(action_groups, SimpleNamespace())
 
-    original_action = action_groups["core"]["actions"]["action/core/add_container_to_assay_q/1.0"]
-    hydrated_action = hydrated["core"]["actions"]["action/core/add_container_to_assay_q/1.0"]
+    original_action = action_groups["core"]["actions"][
+        "action/core/add_container_to_assay_q/1.0"
+    ]
+    hydrated_action = hydrated["core"]["actions"][
+        "action/core/add_container_to_assay_q/1.0"
+    ]
 
     assert original_action["captured_data"] == {}
     assert "___workflow/assay/" not in hydrated_action["captured_data"]
