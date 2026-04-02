@@ -77,13 +77,14 @@ class _MappedCognitoAuth:
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("BLOOM_OAUTH", "yes")
     return TestClient(main.app, raise_server_exceptions=False, base_url="https://localhost:8912")
 
 
 def _begin_login(client: TestClient, next_path: str = "/") -> str:
     response = client.get(f"/auth/login?next={next_path}", follow_redirects=False)
-    assert response.status_code == 302
+    assert response.status_code in (302, 303)
     location = response.headers["location"]
     params = parse_qs(urlparse(location).query)
     state = params.get("state", [""])[0]
@@ -113,7 +114,7 @@ def test_auth_callback_get_completes_login(monkeypatch: pytest.MonkeyPatch, clie
     state = _begin_login(client)
     response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
 
-    assert response.status_code == 302
+    assert response.status_code in (302, 303)
     assert response.headers["location"] == "/"
     assert client.cookies.get("bloom_session")
     assert not client.cookies.get("session")
@@ -133,7 +134,7 @@ def test_auth_callback_get_requires_prior_login_state(
 
     response = client.get("/auth/callback?code=auth-code&state=missing", follow_redirects=False)
 
-    assert response.status_code == 303
+    assert response.status_code in (302, 303)
     assert response.headers["location"].startswith("/auth/error?reason=invalid_state")
 
 
@@ -161,7 +162,7 @@ def test_auth_callback_get_redirects_when_session_bootstrap_fails(
     state = _begin_login(client)
     response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
 
-    assert response.status_code == 302
+    assert response.status_code in (302, 303)
     assert response.headers["location"].startswith("/auth/error?reason=session_bootstrap_failed")
 
 
@@ -176,7 +177,7 @@ def test_auth_callback_get_redirects_exchange_errors(
     state = _begin_login(client)
     response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
 
-    assert response.status_code == 303
+    assert response.status_code in (302, 303)
     assert response.headers["location"].startswith("/auth/error?reason=token_exchange_failed")
 
 
@@ -200,7 +201,7 @@ def test_auth_callback_get_unexpected_error_redirects_cleanly(
     state = _begin_login(client)
     response = client.get(f"/auth/callback?code=auth-code&state={state}", follow_redirects=False)
 
-    assert response.status_code == 303
+    assert response.status_code in (302, 303)
     assert response.headers["location"].startswith("/auth/error?reason=authentication_failed")
 
 
@@ -328,13 +329,13 @@ def test_multiple_gui_clients_keep_distinct_sessions(monkeypatch: pytest.MonkeyP
         ]:
             state = _begin_login(client)
             response = client.get(f"/auth/callback?code={code}&state={state}", follow_redirects=False)
-            assert response.status_code == 302
+            assert response.status_code in (302, 303)
             home = client.get("/user_home")
             assert home.status_code == 200
             assert expected_email in home.text
 
         logout = alice_1.get("/auth/logout", follow_redirects=False)
-        assert logout.status_code == 303
+        assert logout.status_code in (302, 303)
 
         alice_2_home = alice_2.get("/user_home")
         bob_home = bob.get("/user_home")

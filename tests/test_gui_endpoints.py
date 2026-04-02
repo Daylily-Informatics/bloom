@@ -27,7 +27,7 @@ from main import app
 @pytest.fixture
 def client():
     """Create test client with auth disabled."""
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app, raise_server_exceptions=False, base_url="https://testserver")
 
 
 class TestPublicEndpoints:
@@ -1360,9 +1360,9 @@ class TestOAuthEndpoints:
 
     def test_oauth_callback_get_without_code(self, client):
         """Test OAuth callback GET without authorization code."""
-        response = client.get("/oauth_callback")
-        assert response.status_code == 200
-        assert "Processing your login" in response.text
+        response = client.get("/oauth_callback", follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"].startswith("/auth/error?reason=missing_code")
 
     def test_oauth_callback_post_without_code(self, client):
         """Test OAuth callback POST without authorization code."""
@@ -1988,9 +1988,9 @@ class TestOAuthEndpointsV2:
 
     def test_oauth_callback_get(self, client):
         """Test OAuth callback GET endpoint."""
-        response = client.get("/oauth_callback")
-        assert response.status_code == 200
-        assert "Processing your login" in response.text
+        response = client.get("/oauth_callback", follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"].startswith("/auth/error?reason=missing_code")
 
     def test_oauth_callback_post(self, client):
         """Test OAuth callback POST endpoint."""

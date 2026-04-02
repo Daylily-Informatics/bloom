@@ -27,7 +27,7 @@ import main
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(main.app, raise_server_exceptions=False)
+    return TestClient(main.app, raise_server_exceptions=False, base_url="https://testserver")
 
 
 def _warm_session(client: TestClient) -> None:
@@ -74,9 +74,9 @@ def _create_queue_instance(client: TestClient) -> dict:
 
 
 def test_auth_callback_aliases(client: TestClient) -> None:
-    resp = client.get("/auth/callback")
-    assert resp.status_code == 200
-    assert "Processing" in resp.text or "login" in resp.text.lower()
+    resp = client.get("/auth/callback", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"].startswith("/auth/error?reason=missing_code")
 
     with patch(
         "bloom_lims.gui.routes.auth._complete_cognito_login",
