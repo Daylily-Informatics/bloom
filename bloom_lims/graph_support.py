@@ -10,7 +10,6 @@ from urllib.parse import urlencode
 from bloom_lims.config import get_settings
 from bloom_lims.db import get_parent_lineages
 
-
 GRAPH_CATEGORY_COLORS = {
     "workflow": "#00FF7F",
     "workflow_step": "#ADFF2F",

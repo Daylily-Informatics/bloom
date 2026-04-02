@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from bloom_lims.api.rate_limiting import RateLimitMiddleware, RateLimiter
+from bloom_lims.api.rate_limiting import RateLimiter, RateLimitMiddleware
 
 
 async def _ok_app(scope, receive, send):

@@ -9,8 +9,9 @@ With BLOOM_OAUTH=no, authentication is bypassed for testing.
 
 import os
 import sys
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # Set up auth bypass BEFORE importing FastAPI app
 os.environ["BLOOM_OAUTH"] = "no"
@@ -941,6 +942,7 @@ class TestModernUINavigation:
 
     def test_dashboard_hides_admin_nav_for_non_admin(self, client):
         from fastapi import Request
+
         from bloom_lims.gui.deps import require_auth
 
         async def _non_admin_auth(request: Request):
@@ -1156,7 +1158,7 @@ class TestProtectedEndpoints:
 
 
 @pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
-class TestWorkflowEndpoints:
+class TestWorkflowEndpointsV2:
     """Tests for workflow-related endpoints."""
 
     def test_legacy_step_action_route_removed(self, client):
@@ -1189,7 +1191,7 @@ class TestDeleteEndpoints:
         assert response.status_code in [200, 307, 400, 404, 422, 500]
 
 
-class TestDAGEndpoints:
+class TestDAGEndpointsV2:
     """Tests for DAG (directed acyclic graph) endpoints."""
 
     def test_update_dag_post(self, client):
@@ -1413,7 +1415,7 @@ class TestDagEndpoints:
 
 
 @pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
-class TestWorkflowEndpoints:
+class TestWorkflowEndpointsV3:
     """Tests for workflow-related endpoints."""
 
     def test_workflow_summary(self, client):
@@ -1507,7 +1509,7 @@ class TestFileSetEndpoints:
         assert response.status_code in [404, 302, 307, 400, 422, 500]
 
 
-class TestInstanceCreationEndpoints:
+class TestInstanceCreationEndpointsV2:
     """Tests for instance creation endpoints."""
 
     def test_create_from_template_get(self, client):
@@ -1554,7 +1556,7 @@ class TestNodePropertyEndpoints:
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
 
-class TestScriptsEndpoint:
+class TestScriptsEndpointV2:
     """Tests for scripts endpoint."""
 
     def test_list_scripts(self, client):
@@ -1725,7 +1727,7 @@ class TestObjectTemplatesEndpoints:
         assert response.status_code in [302, 307, 400, 410, 422, 500]
 
 
-class TestQueueEndpoints:
+class TestQueueEndpointsV2:
     """Tests for queue endpoints."""
 
     def test_queue_details_no_params(self, client):
@@ -1927,7 +1929,7 @@ class TestJSONUpdateEndpoints:
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
-class TestOAuthEndpoints:
+class TestOAuthEndpointsV2:
     """Tests for OAuth endpoints."""
 
     def test_oauth_callback_get(self, client):

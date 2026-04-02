@@ -9,10 +9,10 @@ Provides automated validation for JSON templates including:
 
 Usage:
     from bloom_lims.core.template_validation import TemplateValidator
-    
+
     validator = TemplateValidator()
     result = validator.validate_all()
-    
+
     if result.errors:
         print(f"Found {len(result.errors)} errors")
 """
@@ -22,7 +22,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from bloom_lims.config import get_settings
 
@@ -55,11 +55,11 @@ class TemplateDefinition:
 class TemplateValidator:
     """
     Validates BLOOM LIMS JSON template files.
-    
+
     Performs comprehensive validation including schema checks,
     reference validation, and dependency analysis.
     """
-    
+
     # Valid categories (formerly super_types)
     VALID_CATEGORIES = {
         "workflow", "workflow_step", "container", "content",
@@ -68,14 +68,14 @@ class TemplateValidator:
     }
     # Backward compatibility alias
     VALID_SUPER_TYPES = VALID_CATEGORIES
-    
+
     # Required fields for different template types
     REQUIRED_FIELDS = {
         "action": ["action_definition"],
         "workflow": ["action_imports"],
         "workflow_step": ["action_imports"],
     }
-    
+
     # Template reference pattern
     REFERENCE_PATTERN = re.compile(
         r"^([a-z_]+)/([a-z0-9_\-*]+)/([a-z0-9_\-*]+)/([0-9.*]+)/?$"
@@ -87,58 +87,58 @@ class TemplateValidator:
     ACTION_TEMPLATE_CODE_PATTERN = re.compile(
         r"^action/[a-z0-9_-]+/[a-z0-9_-]+/[0-9]+(?:\.[0-9]+)*$"
     )
-    
+
     def __init__(self, config_path: Optional[Path] = None):
         """
         Initialize validator.
-        
+
         Args:
             config_path: Path to config directory (defaults to bloom_lims/config)
         """
         self._settings = get_settings()
-        
+
         if config_path is None:
             self._config_path = Path(__file__).parent.parent / "config"
         else:
             self._config_path = config_path
-        
+
         self._templates: Dict[str, TemplateDefinition] = {}
         self._action_references: Set[str] = set()
-    
+
     def validate_all(self) -> ValidationResult:
         """
         Validate all templates in the config directory.
-        
+
         Returns:
             ValidationResult with errors and warnings
         """
         result = ValidationResult()
-        
+
         if not self._config_path.exists():
             result.valid = False
             result.errors.append(f"Config directory not found: {self._config_path}")
             return result
-        
+
         # First pass: Load and parse all templates
         self._load_templates(result)
-        
+
         # Second pass: Validate references
         self._validate_references(result)
-        
+
         # Third pass: Check for circular dependencies
         self._check_circular_dependencies(result)
-        
+
         result.valid = len(result.errors) == 0
         return result
-    
+
     def _load_templates(self, result: ValidationResult) -> None:
         """Load and parse all template files."""
         for json_file in self._config_path.rglob("*.json"):
             if json_file.name == "metadata.json":
                 continue
-            
+
             result.files_checked += 1
-            
+
             try:
                 with open(json_file) as f:
                     data = json.load(f)
@@ -161,7 +161,7 @@ class TemplateValidator:
                             json_file, category, type_name, version,
                             template_data, result
                         )
-                        
+
             except json.JSONDecodeError as e:
                 result.errors.append(f"{json_file}: Invalid JSON - {e}")
             except Exception as e:

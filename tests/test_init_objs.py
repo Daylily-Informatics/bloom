@@ -1,16 +1,13 @@
-import json
-from bloom_lims.db import BLOOMdb3
-
-from bloom_lims.bobjs import BloomObj
 from bloom_lims.bobjs import (
     BloomContainer,
     BloomContainerPlate,
     BloomContent,
+    BloomEquipment,
+    BloomObj,
     BloomWorkflow,
     BloomWorkflowStep,
-    BloomEquipment,
 )
-
+from bloom_lims.db import BLOOMdb3
 
 ###
 #
@@ -67,7 +64,7 @@ def test_create_instances_from_instance_templates():
     for template in generic_templates:
         try:
             bob.create_instances(template.euid)
-        except Exception as e:
+        except Exception:
             if template.type == "assay":
                 pass  # Expected to fail if already instantiated
             elif template.category == "test_requisition":
