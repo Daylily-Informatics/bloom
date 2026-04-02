@@ -32,7 +32,9 @@ async def _run_request(path: str, middleware: RateLimitMiddleware):
 
 
 def _status(messages: list[dict]) -> int:
-    return next(msg["status"] for msg in messages if msg["type"] == "http.response.start")
+    return next(
+        msg["status"] for msg in messages if msg["type"] == "http.response.start"
+    )
 
 
 def test_rate_limit_middleware_limits_untrusted_paths():
@@ -58,7 +60,9 @@ def test_rate_limit_middleware_skips_atlas_external_paths():
     )
 
     first = asyncio.run(_run_request("/api/v1/external/atlas/beta/tubes", middleware))
-    second = asyncio.run(_run_request("/api/v1/external/atlas/beta/materials", middleware))
+    second = asyncio.run(
+        _run_request("/api/v1/external/atlas/beta/materials", middleware)
+    )
 
     assert _status(first) == 200
     assert _status(second) == 200

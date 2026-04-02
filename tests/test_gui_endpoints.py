@@ -116,7 +116,9 @@ class TestMainGUIEndpoints:
         from tests.test_anomalies import _StubBloomDB, _StubRepository
 
         with patch.object(operations, "BLOOMdb3", _StubBloomDB):
-            with patch.object(operations, "TapdbAnomalyRepository", lambda _session: _StubRepository()):
+            with patch.object(
+                operations, "TapdbAnomalyRepository", lambda _session: _StubRepository()
+            ):
                 response = client.get("/admin/anomalies")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
@@ -277,6 +279,7 @@ class TestWorkflowEndpoints:
         response = client.get("/workflow_details")
         assert response.status_code == 422
 
+
 class TestEquipmentEndpoints:
     """Tests for equipment-related endpoints."""
 
@@ -414,7 +417,9 @@ class TestUserEndpoints:
         """Test user home page returns content or redirects to login (based on auth state)."""
         response = client.get("/user_home", follow_redirects=False)
         # Should either return 200 (authenticated) or 307 redirect to login
-        assert response.status_code in [200, 307], f"Expected 200 or 307, got {response.status_code}"
+        assert response.status_code in [200, 307], (
+            f"Expected 200 or 307, got {response.status_code}"
+        )
         if response.status_code == 307:
             assert "/login" in response.headers.get("location", "")
 
@@ -660,8 +665,7 @@ class TestModernAPIs:
         """Test bulk create API accepts POST."""
         # Test with invalid data - should return validation error
         response = client.post(
-            "/api/v1/containers/bulk-create",
-            json={"containers": []}
+            "/api/v1/containers/bulk-create", json={"containers": []}
         )
         # Should return 200 or validation error, not 500
         assert response.status_code in [200, 201, 400, 422]
@@ -801,7 +805,10 @@ class TestObjectCreationAPI:
         """Categories should be case-insensitive alpha sorted."""
         response = client.get("/api/v1/object-creation/categories")
         assert response.status_code == 200
-        names = [st.get("display_name", st.get("name", "")) for st in response.json().get("categories", [])]
+        names = [
+            st.get("display_name", st.get("name", ""))
+            for st in response.json().get("categories", [])
+        ]
         assert names == sorted(names, key=lambda value: str(value).casefold())
 
     def test_types_api(self, client):
@@ -823,7 +830,9 @@ class TestObjectCreationAPI:
 
     def test_subtypes_api(self, client):
         """Test subtypes API endpoint."""
-        response = client.get("/api/v1/object-creation/subtypes?category=container&type=tube")
+        response = client.get(
+            "/api/v1/object-creation/subtypes?category=container&type=tube"
+        )
         assert response.status_code == 200
         data = response.json()
         assert "subtypes" in data
@@ -838,7 +847,9 @@ class TestObjectCreationAPI:
     def test_template_api(self, client):
         """Test template details API endpoint."""
         # First get a subtype
-        response = client.get("/api/v1/object-creation/subtypes?category=container&type=tube")
+        response = client.get(
+            "/api/v1/object-creation/subtypes?category=container&type=tube"
+        )
         assert response.status_code == 200
         subtypes = response.json()["subtypes"]
         if subtypes:
@@ -886,7 +897,7 @@ class TestLoginLogoutButtonDisplay:
         # The dashboard passes 'udat' to the template
         # Should show logout, not login
         assert 'href="/auth/logout"' in content
-        assert 'fa-sign-out-alt' in content  # Logout icon
+        assert "fa-sign-out-alt" in content  # Logout icon
 
     def test_create_object_shows_logout_with_user(self, client):
         """Test create_object page shows logout button when user is passed."""
@@ -1072,7 +1083,10 @@ class TestDataModificationEndpoints:
         """Test update preference POST endpoint."""
         response = client.post(
             "/update_preference",
-            json={"preference_key": "skin_css", "preference_value": "/static/modern/css/bloom_modern.css"},
+            json={
+                "preference_key": "skin_css",
+                "preference_value": "/static/modern/css/bloom_modern.css",
+            },
         )
         assert response.status_code in [200, 307, 422]
 
@@ -1080,7 +1094,11 @@ class TestDataModificationEndpoints:
         """Test save JSON addl key POST endpoint."""
         response = client.post(
             "/save_json_addl_key",
-            json={"euid": "EX1", "json_addl_key": "test", "json_data": {"value": "test"}},
+            json={
+                "euid": "EX1",
+                "json_addl_key": "test",
+                "json_data": {"value": "test"},
+            },
         )
         assert response.status_code in [200, 307, 400, 404, 422, 500]
 
@@ -1088,7 +1106,12 @@ class TestDataModificationEndpoints:
         """Test update accordion state POST endpoint."""
         response = client.post(
             "/update_accordion_state",
-            json={"step_euid": "WF1", "section": "test", "is_open": True, "state": "open"},
+            json={
+                "step_euid": "WF1",
+                "section": "test",
+                "is_open": True,
+                "state": "open",
+            },
         )
         assert response.status_code in [200, 307, 400, 422, 500]
 
@@ -1257,7 +1280,12 @@ class TestFileCreationEndpoints:
         """Test download file POST endpoint."""
         response = client.post(
             "/download_file",
-            data={"euid": "FI1", "download_type": "flat", "create_metadata_file": "no", "ret_json": "1"},
+            data={
+                "euid": "FI1",
+                "download_type": "flat",
+                "create_metadata_file": "no",
+                "ret_json": "1",
+            },
         )
         assert response.status_code in [404, 307, 400, 422, 500]
 
@@ -1272,8 +1300,15 @@ class TestFileCreationEndpoints:
     def test_bulk_create_files_from_tsv_post(self, client):
         """Test bulk create files from TSV POST endpoint."""
         import io
+
         tsv_content = "file_name\tfile_type\ntest.txt\ttext\n"
-        files = {"file": ("test.tsv", io.BytesIO(tsv_content.encode()), "text/tab-separated-values")}
+        files = {
+            "file": (
+                "test.tsv",
+                io.BytesIO(tsv_content.encode()),
+                "text/tab-separated-values",
+            )
+        }
         response = client.post("/bulk_create_files_from_tsv", files=files)
         assert response.status_code in [404, 307, 400, 422, 500]
 
@@ -1467,7 +1502,9 @@ class TestObjectManagementEndpoints:
 
     def test_update_obj_json_addl_properties(self, client):
         """Test update object JSON addl properties."""
-        response = client.post("/update_obj_json_addl_properties", data={"obj_euid": "EX1"})
+        response = client.post(
+            "/update_obj_json_addl_properties", data={"obj_euid": "EX1"}
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_update_object_name(self, client):
@@ -1608,12 +1645,17 @@ class TestJSONDataEndpoints:
 
     def test_save_json_update(self, client):
         """Legacy save JSON update endpoint must be removed."""
-        response = client.post("/save_json_update", json={"euid": "EX1", "json_data": {}})
+        response = client.post(
+            "/save_json_update", json={"euid": "EX1", "json_data": {}}
+        )
         assert response.status_code == 404
 
     def test_update_json_value(self, client):
         """Legacy update JSON value endpoint must be removed."""
-        response = client.post("/update_json_value", json={"euid": "EX1", "key": "test_key", "value": "test_value"})
+        response = client.post(
+            "/update_json_value",
+            json={"euid": "EX1", "key": "test_key", "value": "test_value"},
+        )
         assert response.status_code == 404
 
 
@@ -1758,10 +1800,9 @@ class TestActionEndpoints:
 
     def test_execute_action_post(self, client):
         """Test execute action POST endpoint."""
-        response = client.post("/execute_action", json={
-            "action_euid": "ACT1",
-            "target_euid": "TGT1"
-        })
+        response = client.post(
+            "/execute_action", json={"action_euid": "ACT1", "target_euid": "TGT1"}
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
@@ -1772,7 +1813,12 @@ class TestFileOperationEndpoints:
         """Test download file endpoint."""
         response = client.post(
             "/download_file",
-            data={"euid": "FI1", "download_type": "flat", "create_metadata_file": "no", "ret_json": "1"},
+            data={
+                "euid": "FI1",
+                "download_type": "flat",
+                "create_metadata_file": "no",
+                "ret_json": "1",
+            },
         )
         assert response.status_code in [404, 302, 307, 400, 422, 500]
 
@@ -1897,18 +1943,16 @@ class TestPreferencesEndpoints:
 
     def test_update_preference(self, client):
         """Test update preference endpoint."""
-        response = client.post("/update_preference", json={
-            "key": "test_pref",
-            "value": "test_value"
-        })
+        response = client.post(
+            "/update_preference", json={"key": "test_pref", "value": "test_value"}
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_update_accordion_state(self, client):
         """Test update accordion state endpoint."""
-        response = client.post("/update_accordion_state", json={
-            "accordion_id": "test",
-            "state": "open"
-        })
+        response = client.post(
+            "/update_accordion_state", json={"accordion_id": "test", "state": "open"}
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
 
@@ -1917,14 +1961,21 @@ class TestJSONUpdateEndpoints:
 
     def test_update_obj_json_addl_properties(self, client):
         """Test update object JSON addl properties endpoint."""
-        response = client.post("/update_obj_json_addl_properties", data={"obj_euid": "EX1", "test_key": "test"})
+        response = client.post(
+            "/update_obj_json_addl_properties",
+            data={"obj_euid": "EX1", "test_key": "test"},
+        )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
     def test_save_json_addl_key(self, client):
         """Test save JSON addl key endpoint."""
         response = client.post(
             "/save_json_addl_key",
-            json={"euid": "EX1", "json_addl_key": "test", "json_data": {"value": "test"}},
+            json={
+                "euid": "EX1",
+                "json_addl_key": "test",
+                "json_data": {"value": "test"},
+            },
         )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
@@ -1980,6 +2031,8 @@ class TestWorkflowQueryParamCompatibility:
 
     def test_workflow_details_accepts_workflow_euid_param(self, client):
         """workflow_details should accept workflow_euid query parameter (new workflow UI contract)."""
-        response = client.get("/workflow_details?workflow_euid=NONEXISTENT_WORKFLOW_EUID")
+        response = client.get(
+            "/workflow_details?workflow_euid=NONEXISTENT_WORKFLOW_EUID"
+        )
         # The route may render an error for missing workflow, but should not fail validation.
         assert response.status_code != 422

@@ -252,9 +252,7 @@ class BLOOMdb3:
         try:
             from bloom_lims.config import get_settings
 
-            maybe_install_engine_metrics(
-                self.engine, env_name=get_settings().tapdb.env
-            )
+            maybe_install_engine_metrics(self.engine, env_name=get_settings().tapdb.env)
         except Exception:
             # Metrics are best-effort; never block DB init.
             pass

@@ -90,7 +90,9 @@ def normalize_graph_request_params(
     return resolved_start, resolved_depth
 
 
-def build_graph_elements_for_start(bobj: Any, start_euid: str, depth: int) -> tuple[list, list]:
+def build_graph_elements_for_start(
+    bobj: Any, start_euid: str, depth: int
+) -> tuple[list, list]:
     instance_result = {}
     lineage_result = {}
 
@@ -173,7 +175,10 @@ def build_graph_object_payload(bobj: Any, euid: str) -> dict[str, Any]:
         "created_dt": _iso(getattr(obj, "created_dt", None)),
         "modified_dt": _iso(getattr(obj, "modified_dt", None)),
         "external_refs": (
-            [ref.to_public_dict(ref_index=index) for index, ref in enumerate(resolve_external_refs_for_object(obj))]
+            [
+                ref.to_public_dict(ref_index=index)
+                for index, ref in enumerate(resolve_external_refs_for_object(obj))
+            ]
             if object_kind == "instance"
             else []
         ),
@@ -197,7 +202,9 @@ def build_graph_object_payload(bobj: Any, euid: str) -> dict[str, Any]:
                 .filter(instance_cls.uid == child_instance_uid)
                 .first()
             )
-        payload["relationship_type"] = getattr(obj, "relationship_type", "generic") or "generic"
+        payload["relationship_type"] = (
+            getattr(obj, "relationship_type", "generic") or "generic"
+        )
         payload["source"] = getattr(child_obj, "euid", None)
         payload["target"] = getattr(parent_obj, "euid", None)
 
@@ -223,7 +230,8 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
     for lineage in lineages:
         if (
             getattr(lineage, "is_deleted", False)
-            or getattr(lineage, "relationship_type", "") != EXTERNAL_REFERENCE_RELATIONSHIP
+            or getattr(lineage, "relationship_type", "")
+            != EXTERNAL_REFERENCE_RELATIONSHIP
         ):
             continue
         external_ref = getattr(lineage, "child_instance", None)

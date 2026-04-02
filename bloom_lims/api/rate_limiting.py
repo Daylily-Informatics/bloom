@@ -34,7 +34,7 @@ from bloom_lims.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 DEFAULT_EXCLUDE_PATHS = [
     "/health",
@@ -50,6 +50,7 @@ DEFAULT_EXCLUDE_PATHS = [
 @dataclass
 class RateLimitConfig:
     """Configuration for rate limiting."""
+
     requests_per_minute: int = 60
     requests_per_hour: int = 1000
     burst_size: int = 10
@@ -59,6 +60,7 @@ class RateLimitConfig:
 @dataclass
 class ClientBucket:
     """Token bucket for a single client."""
+
     tokens: float
     last_update: float
     requests_minute: int = 0
@@ -110,7 +112,7 @@ class RateLimiter:
 
         # Load from settings if available
         settings = get_settings()
-        if hasattr(settings, 'api') and hasattr(settings.api, 'rate_limit_per_minute'):
+        if hasattr(settings, "api") and hasattr(settings.api, "rate_limit_per_minute"):
             self.requests_per_minute = settings.api.rate_limit_per_minute
 
     def is_allowed(self, client_id: str) -> Tuple[bool, Dict[str, Any]]:
@@ -134,7 +136,7 @@ class RateLimiter:
             elapsed = now - bucket.last_update
             bucket.tokens = min(
                 self.burst_size,
-                bucket.tokens + elapsed * (self.requests_per_minute / 60)
+                bucket.tokens + elapsed * (self.requests_per_minute / 60),
             )
             bucket.last_update = now
 
@@ -199,7 +201,7 @@ class RateLimiter:
                     "requests_per_minute": self.requests_per_minute,
                     "requests_per_hour": self.requests_per_hour,
                     "burst_size": self.burst_size,
-                }
+                },
             }
 
     def reset(self, client_id: Optional[str] = None) -> None:
@@ -240,6 +242,7 @@ def rate_limit(
         def api_endpoint(request):
             pass
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -251,9 +254,9 @@ def rate_limit(
             elif args:
                 # Try to get client IP from request object
                 request = args[0]
-                if hasattr(request, 'client'):
-                    client_id = str(getattr(request.client, 'host', 'unknown'))
-                elif hasattr(request, 'remote_addr'):
+                if hasattr(request, "client"):
+                    client_id = str(getattr(request.client, "host", "unknown"))
+                elif hasattr(request, "remote_addr"):
                     client_id = request.remote_addr
                 else:
                     client_id = "default"
@@ -269,6 +272,7 @@ def rate_limit(
                 )
                 # Raise or return appropriate response
                 from bloom_lims.core.exceptions import BloomError
+
                 raise BloomError(
                     f"Rate limit exceeded. Retry after {info.get('retry_after', 60)} seconds",
                     error_code="RATE_LIMIT_EXCEEDED",
@@ -277,6 +281,7 @@ def rate_limit(
             return func(*args, **kwargs)
 
         return wrapper  # type: ignore
+
     return decorator
 
 
@@ -343,18 +348,22 @@ class RateLimitMiddleware:
                 f'"retry_after": {info.get("retry_after", 60)}}}'
             ).encode()
 
-            await send({
-                "type": "http.response.start",
-                "status": 429,
-                "headers": [
-                    [b"content-type", b"application/json"],
-                    [b"retry-after", str(info.get("retry_after", 60)).encode()],
-                ],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": response_body,
-            })
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 429,
+                    "headers": [
+                        [b"content-type", b"application/json"],
+                        [b"retry-after", str(info.get("retry_after", 60)).encode()],
+                    ],
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": response_body,
+                }
+            )
             return
 
         await self.app(scope, receive, send)

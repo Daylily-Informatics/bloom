@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValidationResult:
     """Result of template validation."""
+
     valid: bool = True
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -42,6 +43,7 @@ class ValidationResult:
 @dataclass
 class TemplateDefinition:
     """Parsed template definition."""
+
     file_path: Path
     category: str
     type: str
@@ -62,9 +64,18 @@ class TemplateValidator:
 
     # Valid categories (formerly super_types)
     VALID_CATEGORIES = {
-        "workflow", "workflow_step", "container", "content",
-        "equipment", "data", "actor",
-        "action", "file", "health_event", "generic", "subject"
+        "workflow",
+        "workflow_step",
+        "container",
+        "content",
+        "equipment",
+        "data",
+        "actor",
+        "action",
+        "file",
+        "health_event",
+        "generic",
+        "subject",
     }
     # Backward compatibility alias
     VALID_SUPER_TYPES = VALID_CATEGORIES
@@ -158,8 +169,12 @@ class TemplateValidator:
                         result.templates_checked += 1
 
                         self._validate_template_structure(
-                            json_file, category, type_name, version,
-                            template_data, result
+                            json_file,
+                            category,
+                            type_name,
+                            version,
+                            template_data,
+                            result,
                         )
 
             except json.JSONDecodeError as e:
@@ -174,7 +189,7 @@ class TemplateValidator:
         type_name: str,
         version: str,
         data: Dict[str, Any],
-        result: ValidationResult
+        result: ValidationResult,
     ) -> None:
         """Validate individual template structure."""
         template_id = f"{category}/{type_name}/{version}"
@@ -231,7 +246,7 @@ class TemplateValidator:
         file_path: Path,
         template_id: str,
         action_imports: Dict[str, Any],
-        result: ValidationResult
+        result: ValidationResult,
     ) -> None:
         """Validate action_imports structure."""
         if not isinstance(action_imports, dict):
@@ -241,9 +256,9 @@ class TemplateValidator:
             return
 
         for action_key, template_code in action_imports.items():
-            if not isinstance(action_key, str) or not self.ACTION_IMPORT_KEY_PATTERN.match(
-                action_key
-            ):
+            if not isinstance(
+                action_key, str
+            ) or not self.ACTION_IMPORT_KEY_PATTERN.match(action_key):
                 result.errors.append(
                     f"{file_path}: {template_id} action_imports key '{action_key}' "
                     "must be snake_case (^[a-z][a-z0-9_]*$)"
@@ -295,7 +310,7 @@ class TemplateValidator:
         file_path: Path,
         template_id: str,
         layouts: List[Any],
-        result: ValidationResult
+        result: ValidationResult,
     ) -> None:
         """Validate instantiation_layouts structure."""
         if not isinstance(layouts, list):
@@ -314,7 +329,9 @@ class TemplateValidator:
         """Validate all cross-references between templates."""
         for ref in self._action_references:
             if not self._is_valid_reference(ref):
-                result.warnings.append(f"Action reference '{ref}' may be invalid pattern")
+                result.warnings.append(
+                    f"Action reference '{ref}' may be invalid pattern"
+                )
 
     def _is_valid_reference(self, ref: str) -> bool:
         """Check if a template reference is valid."""
