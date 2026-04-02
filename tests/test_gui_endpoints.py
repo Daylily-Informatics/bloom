@@ -180,11 +180,6 @@ class TestAssaysEndpoint:
         response = client.get("/assays?show_type=all")
         assert response.status_code == 404
 
-    def test_assays_show_type_accessioning(self, client):
-        """Accessioning query still resolves to unmounted route."""
-        response = client.get("/assays?show_type=accessioning")
-        assert response.status_code == 404
-
     def test_assays_show_type_assay(self, client):
         """Assay-specific query still resolves to unmounted route."""
         response = client.get("/assays?show_type=assay")

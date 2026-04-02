@@ -36,6 +36,16 @@ logger = logging.getLogger(__name__)
 
 F = TypeVar('F', bound=Callable[..., Any])
 
+DEFAULT_EXCLUDE_PATHS = [
+    "/health",
+    "/health/live",
+    "/health/ready",
+    # Atlas talks to these endpoints with an API key as a trusted service client.
+    # Applying the generic per-IP middleware limiter here blocks legitimate
+    # internal workflows like high-volume tube/specimen creation.
+    "/api/v1/external/atlas/",
+]
+
 
 @dataclass
 class RateLimitConfig:
@@ -301,7 +311,7 @@ class RateLimitMiddleware:
             requests_per_minute=requests_per_minute,
             requests_per_hour=requests_per_hour,
         )
-        self.exclude_paths = exclude_paths or ["/health", "/health/live", "/health/ready"]
+        self.exclude_paths = list(exclude_paths or DEFAULT_EXCLUDE_PATHS)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -348,4 +358,3 @@ class RateLimitMiddleware:
             return
 
         await self.app(scope, receive, send)
-

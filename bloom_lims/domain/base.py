@@ -513,7 +513,7 @@ class BloomObj:
         The class subclassing is an experiment, see the docs (hopefully) for more, in short:
             TABLE_template entries hold the TABLE_instance definitions (and to a large extend, the TABLE_instance_lineage as well)
             TABLE_template is seeded initially from json files in
-            bloom_lims/config/{container,content,workflow,workflow_step,equipment,data,test_requisition,...}/*.json
+            bloom_lims/config/{container,content,workflow,workflow_step,equipment,data,...}/*.json
             These are only used to seed the templates... the idea is to allow users to add subtypes as they see fit. (TBD)
 
             ~ TABLE_template/{type}/{subtype}/{version} is the pattern used to for the template table name
@@ -624,7 +624,7 @@ class BloomObj:
                     # The non-action object action definition.  Its mostly shaky b/c the overrides are applied to all actions
                     # in the matched group... so, when all core are imported for example, an override will match all
                     # I think...  for singleton imports should be ok.
-                    # this is to be used mostly for the assay links for test requisitions
+                    # this is used for singleton action import overrides
                     _update_recursive(
                         ret_ds[group]["actions"][action_key],
                         actions_cfg.get(ai, {}),
@@ -1148,33 +1148,6 @@ class BloomObj:
 
         return euid_cost_tuples
 
-    def query_all_fedex_transit_times_by_ay_euid(self, qx_euid):
-        query = text(
-            """SELECT gi.euid,
-        gi.json_addl -> 'properties' -> 'fedex_tracking_data' -> 0 ->> 'Transit_Time_sec' AS transit_time
-        FROM generic_instance AS gi
-        JOIN generic_instance_lineage AS gil1 ON gi.uid = gil1.child_instance_uid
-        JOIN generic_instance AS gi_parent1 ON gil1.parent_instance_uid = gi_parent1.uid
-        JOIN generic_instance_lineage AS gil2 ON gi_parent1.uid = gil2.child_instance_uid
-        JOIN generic_instance AS gi_parent2 ON gil2.parent_instance_uid = gi_parent2.uid
-        WHERE
-        gi_parent2.euid = :qx_euid AND
-        gi.type = 'package' AND
-        jsonb_typeof(gi.json_addl -> 'properties') = 'object' AND
-        jsonb_typeof(gi.json_addl -> 'properties' -> 'fedex_tracking_data') = 'array' AND
-        jsonb_typeof((gi.json_addl -> 'properties' -> 'fedex_tracking_data' -> 0)) = 'object' AND
-        COALESCE(NULLIF(gi.json_addl -> 'properties' -> 'fedex_tracking_data' -> 0 ->> 'Transit_Time_sec', ''), '0') >= '0';
-        """
-        )
-
-        # Execute the query
-        result = self.session.execute(query, {"qx_euid": qx_euid})
-
-        # Extract euids and transit times from the result
-        euid_transit_time_tuples = [(row[0], row[1]) for row in result]
-
-        return euid_transit_time_tuples
-
     def fetch_graph_data_by_node_depth(self, start_euid, depth):
         """
         Fetch graph data for a node and its neighbors up to a specified depth.
@@ -1569,15 +1542,6 @@ class BloomObj:
         self.delete_obj(lineage_link)
         ##self.session.flush()
         self.session.commit()
-
-    # Doing this globally for now
-    def do_action_create_package_and_first_workflow_step_assay(
-        self, euid, action_ds={}
-    ):
-        raise RuntimeError(
-            "Package/kit accessioning actions have been retired from Bloom. "
-            "Accessioning ownership is Atlas-only."
-        )
 
     def do_action_print_barcode_label(self, euid, action_ds={}):
         """_summary_

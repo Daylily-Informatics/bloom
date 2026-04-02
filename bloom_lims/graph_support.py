@@ -20,7 +20,6 @@ GRAPH_CATEGORY_COLORS = {
     "data": "#FFD700",
     "actor": "#FF69B4",
     "action": "#FF8C00",
-    "test_requisition": "#FFA500",
     "health_event": "#DC143C",
     "file": "#00FF00",
     "subject": "#9370DB",

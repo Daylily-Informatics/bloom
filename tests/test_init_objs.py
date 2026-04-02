@@ -70,6 +70,8 @@ def test_create_instances_from_instance_templates():
         except Exception as e:
             if template.type == "assay":
                 pass  # Expected to fail if already instantiated
+            elif template.category == "test_requisition":
+                pass  # Retired category — templates may linger in DB but ORM class removed
             else:
                 err = True
                 raise Exception(

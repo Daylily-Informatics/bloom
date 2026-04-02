@@ -63,7 +63,7 @@ class TemplateValidator:
     # Valid categories (formerly super_types)
     VALID_CATEGORIES = {
         "workflow", "workflow_step", "container", "content",
-        "equipment", "data", "test_requisition", "actor",
+        "equipment", "data", "actor",
         "action", "file", "health_event", "generic", "subject"
     }
     # Backward compatibility alias

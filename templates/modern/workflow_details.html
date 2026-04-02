@@ -103,10 +103,6 @@
         background: #3f4b5f;
         color: var(--wf-text-primary);
     }
-    .accordion-button.step-type-package {
-        background: #45546b;
-        color: var(--wf-text-primary);
-    }
     .step-info {
         display: flex;
         flex-wrap: wrap;
@@ -521,55 +517,7 @@
 </div>
 {% endif %}
 
-<!-- Linked Test Requisitions (shown if workflow is child of any test_requisition) -->
-{% if workflow.child_of_lineages %}
-{% set linked_requisitions = [] %}
-{% for lineage in workflow.child_of_lineages %}
-    {% if lineage.parent_instance and lineage.parent_instance.type == 'test_requisition' and not lineage.parent_instance.is_deleted %}
-        {% set _ = linked_requisitions.append(lineage.parent_instance) %}
-    {% endif %}
-{% endfor %}
-{% if linked_requisitions|length > 0 %}
-<div class="card mb-4">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-file-medical"></i> Linked Test Requisitions ({{ linked_requisitions|length }})</h3>
-    </div>
-    <div class="card-body">
-        {% for trx in linked_requisitions %}
-        <div class="requisition-item" style="margin-bottom: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-gray-700); border-radius: var(--radius-sm);">
-            <div style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; margin-bottom: var(--spacing-sm);">
-                <a href="/euid_details?euid={{ trx.euid }}" class="text-highlight" style="font-weight: 600;">{{ trx.euid }}</a>
-                <span class="text-muted">{{ trx.json_addl.get('properties', {}).get('name', '') }}</span>
-                <span class="badge bg-{{ 'success' if trx.bstatus == 'active' else 'secondary' }}">{{ trx.bstatus }}</span>
-                <a href="/dindex2?start_euid={{ trx.euid }}" target="bloom_dag" title="View DAG" style="color: var(--color-highlight);">🕸️</a>
-            </div>
-            {% set trx_action_groups = action_groups_by_euid.get(trx.euid, {}) if action_groups_by_euid is defined else {} %}
-            {% if trx_action_groups %}
-            <div class="requisition-actions" style="display: flex; flex-wrap: wrap; gap: var(--spacing-xs);">
-                {% for group_key, group_value in trx_action_groups.items() %}
-                <div class="action-group" style="display: flex; align-items: center; gap: var(--spacing-xs);">
-                    <span class="action-group-name" style="font-size: 0.75rem; color: var(--color-gray-400);">{{ group_value.group_name }}:</span>
-                    {% for action_key, action_value in group_value.actions.items() %}
-                    <button class="action-btn btn btn-outline btn-sm"
-                            data-action-json="{{ action_value | tojson | e }}"
-                            data-euid="{{ trx.euid }}"
-                            data-action-name="{{ action_key }}"
-                            data-action-group="{{ group_key }}"
-                            onclick="showCapturedDataFormFromDataAttributes(this)"
-                            {% if action_value.action_enabled == "0" %}disabled style="opacity: 0.5;"{% endif %}>
-                        {{ action_value.action_name }}
-                    </button>
-                    {% endfor %}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-{% endif %}
+
 
 <!-- Define recursive step rendering macro -->
 {% macro render_step(step, accordion_states, step_descendant_summaries, depth=0) %}

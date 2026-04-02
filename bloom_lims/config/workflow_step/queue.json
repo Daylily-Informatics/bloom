@@ -409,11 +409,7 @@
         "state": "active"
       },
       "description": "Plasma Isolation Exception Queue",
-      "expected_inputs": [
-        {
-          "container/kit/generic/*/": {}
-        }
-      ],
+      "expected_inputs": [],
       "expected_outputs": [
         {
           "container/tube/tube-strek-10ml/*/": {
@@ -464,18 +460,7 @@
       },
       "description": "Containers Removed From Queue",
       "expected_inputs": [],
-      "expected_outputs": [
-        {
-          "container/package/generic/*/": {
-            "json_addl": {
-              "properties": {
-                "carrier_name": "str()",
-                "carrier_tracking_number": "str()"
-              }
-            }
-          }
-        }
-      ],
+      "expected_outputs": [],
       "instantiation_layouts": [],
       "properties": {
         "comments": "",
