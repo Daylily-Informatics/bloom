@@ -41,7 +41,11 @@ _bloom_reject_legacy_local_rebind_env() {
     local var_name=""
     local var_value=""
     for var_name in "${_BLOOM_LEGACY_REBIND_VARS[@]}"; do
-        var_value="$(eval "printf '%s' \"\${${var_name}:-}\"")"
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            eval 'var_value="${(P)var_name-}"'
+        else
+            eval 'var_value="${!var_name-}"'
+        fi
         if [[ -n "$var_value" ]]; then
             echo -e "  ${_YELLOW}⚠${_NC} ${var_name} is no longer supported."
             echo -e "  ${_CYAN}→${_NC} Bloom activation now requires packaged dependencies from ${_BLOOM_CONDA_ENV_NAME:-the active conda environment}."
