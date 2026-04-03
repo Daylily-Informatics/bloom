@@ -872,7 +872,7 @@ async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
         json_addl_key = data.get("json_addl_key")
         json_data = data.get("json_data")
 
-        if not euid or not json_addl_key or not json_data:
+        if not euid or not json_addl_key or json_data is None:
             logging.error("EUID, JSON key, or JSON data missing")
             raise HTTPException(status_code=400, detail="EUID, JSON key, or JSON data missing")
 
@@ -888,6 +888,8 @@ async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
 
         return RedirectResponse(url=f"/euid_details?euid={euid}", status_code=303)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error("Error saving JSON properties: %s", e)
         raise HTTPException(status_code=500, detail="An error occurred while saving JSON properties")

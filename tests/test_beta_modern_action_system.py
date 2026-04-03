@@ -17,6 +17,7 @@ from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.core import action_execution as action_exec
 from bloom_lims.core.tapdb_action_dispatcher import (
     BloomTapDBActionDispatcher,
+    _coerce_action_template_uid,
     _normalize_action_slug,
 )
 from bloom_lims.domain.execution_queue import ExecutionQueueService
@@ -84,6 +85,14 @@ def test_action_key_slug_normalization():
     assert _normalize_action_slug("") == ""
 
 
+def test_bloom_dispatcher_coerces_action_template_uid_types():
+    uuid_value = str(uuid.uuid4())
+
+    assert _coerce_action_template_uid("108") == 108
+    assert _coerce_action_template_uid(uuid_value) == uuid.UUID(uuid_value)
+    assert _coerce_action_template_uid(42) == 42
+
+
 def test_bloom_dispatcher_dynamic_handler_mapping():
     calls: dict[str, object] = {}
 
@@ -116,6 +125,69 @@ def test_bloom_dispatcher_dynamic_handler_mapping():
     assert payload["captured_data"]["note"] == "ok"
     assert group == "state"
     assert raw_key == "/workflow/step/set-object-status/"
+
+
+@pytest.mark.parametrize(
+    ("attr_name", "expected"),
+    [
+        (
+            "do_action_return_object",
+            {
+                "status": "success",
+                "message": "Action completed",
+                "result_euid": "OBJ-1",
+            },
+        ),
+        (
+            "do_action_return_string",
+            {
+                "status": "success",
+                "message": "created subject",
+            },
+        ),
+        (
+            "do_action_return_none",
+            {
+                "status": "success",
+                "message": "Action completed",
+            },
+        ),
+        (
+            "do_action_return_error",
+            {
+                "status": "error",
+                "message": "boom",
+            },
+        ),
+    ],
+)
+def test_bloom_dispatcher_normalizes_handler_results(attr_name, expected):
+    class _Executor:
+        def do_action_return_object(self, euid, action_ds):
+            assert euid == "OB_TEST"
+            assert action_ds["captured_data"] == {"field": "value"}
+            return SimpleNamespace(euid="OBJ-1")
+
+        def do_action_return_string(self, _euid, _action_ds):
+            return "created subject"
+
+        def do_action_return_none(self, _euid, _action_ds):
+            return None
+
+        def do_action_return_error(self, _euid, _action_ds):
+            return {"status": "error", "message": "boom"}
+
+    dispatcher = BloomTapDBActionDispatcher(_Executor())
+    instance = SimpleNamespace(euid="OB_TEST")
+
+    result = getattr(dispatcher, attr_name)(
+        instance,
+        {"captured_data": {}},
+        {"field": "value"},
+    )
+
+    assert isinstance(result, dict)
+    assert result == expected
 
 
 def test_bloom_dispatcher_updates_nested_action_groups(monkeypatch):
@@ -445,6 +517,91 @@ def test_action_execute_missing_required_fields_and_message_fallback(monkeypatch
         user_preferences={},
     )
     assert response["message"] == "custom success message"
+
+
+def test_action_execute_success_with_real_dispatcher_non_dict_result(monkeypatch):
+    class _FakeBdb:
+        def __init__(self):
+            self.session = SimpleNamespace(add=lambda *_: None, flush=lambda: None)
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class _FakeQueryObj:
+        def __init__(self, instance):
+            self._instance = instance
+
+        def get_by_euid(self, _euid):
+            return self._instance
+
+    instance = SimpleNamespace(
+        uid=uuid.uuid4(),
+        euid="OB6",
+        category="workflow",
+        type="step",
+        subtype="generic",
+        version="1.0",
+        json_addl={
+            "action_groups": {
+                "state": {
+                    "actions": {
+                        "/state/set-object-status/": {
+                            "action_template_uid": str(uuid.uuid4()),
+                            "captured_data": {},
+                            "ui_schema": {"fields": []},
+                            "action_executed": "0",
+                            "executed_datetime": [],
+                        }
+                    }
+                }
+            }
+        },
+    )
+    fake_bdb = _FakeBdb()
+    query_obj = _FakeQueryObj(instance)
+
+    class _Executor:
+        def set_actor_context(self, **_kwargs):
+            return None
+
+        def do_action_set_object_status(self, euid, _action_ds, _action_group, _raw_key):
+            return SimpleNamespace(euid=euid)
+
+    created_records = []
+
+    monkeypatch.setattr(action_exec, "BLOOMdb3", lambda app_username=None: fake_bdb)
+    monkeypatch.setattr(action_exec, "BloomObj", lambda *_: query_obj)
+    monkeypatch.setattr(action_exec, "_resolve_executor", lambda *_: _Executor())
+    monkeypatch.setattr(
+        "bloom_lims.core.tapdb_action_dispatcher.flag_modified",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        BloomTapDBActionDispatcher,
+        "_create_action_record",
+        lambda self, *args, **kwargs: created_records.append((args, kwargs)),
+    )
+
+    request_data = action_exec.ActionExecuteRequest(
+        euid="OB6",
+        action_group="state",
+        action_key="/state/set-object-status/",
+        captured_data={"object_status": "ready"},
+    )
+
+    response = action_exec.execute_action_for_instance(
+        request_data,
+        app_username="tester",
+        actor_email="tester@example.com",
+        actor_user_id="u-1",
+        user_preferences={},
+    )
+
+    assert response["status"] == "success"
+    assert response["euid"] == "OB6"
+    assert created_records
+    assert fake_bdb.closed is True
 
 
 def test_action_map_exception_variants():
