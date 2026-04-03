@@ -83,13 +83,12 @@ except ModuleNotFoundError:  # pragma: no cover - compatibility fallback
     from daylib.config import Settings
     from daylib.workset_api import create_app as create_ursa_app
 
-import app.api.routes.intake as atlas_intake_routes  # noqa: E402
+import app.api.routes.bloom_integration as atlas_bloom_routes  # noqa: E402
 import app.api.routes.ursa_integration as atlas_ursa_routes  # noqa: E402
 from app.api.routes.internal import verify_internal_api_key  # noqa: E402
 from app.auth.dependencies import (  # noqa: E402
-    CurrentUser,
-    get_current_user,
-    require_internal,
+    IntegrationClientPrincipal,
+    get_bloom_integration_client,
 )
 from app.db.engine import get_db  # noqa: E402
 
@@ -277,28 +276,24 @@ class SmokeUrsaAuthProvider:
         )
 
 
-def _build_atlas_intake_app(tenant_id: uuid.UUID) -> FastAPI:
+def _build_atlas_bloom_integration_app(tenant_id: uuid.UUID) -> FastAPI:
     app = FastAPI()
-    app.include_router(atlas_intake_routes.router)
+    app.include_router(atlas_bloom_routes.router)
 
     def override_get_db():
         yield None
 
-    async def override_require_internal():
-        return None
-
-    def override_current_user():
-        return CurrentUser(
-            sub=str(uuid.uuid4()),
-            email="internal@example.com",
-            name="Internal User",
+    def override_bloom_integration_client():
+        return IntegrationClientPrincipal(
+            client_id=uuid.uuid4(),
             tenant_id=tenant_id,
-            roles=["INTERNAL_USER"],
+            client_name="atlas-smoke-client",
+            permissions=["bloom:atlas:write"],
+            allowed_endpoints=["/api/integrations/bloom/v1"],
         )
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[require_internal] = override_require_internal
-    app.dependency_overrides[get_current_user] = override_current_user
+    app.dependency_overrides[get_bloom_integration_client] = override_bloom_integration_client
     return app
 
 
@@ -321,61 +316,31 @@ def test_cross_repo_beta_smoke(monkeypatch):
     tenant_id = uuid.uuid4()
     atlas_trf_euid = _opaque("trf")
     atlas_test_accept = _opaque("test")
-    atlas_test_hold = _opaque("test")
-    atlas_test_reject = _opaque("test")
-    fulfillment_item_accept = _opaque("tpc")
     patient_euid = _opaque("patient")
     shipment_euid = _opaque("shipment")
     captured_return: dict[str, object] = {}
 
-    class FakeIntakeService:
+    class FakeBridgeService:
         def __init__(self, db, provided_tenant_id):
             assert provided_tenant_id == tenant_id
 
-        def record_material_outcome(self, data, *, actor_id=None):
+        def register_accepted_material(self, data, actor_id=None):
             assert actor_id is not None
-            if data.outcome.value == "REJECTED":
-                return SimpleNamespace(
-                    outcome="REJECTED",
-                    accepted=False,
-                    trf_euid=data.trf_euid,
-                    trf_status="REJECTED",
-                    test_euids=data.test_euids,
-                    fulfillment_item_euids=[],
-                    test_statuses={data.test_euids[0]: "REJECTED"},
-                    patient_euid=data.patient_euid,
-                    container_euid=None,
-                    specimen_euid=None,
-                    current_queue=None,
-                )
-            if data.outcome.value == "HOLD":
-                return SimpleNamespace(
-                    outcome="HOLD",
-                    accepted=False,
-                    trf_euid=data.trf_euid,
-                    trf_status="ON_HOLD",
-                    test_euids=data.test_euids,
-                    fulfillment_item_euids=[],
-                    test_statuses={data.test_euids[0]: "ON_HOLD"},
-                    patient_euid=data.patient_euid,
-                    container_euid=None,
-                    specimen_euid=None,
-                    current_queue=None,
-                )
+            assert data.trf_euid == atlas_trf_euid
+            assert data.test_euids == [atlas_test_accept]
+            assert data.patient_euid == patient_euid
+            assert data.shipment_euid == shipment_euid
+            assert data.starting_queue == "extraction_prod"
             return SimpleNamespace(
-                outcome="ACCEPTED",
-                accepted=True,
-                trf_euid=data.trf_euid,
-                trf_status="IN_PROGRESS",
-                test_euids=data.test_euids,
-                fulfillment_item_euids=[fulfillment_item_accept],
-                test_statuses={
-                    test_euid: "SPECIMEN_RECEIVED" for test_euid in data.test_euids
-                },
-                patient_euid=data.patient_euid,
+                container_external_object_euid="EXB-CNT-SMOKE",
+                specimen_external_object_euid="EXB-SP-SMOKE",
                 container_euid="CNT-SMOKE",
                 specimen_euid="SP-SMOKE",
+                starting_queue=data.starting_queue,
                 current_queue=data.starting_queue,
+                created=True,
+                queue_idempotent_replay=False,
+                fulfillment_item_euids=[_opaque("tpc")],
             )
 
     class FakeUrsaResultReturnService:
@@ -392,7 +357,11 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 idempotent_replay=False,
             )
 
-    monkeypatch.setattr(atlas_intake_routes, "IntakeService", FakeIntakeService)
+    monkeypatch.setattr(
+        atlas_bloom_routes,
+        "ContainerSpecimenBridgeService",
+        FakeBridgeService,
+    )
     monkeypatch.setattr(
         atlas_ursa_routes,
         "UrsaResultReturnService",
@@ -402,51 +371,32 @@ def test_cross_repo_beta_smoke(monkeypatch):
     bloom_app = create_bloom_app()
     bloom_app.dependency_overrides[require_external_token_auth] = _external_rw_user
 
-    atlas_intake_app = _build_atlas_intake_app(tenant_id)
+    atlas_bloom_app = _build_atlas_bloom_integration_app(tenant_id)
     atlas_result_app = _build_atlas_result_app()
 
     with (
-        TestClient(atlas_intake_app) as atlas_intake_client,
+        TestClient(atlas_bloom_app) as atlas_bloom_client,
         TestClient(atlas_result_app) as atlas_result_client,
         TestClient(bloom_app) as bloom_client,
     ):
-        for outcome, test_euid in (
-            ("REJECTED", atlas_test_reject),
-            ("HOLD", atlas_test_hold),
-        ):
-            response = atlas_intake_client.post(
-                "/api/intake/outcomes",
-                json={
-                    "trf_euid": atlas_trf_euid,
-                    "test_euids": [test_euid],
-                    "patient_euid": patient_euid,
-                    "shipment_euid": shipment_euid,
-                    "outcome": outcome,
-                    "starting_queue": None,
-                },
-            )
-            assert response.status_code == 200, response.text
-            body = response.json()
-            _assert_no_uuid_keys(body)
-            assert body["accepted"] is False
-            assert body["fulfillment_item_euids"] == []
-
-        accepted_response = atlas_intake_client.post(
-            "/api/intake/outcomes",
+        accepted_response = atlas_bloom_client.post(
+            "/api/integrations/bloom/v1/materials/accepted",
+            headers={"Idempotency-Key": _opaque("idem-atlas-accepted")},
             json={
                 "trf_euid": atlas_trf_euid,
                 "test_euids": [atlas_test_accept],
                 "patient_euid": patient_euid,
                 "shipment_euid": shipment_euid,
-                "outcome": "ACCEPTED",
                 "starting_queue": "extraction_prod",
             },
         )
-        assert accepted_response.status_code == 200, accepted_response.text
+        assert accepted_response.status_code == 201, accepted_response.text
         accepted_body = accepted_response.json()
         _assert_no_uuid_keys(accepted_body)
         assert accepted_body["accepted"] is True
-        assert accepted_body["fulfillment_item_euids"] == [fulfillment_item_accept]
+        assert accepted_body["current_queue"] == "extraction_prod"
+        assert accepted_body["fulfillment_item_euids"]
+        fulfillment_item_accept = accepted_body["fulfillment_item_euids"][0]
 
         atlas_context = {
             "atlas_tenant_id": str(tenant_id),
@@ -471,9 +421,10 @@ def test_cross_repo_beta_smoke(monkeypatch):
         material = material_response.json()
         _assert_no_uuid_keys(material)
         specimen_euid = material["specimen_euid"]
+        container_euid = material["container_euid"]
 
         queued = bloom_client.post(
-            f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{specimen_euid}",
+            f"/api/v1/external/atlas/beta/queues/extraction_prod/items/{container_euid}",
             headers={"Idempotency-Key": _opaque("idem-queue")},
             json={"metadata": {"reason": "accepted-material"}},
         )
@@ -596,12 +547,20 @@ def test_cross_repo_beta_smoke(monkeypatch):
             dewey_client=dewey_client,
             auth_provider=SmokeUrsaAuthProvider(tenant_id),
             settings=Settings(
+                aws_profile="",
+                cors_origins="*",
+                session_secret_key="test-session-secret",
                 ursa_internal_api_key="ursa-smoke-key",
                 ursa_internal_output_bucket="beta-analysis-artifacts",
                 bloom_base_url="https://testserver",
                 bloom_api_token="bloom-smoke-token",
                 atlas_base_url="https://testserver",
                 atlas_internal_api_key="atlas-smoke-key",
+                cognito_domain="ursa.auth.us-west-2.amazoncognito.com",
+                cognito_app_client_id="client-123",
+                cognito_callback_url="https://localhost:8914/auth/callback",
+                cognito_logout_url="https://localhost:8914/login",
+                ursa_tapdb_mount_enabled=False,
             ),
         )
 
