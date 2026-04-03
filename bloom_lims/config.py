@@ -60,7 +60,9 @@ def _resolve_deployment_code() -> str:
 
 
 def _user_config_dir() -> Path:
-    xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    xdg_config_home = Path(
+        os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
+    )
     return xdg_config_home / f"bloom-{_resolve_deployment_code()}"
 
 
@@ -70,9 +72,13 @@ def _user_config_file() -> Path:
 
 
 def _deployment_scoped_tapdb_config_path(client_id: str, namespace: str) -> str:
-    xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    xdg_config_home = Path(
+        os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
+    )
     scoped_namespace = f"{namespace}-{_resolve_deployment_code()}"
-    return str(xdg_config_home / "tapdb" / client_id / scoped_namespace / "tapdb-config.yaml")
+    return str(
+        xdg_config_home / "tapdb" / client_id / scoped_namespace / "tapdb-config.yaml"
+    )
 
 
 def _validate_optional_https_url(value: str, *, field_name: str) -> str:
@@ -108,9 +114,7 @@ def _load_template_text() -> str:
 
     return template_text.replace(
         "__BLOOM_WEB_PORT__", str(DEFAULT_BLOOM_WEB_PORT)
-    ).replace(
-        "__BLOOM_TAPDB_LOCAL_PG_PORT__", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
-    )
+    ).replace("__BLOOM_TAPDB_LOCAL_PG_PORT__", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT))
 
 
 def _load_template_config() -> Dict[str, Any]:
@@ -535,7 +539,9 @@ class ZebraDaySettings(BaseModel):
 
     base_url: str = Field(default="", description="zebra_day API base URL")
     token: str = Field(default="", description="zebra_day internal API bearer token")
-    timeout_seconds: int = Field(default=10, description="zebra_day API timeout seconds")
+    timeout_seconds: int = Field(
+        default=10, description="zebra_day API timeout seconds"
+    )
     verify_ssl: bool = Field(
         default=True, description="Verify zebra_day TLS certificates"
     )
@@ -547,7 +553,9 @@ class ZebraDaySettings(BaseModel):
         if not normalized:
             return ""
         if not normalized.startswith(("https://", "http://")):
-            raise ValueError("zebra_day.base_url must use an absolute http:// or https:// URL")
+            raise ValueError(
+                "zebra_day.base_url must use an absolute http:// or https:// URL"
+            )
         return normalized.rstrip("/")
 
 

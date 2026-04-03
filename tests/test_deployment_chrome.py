@@ -10,7 +10,9 @@ from bloom_lims.config import (
 from bloom_lims.gui.jinja import _resolve_deployment_metadata
 
 
-def test_deployment_settings_fall_back_to_deployment_code(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployment_settings_fall_back_to_deployment_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "staging")
 
     deployment = DeploymentSettings(name="", color="", is_production=True)

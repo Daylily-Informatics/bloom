@@ -64,7 +64,9 @@ def _resolve_display_timezone(context: dict[str, Any]) -> str:
 
 
 @pass_context
-def format_dt(context: dict[str, Any], value: Any, format_type: str = "standard") -> str:
+def format_dt(
+    context: dict[str, Any], value: Any, format_type: str = "standard"
+) -> str:
     dt = _coerce_datetime(value)
     if dt is None:
         if value is None:
@@ -156,6 +158,7 @@ def _resolve_gui_metadata() -> Dict[str, str]:
         "support_email": support_email,
         "github_repo_url": github_repo_url,
     }
+
 
 def _resolve_deployment_metadata() -> Dict[str, str | bool]:
     deployment = {
