@@ -24,9 +24,9 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
-    "cli-core-yo>=0.5.1",
-    "daylily-tapdb==3.2.2",
-    "daylily-cognito==0.4.1",
+    "cli-core-yo==0.5.2",
+    "daylily-tapdb==3.2.3",
+    "daylily-cognito==0.4.2",
     "boto3>=1.34.0",
     "fastapi>=0.110.0",
     "httpx>=0.27.2",
@@ -45,7 +45,7 @@ dependencies = [
     "sqlalchemy>=2.0.23",
     "starlette>=0.35.1",
     "uvicorn>=0.28.0",
-    "zebra-day==4.0.0",
+    "zebra-day==5.0.6",
     "daylily-carrier-tracking==0.5.1",
 ]
 classifiers = [
