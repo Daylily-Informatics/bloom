@@ -26,6 +26,44 @@ def _normalize_action_slug(action_key: str) -> str:
     return raw.replace("-", "_")
 
 
+def _normalize_action_result(result: Any) -> dict[str, Any]:
+    if isinstance(result, dict):
+        return result
+
+    payload: dict[str, Any] = {
+        "status": "success",
+        "message": "Action completed",
+    }
+
+    if isinstance(result, str):
+        message = result.strip()
+        if message:
+            payload["message"] = message
+        return payload
+
+    result_euid = getattr(result, "euid", None)
+    if result_euid is not None:
+        payload["result_euid"] = str(result_euid)
+
+    return payload
+
+
+def _coerce_action_template_uid(action_template_uid: Any) -> Any:
+    if not isinstance(action_template_uid, str):
+        return action_template_uid
+
+    candidate = action_template_uid.strip()
+    if not candidate:
+        return candidate
+    if candidate.isdigit():
+        return int(candidate)
+
+    try:
+        return uuid.UUID(candidate)
+    except ValueError:
+        return candidate
+
+
 class BloomTapDBActionDispatcher(ActionDispatcher):
     """Executes Bloom object actions via TapDB dispatcher semantics."""
 
@@ -54,13 +92,16 @@ class BloomTapDBActionDispatcher(ActionDispatcher):
             payload["captured_data"] = merged_captured
 
             if handler_name == "do_action_set_object_status":
-                return target_handler(
+                result = target_handler(
                     instance.euid,
                     payload,
                     payload.get("action_group"),
                     payload.get("_raw_action_key", encoded_action_key),
                 )
-            return target_handler(instance.euid, payload)
+                return _normalize_action_result(result)
+
+            result = target_handler(instance.euid, payload)
+            return _normalize_action_result(result)
 
         return _wrapped
 
@@ -109,8 +150,7 @@ class BloomTapDBActionDispatcher(ActionDispatcher):
         action_template_uid = action_ds.get("action_template_uid")
         if not action_template_uid:
             raise ValueError("action_ds is missing required 'action_template_uid'")
-        if isinstance(action_template_uid, str):
-            action_template_uid = uuid.UUID(action_template_uid)
+        action_template_uid = _coerce_action_template_uid(action_template_uid)
 
         action_subtype = _normalize_action_slug(action_key) or "unknown_action"
         executed_at = datetime.now(UTC).isoformat()
