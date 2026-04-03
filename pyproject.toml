@@ -2,13 +2,14 @@
 # BLOOM LIMS Project Configuration
 # =============================================================================
 # ENVIRONMENT MANAGEMENT: This project uses CONDA for environment management.
-# The conda environment is named "BLOOM" (all caps).
+# The supported local entrypoint is `source ./activate <deploy-name>`.
+# Activation creates a deployment-scoped conda environment named
+# `BLOOM-<deploy-name>` from repo-root `environment.yaml`.
 #
 # To set up the environment:
-#   conda env create -f bloom_env.yaml
-#   conda activate BLOOM
+#   source ./activate <deploy-name>
 #
-# See bloom_env.yaml for the full list of dependencies.
+# See environment.yaml for the full list of dependencies.
 # =============================================================================
 
 [build-system]
@@ -103,20 +104,19 @@ bloom_lims = ["etc/*.yaml"]
 # Environment management method - DO NOT USE pip/poetry/venv for this project
 environment_manager = "conda"
 
-# The conda environment name (IMPORTANT: all caps)
-conda_environment_name = "BLOOM"
+# The deployment-scoped conda environment name pattern
+conda_environment_name = "BLOOM-<deploy-name>"
 
 # The conda environment definition file
-conda_environment_file = "bloom_env.yaml"
+conda_environment_file = "environment.yaml"
 
 # Commands to set up the development environment
 setup_commands = [
-    "conda env create -f bloom_env.yaml",
-    "conda activate BLOOM",
+    "source ./activate <deploy-name>",
 ]
 
 # Command to run tests (must activate conda environment first)
-test_command = "conda run -n BLOOM pytest"
+test_command = "source ./activate <deploy-name> && pytest"
 
 # =============================================================================
 # Tool Configurations
