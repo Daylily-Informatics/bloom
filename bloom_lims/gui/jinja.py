@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import json
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict
 from zoneinfo import ZoneInfo
 
-import json
-from jinja2 import Environment, FileSystemLoader, pass_context
+from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 
 try:
     from daylily_tapdb.timezone_utils import (
@@ -29,7 +29,10 @@ except Exception:
             return default
 
 
-templates = Environment(loader=FileSystemLoader("templates"))
+templates = Environment(
+    loader=FileSystemLoader("templates"),
+    autoescape=select_autoescape(("html", "xml")),
+)
 templates.filters["tojson"] = lambda x: json.dumps(x)
 
 
