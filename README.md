@@ -51,6 +51,8 @@ bloom db seed
 bloom server start --port 8912
 ```
 
+`source ./activate <deploy-name>` creates the deployment-scoped conda environment from repo-root `environment.yaml` when it is missing, then activates it and installs only the Bloom repo editable.
+
 The supported local workflow is CLI-first and uses Bloom’s own environment/bootstrap path.
 
 Delete-only teardown is also available:

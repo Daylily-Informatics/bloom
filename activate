@@ -229,9 +229,9 @@ if command -v conda &> /dev/null; then
         fi
     else
         echo -e "  ${_YELLOW}⚠${_NC} Conda environment '${_BLOOM_CONDA_ENV_NAME}' not found."
-        if [[ -f "$BLOOM_ROOT/bloom_env.yaml" ]]; then
-            echo -e "  ${_CYAN}→${_NC} Installing conda environment from bloom_env.yaml..."
-            if conda env create -n "${_BLOOM_CONDA_ENV_NAME}" -f "$BLOOM_ROOT/bloom_env.yaml"; then
+        if [[ -f "$BLOOM_ROOT/environment.yaml" ]]; then
+            echo -e "  ${_CYAN}→${_NC} Installing conda environment from environment.yaml..."
+            if conda env create -n "${_BLOOM_CONDA_ENV_NAME}" -f "$BLOOM_ROOT/environment.yaml"; then
                 echo -e "  ${_GREEN}✓${_NC} Conda environment created successfully"
                 conda activate "${_BLOOM_CONDA_ENV_NAME}"
                 if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
@@ -241,7 +241,7 @@ if command -v conda &> /dev/null; then
                 echo -e "  ${_YELLOW}⚠${_NC} Failed to create conda environment."
             fi
         else
-            echo -e "  ${_YELLOW}⚠${_NC} bloom_env.yaml not found."
+            echo -e "  ${_YELLOW}⚠${_NC} environment.yaml not found."
         fi
     fi
 else
@@ -251,7 +251,7 @@ fi
 
 if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_CONDA_ENV_NAME}" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
     echo -e "  ${_YELLOW}⚠${_NC} ${_BLOOM_CONDA_ENV_NAME} conda environment is required."
-    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f bloom_env.yaml' if needed, then retry 'source ./activate <deploy-name>'."
+    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f environment.yaml' if needed, then retry 'source ./activate <deploy-name>'."
     return 1
 fi
 
