@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import json
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict
 from zoneinfo import ZoneInfo
 
-import json
-from jinja2 import Environment, FileSystemLoader, pass_context
+from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 
 try:
     from daylily_tapdb.timezone_utils import (
@@ -29,7 +29,10 @@ except Exception:
             return default
 
 
-templates = Environment(loader=FileSystemLoader("templates"))
+templates = Environment(
+    loader=FileSystemLoader("templates"),
+    autoescape=select_autoescape(("html", "xml")),
+)
 templates.filters["tojson"] = lambda x: json.dumps(x)
 
 
@@ -61,7 +64,9 @@ def _resolve_display_timezone(context: dict[str, Any]) -> str:
 
 
 @pass_context
-def format_dt(context: dict[str, Any], value: Any, format_type: str = "standard") -> str:
+def format_dt(
+    context: dict[str, Any], value: Any, format_type: str = "standard"
+) -> str:
     dt = _coerce_datetime(value)
     if dt is None:
         if value is None:
@@ -154,10 +159,11 @@ def _resolve_gui_metadata() -> Dict[str, str]:
         "github_repo_url": github_repo_url,
     }
 
+
 def _resolve_deployment_metadata() -> Dict[str, str | bool]:
     deployment = {
         "name": "",
-        "color": "#0f766e",
+        "color": "#AFEEEE",
         "is_production": False,
     }
     try:
