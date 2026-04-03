@@ -12,9 +12,9 @@ import hashlib
 import importlib.metadata
 import logging
 import os
+import re
 import secrets
 import string
-import re
 import tempfile
 from functools import lru_cache
 from importlib import resources as importlib_resources
