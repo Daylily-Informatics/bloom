@@ -80,6 +80,26 @@ def test_strict_app_startup_accepts_synthesized_test_config(
     assert app.title == "FastAPI"
 
 
+def test_create_app_does_not_mount_upload_or_tmp_static_dirs(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
+    monkeypatch.setenv(
+        "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
+    )
+
+    ensure_test_runtime_environment()
+    get_settings.cache_clear()
+
+    app = create_app()
+    mount_paths = {route.path for route in app.routes}
+
+    assert "/static" in mount_paths
+    assert "/templates" in mount_paths
+    assert "/uploads" not in mount_paths
+    assert "/tmp" not in mount_paths
+
+
 def test_generate_example_webhook_secret_is_20_char_alphanumeric():
     secret = generate_example_webhook_secret()
     assert len(secret) == 20

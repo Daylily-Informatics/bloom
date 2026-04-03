@@ -137,8 +137,6 @@ def create_app() -> FastAPI:
 
     app.mount("/static", StaticFiles(directory="static"), name="static")
     app.mount("/templates", StaticFiles(directory="templates"), name="templates")
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-    app.mount("/tmp", StaticFiles(directory="tmp"), name="tmp")
 
     app.add_middleware(
         TrustedHostMiddleware,
