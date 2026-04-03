@@ -173,8 +173,8 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ env.PYTHON_VERSION }}
-          activate-environment: BLOOM
-          environment-file: bloom_env.yaml
+          activate-environment: BLOOM-local
+          environment-file: environment.yaml
           auto-activate-base: false
 
       - name: Install bloom in editable mode
