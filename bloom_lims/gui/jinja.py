@@ -157,7 +157,7 @@ def _resolve_gui_metadata() -> Dict[str, str]:
 def _resolve_deployment_metadata() -> Dict[str, str | bool]:
     deployment = {
         "name": "",
-        "color": "#0f766e",
+        "color": "#AFEEEE",
         "is_production": False,
     }
     try:

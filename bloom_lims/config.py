@@ -7,6 +7,8 @@ Configuration precedence (highest to lowest):
 3. Template defaults
 """
 
+import colorsys
+import hashlib
 import importlib.metadata
 import logging
 import os
@@ -37,6 +39,8 @@ DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT = 5566
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
 )
+DEFAULT_DEPLOYMENT_BANNER_COLOR = "#AFEEEE"
+PRODUCTION_DEPLOYMENT_NAMES = {"prod", "production"}
 
 
 def _sanitize_deployment_code(value: str) -> str:
@@ -145,6 +149,38 @@ def _rendered_template_config_file() -> Path:
         except Exception as exc:
             logger.debug("Failed to materialize rendered template config: %s", exc)
     return rendered_path
+
+
+def _stable_deployment_color_hex(name: str) -> str:
+    digest = hashlib.sha256(name.encode("utf-8")).digest()
+    hue = int.from_bytes(digest[:8], "big") % 360
+    red, green, blue = colorsys.hls_to_rgb(hue / 360.0, 0.46, 0.72)
+    return "#{:02x}{:02x}{:02x}".format(
+        round(red * 255),
+        round(green * 255),
+        round(blue * 255),
+    )
+
+
+def _resolve_deployment_chrome(
+    *,
+    name: str | None,
+    color: str | None,
+    fallback_name: str | None = None,
+) -> dict[str, str | bool]:
+    resolved_name = str(name or "").strip() or str(fallback_name or "").strip()
+    resolved_color = str(color or "").strip()
+    if not resolved_color:
+        resolved_color = (
+            _stable_deployment_color_hex(resolved_name)
+            if resolved_name
+            else DEFAULT_DEPLOYMENT_BANNER_COLOR
+        )
+    return {
+        "name": resolved_name,
+        "color": resolved_color,
+        "is_production": resolved_name.lower() in PRODUCTION_DEPLOYMENT_NAMES,
+    }
 
 
 def _load_yaml_config() -> Dict[str, Any]:
@@ -366,10 +402,22 @@ class DeploymentSettings(BaseModel):
     """Deployment-specific GUI chrome."""
 
     name: str = Field(default="", description="Deployment label")
-    color: str = Field(default="#0f766e", description="Deployment banner color")
+    color: str = Field(default="", description="Deployment banner color")
     is_production: bool = Field(
         default=False, description="Hide deployment banner in production"
     )
+
+    @model_validator(mode="after")
+    def normalize_banner(self) -> "DeploymentSettings":
+        deployment = _resolve_deployment_chrome(
+            name=self.name,
+            color=self.color,
+            fallback_name=_resolve_deployment_code(),
+        )
+        self.name = str(deployment["name"])
+        self.color = str(deployment["color"])
+        self.is_production = bool(deployment["is_production"])
+        return self
 
 
 class AuthSettings(BaseModel):
