@@ -131,6 +131,12 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
             [
                 "config",
                 "init",
+                "--client-id",
+                "bloom",
+                "--database-name",
+                "bloom",
+                "--euid-client-code",
+                "B",
                 "--env",
                 "dev",
                 "--db-port",

@@ -229,10 +229,29 @@ class TapdbAnomalyRepository:
             summary=str(props.get("summary") or ""),
             first_seen_at=str(props.get("first_seen_at") or ""),
             last_seen_at=str(props.get("last_seen_at") or ""),
-            occurrence_count=int(props.get("occurrence_count") or 0),
-            redacted_context=dict(props.get("redacted_context") or {}),
+            occurrence_count=_safe_int(props.get("occurrence_count")),
+            redacted_context=_safe_redacted_context(props.get("redacted_context")),
             source_view_url=f"/admin/anomalies/{instance.euid}",
         )
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_redacted_context(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if value is None:
+        return {}
+    if isinstance(value, str) and not value.strip():
+        return {}
+    if isinstance(value, (list, tuple)) and not value:
+        return {}
+    return {"value": redact_context(value)}
 
 
 def open_anomaly_repository(*, app_username: str):

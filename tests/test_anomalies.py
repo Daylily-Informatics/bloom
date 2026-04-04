@@ -53,6 +53,7 @@ def _build_fake_repository() -> TapdbAnomalyRepository:
     repository._ensure_templates = lambda: None  # type: ignore[method-assign]
     repository._instances = lambda: list(instances)  # type: ignore[method-assign]
     repository.factory = SimpleNamespace(create_instance=create_instance)
+    repository._test_instances = instances  # type: ignore[attr-defined]
     return repository
 
 
@@ -189,3 +190,47 @@ def test_admin_anomalies_views_render(monkeypatch) -> None:
     assert "[redacted]" in detail.text
 
     assert missing.status_code == 404
+
+
+def test_anomaly_api_tolerates_malformed_stored_properties(monkeypatch) -> None:
+    repository = _build_fake_repository()
+    repository._test_instances.append(  # type: ignore[attr-defined]
+        SimpleNamespace(
+            euid="BAN-0099",
+            name="malformed",
+            json_addl={
+                "properties": {
+                    "service": "bloom",
+                    "environment": "dev",
+                    "category": "database",
+                    "severity": "error",
+                    "fingerprint": "db-malformed",
+                    "summary": "Malformed stored anomaly payload",
+                    "first_seen_at": "2026-03-29T22:00:00+00:00",
+                    "last_seen_at": "2026-03-29T22:01:00+00:00",
+                    "occurrence_count": "not-an-int",
+                    "redacted_context": ["opaque", "payload"],
+                }
+            },
+            created_dt=datetime.now(UTC),
+            category="bloom",
+            type="ops",
+            subtype="anomaly-record",
+            version="1.0",
+            is_deleted=False,
+        )
+    )
+    monkeypatch.setattr(
+        observability_routes,
+        "_anomaly_repository",
+        lambda _app_username: (_StubBloomDB(), repository),
+    )
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/api/anomalies")
+
+    assert response.status_code == 200
+    payload = response.json()
+    item = next(record for record in payload["items"] if record["id"] == "BAN-0099")
+    assert item["occurrence_count"] == 0
+    assert item["redacted_context"] == {"value": ["opaque", "payload"]}
