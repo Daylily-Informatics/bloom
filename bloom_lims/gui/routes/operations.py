@@ -18,7 +18,17 @@ from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -34,7 +44,9 @@ from bloom_lims.core.action_execution import (
     execute_action_for_instance,
     normalize_action_execute_payload,
 )
-from bloom_lims.gui.actions import hydrate_dynamic_action_groups as _hydrate_dynamic_action_groups
+from bloom_lims.gui.actions import (
+    hydrate_dynamic_action_groups as _hydrate_dynamic_action_groups,
+)
 from bloom_lims.gui.deps import (
     _get_request_cognito_auth,
     get_allowed_domains,
@@ -53,6 +65,7 @@ router = APIRouter()
 
 BVARS = BloomVars()
 BASE_DIR = Path("./served_data").resolve()
+
 
 class FormField(BaseModel):
     name: str
@@ -159,7 +172,9 @@ def highlight_json_changes(old_json_str, new_json_str):
     old_json_formatted = json.dumps(old_json, indent=2)
     new_json_formatted = json.dumps(new_json, indent=2)
 
-    diff = difflib.ndiff(old_json_formatted.splitlines(), new_json_formatted.splitlines())
+    diff = difflib.ndiff(
+        old_json_formatted.splitlines(), new_json_formatted.splitlines()
+    )
 
     old_json_highlighted = []
     new_json_highlighted = []
@@ -314,7 +329,9 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
     from bloom_lims.tapdb_metrics import build_metrics_page_context
     from bloom_lims.config import get_settings
 
-    tapdb_metrics_summary = build_metrics_page_context(get_settings().tapdb.env, limit=1000)
+    tapdb_metrics_summary = build_metrics_page_context(
+        get_settings().tapdb.env, limit=1000
+    )
 
     template = templates.get_template("modern/admin.html")
     context = {
@@ -336,7 +353,9 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
 
 
 @router.get("/admin/metrics", response_class=HTMLResponse)
-async def admin_metrics(request: Request, _auth=Depends(require_auth), limit: int = 5000):
+async def admin_metrics(
+    request: Request, _auth=Depends(require_auth), limit: int = 5000
+):
     if not _is_admin_session(request):
         return _admin_forbidden_response(request)
 
@@ -347,12 +366,19 @@ async def admin_metrics(request: Request, _auth=Depends(require_auth), limit: in
     metrics_ctx = build_metrics_page_context(get_settings().tapdb.env, limit=limit)
 
     template = templates.get_template("modern/admin_metrics.html")
-    context = {"request": request, "udat": user_data, "user_data": user_data, **metrics_ctx}
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user_data": user_data,
+        **metrics_ctx,
+    }
     return HTMLResponse(content=template.render(context))
 
 
 @router.get("/admin/observability", response_class=HTMLResponse)
-async def admin_observability(request: Request, _auth=Depends(require_auth), limit: int = 25):
+async def admin_observability(
+    request: Request, _auth=Depends(require_auth), limit: int = 25
+):
     if not _is_admin_session(request):
         return _admin_forbidden_response(request)
 
@@ -384,7 +410,9 @@ async def admin_observability(request: Request, _auth=Depends(require_auth), lim
 
 
 @router.get("/admin/anomalies", response_class=HTMLResponse)
-async def admin_anomalies(request: Request, _auth=Depends(require_auth), limit: int = 100):
+async def admin_anomalies(
+    request: Request, _auth=Depends(require_auth), limit: int = 100
+):
     if not _is_admin_session(request):
         return _admin_forbidden_response(request)
 
@@ -393,7 +421,10 @@ async def admin_anomalies(request: Request, _auth=Depends(require_auth), limit: 
     error_detail = ""
     bdb = BLOOMdb3(app_username=user_data.get("email", "admin-anomalies"))
     try:
-        anomalies = [record.__dict__ for record in TapdbAnomalyRepository(bdb.session).list(limit=limit)]
+        anomalies = [
+            record.__dict__
+            for record in TapdbAnomalyRepository(bdb.session).list(limit=limit)
+        ]
     except Exception as exc:
         error_detail = str(exc)
     finally:
@@ -483,7 +514,10 @@ async def update_preference(request: Request, auth: dict = Depends(require_auth)
         auth_email = str(request.session.get("user_data", {}).get("email") or "")
 
     if not auth_email:
-        return {"status": "error", "message": "Authentication failed or user data missing"}
+        return {
+            "status": "error",
+            "message": "Authentication failed or user data missing",
+        }
 
     data = await request.json()
     key = data.get("key")
@@ -585,7 +619,9 @@ async def update_obj_json_addl_properties(
     for key, values in properties.items():
         target_key = key[:-2] if key.endswith("[]") else key
         if isinstance(payload["properties"].get(target_key), list):
-            payload["properties"][target_key] = values if isinstance(values, list) else [values]
+            payload["properties"][target_key] = (
+                values if isinstance(values, list) else [values]
+            )
         else:
             payload["properties"][target_key] = values
 
@@ -615,12 +651,17 @@ async def execute_ui_action(request: Request, _auth=Depends(require_auth)):
         )
         return JSONResponse(content=result)
     except ActionExecutionError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.to_payload()) from exc
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.to_payload()
+        ) from exc
 
 
 @router.get("/workflows")
 async def workflows_redirect():
-    raise HTTPException(status_code=410, detail="Workflow pages are retired in queue-centric Bloom beta.")
+    raise HTTPException(
+        status_code=410,
+        detail="Workflow pages are retired in queue-centric Bloom beta.",
+    )
 
 
 @router.get("/equipment")
@@ -675,7 +716,9 @@ async def query_by_euids(request: Request, file_euids: str = Form(...)):
 
     except Exception as e:
         logging.error(f"Error querying files: {e}", exc_info=True)
-        return HTMLResponse(content=f"<html><body><h2>Error: {e}</h2></body></html>", status_code=500)
+        return HTMLResponse(
+            content=f"<html><body><h2>Error: {e}</h2></body></html>", status_code=500
+        )
 
 
 @router.get("/update_object_name", response_class=HTMLResponse)
@@ -772,8 +815,12 @@ async def _create_from_template(request: Request, euid: str):
     template = bobdb.create_instances(euid)
 
     if template:
-        return RedirectResponse(url=f"/euid_details?euid={template[0][0].euid}", status_code=303)
+        return RedirectResponse(
+            url=f"/euid_details?euid={template[0][0].euid}", status_code=303
+        )
     return RedirectResponse(url="/equipment_overview", status_code=303)
+
+
 @router.get("/vertical_exp", response_class=HTMLResponse)
 async def vertical_exp(request: Request, euid=None, _auth=Depends(require_auth)):
     raise HTTPException(status_code=404, detail="Vertical explorer has been retired.")
@@ -788,11 +835,15 @@ async def plate_carosel(
 
 @router.get("/get_related_plates", response_class=HTMLResponse)
 async def get_related_plates(request: Request, main_plate, _auth=Depends(require_auth)):
-    raise HTTPException(status_code=404, detail="Related plate expansion has been retired.")
+    raise HTTPException(
+        status_code=404, detail="Related plate expansion has been retired."
+    )
 
 
 @router.get("/plate_visualization", response_class=HTMLResponse)
-async def plate_visualization(request: Request, plate_euid, _auth=Depends(require_auth)):
+async def plate_visualization(
+    request: Request, plate_euid, _auth=Depends(require_auth)
+):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     plate = bobdb.get_by_euid(plate_euid)
 
@@ -874,7 +925,9 @@ async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
 
         if not euid or not json_addl_key or json_data is None:
             logging.error("EUID, JSON key, or JSON data missing")
-            raise HTTPException(status_code=400, detail="EUID, JSON key, or JSON data missing")
+            raise HTTPException(
+                status_code=400, detail="EUID, JSON key, or JSON data missing"
+            )
 
         bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
         obj = bobdb.get_by_euid(euid)
@@ -893,7 +946,9 @@ async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
         raise
     except Exception as e:
         logging.error("Error saving JSON properties: %s", e)
-        raise HTTPException(status_code=500, detail="An error occurred while saving JSON properties")
+        raise HTTPException(
+            status_code=500, detail="An error occurred while saving JSON properties"
+        )
 
 
 @router.get("/object_templates_summary", response_class=HTMLResponse)
@@ -906,7 +961,9 @@ async def object_templates_summary(request: Request, _auth=Depends(require_auth)
         .all()
     )
 
-    unique_discriminators = sorted(set(t.polymorphic_discriminator for t in generic_templates))
+    unique_discriminators = sorted(
+        set(t.polymorphic_discriminator for t in generic_templates)
+    )
     user_data = request.session.get("user_data", {})
 
     template = templates.get_template("modern/object_templates_summary.html")
@@ -947,7 +1004,10 @@ async def euid_details(
                 )
                 obj = bobdb_deleted.get_by_euid(euid)
                 if obj:
-                    return RedirectResponse(url=f"/euid_details?euid={euid}&is_deleted=true", status_code=303)
+                    return RedirectResponse(
+                        url=f"/euid_details?euid={euid}&is_deleted=true",
+                        status_code=303,
+                    )
             except Exception:
                 pass
 
@@ -961,7 +1021,9 @@ async def euid_details(
             for column in obj.__table__.columns
             if hasattr(obj, column.key)
         }
-        obj_dict["parent_template_euid"] = obj.parent_template.euid if hasattr(obj, "parent_template") else ""
+        obj_dict["parent_template_euid"] = (
+            obj.parent_template.euid if hasattr(obj, "parent_template") else ""
+        )
         audit_logs = bobdb.query_audit_log_by_euid(euid)
         user_data = request.session.get("user_data", {})
 
@@ -1000,6 +1062,8 @@ async def euid_details(
     except Exception as e:
         logging.error("Error in euid_details for %s: %s", euid, e, exc_info=True)
         raise e
+
+
 @router.get("/bloom_schema_report", response_class=HTMLResponse)
 async def bloom_schema_report(request: Request, _auth=Depends(require_auth)):
     return JSONResponse(
@@ -1024,7 +1088,9 @@ def delete_by_euid(request: Request, euid, _auth=Depends(require_auth)):
 
 @router.post("/delete_object")
 async def delete_object(request: Request, _auth=Depends(require_auth)):
-    logging.warning("Deprecated endpoint /delete_object used; prefer DELETE /api/object/{euid}")
+    logging.warning(
+        "Deprecated endpoint /delete_object used; prefer DELETE /api/object/{euid}"
+    )
     data = await request.json()
     euid = data.get("euid")
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -1158,7 +1224,10 @@ async def user_home(request: Request):
         "css_files": css_files,
         "dest_section": dest_section,
         "whitelisted_domains": " , ".join(get_allowed_domains()) or "all",
-        "s3_bucket_prefix": os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!") + "0",
+        "s3_bucket_prefix": os.environ.get(
+            "BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!"
+        )
+        + "0",
         "cognito_details": cognito_details,
         "printer_info": printer_info,
         "bloom_version": bloom_version,

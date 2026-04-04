@@ -1985,7 +1985,9 @@ class TestJSONUpdateEndpoints:
         )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
 
-    def test_save_json_addl_key_accepts_empty_dict_and_initializes_json_addl(self, client):
+    def test_save_json_addl_key_accepts_empty_dict_and_initializes_json_addl(
+        self, client
+    ):
         """Empty JSON payloads are valid and should initialize json_addl when absent."""
         from bloom_lims.gui.routes import operations
 
@@ -1995,7 +1997,9 @@ class TestJSONUpdateEndpoints:
 
         with patch.object(operations, "BLOOMdb3", lambda **_kwargs: object()):
             with patch.object(operations, "BloomObj", lambda _db: repo):
-                with patch.object(operations, "flag_modified", lambda *_args, **_kwargs: None):
+                with patch.object(
+                    operations, "flag_modified", lambda *_args, **_kwargs: None
+                ):
                     response = client.post(
                         "/save_json_addl_key",
                         json={
@@ -2020,7 +2024,9 @@ class TestJSONUpdateEndpoints:
 
         with patch.object(operations, "BLOOMdb3", lambda **_kwargs: object()):
             with patch.object(operations, "BloomObj", lambda _db: repo):
-                with patch.object(operations, "flag_modified", lambda *_args, **_kwargs: None):
+                with patch.object(
+                    operations, "flag_modified", lambda *_args, **_kwargs: None
+                ):
                     response = client.post(
                         "/save_json_addl_key",
                         json={
