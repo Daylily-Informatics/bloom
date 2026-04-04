@@ -882,12 +882,13 @@ async def save_json_addl_key(request: Request, _auth=Depends(require_auth)):
         if not obj:
             raise HTTPException(status_code=404, detail="Object not found")
 
+        if not isinstance(obj.json_addl, dict):
+            obj.json_addl = {}
         obj.json_addl[json_addl_key] = json_data
         flag_modified(obj, "json_addl")
         bobdb.session.commit()
 
         return RedirectResponse(url=f"/euid_details?euid={euid}", status_code=303)
-
     except HTTPException:
         raise
     except Exception as e:
