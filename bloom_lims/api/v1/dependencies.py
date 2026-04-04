@@ -289,12 +289,15 @@ async def get_api_user(
 
     if hasattr(request, "session") and "user_data" in request.session:
         user_data = request.session.get("user_data", {})
+        session_groups = user_data.get("service_groups")
+        if not isinstance(session_groups, list):
+            session_groups = user_data.get("groups") if isinstance(user_data.get("groups"), list) else []
         return _make_user(
             email=user_data.get("email", "session-user"),
-            user_id=user_data.get("sub"),
+            user_id=user_data.get("sub") or user_data.get("user_id"),
             role_hint=user_data.get("role"),
             auth_source="session",
-            groups_hint=user_data.get("groups") if isinstance(user_data.get("groups"), list) else [],
+            groups_hint=session_groups,
         )
 
     if x_api_key:

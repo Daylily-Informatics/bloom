@@ -24,6 +24,7 @@ from bloom_lims.auth.repositories.tapdb.user_api_tokens import (
     UserTokenRevisionRecord,
     UserTokenUsageRecord,
 )
+from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService
 
 
@@ -279,8 +280,10 @@ class UserAPITokenService:
         *,
         token: UserTokenRecord,
     ) -> tuple[list[str], list[str]]:
+        owner_record = resolve_user_record(self.db, token.user_id, include_inactive=True)
+        fallback_role = owner_record.role if owner_record and owner_record.role else Role.READ_ONLY.value
         owner = self.groups.resolve_user_roles_and_groups(
             user_id=token.user_id,
-            fallback_role=Role.READ_ONLY.value,
+            fallback_role=fallback_role,
         )
         return constrain_roles_by_scope(owner.roles, token.scope), owner.groups

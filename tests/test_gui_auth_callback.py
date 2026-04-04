@@ -112,7 +112,7 @@ def test_auth_callback_get_completes_login(
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth._resolve_login_roles_and_groups",
-        lambda **_kwargs: (["ADMIN"], ["bloom-admin"], "sub-123"),
+        lambda **_kwargs: (["ADMIN"], ["API_ACCESS"], "sub-123", "ADMIN"),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_user_preferences",
@@ -294,13 +294,14 @@ def test_normalize_user_data_strips_raw_tokens() -> None:
         user_sub="sub-123",
         email="johnm@lsmc.com",
         roles=["ADMIN"],
-        cognito_groups=["bloom-admin"],
+        cognito_groups=["platform-admin", "bloom-admin"],
         auth_mode="cognito",
     )
 
     normalized = _normalize_user_data(
         {
             "email": "johnm@lsmc.com",
+            "service_groups": ["API_ACCESS", "ENABLE_ATLAS_API"],
             "access_token": "access-token",
             "id_token": "id-token",
             "refresh_token": "refresh-token",
@@ -311,6 +312,10 @@ def test_normalize_user_data_strips_raw_tokens() -> None:
     assert "access_token" not in normalized
     assert "id_token" not in normalized
     assert "refresh_token" not in normalized
+    assert normalized["identity_groups"] == ["platform-admin", "bloom-admin"]
+    assert normalized["cognito_groups"] == ["platform-admin", "bloom-admin"]
+    assert normalized["service_groups"] == ["API_ACCESS", "ENABLE_ATLAS_API"]
+    assert normalized["groups"] == ["API_ACCESS", "ENABLE_ATLAS_API"]
 
 
 def test_multiple_gui_clients_keep_distinct_sessions(
@@ -362,6 +367,7 @@ def test_multiple_gui_clients_keep_distinct_sessions(
             ["READ_WRITE"],
             [],
             kwargs.get("cognito_sub") or kwargs.get("email"),
+            "READ_WRITE",
         ),
     )
     monkeypatch.setattr(

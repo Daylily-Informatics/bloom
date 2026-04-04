@@ -8,11 +8,8 @@ from sqlalchemy.orm import Session
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
-    BLOOM_ADMIN_GROUP,
     BLOOM_AUDITOR_GROUP,
     BLOOM_CLINICAL_GROUP,
-    BLOOM_READONLY_GROUP,
-    BLOOM_READWRITE_GROUP,
     BLOOM_RND_GROUP,
     ENABLE_ATLAS_API_GROUP,
     ENABLE_URSA_API_GROUP,
@@ -23,9 +20,6 @@ from bloom_lims.auth.repositories.tapdb.groups import GroupMembershipRecord, Gro
 
 
 SYSTEM_GROUP_CODES = [
-    BLOOM_READONLY_GROUP,
-    BLOOM_READWRITE_GROUP,
-    BLOOM_ADMIN_GROUP,
     BLOOM_RND_GROUP,
     BLOOM_CLINICAL_GROUP,
     BLOOM_AUDITOR_GROUP,
@@ -33,12 +27,6 @@ SYSTEM_GROUP_CODES = [
     ENABLE_ATLAS_API_GROUP,
     ENABLE_URSA_API_GROUP,
 ]
-
-GROUP_ROLE_MAP = {
-    BLOOM_READONLY_GROUP.upper(): Role.READ_ONLY.value,
-    BLOOM_READWRITE_GROUP.upper(): Role.READ_WRITE.value,
-    BLOOM_ADMIN_GROUP.upper(): Role.ADMIN.value,
-}
 
 
 def map_legacy_role(role_value: str | None) -> str:
@@ -106,11 +94,5 @@ class GroupService:
     ) -> GroupResolution:
         fallback = map_legacy_role(fallback_role)
         groups = self.get_group_codes_for_user(user_id)
-        role_groups = []
-        for group in groups:
-            normalized_group = str(group or "").strip().upper()
-            mapped_role = GROUP_ROLE_MAP.get(normalized_group)
-            if mapped_role:
-                role_groups.append(mapped_role)
-        roles = normalize_roles(role_groups or [fallback], fallback=fallback)
+        roles = normalize_roles([fallback], fallback=fallback)
         return GroupResolution(roles=roles, groups=sorted(groups))

@@ -17,9 +17,6 @@ Bloom permissions:
 - `token:admin_manage`
 
 System groups:
-- `bloom-readonly`
-- `bloom-readwrite`
-- `bloom-admin`
 - `bloom-rnd`
 - `bloom-clinical`
 - `bloom-auditor`
@@ -39,7 +36,7 @@ Mounted mode defaults:
 
 Auth behavior for mounted path:
 - Bloom session/user model is the only gate
-- admin-only access (`user_data.role == "admin"` or role set contains `ADMIN`)
+- admin-only access (`user_data.role == "ADMIN"` or role set contains `ADMIN`)
 - browser unauthenticated -> redirect `/login`
 - browser non-admin -> redirect `/user_home?admin_required=1`
 - API/XHR-style denied access -> JSON `401`/`403`
@@ -87,6 +84,9 @@ Admin:
 
 Auth context:
 - `GET /api/v1/auth/me` now includes `roles`, `groups`, `permissions`, and `auth_source`.
+- `roles` are canonical uppercase service roles.
+- `groups` are Bloom service groups/entitlements.
+- `identity_groups` in the session payload carry raw Cognito group names.
 
 ## Legacy API Key Behavior
 

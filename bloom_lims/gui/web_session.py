@@ -134,7 +134,12 @@ def _normalize_user_data(user_data: dict[str, Any], principal: SessionPrincipal)
     else:
         normalized["role"] = str(normalized.get("role") or "READ_WRITE").upper()
         normalized["roles"] = [normalized["role"]]
-    normalized["groups"] = list(normalized.get("groups") or principal.cognito_groups or [])
+    normalized["identity_groups"] = list(
+        normalized.get("identity_groups") or normalized.get("cognito_groups") or principal.cognito_groups or []
+    )
+    normalized["cognito_groups"] = list(normalized["identity_groups"])
+    normalized["service_groups"] = list(normalized.get("service_groups") or normalized.get("groups") or [])
+    normalized["groups"] = list(normalized["service_groups"])
     return normalized
 
 

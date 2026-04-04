@@ -183,6 +183,10 @@ async def require_auth(request: Request):
             "dag_fnv2": "",
             "role": "ADMIN",
             "roles": ["ADMIN"],
+            "identity_groups": [],
+            "cognito_groups": [],
+            "service_groups": [],
+            "groups": [],
             "display_timezone": DEFAULT_DISPLAY_TIMEZONE,
         }
         return request
