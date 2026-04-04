@@ -52,7 +52,9 @@ def _normalize_identifier(value: str | int | None) -> str:
     return candidate
 
 
-def _normalize_stored_role(role_value: Any, *, default: str | None = None) -> str | None:
+def _normalize_stored_role(
+    role_value: Any, *, default: str | None = None
+) -> str | None:
     def _coerce(value: Any) -> str | None:
         candidate = str(value or "").strip()
         if not candidate:
@@ -91,7 +93,9 @@ def _row_to_user(row: dict[str, Any]) -> TapdbUserRecord:
     )
 
 
-def list_users(session: Session, *, include_inactive: bool = False) -> list[TapdbUserRecord]:
+def list_users(
+    session: Session, *, include_inactive: bool = False
+) -> list[TapdbUserRecord]:
     sql = _USER_SELECT_SQL
     if not include_inactive:
         sql += "\n      AND CASE\n            WHEN COALESCE(gi.is_deleted, FALSE) THEN FALSE\n            WHEN gi.bstatus IS NOT NULL AND lower(CAST(gi.bstatus AS text)) IN ('inactive', 'disabled', 'deleted') THEN FALSE\n            WHEN COALESCE(gi.json_addl->>'is_active', '') = '' THEN TRUE\n            ELSE lower(COALESCE(gi.json_addl->>'is_active', 'true')) IN ('true', '1', 'yes', 'on')\n        END = TRUE"
@@ -154,10 +158,14 @@ def resolve_user_record(
         if by_uid is not None:
             return by_uid
 
-    return get_user_by_login_or_email(session, candidate, include_inactive=include_inactive)
+    return get_user_by_login_or_email(
+        session, candidate, include_inactive=include_inactive
+    )
 
 
-def normalize_persisted_role(role_value: Any, *, default: str | None = Role.READ_WRITE.value) -> str | None:
+def normalize_persisted_role(
+    role_value: Any, *, default: str | None = Role.READ_WRITE.value
+) -> str | None:
     return _normalize_stored_role(role_value, default=default)
 
 

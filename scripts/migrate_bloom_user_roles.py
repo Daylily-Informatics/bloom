@@ -33,7 +33,9 @@ LEGACY_ROLE_GROUP_CODES = (
 
 
 def _infer_role_from_groups(groups: list[str]) -> str | None:
-    group_set = {str(group or "").strip().upper() for group in groups if str(group or "").strip()}
+    group_set = {
+        str(group or "").strip().upper() for group in groups if str(group or "").strip()
+    }
     for group_name, role_name in LEGACY_ROLE_GROUP_PRIORITY:
         if group_name in group_set:
             return role_name
@@ -58,27 +60,43 @@ def migrate_roles(*, dry_run: bool = False) -> dict[str, object]:
                 for candidate in (user.uid, user.username, user.email):
                     if not candidate:
                         continue
-                    candidate_groups.extend(group_service.get_group_codes_for_user(str(candidate)))
+                    candidate_groups.extend(
+                        group_service.get_group_codes_for_user(str(candidate))
+                    )
                 stored_role = _infer_role_from_groups(candidate_groups)
             if stored_role is None:
-                unresolved.append({"uid": user.uid, "username": user.username, "email": user.email})
+                unresolved.append(
+                    {"uid": user.uid, "username": user.username, "email": user.email}
+                )
                 continue
 
             current_role = str(user.role or "").strip()
             identifier = user.username or user.email or str(user.uid)
             if current_role != stored_role:
                 updates.append({"identifier": identifier, "role": stored_role})
-                if not dry_run and not set_user_role(bdb.session, identifier, stored_role):
-                    unresolved.append({"uid": user.uid, "username": user.username, "email": user.email})
+                if not dry_run and not set_user_role(
+                    bdb.session, identifier, stored_role
+                ):
+                    unresolved.append(
+                        {
+                            "uid": user.uid,
+                            "username": user.username,
+                            "email": user.email,
+                        }
+                    )
                     continue
 
             legacy_group_codes = {
-                str(group or "").strip().upper() for group in candidate_groups if str(group or "").strip()
+                str(group or "").strip().upper()
+                for group in candidate_groups
+                if str(group or "").strip()
             }
             for group_code in LEGACY_ROLE_GROUP_CODES:
                 if group_code.upper() not in legacy_group_codes:
                     continue
-                removed_memberships.append({"identifier": identifier, "group_code": group_code})
+                removed_memberships.append(
+                    {"identifier": identifier, "group_code": group_code}
+                )
                 if not dry_run:
                     group_service.remove_user_from_group(
                         group_code=group_code,
@@ -90,7 +108,8 @@ def migrate_roles(*, dry_run: bool = False) -> dict[str, object]:
             raise RuntimeError(
                 "Unable to resolve Bloom roles for: "
                 + ", ".join(
-                    str(item.get("username") or item.get("email") or item.get("uid")) for item in unresolved
+                    str(item.get("username") or item.get("email") or item.get("uid"))
+                    for item in unresolved
                 )
             )
 
@@ -112,7 +131,9 @@ def migrate_roles(*, dry_run: bool = False) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="Report planned updates without writing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Report planned updates without writing"
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON summary")
     args = parser.parse_args()
 

@@ -16,12 +16,19 @@ def load_module(name: str, relative_path: str):
     return module
 
 
-MIGRATION = load_module("migrate_bloom_user_roles", "scripts/migrate_bloom_user_roles.py")
+MIGRATION = load_module(
+    "migrate_bloom_user_roles", "scripts/migrate_bloom_user_roles.py"
+)
 
 
 def test_infer_role_from_groups_prefers_admin_over_other_groups():
-    assert MIGRATION._infer_role_from_groups(["bloom-readwrite", "bloom-admin"]) == "ADMIN"
-    assert MIGRATION._infer_role_from_groups(["bloom-readwrite", "bloom-readonly"]) == "READ_WRITE"
+    assert (
+        MIGRATION._infer_role_from_groups(["bloom-readwrite", "bloom-admin"]) == "ADMIN"
+    )
+    assert (
+        MIGRATION._infer_role_from_groups(["bloom-readwrite", "bloom-readonly"])
+        == "READ_WRITE"
+    )
     assert MIGRATION._infer_role_from_groups(["bloom-readonly"]) == "READ_ONLY"
 
 
@@ -43,9 +50,15 @@ def test_migrate_roles_uppercases_and_infers_missing_roles(monkeypatch):
             calls.append(("close", ""))
 
     users = [
-        SimpleNamespace(uid=1, username="one@example.com", email="one@example.com", role="admin"),
-        SimpleNamespace(uid=2, username="two@example.com", email="two@example.com", role=""),
-        SimpleNamespace(uid=3, username="three@example.com", email="three@example.com", role=None),
+        SimpleNamespace(
+            uid=1, username="one@example.com", email="one@example.com", role="admin"
+        ),
+        SimpleNamespace(
+            uid=2, username="two@example.com", email="two@example.com", role=""
+        ),
+        SimpleNamespace(
+            uid=3, username="three@example.com", email="three@example.com", role=None
+        ),
     ]
 
     group_memberships = {
@@ -77,7 +90,9 @@ def test_migrate_roles_uppercases_and_infers_missing_roles(monkeypatch):
     monkeypatch.setattr(MIGRATION, "BLOOMdb3", FakeDB)
     monkeypatch.setattr(MIGRATION, "GroupService", FakeGroupService)
     monkeypatch.setattr(MIGRATION, "set_user_role", fake_set_user_role)
-    monkeypatch.setattr(MIGRATION, "list_users", lambda _session, include_inactive=True: users)
+    monkeypatch.setattr(
+        MIGRATION, "list_users", lambda _session, include_inactive=True: users
+    )
 
     result = MIGRATION.migrate_roles(dry_run=False)
 

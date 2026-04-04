@@ -50,9 +50,10 @@ def _load_shared_display_timezone(email: str) -> str:
 
         bdb = BLOOMdb3(app_username=normalized_email)
         try:
-            row = bdb.session.execute(
-                text(
-                    """
+            row = (
+                bdb.session.execute(
+                    text(
+                        """
                     SELECT gi.json_addl->'preferences'->>'display_timezone' AS display_timezone
                     FROM generic_instance gi
                     WHERE gi.is_deleted = FALSE
@@ -66,9 +67,12 @@ def _load_shared_display_timezone(email: str) -> str:
                       )
                     LIMIT 1
                     """
-                ),
-                {"identifier": normalized_email},
-            ).mappings().first()
+                    ),
+                    {"identifier": normalized_email},
+                )
+                .mappings()
+                .first()
+            )
             return normalize_display_timezone((row or {}).get("display_timezone"))
         finally:
             bdb.close()
@@ -109,7 +113,10 @@ def persist_display_timezone(email: str, display_timezone: str | None) -> bool:
                     RETURNING gi.uid
                     """
                 ),
-                {"identifier": normalized_email, "display_timezone": normalized_timezone},
+                {
+                    "identifier": normalized_email,
+                    "display_timezone": normalized_timezone,
+                },
             ).fetchone()
             if row:
                 bdb.session.commit()
@@ -222,7 +229,11 @@ def _resolve_auth_email(auth: Dict, request: Request) -> str:
 def _resolve_auth_role(auth: Dict, request: Request) -> str:
     if isinstance(auth, dict) and auth.get("role"):
         return str(auth["role"]).strip().upper()
-    return str(request.session.get("user_data", {}).get("role", "READ_WRITE")).strip().upper()
+    return (
+        str(request.session.get("user_data", {}).get("role", "READ_WRITE"))
+        .strip()
+        .upper()
+    )
 
 
 def _require_graph_admin(auth: Dict, request: Request) -> None:

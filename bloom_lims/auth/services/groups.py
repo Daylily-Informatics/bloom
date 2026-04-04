@@ -71,7 +71,9 @@ class GroupService:
         added_by: str | None,
     ) -> GroupMembershipRecord:
         self.ensure_system_groups()
-        return self.repo.add_user_to_group(group_code=group_code, user_id=user_id, added_by=added_by)
+        return self.repo.add_user_to_group(
+            group_code=group_code, user_id=user_id, added_by=added_by
+        )
 
     def remove_user_from_group(
         self,
@@ -81,7 +83,9 @@ class GroupService:
         removed_by: str | None,
     ) -> GroupMembershipRecord | None:
         self.ensure_system_groups()
-        return self.repo.remove_user_from_group(group_code=group_code, user_id=user_id, removed_by=removed_by)
+        return self.repo.remove_user_from_group(
+            group_code=group_code, user_id=user_id, removed_by=removed_by
+        )
 
     def get_group_codes_for_user(self, user_id: str | None) -> list[str]:
         self.ensure_system_groups()
