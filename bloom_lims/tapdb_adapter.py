@@ -180,6 +180,7 @@ class _TransactionContext:
         return False
 
 
+class BLOOMdb3:
     def __init__(
         self,
         app_username: str = "bloomdborm",
