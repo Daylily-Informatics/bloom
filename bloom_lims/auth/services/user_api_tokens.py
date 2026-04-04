@@ -24,8 +24,8 @@ from bloom_lims.auth.repositories.tapdb.user_api_tokens import (
     UserTokenRevisionRecord,
     UserTokenUsageRecord,
 )
+from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService
-
 
 TOKEN_PREFIX = "blm_"
 TOKEN_STATUS_ACTIVE = "ACTIVE"
@@ -124,9 +124,13 @@ class UserAPITokenService:
             created_by=actor_user_id,
             note=payload.note,
         )
-        return TokenCreateResult(token=token, revision=revision, plaintext_token=plaintext)
+        return TokenCreateResult(
+            token=token, revision=revision, plaintext_token=plaintext
+        )
 
-    def list_user_tokens(self, *, user_id: str) -> list[tuple[UserTokenRecord, UserTokenRevisionRecord]]:
+    def list_user_tokens(
+        self, *, user_id: str
+    ) -> list[tuple[UserTokenRecord, UserTokenRevisionRecord]]:
         rows: list[tuple[UserTokenRecord, UserTokenRevisionRecord]] = []
         for token in self.repo.list_tokens(user_id=user_id):
             revision = self.repo.get_latest_revision(token.id)
@@ -144,7 +148,9 @@ class UserAPITokenService:
             rows.append((token, revision))
         return rows
 
-    def get_token(self, *, token_id: str) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
+    def get_token(
+        self, *, token_id: str
+    ) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
         return self.repo.get_token(token_id)
 
     def revoke_token(
@@ -272,15 +278,25 @@ class UserAPITokenService:
         roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
         if token.user_id != actor_user_id and not is_admin(roles):
             raise PermissionError("Cannot view usage for another user's token")
-        return self.repo.get_usage_logs(token_id=token_id, limit=max(1, min(limit, 1000)))
+        return self.repo.get_usage_logs(
+            token_id=token_id, limit=max(1, min(limit, 1000))
+        )
 
     def constrained_roles_for_token_owner(
         self,
         *,
         token: UserTokenRecord,
     ) -> tuple[list[str], list[str]]:
+        owner_record = resolve_user_record(
+            self.db, token.user_id, include_inactive=True
+        )
+        fallback_role = (
+            owner_record.role
+            if owner_record and owner_record.role
+            else Role.READ_ONLY.value
+        )
         owner = self.groups.resolve_user_roles_and_groups(
             user_id=token.user_id,
-            fallback_role=Role.READ_ONLY.value,
+            fallback_role=fallback_role,
         )
         return constrain_roles_by_scope(owner.roles, token.scope), owner.groups

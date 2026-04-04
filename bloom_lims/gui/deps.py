@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import socket
-import logging
 from typing import Dict, List
 from zoneinfo import ZoneInfo
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request
 from sqlalchemy import text
 
 from auth.cognito.client import (
@@ -14,9 +14,11 @@ from auth.cognito.client import (
     CognitoConfigurationError,
     get_cognito_auth,
 )
-
 from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
-from bloom_lims.gui.errors import AuthenticationRequiredException, MissingCognitoEnvVarsException
+from bloom_lims.gui.errors import (
+    AuthenticationRequiredException,
+    MissingCognitoEnvVarsException,
+)
 from bloom_lims.gui.web_session import load_bloom_user_data
 
 DEFAULT_DISPLAY_TIMEZONE = "UTC"
@@ -48,9 +50,10 @@ def _load_shared_display_timezone(email: str) -> str:
 
         bdb = BLOOMdb3(app_username=normalized_email)
         try:
-            row = bdb.session.execute(
-                text(
-                    """
+            row = (
+                bdb.session.execute(
+                    text(
+                        """
                     SELECT gi.json_addl->'preferences'->>'display_timezone' AS display_timezone
                     FROM generic_instance gi
                     WHERE gi.is_deleted = FALSE
@@ -64,9 +67,12 @@ def _load_shared_display_timezone(email: str) -> str:
                       )
                     LIMIT 1
                     """
-                ),
-                {"identifier": normalized_email},
-            ).mappings().first()
+                    ),
+                    {"identifier": normalized_email},
+                )
+                .mappings()
+                .first()
+            )
             return normalize_display_timezone((row or {}).get("display_timezone"))
         finally:
             bdb.close()
@@ -107,7 +113,10 @@ def persist_display_timezone(email: str, display_timezone: str | None) -> bool:
                     RETURNING gi.uid
                     """
                 ),
-                {"identifier": normalized_email, "display_timezone": normalized_timezone},
+                {
+                    "identifier": normalized_email,
+                    "display_timezone": normalized_timezone,
+                },
             ).fetchone()
             if row:
                 bdb.session.commit()
@@ -183,6 +192,10 @@ async def require_auth(request: Request):
             "dag_fnv2": "",
             "role": "ADMIN",
             "roles": ["ADMIN"],
+            "identity_groups": [],
+            "cognito_groups": [],
+            "service_groups": [],
+            "groups": [],
             "display_timezone": DEFAULT_DISPLAY_TIMEZONE,
         }
         return request
@@ -216,7 +229,11 @@ def _resolve_auth_email(auth: Dict, request: Request) -> str:
 def _resolve_auth_role(auth: Dict, request: Request) -> str:
     if isinstance(auth, dict) and auth.get("role"):
         return str(auth["role"]).strip().upper()
-    return str(request.session.get("user_data", {}).get("role", "READ_WRITE")).strip().upper()
+    return (
+        str(request.session.get("user_data", {}).get("role", "READ_WRITE"))
+        .strip()
+        .upper()
+    )
 
 
 def _require_graph_admin(auth: Dict, request: Request) -> None:

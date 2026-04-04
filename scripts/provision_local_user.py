@@ -6,9 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 
+from daylily_tapdb.user_store import create_or_get
+
+from bloom_lims.auth.repositories.tapdb.users import (
+    normalize_persisted_role,
+    set_user_role,
+)
 from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.db import BLOOMdb3
-from daylily_tapdb.user_store import create_or_get, set_role
 
 
 def main() -> int:
@@ -23,7 +28,7 @@ def main() -> int:
 
     username = str(args.username).strip().lower()
     email = str(args.email or args.username).strip().lower()
-    role = str(args.role or "admin").strip().lower()
+    role = normalize_persisted_role(args.role, default="ADMIN") or "ADMIN"
     groups = [str(group).strip().upper() for group in args.group if str(group).strip()]
 
     bdb = BLOOMdb3(app_username="local-provision")
@@ -33,10 +38,11 @@ def main() -> int:
             login_identifier=username,
             email=email,
             display_name=args.name.strip(),
-            role=role,
+            role="admin" if role == "ADMIN" else "user",
             cognito_username=email,
         )
-        set_role(bdb.session, username, role)
+        if not set_user_role(bdb.session, username, role):
+            raise RuntimeError("Failed to persist canonical role")
         group_service = GroupService(bdb.session)
         group_service.ensure_system_groups()
         for group_code in groups:

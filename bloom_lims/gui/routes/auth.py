@@ -10,14 +10,19 @@ from daylily_cognito import (
     complete_cognito_callback,
     start_cognito_login,
 )
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
+from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService, map_legacy_role
 from bloom_lims.db import BLOOMdb3
-from bloom_lims.gui.deps import _get_request_cognito_auth, get_allowed_domains, get_user_preferences, require_auth
+from bloom_lims.gui.deps import (
+    _get_request_cognito_auth,
+    get_allowed_domains,
+    get_user_preferences,
+)
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
 from bloom_lims.gui.jinja import templates
 from bloom_lims.gui.web_session import (
@@ -26,7 +31,6 @@ from bloom_lims.gui.web_session import (
     load_bloom_user_data,
     store_bloom_session,
 )
-
 
 router = APIRouter()
 
@@ -97,34 +101,50 @@ def _resolve_login_roles_and_groups(
     email: str,
     cognito_sub: str | None,
     fallback_role: str | None,
-) -> tuple[list[str], list[str], str]:
+) -> tuple[list[str], list[str], str, str]:
     normalized_email = str(email or "").strip()
     normalized_sub = str(cognito_sub or "").strip()
     bdb = None
     try:
-        fallback = map_legacy_role(fallback_role)
         bdb = BLOOMdb3(app_username=normalized_email or "cognito-login")
         service = GroupService(bdb.session)
         service.ensure_system_groups()
+        found_user_id = ""
+        found_fallback = map_legacy_role(fallback_role)
 
         for candidate in (normalized_sub, normalized_email):
             if not candidate:
                 continue
+            stored_user = resolve_user_record(
+                bdb.session, candidate, include_inactive=True
+            )
+            fallback = map_legacy_role(
+                stored_user.role if stored_user and stored_user.role else fallback_role
+            )
             resolution = service.resolve_user_roles_and_groups(
                 user_id=candidate,
                 fallback_role=fallback,
             )
             if resolution.groups:
-                return resolution.roles, resolution.groups, candidate
+                return resolution.roles, resolution.groups, candidate, fallback
+            if stored_user is not None and not found_user_id:
+                found_user_id = candidate
+                found_fallback = fallback
+
+        if found_user_id:
+            return [found_fallback], [], found_user_id, found_fallback
 
         default_user_id = normalized_sub or normalized_email
+        fallback = map_legacy_role(fallback_role)
         resolution = service.resolve_user_roles_and_groups(
             user_id=default_user_id,
             fallback_role=fallback,
         )
-        return resolution.roles, resolution.groups, default_user_id
+        return resolution.roles, resolution.groups, default_user_id, fallback
     except Exception as exc:
-        logging.warning("Failed to resolve session RBAC for %s: %s", normalized_email, exc)
+        logging.warning(
+            "Failed to resolve session RBAC for %s: %s", normalized_email, exc
+        )
         raise SessionBootstrapError(
             "Bloom could not initialize your local access profile. Please try signing in again."
         ) from exc
@@ -165,11 +185,19 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
             )
 
     cognito_sub = decoded_token.get("sub")
+    cognito_groups = decoded_token.get("cognito:groups")
+    identity_groups = (
+        [str(item).strip() for item in cognito_groups if str(item).strip()]
+        if isinstance(cognito_groups, list)
+        else []
+    )
     try:
-        roles, groups, resolved_user_id = _resolve_login_roles_and_groups(
-            email=primary_email,
-            cognito_sub=cognito_sub,
-            fallback_role=None,
+        roles, groups, resolved_user_id, persisted_role = (
+            _resolve_login_roles_and_groups(
+                email=primary_email,
+                cognito_sub=cognito_sub,
+                fallback_role=None,
+            )
         )
     except SessionBootstrapError as exc:
         raise CognitoWebAuthError(
@@ -180,7 +208,11 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
         ) from exc
 
     normalized_roles = [str(role).upper() for role in roles if str(role).strip()]
-    primary_role = (normalized_roles[0] if normalized_roles else Role.READ_WRITE.value).upper()
+    primary_role = (
+        persisted_role
+        or (normalized_roles[0] if normalized_roles else Role.READ_WRITE.value)
+    ).upper()
+    service_groups = list(dict.fromkeys(groups))
     user_data = get_user_preferences(primary_email)
     user_data.update(
         {
@@ -188,10 +220,15 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
             "cognito_sub": cognito_sub,
             "sub": cognito_sub,
             "user_id": resolved_user_id,
-            "name": decoded_token.get("name") or decoded_token.get("cognito:username") or primary_email,
+            "name": decoded_token.get("name")
+            or decoded_token.get("cognito:username")
+            or primary_email,
             "role": primary_role,
             "roles": normalized_roles or [primary_role],
-            "groups": groups,
+            "identity_groups": identity_groups,
+            "cognito_groups": list(identity_groups),
+            "service_groups": service_groups,
+            "groups": service_groups,
         }
     )
 
@@ -200,14 +237,16 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
         email=primary_email,
         name=str(user_data.get("name") or primary_email),
         roles=list(user_data["roles"]),
-        cognito_groups=list(groups),
+        cognito_groups=list(identity_groups),
         auth_mode="cognito",
         app_context={"user_data": dict(user_data)},
     )
     return principal, user_data
 
 
-def _resolve_principal_from_token_payload(token_payload: dict, request: Request) -> SessionPrincipal:
+def _resolve_principal_from_token_payload(
+    token_payload: dict, request: Request
+) -> SessionPrincipal:
     id_token = token_payload.get("id_token")
     access_token = token_payload.get("access_token")
     if not id_token and not access_token:
@@ -325,7 +364,9 @@ async def auth_callback(request: Request):
 
 
 @router.get("/auth/error", include_in_schema=False)
-async def auth_error(request: Request, reason: str = "authentication_failed", next: str = "/"):
+async def auth_error(
+    request: Request, reason: str = "authentication_failed", next: str = "/"
+):
     next_path = _next_path(next)
     template = templates.get_template("modern/login.html")
     context = {
@@ -343,12 +384,16 @@ async def auth_error(request: Request, reason: str = "authentication_failed", ne
 async def login(_: Request, __: Response, email: str = Form(None)):
     if not email:
         return JSONResponse(
-            content={"message": "Direct login is disabled. Please authenticate with Cognito SSO."},
+            content={
+                "message": "Direct login is disabled. Please authenticate with Cognito SSO."
+            },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     return JSONResponse(
-        content={"message": "Direct login is disabled. Please authenticate with Cognito SSO."},
+        content={
+            "message": "Direct login is disabled. Please authenticate with Cognito SSO."
+        },
         status_code=status.HTTP_400_BAD_REQUEST,
     )
 
@@ -372,7 +417,9 @@ async def _logout_response(request: Request, response: Response):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
-    logout_response = RedirectResponse(url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER)
+    logout_response = RedirectResponse(
+        url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER
+    )
     logout_response.delete_cookie("bloom_session", path="/")
     logout_response.delete_cookie("session", path="/")
     return logout_response

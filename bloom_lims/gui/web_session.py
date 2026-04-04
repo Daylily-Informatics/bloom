@@ -5,7 +5,6 @@ import secrets
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request
 from daylily_cognito import (
     CognitoWebSessionConfig,
     SessionPrincipal,
@@ -14,9 +13,9 @@ from daylily_cognito import (
     load_session_principal,
     store_session_principal,
 )
+from fastapi import FastAPI, Request
 
 from auth.cognito.client import CognitoAuth
-
 from bloom_lims.config import get_settings
 
 _SERVER_INSTANCE_ID = secrets.token_urlsafe(16)
@@ -31,7 +30,9 @@ def setup_bloom_session_middleware(app: FastAPI) -> None:
     configure_session_middleware(app, build_bloom_web_session_config())
 
 
-def build_bloom_web_session_config(request: Request | None = None) -> CognitoWebSessionConfig:
+def build_bloom_web_session_config(
+    request: Request | None = None,
+) -> CognitoWebSessionConfig:
     settings = get_settings()
     cognito = _resolve_cognito_auth(request)
     public_base_url = _origin(cognito.config.redirect_uri or "https://localhost:8912")
@@ -47,7 +48,8 @@ def build_bloom_web_session_config(request: Request | None = None) -> CognitoWeb
         domain=cognito.config.domain,
         client_id=cognito.config.client_id,
         redirect_uri=cognito.config.redirect_uri,
-        logout_uri=cognito.config.logout_redirect_uri or f"{public_base_url}/auth/logout",
+        logout_uri=cognito.config.logout_redirect_uri
+        or f"{public_base_url}/auth/logout",
         public_base_url=public_base_url,
         session_secret_key=base_secret,
         session_cookie_name="bloom_session",
@@ -110,14 +112,18 @@ def _resolve_cognito_auth(request: Request | None = None) -> CognitoAuth:
 
 
 def _user_data_from_principal(principal: SessionPrincipal) -> dict[str, Any]:
-    app_context = principal.app_context if isinstance(principal.app_context, dict) else {}
+    app_context = (
+        principal.app_context if isinstance(principal.app_context, dict) else {}
+    )
     user_data = app_context.get("user_data")
     if not isinstance(user_data, dict):
         user_data = {}
     return _normalize_user_data(dict(user_data), principal)
 
 
-def _normalize_user_data(user_data: dict[str, Any], principal: SessionPrincipal) -> dict[str, Any]:
+def _normalize_user_data(
+    user_data: dict[str, Any], principal: SessionPrincipal
+) -> dict[str, Any]:
     normalized = dict(user_data)
     normalized.pop("access_token", None)
     normalized.pop("id_token", None)
@@ -129,12 +135,26 @@ def _normalize_user_data(user_data: dict[str, Any], principal: SessionPrincipal)
     normalized["user_id"] = str(normalized.get("user_id") or normalized["sub"])
     normalized["roles"] = list(normalized.get("roles") or principal.roles or [])
     if normalized["roles"]:
-        normalized["role"] = str(normalized.get("role") or normalized["roles"][0]).upper()
-        normalized["roles"] = [str(role).upper() for role in normalized["roles"] if str(role).strip()]
+        normalized["role"] = str(
+            normalized.get("role") or normalized["roles"][0]
+        ).upper()
+        normalized["roles"] = [
+            str(role).upper() for role in normalized["roles"] if str(role).strip()
+        ]
     else:
         normalized["role"] = str(normalized.get("role") or "READ_WRITE").upper()
         normalized["roles"] = [normalized["role"]]
-    normalized["groups"] = list(normalized.get("groups") or principal.cognito_groups or [])
+    normalized["identity_groups"] = list(
+        normalized.get("identity_groups")
+        or normalized.get("cognito_groups")
+        or principal.cognito_groups
+        or []
+    )
+    normalized["cognito_groups"] = list(normalized["identity_groups"])
+    normalized["service_groups"] = list(
+        normalized.get("service_groups") or normalized.get("groups") or []
+    )
+    normalized["groups"] = list(normalized["service_groups"])
     return normalized
 
 

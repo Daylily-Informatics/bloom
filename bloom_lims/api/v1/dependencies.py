@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import Depends, HTTPException, Header, Request
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from bloom_lims.auth.rbac import (
@@ -45,7 +45,9 @@ class APIUser:
         token_id: str | None = None,
     ):
         fallback_role = map_legacy_role(role)
-        normalized_roles = normalize_roles(roles or ([fallback_role] if fallback_role else []), fallback=fallback_role)
+        normalized_roles = normalize_roles(
+            roles or ([fallback_role] if fallback_role else []), fallback=fallback_role
+        )
         if not normalized_roles:
             normalized_roles = [Role.READ_WRITE.value]
         self.email = email
@@ -118,6 +120,7 @@ def _build_cognito_dependency():
     try:
         from daylily_cognito.auth import CognitoAuth
         from daylily_cognito.fastapi import create_auth_dependency
+
         from auth.cognito.client import get_cognito_auth
 
         auth_cfg = get_cognito_auth().config
@@ -181,7 +184,10 @@ def _make_user(
         fallback_role=role_hint,
     )
     all_groups = sorted(set((groups_hint or []) + resolved_groups))
-    if API_ACCESS_GROUP in all_groups and Permission.TOKEN_SELF_MANAGE.value not in permissions:
+    if (
+        API_ACCESS_GROUP in all_groups
+        and Permission.TOKEN_SELF_MANAGE.value not in permissions
+    ):
         permissions = sorted(set(permissions + [Permission.TOKEN_SELF_MANAGE.value]))
     primary_role = roles[0] if roles else Role.READ_WRITE.value
     return APIUser(
@@ -204,7 +210,11 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
         token_service = UserAPITokenService(bdb.session)
         token_service.groups.ensure_system_groups()
         validation = token_service.validate_token(token_value)
-        if not validation.is_valid or validation.token is None or validation.revision is None:
+        if (
+            not validation.is_valid
+            or validation.token is None
+            or validation.revision is None
+        ):
             raise HTTPException(
                 status_code=401,
                 detail=validation.error or "Invalid Bloom API token",
@@ -212,7 +222,9 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             )
 
         token_row = validation.token
-        constrained_roles, owner_groups = token_service.constrained_roles_for_token_owner(token=token_row)
+        constrained_roles, owner_groups = (
+            token_service.constrained_roles_for_token_owner(token=token_row)
+        )
         permissions = sorted(effective_permissions(constrained_roles))
         user = APIUser(
             email=f"token-user:{token_row.user_id}",
@@ -266,7 +278,9 @@ async def verify_api_key(api_key: str) -> APIUser | None:
 
 async def get_api_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        HTTPBearer(auto_error=False)
+    ),
     x_api_key: str | None = Header(None, alias="X-API-Key"),
 ) -> APIUser:
     """Authenticate API requests and return resolved RBAC context."""
@@ -289,12 +303,19 @@ async def get_api_user(
 
     if hasattr(request, "session") and "user_data" in request.session:
         user_data = request.session.get("user_data", {})
+        session_groups = user_data.get("service_groups")
+        if not isinstance(session_groups, list):
+            session_groups = (
+                user_data.get("groups")
+                if isinstance(user_data.get("groups"), list)
+                else []
+            )
         return _make_user(
             email=user_data.get("email", "session-user"),
-            user_id=user_data.get("sub"),
+            user_id=user_data.get("sub") or user_data.get("user_id"),
             role_hint=user_data.get("role"),
             auth_source="session",
-            groups_hint=user_data.get("groups") if isinstance(user_data.get("groups"), list) else [],
+            groups_hint=session_groups,
         )
 
     if x_api_key:
@@ -394,7 +415,9 @@ async def require_external_ursa_api_enabled(
 def require_permission(permission: Permission | str):
     async def _check(user: APIUser = Depends(get_api_user)) -> APIUser:
         if not user.has_permission(permission):
-            raise HTTPException(status_code=403, detail=f"Permission required: {permission}")
+            raise HTTPException(
+                status_code=403, detail=f"Permission required: {permission}"
+            )
         return user
 
     return _check
@@ -402,7 +425,9 @@ def require_permission(permission: Permission | str):
 
 async def optional_api_auth(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        HTTPBearer(auto_error=False)
+    ),
     x_api_key: str | None = Header(None, alias="X-API-Key"),
 ) -> APIUser | None:
     try:
