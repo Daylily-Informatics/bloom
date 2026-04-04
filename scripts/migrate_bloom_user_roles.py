@@ -20,7 +20,6 @@ from bloom_lims.auth.repositories.tapdb.users import (
 from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.db import BLOOMdb3
 
-
 LEGACY_ROLE_GROUP_PRIORITY = (
     (BLOOM_ADMIN_GROUP.upper(), Role.ADMIN.value),
     (BLOOM_READWRITE_GROUP.upper(), Role.READ_WRITE.value),

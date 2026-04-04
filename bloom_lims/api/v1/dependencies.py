@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import Depends, HTTPException, Header, Request
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from bloom_lims.auth.rbac import (
@@ -118,6 +118,7 @@ def _build_cognito_dependency():
     try:
         from daylily_cognito.auth import CognitoAuth
         from daylily_cognito.fastapi import create_auth_dependency
+
         from auth.cognito.client import get_cognito_auth
 
         auth_cfg = get_cognito_auth().config

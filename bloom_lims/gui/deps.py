@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import socket
-import logging
 from typing import Dict, List
 from zoneinfo import ZoneInfo
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request
 from sqlalchemy import text
 
 from auth.cognito.client import (
@@ -14,9 +14,11 @@ from auth.cognito.client import (
     CognitoConfigurationError,
     get_cognito_auth,
 )
-
 from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
-from bloom_lims.gui.errors import AuthenticationRequiredException, MissingCognitoEnvVarsException
+from bloom_lims.gui.errors import (
+    AuthenticationRequiredException,
+    MissingCognitoEnvVarsException,
+)
 from bloom_lims.gui.web_session import load_bloom_user_data
 
 DEFAULT_DISPLAY_TIMEZONE = "UTC"

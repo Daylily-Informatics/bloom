@@ -6,10 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 
-from bloom_lims.auth.services.groups import GroupService
-from bloom_lims.auth.repositories.tapdb.users import normalize_persisted_role, set_user_role
-from bloom_lims.db import BLOOMdb3
 from daylily_tapdb.user_store import create_or_get
+
+from bloom_lims.auth.repositories.tapdb.users import (
+    normalize_persisted_role,
+    set_user_role,
+)
+from bloom_lims.auth.services.groups import GroupService
+from bloom_lims.db import BLOOMdb3
 
 
 def main() -> int:

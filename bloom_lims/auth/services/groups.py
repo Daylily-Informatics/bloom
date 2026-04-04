@@ -16,8 +16,11 @@ from bloom_lims.auth.rbac import (
     Role,
     normalize_roles,
 )
-from bloom_lims.auth.repositories.tapdb.groups import GroupMembershipRecord, GroupRecord, TapdbGroupRepository
-
+from bloom_lims.auth.repositories.tapdb.groups import (
+    GroupMembershipRecord,
+    GroupRecord,
+    TapdbGroupRepository,
+)
 
 SYSTEM_GROUP_CODES = [
     BLOOM_RND_GROUP,

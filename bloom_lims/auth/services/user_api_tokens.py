@@ -27,7 +27,6 @@ from bloom_lims.auth.repositories.tapdb.user_api_tokens import (
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService
 
-
 TOKEN_PREFIX = "blm_"
 TOKEN_STATUS_ACTIVE = "ACTIVE"
 TOKEN_STATUS_EXPIRED = "EXPIRED"

@@ -10,15 +10,19 @@ from daylily_cognito import (
     complete_cognito_callback,
     start_cognito_login,
 )
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
-from bloom_lims.auth.services.groups import GroupService, map_legacy_role
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
+from bloom_lims.auth.services.groups import GroupService, map_legacy_role
 from bloom_lims.db import BLOOMdb3
-from bloom_lims.gui.deps import _get_request_cognito_auth, get_allowed_domains, get_user_preferences, require_auth
+from bloom_lims.gui.deps import (
+    _get_request_cognito_auth,
+    get_allowed_domains,
+    get_user_preferences,
+)
 from bloom_lims.gui.errors import MissingCognitoEnvVarsException
 from bloom_lims.gui.jinja import templates
 from bloom_lims.gui.web_session import (
@@ -27,7 +31,6 @@ from bloom_lims.gui.web_session import (
     load_bloom_user_data,
     store_bloom_session,
 )
-
 
 router = APIRouter()
 
