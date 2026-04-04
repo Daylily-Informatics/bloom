@@ -11,10 +11,10 @@ os.environ["BLOOM_OAUTH"] = "no"
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import app
 from bloom_lims import observability_routes
 from bloom_lims.anomalies import AnomalyRecord, TapdbAnomalyRepository
 from bloom_lims.gui.routes import operations
+from main import app
 
 
 class _FakeSession:
