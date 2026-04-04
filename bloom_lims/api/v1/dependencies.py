@@ -107,14 +107,6 @@ def _is_dev_bypass_active() -> bool:
     return True
 
 
-def _allow_legacy_api_key() -> bool:
-    settings = get_settings()
-    env = (os.environ.get("APP_ENV") or settings.environment or "development").lower()
-    if env != "development":
-        return False
-    return _is_truthy(os.environ.get("BLOOM_ALLOW_LEGACY_API_KEY"))
-
-
 def _build_cognito_dependency():
     """Create the Cognito auth dependency if available."""
     try:
@@ -261,27 +253,9 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
         bdb.close()
 
 
-async def verify_api_key(api_key: str) -> APIUser | None:
-    """Verify legacy API key and return a service account user."""
-    valid_key = os.environ.get("BLOOM_API_KEY")
-    if not (valid_key and api_key == valid_key):
-        return None
-    return _make_user(
-        email="api-legacy@daylilyinformatics.bio",
-        user_id="legacy-api-key",
-        role_hint=Role.ADMIN.value,
-        auth_source="legacy_api_key",
-        is_service_account=True,
-        groups_hint=[API_ACCESS_GROUP, Role.ADMIN.value],
-    )
-
-
 async def get_api_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(
-        HTTPBearer(auto_error=False)
-    ),
-    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
 ) -> APIUser:
     """Authenticate API requests and return resolved RBAC context."""
     if _is_dev_bypass_active():
@@ -317,14 +291,6 @@ async def get_api_user(
             auth_source="session",
             groups_hint=session_groups,
         )
-
-    if x_api_key:
-        if _allow_legacy_api_key():
-            api_user = await verify_api_key(x_api_key)
-            if api_user is not None:
-                return api_user
-        else:
-            logger.warning("Legacy X-API-Key auth attempted while disabled")
 
     if credentials:
         token = (credentials.credentials or "").strip()

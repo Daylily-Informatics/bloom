@@ -180,24 +180,8 @@ class _TransactionContext:
         return False
 
 
-class _BLOOMBaseProxy:
-    """Automap-like proxy exposing `.classes` for legacy BLOOM code."""
-
-    def __init__(self) -> None:
-        self.metadata = TapDBBase.metadata
-        self.classes = SimpleNamespace()
-
-
-class BLOOMdb3:
-    """BLOOM database adapter powered exclusively by daylily-tapdb."""
-
     def __init__(
         self,
-        db_url_prefix: str = "postgresql://",
-        db_hostname: Optional[str] = None,
-        db_pass: Optional[str] = None,
-        db_user: Optional[str] = None,
-        db_name: Optional[str] = None,
         app_username: str = "bloomdborm",
         echo_sql: Optional[bool] = None,
         pool_size: int = 5,
@@ -214,15 +198,6 @@ class BLOOMdb3:
             db_username_var.set(app_username)
         except Exception:
             pass
-
-        # Legacy arguments remain accepted; TapDB config is authoritative.
-        if any(
-            [db_url_prefix != "postgresql://", db_hostname, db_pass, db_user, db_name]
-        ):
-            self.logger.warning(
-                "Legacy BLOOMdb3 connection arguments are deprecated and ignored; "
-                "TapDB runtime config is authoritative."
-            )
 
         cfg = get_tapdb_db_config()
         engine_type = cfg.get("engine_type", "local")
@@ -259,8 +234,6 @@ class BLOOMdb3:
         self._Session = self._conn._Session
         self.session = self._conn.get_session()
 
-        self.Base = _BLOOMBaseProxy()
-        self._register_orm_classes()
         self._set_session_username(self.session)
 
     def _set_session_username(self, session: Session) -> None:
@@ -272,59 +245,6 @@ class BLOOMdb3:
             )
         except Exception as exc:
             self.logger.warning("Could not set session username: %s", exc)
-
-    def _register_orm_classes(self) -> None:
-        classes_to_register = [
-            generic_template,
-            generic_instance,
-            generic_instance_lineage,
-            workflow_template,
-            workflow_step_template,
-            container_template,
-            content_template,
-            equipment_template,
-            data_template,
-            actor_template,
-            action_template,
-            health_event_template,
-            file_template,
-            subject_template,
-            workflow_instance,
-            workflow_step_instance,
-            container_instance,
-            content_instance,
-            equipment_instance,
-            data_instance,
-            actor_instance,
-            action_instance,
-            health_event_instance,
-            file_instance,
-            subject_instance,
-            workflow_instance_lineage,
-            workflow_step_instance_lineage,
-            container_instance_lineage,
-            content_instance_lineage,
-            equipment_instance_lineage,
-            data_instance_lineage,
-            actor_instance_lineage,
-            action_instance_lineage,
-            health_event_instance_lineage,
-            file_instance_lineage,
-            subject_instance_lineage,
-            audit_log,
-        ]
-
-        for cls in classes_to_register:
-            setattr(self.Base.classes, cls.__name__, cls)
-
-        setattr(self.Base.classes, "file_set_template", file_template)
-        setattr(self.Base.classes, "file_reference_template", file_template)
-        setattr(self.Base.classes, "file_set_instance", file_instance)
-        setattr(self.Base.classes, "file_reference_instance", file_instance)
-        setattr(self.Base.classes, "file_set_instance_lineage", file_instance_lineage)
-        setattr(
-            self.Base.classes, "file_reference_instance_lineage", file_instance_lineage
-        )
 
     def __enter__(self) -> "BLOOMdb3":
         return self
