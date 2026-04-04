@@ -192,6 +192,9 @@ target-version = "py312"
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+"bloom_lims/gui/routes/operations.py" = ["E402", "E712", "F401", "F841", "I001"]
+
 [tool.bandit]
 exclude_dirs = ["tests", "bloom_lims/database", "stage_to_delete"]
 skips = [

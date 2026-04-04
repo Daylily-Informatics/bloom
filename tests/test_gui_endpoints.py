@@ -9,6 +9,7 @@ With BLOOM_OAUTH=no, authentication is bypassed for testing.
 
 import os
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -1983,6 +1984,82 @@ class TestJSONUpdateEndpoints:
             },
         )
         assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+
+    def test_save_json_addl_key_accepts_empty_dict_and_initializes_json_addl(
+        self, client
+    ):
+        """Empty JSON payloads are valid and should initialize json_addl when absent."""
+        from bloom_lims.gui.routes import operations
+
+        obj = SimpleNamespace(euid="EX1", json_addl=None)
+        session = SimpleNamespace(commit=lambda: None)
+        repo = SimpleNamespace(get_by_euid=lambda _euid: obj, session=session)
+
+        with patch.object(operations, "BLOOMdb3", lambda **_kwargs: object()):
+            with patch.object(operations, "BloomObj", lambda _db: repo):
+                with patch.object(
+                    operations, "flag_modified", lambda *_args, **_kwargs: None
+                ):
+                    response = client.post(
+                        "/save_json_addl_key",
+                        json={
+                            "euid": "EX1",
+                            "json_addl_key": "properties",
+                            "json_data": {},
+                        },
+                        follow_redirects=False,
+                    )
+
+        assert response.status_code == 303
+        assert response.headers["location"] == "/euid_details?euid=EX1"
+        assert obj.json_addl == {"properties": {}}
+
+    def test_save_json_addl_key_updates_controlled_properties(self, client):
+        """Template-form saves should write controlled_properties without error."""
+        from bloom_lims.gui.routes import operations
+
+        obj = SimpleNamespace(euid="EX1", json_addl={"properties": {"name": "x"}})
+        session = SimpleNamespace(commit=lambda: None)
+        repo = SimpleNamespace(get_by_euid=lambda _euid: obj, session=session)
+
+        with patch.object(operations, "BLOOMdb3", lambda **_kwargs: object()):
+            with patch.object(operations, "BloomObj", lambda _db: repo):
+                with patch.object(
+                    operations, "flag_modified", lambda *_args, **_kwargs: None
+                ):
+                    response = client.post(
+                        "/save_json_addl_key",
+                        json={
+                            "euid": "EX1",
+                            "json_addl_key": "controlled_properties",
+                            "json_data": {"fields": []},
+                        },
+                        follow_redirects=False,
+                    )
+
+        assert response.status_code == 303
+        assert obj.json_addl["controlled_properties"] == {"fields": []}
+
+    def test_save_json_addl_key_missing_object_returns_404(self, client):
+        """Missing objects should stay 404 instead of being collapsed into 500."""
+        from bloom_lims.gui.routes import operations
+
+        session = SimpleNamespace(commit=lambda: None)
+        repo = SimpleNamespace(get_by_euid=lambda _euid: None, session=session)
+
+        with patch.object(operations, "BLOOMdb3", lambda **_kwargs: object()):
+            with patch.object(operations, "BloomObj", lambda _db: repo):
+                response = client.post(
+                    "/save_json_addl_key",
+                    json={
+                        "euid": "EX1",
+                        "json_addl_key": "properties",
+                        "json_data": {"value": "test"},
+                    },
+                    follow_redirects=False,
+                )
+
+        assert response.status_code == 404
 
 
 class TestOAuthEndpointsV2:
