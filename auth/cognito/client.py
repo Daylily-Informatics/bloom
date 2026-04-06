@@ -65,7 +65,12 @@ class CognitoConfig:
         query = urlencode(
             {
                 "client_id": self.client_id,
-                "logout_uri": self.logout_redirect_uri.rstrip("/"),
+                # Cognito managed-login logout validates redirect_uri against
+                # CallbackURLs. Using logout_uri can fall through to Cognito's
+                # generic hosted error page even when the local app can explain
+                # the contract mismatch more clearly.
+                "redirect_uri": self.redirect_uri.rstrip("/"),
+                "response_type": "code",
             }
         )
         return f"https://{self._bare_domain}/logout?{query}"
@@ -140,7 +145,7 @@ class CognitoAuth:
         required_client_name: str = "",
     ) -> "CognitoAuth":
         """Create CognitoAuth from BloomSettings.auth instance.
-        
+
         Args:
             auth_settings: AuthSettings instance from bloom_lims.config
         """

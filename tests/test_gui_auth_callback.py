@@ -13,6 +13,7 @@ os.environ.setdefault("BLOOM_DEV_AUTH_BYPASS", "true")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main
+from auth.cognito.client import CognitoConfigurationError
 from bloom_lims.gui.routes.auth import SessionBootstrapError
 from bloom_lims.gui.web_session import _normalize_user_data
 
@@ -240,6 +241,51 @@ def test_auth_callback_get_unexpected_error_redirects_cleanly(
     assert response.headers["location"].startswith(
         "/auth/error?reason=authentication_failed"
     )
+
+
+def test_auth_login_redirects_to_local_auth_error_when_cognito_is_misconfigured(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.clear_bloom_session", lambda _request: None
+    )
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.build_bloom_web_session_config",
+        lambda _request: (_ for _ in ()).throw(
+            CognitoConfigurationError("callback/logout mismatch")
+        ),
+    )
+
+    response = client.get("/auth/login?next=/worksets", follow_redirects=False)
+
+    assert response.status_code in (302, 303)
+    assert response.headers["location"] == "/auth/error?reason=cognito_sign_in_misconfigured&next=/worksets"
+
+
+def test_auth_error_renders_human_readable_message(client: TestClient) -> None:
+    response = client.get(
+        "/auth/error?reason=cognito_logout_misconfigured",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+    assert "Bloom cleared your local session" in response.text
+
+
+def test_auth_logout_redirects_to_local_auth_error_when_cognito_is_misconfigured(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
+        lambda _request: (_ for _ in ()).throw(
+            CognitoConfigurationError("logout redirect mismatch")
+        ),
+    )
+
+    response = client.get("/auth/logout", follow_redirects=False)
+
+    assert response.status_code in (302, 303)
+    assert response.headers["location"] == "/auth/error?reason=cognito_logout_misconfigured&next=/"
 
 
 def test_auth_callback_post_requires_tokens(client: TestClient) -> None:
