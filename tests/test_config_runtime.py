@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from pathlib import Path
 
-import logging
-
 from bloom_lims.app import create_app
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
-    DEFAULT_BLOOM_WEB_PORT,
     BloomSettings,
     StorageSettings,
     _deployment_scoped_tapdb_config_path,
-    atlas_webhook_secret_warning,
     generate_example_webhook_secret,
     get_settings,
     get_tapdb_runtime_context,
@@ -112,11 +109,16 @@ def test_validate_settings_warns_when_atlas_webhook_secret_missing(monkeypatch):
 
     warnings = validate_settings()
 
-    assert any("Atlas webhook signature secret is not configured" in warning for warning in warnings)
+    assert any(
+        "Atlas webhook signature secret is not configured" in warning
+        for warning in warnings
+    )
     assert any("20-character alphanumeric secret" in warning for warning in warnings)
 
 
-def test_create_app_logs_atlas_webhook_secret_warning(monkeypatch, tmp_path: Path, caplog):
+def test_create_app_logs_atlas_webhook_secret_warning(
+    monkeypatch, tmp_path: Path, caplog
+):
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv(
         "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
@@ -135,7 +137,9 @@ def test_create_app_logs_atlas_webhook_secret_warning(monkeypatch, tmp_path: Pat
     )
 
 
-def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(monkeypatch, tmp_path: Path):
+def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(
+    monkeypatch, tmp_path: Path
+):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
     monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
@@ -145,4 +149,25 @@ def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(monkeypatch,
     ctx = get_tapdb_runtime_context(settings)
 
     assert ctx.config_path == _deployment_scoped_tapdb_config_path("bloom", "bloom")
-    assert ctx.config_path.endswith("/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml")
+    assert ctx.config_path.endswith(
+        "/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml"
+    )
+
+
+def test_tapdb_version_contract_defaults_match_shipped_templates():
+    settings = BloomSettings()
+
+    assert settings.tapdb.min_version == "4.1.1"
+    assert settings.tapdb.max_version_exclusive == "4.1.2"
+
+    root_template = Path("config/bloom-config-template.yaml").read_text(
+        encoding="utf-8"
+    )
+    packaged_template = Path("bloom_lims/etc/bloom-config-template.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'min_version: "4.1.1"' in root_template
+    assert 'max_version_exclusive: "4.1.2"' in root_template
+    assert 'min_version: "4.1.1"' in packaged_template
+    assert 'max_version_exclusive: "4.1.2"' in packaged_template

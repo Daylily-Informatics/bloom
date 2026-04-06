@@ -151,7 +151,52 @@ file_set_instance_lineage = file_instance_lineage
 file_reference_instance_lineage = file_instance_lineage
 
 bloom_core = tapdb_core
-Base = TapDBBase
+_COMPAT_BASE_CLASSES = SimpleNamespace(
+    generic_template=generic_template,
+    generic_instance=generic_instance,
+    generic_instance_lineage=generic_instance_lineage,
+    workflow_template=workflow_template,
+    workflow_step_template=workflow_step_template,
+    container_template=container_template,
+    content_template=content_template,
+    equipment_template=equipment_template,
+    data_template=data_template,
+    actor_template=actor_template,
+    action_template=action_template,
+    health_event_template=health_event_template,
+    file_template=file_template,
+    file_set_template=file_set_template,
+    file_reference_template=file_reference_template,
+    subject_template=subject_template,
+    workflow_instance=workflow_instance,
+    workflow_step_instance=workflow_step_instance,
+    container_instance=container_instance,
+    content_instance=content_instance,
+    equipment_instance=equipment_instance,
+    data_instance=data_instance,
+    actor_instance=actor_instance,
+    action_instance=action_instance,
+    health_event_instance=health_event_instance,
+    file_instance=file_instance,
+    file_set_instance=file_set_instance,
+    file_reference_instance=file_reference_instance,
+    subject_instance=subject_instance,
+    workflow_instance_lineage=workflow_instance_lineage,
+    workflow_step_instance_lineage=workflow_step_instance_lineage,
+    container_instance_lineage=container_instance_lineage,
+    content_instance_lineage=content_instance_lineage,
+    equipment_instance_lineage=equipment_instance_lineage,
+    data_instance_lineage=data_instance_lineage,
+    actor_instance_lineage=actor_instance_lineage,
+    action_instance_lineage=action_instance_lineage,
+    health_event_instance_lineage=health_event_instance_lineage,
+    file_instance_lineage=file_instance_lineage,
+    file_set_instance_lineage=file_set_instance_lineage,
+    file_reference_instance_lineage=file_reference_instance_lineage,
+    subject_instance_lineage=subject_instance_lineage,
+    audit_log=audit_log,
+)
+Base = SimpleNamespace(classes=_COMPAT_BASE_CLASSES, metadata=TapDBBase.metadata)
 
 
 class _TransactionContext:
@@ -224,6 +269,8 @@ class BLOOMdb3:
         )
 
         self.engine = self._conn.engine
+        # Preserve the long-standing BLOOM ORM contract used across API/domain code.
+        self.Base = Base
         # Install TapDB-style per-query metrics once per engine.
         try:
             from bloom_lims.config import get_settings

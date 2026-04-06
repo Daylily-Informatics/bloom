@@ -11,6 +11,6 @@ source ./activate "${DEPLOY_NAME}"
 
 # TapDB-managed reset + setup + seed for local development.
 bloom server stop || true
-bloom db init --force
+bloom db build --force
 bloom db seed
 pytest

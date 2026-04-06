@@ -364,9 +364,9 @@ class TestDAGEndpoints:
         )
 
     def test_get_dagv2_requires_euid(self, client):
-        """Test get_dagv2 requires euid parameter."""
+        """Legacy get_dagv2 endpoint is removed."""
         response = client.get("/get_dagv2")
-        assert response.status_code in [200, 422, 500]
+        assert response.status_code == 404
 
 
 class TestFileEndpoints:
@@ -1059,10 +1059,9 @@ class TestGraphAndVisualizationEndpoints:
     """Tests for graph and visualization endpoints."""
 
     def test_get_dagv2_requires_euid(self, client):
-        """Test get_dagv2 endpoint."""
+        """Legacy get_dagv2 endpoint is removed."""
         response = client.get("/get_dagv2")
-        # Missing euid should be handled
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_get_node_info_requires_node(self, client):
         """Test get_node_info endpoint."""
@@ -1219,54 +1218,51 @@ class TestDeleteEndpoints:
 
 
 class TestDAGEndpointsV2:
-    """Tests for DAG (directed acyclic graph) endpoints."""
+    """Legacy DAG mutation aliases are removed."""
 
     def test_update_dag_post(self, client):
-        """Test update DAG POST endpoint."""
+        """Legacy update_dag endpoint is removed."""
         response = client.post(
             "/update_dag",
             json={"euid": "EX1", "nodes": [], "edges": []},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_update_dag_post_writes_under_dags(self, client, monkeypatch, tmp_path):
-        """Test update DAG writes files under dags/ and not repo root."""
+        """Legacy update_dag endpoint is removed and writes no files."""
         monkeypatch.chdir(tmp_path)
         response = client.post(
             "/update_dag",
             json={"euid": "EX1", "nodes": [], "edges": []},
         )
 
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["status"] == "success"
-        assert payload["filename"].startswith("dags/dag_")
-        assert (tmp_path / payload["filename"]).exists()
+        assert response.status_code == 404
         assert not list(tmp_path.glob("dag_*"))
+        assert not (tmp_path / "dags").exists()
 
     def test_add_new_edge_post(self, client):
-        """Test add new edge POST endpoint."""
+        """Legacy add_new_edge endpoint is removed."""
         response = client.post(
             "/add_new_edge",
             json={"parent_euid": "EX1", "child_euid": "EX2"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_delete_node_post(self, client):
-        """Test delete node POST endpoint."""
+        """Legacy delete_node endpoint is removed."""
         response = client.post(
             "/delete_node",
             json={"euid": "EX1"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_delete_edge_post(self, client):
-        """Test delete edge POST endpoint."""
+        """Legacy delete_edge endpoint is removed."""
         response = client.post(
             "/delete_edge",
             json={"parent_euid": "EX1", "child_euid": "EX2"},
         )
-        assert response.status_code in [200, 307, 400, 422, 500]
+        assert response.status_code == 404
 
 
 class TestFileCreationEndpoints:
@@ -1430,29 +1426,29 @@ class TestDagEndpoints:
         assert response.status_code in [200, 302, 307, 400, 422, 500]
 
     def test_get_dagv2(self, client):
-        """Test get DAG v2 endpoint."""
+        """Legacy get_dagv2 endpoint is removed."""
         response = client.get("/get_dagv2")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_update_dag_requires_data(self, client):
-        """Test update DAG requires proper data."""
+        """Legacy update_dag endpoint is removed."""
         response = client.post("/update_dag", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_add_new_edge_requires_data(self, client):
-        """Test add new edge requires proper data."""
+        """Legacy add_new_edge endpoint is removed."""
         response = client.post("/add_new_edge", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_delete_node_requires_data(self, client):
-        """Test delete node requires proper data."""
+        """Legacy delete_node endpoint is removed."""
         response = client.post("/delete_node", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
     def test_delete_edge_requires_data(self, client):
-        """Test delete edge requires proper data."""
+        """Legacy delete_edge endpoint is removed."""
         response = client.post("/delete_edge", json={})
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 404
 
 
 @pytest.mark.skip(reason="Workflow GUI routes are retired in queue-centric Bloom beta.")
@@ -1879,27 +1875,27 @@ class TestObjectOperationEndpoints:
 
 
 class TestDAGOperationEndpoints:
-    """Tests for DAG operation endpoints."""
+    """Legacy DAG operation aliases are removed."""
 
     def test_add_new_edge(self, client):
-        """Deprecated add_new_edge must require canonical EUID keys."""
+        """Legacy add_new_edge endpoint is removed."""
         response = client.post("/add_new_edge", json={})
-        assert response.status_code == 400
+        assert response.status_code == 404
 
     def test_delete_edge(self, client):
-        """Test delete edge endpoint."""
+        """Legacy delete_edge endpoint is removed."""
         response = client.post("/delete_edge", json={})
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 404
 
     def test_delete_node(self, client):
-        """Test delete node endpoint."""
+        """Legacy delete_node endpoint is removed."""
         response = client.post("/delete_node", json={})
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 404
 
     def test_update_dag(self, client):
-        """Test update DAG endpoint."""
+        """Legacy update_dag endpoint is removed."""
         response = client.post("/update_dag", json={})
-        assert response.status_code in [200, 302, 307, 400, 404, 422, 500]
+        assert response.status_code == 404
 
 
 class TestSearchAndFilterEndpoints:

@@ -55,7 +55,7 @@ python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.ya
 ## Config and Cognito Ownership
 
 ```bash
-python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config init \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db-config init \
   --env dev --db-port dev=5566 --ui-port dev=8912
 python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config update \
   --env dev --audit-log-euid-prefix audit.bloom --support-email support@daylilyinformatics.com

@@ -38,6 +38,13 @@ def validate_euid(value: str) -> str:
     """
     value = value.upper().strip()
     validation_kwargs = resolve_runtime_validation_context(environ)
+    if ":" in value and validation_kwargs.get("environment") == "production":
+        domain_code = (environ.get("MERIDIAN_DOMAIN_CODE") or "").strip().upper()
+        if domain_code:
+            validation_kwargs = {
+                "environment": "domain",
+                "allowed_domain_codes": [domain_code],
+            }
     if not tapdb_validate_euid(value, **validation_kwargs):
         raise ValueError(
             f"Invalid EUID format: {value}. "

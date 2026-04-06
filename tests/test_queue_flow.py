@@ -47,6 +47,11 @@ def _opaque(prefix: str) -> str:
     return f"{prefix}-{secrets.token_hex(8)}"
 
 
+def _assert_domain_scoped_euid(euid: str, legacy_prefix: str) -> None:
+    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "B").strip() or "B"
+    assert euid.startswith(f"{domain_code}:{legacy_prefix}")
+
+
 def _assert_no_uuid_keys(payload):
     if isinstance(payload, dict):
         for key, value in payload.items():
@@ -272,10 +277,10 @@ def test_beta_queue_flow_end_to_end():
         library_container_euid = library_body["library_container_euid"]
         library_plate_euid = library_body["library_plate_euid"]
         library_well_euid = library_body["library_well_euid"]
-        assert library_material_euid.startswith("BCT-")
-        assert library_container_euid.startswith("BCN-")
-        assert library_plate_euid.startswith("BCN-")
-        assert library_well_euid.startswith("BCN-")
+        _assert_domain_scoped_euid(library_material_euid, "BCT-")
+        _assert_domain_scoped_euid(library_container_euid, "BCN-")
+        _assert_domain_scoped_euid(library_plate_euid, "BCN-")
+        _assert_domain_scoped_euid(library_well_euid, "BCN-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",

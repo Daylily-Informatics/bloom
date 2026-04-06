@@ -165,6 +165,8 @@ jobs:
     env:
       MERIDIAN_ENVIRONMENT: production
       MERIDIAN_SANDBOX_PREFIX: ""
+      MERIDIAN_DOMAIN_CODE: B
+      TAPDB_APP_CODE: B
     steps:
       - uses: actions/checkout@v4
 
@@ -180,12 +182,12 @@ jobs:
       - name: Install bloom in editable mode
         shell: bash -el {0}
         run: |
-          pip install -e .
+          pip install -e '.[dev]'
 
       - name: Initialize local Bloom database
         shell: bash -el {0}
         run: |
-          bloom db init --skip-conda-env-check
+          bloom db build --skip-conda-env-check
 
       - name: Run beta-critical tests
         shell: bash -el {0}

@@ -96,6 +96,8 @@ def ensure_test_runtime_environment() -> Path:
     """Prepare deterministic Bloom config needed for strict app startup in tests."""
     os.environ.setdefault("MERIDIAN_ENVIRONMENT", "production")
     os.environ.setdefault("MERIDIAN_SANDBOX_PREFIX", "")
+    os.environ.setdefault("MERIDIAN_DOMAIN_CODE", "B")
+    os.environ.setdefault("TAPDB_APP_CODE", "B")
     os.environ.setdefault("BLOOM_TAPDB__CLIENT_ID", "bloom")
     os.environ.setdefault("BLOOM_TAPDB__DATABASE_NAME", "bloom")
     os.environ.setdefault("BLOOM_TAPDB__STRICT_NAMESPACE", "1")
@@ -164,16 +166,16 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     from bloom_lims.cli import db as db_commands
 
     try:
-        db_commands.db_init(force=False)
+        db_commands.db_build(force=False)
     except SystemExit as exc:
-        raise RuntimeError(f"`bloom db init` exited with status {exc.code}") from exc
+        raise RuntimeError(f"`bloom db build` exited with status {exc.code}") from exc
     except Exception as exc:
-        raise RuntimeError(f"`bloom db init` failed: {exc}") from exc
+        raise RuntimeError(f"`bloom db build` failed: {exc}") from exc
 
     if not tapdb_local_available(env_name=env_name):
         raise RuntimeError(
-            "Local TapDB is still unavailable after `bloom db init`. "
-            "Fix the runtime and retry `source ./activate <deploy-name> && bloom db init`."
+            "Local TapDB is still unavailable after `bloom db build`. "
+            "Fix the runtime and retry `source ./activate <deploy-name> && bloom db build`."
         )
 
     return True
