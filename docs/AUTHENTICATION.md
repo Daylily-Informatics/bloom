@@ -23,7 +23,7 @@ export AWS_DEFAULT_REGION=us-west-2
 python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev info
 
 # Initialize the TapDB namespace config for Bloom
-python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev config init \
+python -m daylily_tapdb.cli --config ~/.config/tapdb/bloom/bloom/tapdb-config.yaml --env dev db-config init \
   --env dev --db-port dev=5566 --ui-port dev=8912
 
 # Update shared Cognito app/pool state through daycog

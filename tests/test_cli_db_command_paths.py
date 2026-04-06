@@ -85,7 +85,7 @@ def test_run_tapdb_returns_nonzero_when_check_false(
     assert db_commands._run_tapdb(["db", "setup"], check=False) == 3
 
 
-def test_update_tapdb_namespace_config_uses_config_update(
+def test_update_tapdb_namespace_config_uses_db_config_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
@@ -106,7 +106,7 @@ def test_update_tapdb_namespace_config_uses_config_update(
     assert calls == [
         (
             [
-                "config",
+                "db-config",
                 "update",
                 "--env",
                 "dev",
@@ -159,7 +159,7 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
     assert calls == [
         (
             [
-                "config",
+                "db-config",
                 "init",
                 "--client-id",
                 "bloom",
@@ -178,7 +178,7 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
         ),
         (
             [
-                "config",
+                "db-config",
                 "update",
                 "--env",
                 "dev",

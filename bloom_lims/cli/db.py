@@ -153,7 +153,7 @@ def _tapdb_support_email(env_name: str) -> str:
 def _update_tapdb_namespace_config(env_name: str) -> None:
     _run_tapdb(
         [
-            "config",
+            "db-config",
             "update",
             "--env",
             env_name,
@@ -195,7 +195,7 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
     _ensure_runtime_config_parent()
 
     args = [
-        "config",
+        "db-config",
         "init",
         "--client-id",
         _DEFAULT_TAPDB_CLIENT_ID,
