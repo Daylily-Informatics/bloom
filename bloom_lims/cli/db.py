@@ -130,7 +130,9 @@ def _current_env() -> str:
 
 def _local_pg_port(env_name: str) -> str:
     settings = get_settings()
-    return str(settings.tapdb.local_pg_port or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT).strip()
+    return str(
+        settings.tapdb.local_pg_port or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
+    ).strip()
 
 
 def _local_ui_port(env_name: str) -> str:

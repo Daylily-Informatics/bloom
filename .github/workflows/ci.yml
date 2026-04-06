@@ -185,7 +185,7 @@ jobs:
       - name: Initialize local Bloom database
         shell: bash -el {0}
         run: |
-          bloom db init --skip-conda-env-check
+          bloom db build --skip-conda-env-check
 
       - name: Run beta-critical tests
         shell: bash -el {0}
