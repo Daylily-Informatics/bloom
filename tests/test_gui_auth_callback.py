@@ -289,6 +289,98 @@ def test_empty_allowed_domain_config_blocks_all(
     assert get_allowed_domains() == ["__BLOCK_ALL__"]
 
 
+def test_resolve_login_roles_and_groups_blocks_missing_user_outside_autoprovision_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_settings",
+        lambda: SimpleNamespace(
+            auth=SimpleNamespace(auto_provision_allowed_domains=["lsmc.com"])
+        ),
+    )
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.resolve_user_record",
+        lambda *_args, **_kwargs: None,
+    )
+
+    class _FakeGroupService:
+        def __init__(self, _db):
+            pass
+
+        def ensure_system_groups(self):
+            return None
+
+        def resolve_user_roles_and_groups(self, *, user_id, fallback_role):
+            return SimpleNamespace(roles=[fallback_role or "READ_WRITE"], groups=[])
+
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.GroupService", _FakeGroupService)
+
+    class _FakeBDB:
+        session = object()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.BLOOMdb3", lambda *_, **__: _FakeBDB())
+
+    from bloom_lims.gui.routes.auth import _resolve_login_roles_and_groups
+
+    with pytest.raises(SessionBootstrapError, match="could not initialize your local access profile"):
+        _resolve_login_roles_and_groups(
+            email="new@daylilyinformatics.com",
+            cognito_sub="sub-123",
+            fallback_role=None,
+        )
+
+
+def test_resolve_login_roles_and_groups_allows_missing_user_on_autoprovision_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_settings",
+        lambda: SimpleNamespace(
+            auth=SimpleNamespace(auto_provision_allowed_domains=["lsmc.com"])
+        ),
+    )
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.resolve_user_record",
+        lambda *_args, **_kwargs: None,
+    )
+
+    class _FakeGroupService:
+        def __init__(self, _db):
+            pass
+
+        def ensure_system_groups(self):
+            return None
+
+        def resolve_user_roles_and_groups(self, *, user_id, fallback_role):
+            return SimpleNamespace(roles=[fallback_role or "READ_WRITE"], groups=["API"])
+
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.GroupService", _FakeGroupService)
+
+    class _FakeBDB:
+        session = object()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.BLOOMdb3", lambda *_, **__: _FakeBDB())
+
+    from bloom_lims.gui.routes.auth import _resolve_login_roles_and_groups
+
+    roles, groups, user_id, persisted_role = _resolve_login_roles_and_groups(
+        email="new@lsmc.com",
+        cognito_sub="sub-123",
+        fallback_role=None,
+    )
+
+    assert roles == ["READ_WRITE"]
+    assert groups == ["API"]
+    assert user_id == "sub-123"
+    assert persisted_role == "READ_WRITE"
+
+
 def test_normalize_user_data_strips_raw_tokens() -> None:
     principal = SessionPrincipal(
         user_sub="sub-123",

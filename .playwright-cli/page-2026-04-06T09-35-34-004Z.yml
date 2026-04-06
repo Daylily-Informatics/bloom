@@ -1,0 +1,180 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]: JEMX5
+  - banner [ref=e4]:
+    - link " BLOOM" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e6]: 
+      - text: BLOOM
+    - navigation "Main navigation" [ref=e7]:
+      - link " Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e9]: 
+        - text: Dashboard
+      - link " Queue Runtime" [ref=e10] [cursor=pointer]:
+        - /url: /queue_details
+        - generic [ref=e11]: 
+        - text: Queue Runtime
+      - link " Equipment" [ref=e12] [cursor=pointer]:
+        - /url: /equipment
+        - generic [ref=e13]: 
+        - text: Equipment
+      - link " Reagents" [ref=e14] [cursor=pointer]:
+        - /url: /reagents
+        - generic [ref=e15]: 
+        - text: Reagents
+      - link " Create" [ref=e16] [cursor=pointer]:
+        - /url: /create_object
+        - generic [ref=e17]: 
+        - text: Create
+      - generic [ref=e18]:
+        - link " Tools " [ref=e19] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e20]: 
+          - text: Tools
+          - generic [ref=e21]: 
+        - text:  
+      - link " Admin" [ref=e22] [cursor=pointer]:
+        - /url: /admin
+        - generic [ref=e23]: 
+        - text: Admin
+    - text: 
+    - generic [ref=e24]:
+      - link "john@daylilyinformatics.bio" [ref=e25] [cursor=pointer]:
+        - /url: /user_home
+      - link " Logout" [ref=e26] [cursor=pointer]:
+        - /url: /auth/logout
+        - generic [ref=e27]: 
+        - text: Logout
+  - main [ref=e28]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - heading "Dashboard" [level=1] [ref=e31]
+        - paragraph [ref=e32]: Welcome, john
+      - generic [ref=e33]:
+        - link " 0 Queue Runtime Objects" [ref=e34] [cursor=pointer]:
+          - /url: /queue_details
+          - generic [ref=e36]: 
+          - generic [ref=e37]:
+            - generic [ref=e38]: "0"
+            - generic [ref=e39]: Queue Runtime Objects
+        - link " 1675 Objects" [ref=e40] [cursor=pointer]:
+          - /url: /search?record_types=instance
+          - generic [ref=e42]: 
+          - generic [ref=e43]:
+            - generic [ref=e44]: "1675"
+            - generic [ref=e45]: Objects
+        - link " 5 Equipment" [ref=e46] [cursor=pointer]:
+          - /url: /equipment_overview
+          - generic [ref=e48]: 
+          - generic [ref=e49]:
+            - generic [ref=e50]: "5"
+            - generic [ref=e51]: Equipment
+        - link " 0 Reagents" [ref=e52] [cursor=pointer]:
+          - /url: /reagent_overview
+          - generic [ref=e54]: 
+          - generic [ref=e55]:
+            - generic [ref=e56]: "0"
+            - generic [ref=e57]: Reagents
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - generic [ref=e60]:
+            - heading " Recent Queue Runtime" [level=3] [ref=e61]:
+              - generic [ref=e62]: 
+              - text: Recent Queue Runtime
+            - link "View All" [ref=e63] [cursor=pointer]:
+              - /url: /queue_details
+          - generic [ref=e65]:
+            - generic [ref=e67]: 
+            - paragraph [ref=e68]: No recent queue runtime objects
+            - link "Open Queue Runtime" [ref=e69] [cursor=pointer]:
+              - /url: /queue_details
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - heading " Recent Objects" [level=3] [ref=e72]:
+              - generic [ref=e73]: 
+              - text: Recent Objects
+            - link "View All" [ref=e74] [cursor=pointer]:
+              - /url: /search?record_types=instance
+          - generic [ref=e76]:
+            - link "B:BAC-90M create_run@B:BGX-FNN3 action" [ref=e77] [cursor=pointer]:
+              - /url: /euid_details?euid=B:BAC-90M
+              - generic [ref=e78]:
+                - generic [ref=e79]: B:BAC-90M
+                - generic [ref=e80]: create_run@B:BGX-FNN3
+              - generic [ref=e81]: action
+            - link "B:BAC-8ZP complete_queue_execution@B:BCT-24M action" [ref=e82] [cursor=pointer]:
+              - /url: /euid_details?euid=B:BAC-8ZP
+              - generic [ref=e83]:
+                - generic [ref=e84]: B:BAC-8ZP
+                - generic [ref=e85]: complete_queue_execution@B:BCT-24M
+              - generic [ref=e86]: action
+            - link "B:BGX-FP0D B:BGX-FNN3:2:ONT-IDX-01 generic" [ref=e87] [cursor=pointer]:
+              - /url: /euid_details?euid=B:BGX-FP0D
+              - generic [ref=e88]:
+                - generic [ref=e89]: B:BGX-FP0D
+                - generic [ref=e90]: B:BGX-FNN3:2:ONT-IDX-01
+              - generic [ref=e91]: generic
+            - link "B:BGX-FNN3 ont-run generic" [ref=e92] [cursor=pointer]:
+              - /url: /euid_details?euid=B:BGX-FNN3
+              - generic [ref=e93]:
+                - generic [ref=e94]: B:BGX-FNN3
+                - generic [ref=e95]: ont-run
+              - generic [ref=e96]: generic
+            - link "B:BAC-8YR claim_queue_item@B:BCT-24M action" [ref=e97] [cursor=pointer]:
+              - /url: /euid_details?euid=B:BAC-8YR
+              - generic [ref=e98]:
+                - generic [ref=e99]: B:BAC-8YR
+                - generic [ref=e100]: claim_queue_item@B:BCT-24M
+              - generic [ref=e101]: action
+      - generic [ref=e102]:
+        - heading " Quick Actions" [level=3] [ref=e104]:
+          - generic [ref=e105]: 
+          - text: Quick Actions
+        - generic [ref=e107]:
+          - link " Queue Runtime" [ref=e108] [cursor=pointer]:
+            - /url: /queue_details
+            - generic [ref=e109]: 
+            - text: Queue Runtime
+          - link " Equipment" [ref=e110] [cursor=pointer]:
+            - /url: /equipment_overview
+            - generic [ref=e111]: 
+            - text: Equipment
+          - link " Reagents" [ref=e112] [cursor=pointer]:
+            - /url: /reagent_overview
+            - generic [ref=e113]: 
+            - text: Reagents
+          - link " Templates" [ref=e114] [cursor=pointer]:
+            - /url: /object_templates_summary
+            - generic [ref=e115]: 
+            - text: Templates
+          - link " Statistics" [ref=e116] [cursor=pointer]:
+            - /url: /database_statistics
+            - generic [ref=e117]: 
+            - text: Statistics
+          - link " Admin" [ref=e118] [cursor=pointer]:
+            - /url: /admin
+            - generic [ref=e119]: 
+            - text: Admin
+  - contentinfo [ref=e120]:
+    - generic [ref=e121]:
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - generic [ref=e124]: BLOOM LIMS
+          - generic [ref=e125]: v3.5.8
+        - generic [ref=e126]:
+          - generic [ref=e127]: "Branch: main"
+          - generic [ref=e128]: "Tag: 3.5.8"
+          - generic [ref=e129]: "Commit: 50b36da"
+      - generic [ref=e130]:
+        - link " Help" [ref=e131] [cursor=pointer]:
+          - /url: /help
+          - generic [ref=e132]: 
+          - text: Help
+        - link " support@dyly.bio" [ref=e133] [cursor=pointer]:
+          - /url: mailto:support@dyly.bio
+          - generic [ref=e134]: 
+          - text: support@dyly.bio
+        - link " GitHub" [ref=e135] [cursor=pointer]:
+          - /url: https://github.com/Daylily-Informatics/bloom
+          - generic [ref=e136]: 
+          - text: GitHub

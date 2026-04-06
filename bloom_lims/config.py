@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BLOOM_WEB_PORT = 8912
 DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT = 5566
+DEFAULT_BLOOM_CONDA_ENV_BASE = "BLOOM"
+LEGACY_UPLOAD_DIR = "/var/lib/bloom/uploads"
 
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
@@ -59,6 +61,10 @@ def _resolve_deployment_code() -> str:
     )
 
 
+def expected_conda_env_name() -> str:
+    return f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-{_resolve_deployment_code()}"
+
+
 def _user_config_dir() -> Path:
     xdg_config_home = Path(
         os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
@@ -79,6 +85,29 @@ def _deployment_scoped_tapdb_config_path(client_id: str, namespace: str) -> str:
     return str(
         xdg_config_home / "tapdb" / client_id / scoped_namespace / "tapdb-config.yaml"
     )
+
+
+def _default_upload_dir_for_runtime(
+    *,
+    client_id: str,
+    namespace: str,
+    env_name: str,
+    config_path: str = "",
+) -> str:
+    resolved_config_path = (
+        str(config_path or "").strip()
+        or _deployment_scoped_tapdb_config_path(client_id, namespace)
+    )
+    scoped_root = Path(resolved_config_path).expanduser().resolve().parent
+    return str(scoped_root / env_name.strip().lower() / "uploads")
+
+
+def _ensure_directory(path_value: str) -> None:
+    resolved = Path(path_value).expanduser()
+    try:
+        resolved.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        logger.debug("Failed to create directory %s: %s", resolved, exc)
 
 
 def _validate_optional_https_url(value: str, *, field_name: str) -> str:
@@ -115,6 +144,24 @@ def _load_template_text() -> str:
     return template_text.replace(
         "__BLOOM_WEB_PORT__", str(DEFAULT_BLOOM_WEB_PORT)
     ).replace("__BLOOM_TAPDB_LOCAL_PG_PORT__", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT))
+
+
+def build_default_config_template() -> bytes:
+    """Render the default Bloom config template with per-invocation secrets."""
+    template_text = _load_template_text()
+    if not template_text:
+        return b""
+
+    jwt_secret = secrets.token_urlsafe(64)
+    rendered = re.sub(
+        r'(?m)^(?P<prefix>\s*jwt_secret:\s*)"".*$',
+        lambda match: f'{match.group("prefix")}"{jwt_secret}"',
+        template_text,
+        count=1,
+    )
+    if rendered == template_text:
+        rendered = template_text.replace('jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1)
+    return rendered.encode("utf-8")
 
 
 def _load_template_config() -> Dict[str, Any]:
@@ -321,7 +368,7 @@ class StorageSettings(BaseModel):
     """File storage configuration."""
 
     upload_dir: str = Field(
-        default="/var/lib/bloom/uploads", description="Upload directory"
+        default="", description="Upload directory"
     )
     temp_dir: str = Field(
         default_factory=lambda: str(Path(tempfile.gettempdir()) / "bloom"),
@@ -443,8 +490,16 @@ class AuthSettings(BaseModel):
         description="Cognito OAuth scopes",
     )
     cognito_allowed_domains: List[str] = Field(
-        default_factory=lambda: list(APPROVED_WEB_DOMAIN_SUFFIXES),
+        default_factory=lambda: ["lsmc.com", "lsmc.bio", "lsmc.life", "daylilyinformatics.com"],
         description="Allowed email domains",
+    )
+    cognito_default_tenant_id: str = Field(
+        default="00000000-0000-0000-0000-000000000000",
+        description="Default tenant UUID for auto-provisioned Cognito users",
+    )
+    auto_provision_allowed_domains: List[str] = Field(
+        default_factory=lambda: ["lsmc.com"],
+        description="Email domains allowed to auto-provision missing users",
     )
 
     jwt_secret: str = Field(default="", description="JWT secret key")
@@ -735,10 +790,10 @@ class BloomSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        _ = dotenv_settings
         return (
             init_settings,
             env_settings,
-            dotenv_settings,
             file_secret_settings,
             YamlConfigSettingsSource(
                 settings_cls,
@@ -754,6 +809,20 @@ class BloomSettings(BaseSettings):
                 raise ValueError("dewey.base_url is required when dewey.enabled=true")
             if not str(self.dewey.token or "").strip():
                 raise ValueError("dewey.token is required when dewey.enabled=true")
+        return self
+
+    @model_validator(mode="after")
+    def normalize_local_storage_paths(self) -> "BloomSettings":
+        configured_upload_dir = str(self.storage.upload_dir or "").strip()
+        if not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR:
+            self.storage.upload_dir = _default_upload_dir_for_runtime(
+                client_id=self.tapdb.client_id.strip(),
+                namespace=self.tapdb.database_name.strip(),
+                env_name=self.tapdb.env.strip().lower(),
+                config_path=self.tapdb.config_path,
+            )
+
+        _ensure_directory(self.storage.upload_dir)
         return self
 
     @field_validator("environment")
@@ -901,17 +970,21 @@ def validate_settings() -> List[str]:
     if not settings.auth.cognito_user_pool_id:
         warnings.append(
             "Cognito configuration is missing (auth.cognito_user_pool_id). "
-            "Set it in YAML config or override it with BLOOM_AUTH__COGNITO_USER_POOL_ID."
+            f"Set it in the deployment YAML config: {get_user_config_path()}"
         )
 
     if not settings.auth.jwt_secret and settings.is_production:
         warnings.append("JWT secret is not set in production")
 
-    upload_path = Path(settings.storage.upload_dir)
+    upload_path = Path(settings.storage.upload_dir).expanduser()
     if not upload_path.exists():
         warnings.append(
             f"Upload directory does not exist: {settings.storage.upload_dir}"
         )
+    elif not upload_path.is_dir():
+        warnings.append(f"Upload path is not a directory: {settings.storage.upload_dir}")
+    elif not os.access(upload_path, os.W_OK):
+        warnings.append(f"Upload directory is not writable: {settings.storage.upload_dir}")
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")

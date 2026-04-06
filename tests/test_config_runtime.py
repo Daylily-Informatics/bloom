@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import tempfile
 from pathlib import Path
+
+import yaml
 
 from bloom_lims.app import create_app
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     BloomSettings,
     StorageSettings,
+    build_default_config_template,
     _deployment_scoped_tapdb_config_path,
+    expected_conda_env_name,
     generate_example_webhook_secret,
     get_settings,
     get_tapdb_runtime_context,
@@ -23,6 +28,34 @@ from tests.support.runtime import ensure_test_runtime_environment
 
 def test_storage_temp_dir_uses_system_tempdir():
     assert StorageSettings().temp_dir == str(Path(tempfile.gettempdir()) / "bloom")
+
+
+def test_storage_upload_dir_defaults_to_deployment_scoped_runtime(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
+    monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
+    get_settings.cache_clear()
+
+    settings = BloomSettings()
+    expected = (
+        tmp_path
+        / ".config"
+        / "tapdb"
+        / "bloom"
+        / "bloom-local2"
+        / "dev"
+        / "uploads"
+    )
+
+    assert Path(settings.storage.upload_dir) == expected
+    assert expected.is_dir()
+
+
+def test_expected_conda_env_name_uses_deployment_code(monkeypatch):
+    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "bringup")
+    assert expected_conda_env_name() == "BLOOM-bringup"
 
 
 def test_nested_env_overrides_template_defaults(monkeypatch):
@@ -42,6 +75,45 @@ def test_nested_env_overrides_template_defaults(monkeypatch):
     assert settings.auth.cognito_client_id == "client-from-env"
     assert settings.auth.cognito_domain == "env-test.auth.us-west-2.amazoncognito.com"
     assert settings.auth.cognito_redirect_uri == "https://example.test/auth/callback"
+
+
+def test_build_default_config_template_injects_fresh_jwt_secret():
+    first = build_default_config_template().decode("utf-8")
+    second = build_default_config_template().decode("utf-8")
+
+    assert first != second
+    for template in (first, second):
+        match = re.search(r'jwt_secret:\s*"([^"]+)"', template)
+        assert match is not None
+        assert len(match.group(1)) >= 32
+        data = yaml.safe_load(template)
+        auth = data["auth"]
+        assert auth["cognito_allowed_domains"] == [
+            "lsmc.com",
+            "lsmc.bio",
+            "lsmc.life",
+            "daylilyinformatics.com",
+        ]
+        assert auth["cognito_default_tenant_id"] == "00000000-0000-0000-0000-000000000000"
+        assert auth["auto_provision_allowed_domains"] == ["lsmc.com"]
+        assert "daylilyinformatics.bio" not in template
+
+
+def test_settings_sources_do_not_include_dotenv():
+    init_settings = object()
+    env_settings = object()
+    dotenv_settings = object()
+    file_secret_settings = object()
+
+    sources = BloomSettings.settings_customise_sources(
+        BloomSettings,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    )
+
+    assert dotenv_settings not in sources
 
 
 def test_runtime_bootstrap_replaces_missing_tapdb_config_path(

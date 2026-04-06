@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from bloom_lims.config import (
     apply_runtime_environment,
     assert_tapdb_version,
+    expected_conda_env_name,
     get_settings,
     get_template_config_path,
     get_user_config_path,
@@ -106,6 +107,7 @@ def _status() -> None:
     table.add_column("Value")
 
     rows = [
+        ("deploy-name", settings.deployment.name),
         ("environment", settings.environment),
         ("tapdb.env", settings.tapdb.env),
         ("tapdb.database_name", settings.tapdb.database_name),
@@ -150,12 +152,17 @@ def _doctor() -> None:
         )
 
     conda_env = os.environ.get("CONDA_DEFAULT_ENV")
-    if conda_env == "BLOOM":
-        console.print("[green]✓[/green] Conda environment: BLOOM")
+    expected_env = expected_conda_env_name()
+    if conda_env == expected_env:
+        console.print(f"[green]✓[/green] Conda environment: {expected_env}")
     else:
-        warnings.append(f"Not in BLOOM conda environment (current: {conda_env})")
+        warnings.append(
+            f"Not in expected deployment-scoped conda environment "
+            f"(current: {conda_env}, expected: {expected_env})"
+        )
         console.print(
-            f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} (expected: BLOOM)"
+            f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} "
+            f"(expected: {expected_env})"
         )
 
     for module_name in ["bloom_lims.db", "bloom_lims.config", "daylily_tapdb"]:

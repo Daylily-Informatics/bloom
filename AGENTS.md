@@ -11,6 +11,7 @@ source ./activate <deploy-name>
 ## Command Ownership
 
 - Use `bloom ...` as the primary interface for normal Bloom work.
+- MUST use Bloom's supported API/CLI surface for Bloom operations.
 - Use `tapdb ...` only when Bloom explicitly delegates low-level DB/runtime lifecycle to TapDB.
 - Use `daycog ...` only when Bloom explicitly delegates shared Cognito lifecycle to Daycog.
 
@@ -18,6 +19,7 @@ source ./activate <deploy-name>
 
 - Do not bypass `bloom`, `tapdb`, or `daycog` with raw tools just because something is missing or broken.
 - Do not treat direct `python -m ...`, raw `postgres`, raw AWS CLI mutations, or direct config-file edits as automatic fallbacks.
+- Do not use temporary auth/runtime override hacks such as `BLOOM_OAUTH=no` or ad hoc `BLOOM_AUTH__*` values to force startup unless the user explicitly asks for that exact workaround.
 - If the intended CLI path is broken or incomplete, stop, diagnose, and ask for permission before circumventing it.
 - Prefer patience and repair of the intended CLI workflow over inventing a shortcut.
 

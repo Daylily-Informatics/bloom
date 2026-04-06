@@ -164,6 +164,20 @@ class TestMainCommands:
         result = runner.invoke(cli_app, ["config", "doctor", "--help"])
         assert result.exit_code == 0
 
+    def test_config_status_prints_deploy_name(
+        self,
+        runner: CliRunner,
+        cli_app,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "bringup")
+
+        result = runner.invoke(cli_app, ["config", "status"])
+
+        assert result.exit_code == 0
+        assert "deploy-name" in result.output
+        assert "bringup" in result.output
+
     def test_config_doctor_reports_schema_drift_without_failing(
         self,
         runner: CliRunner,
@@ -194,6 +208,36 @@ class TestMainCommands:
         drift_report = tmp_path / ".local" / "state" / "bloom" / "schema_drift.json"
         assert drift_report.exists()
         assert "expected=12 live=13" in drift_report.read_text(encoding="utf-8")
+
+    def test_config_doctor_expects_deployment_scoped_conda_env(
+        self,
+        runner: CliRunner,
+        cli_app,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "bringup")
+        monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM-bringup")
+        monkeypatch.setattr(
+            config_extra,
+            "run_schema_drift_check",
+            lambda env_name: {
+                "status": "clean",
+                "checked_at": "2026-03-29T12:00:00+00:00",
+                "environment": env_name,
+                "tool_version": "4.1.1",
+                "summary": "ok",
+                "report": {"counts": {"expected": 12, "live": 12}},
+                "stderr": "",
+            },
+        )
+        monkeypatch.setattr(config_extra, "validate_settings", lambda: [])
+        monkeypatch.setattr(config_extra, "assert_tapdb_version", lambda: "4.1.1")
+
+        result = runner.invoke(cli_app, ["config", "doctor"])
+
+        assert result.exit_code == 0
+        assert "Conda environment: BLOOM-bringup" in result.output
+        assert "expected: BLOOM)" not in result.output
 
     def test_config_shell_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "shell", "--help"])

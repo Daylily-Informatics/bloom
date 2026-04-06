@@ -11,7 +11,7 @@ from cli_core_yo.app import run
 from cli_core_yo.spec import CliSpec, ConfigSpec, PluginSpec, XdgSpec
 
 from bloom_lims.config import (
-    _load_template_text,
+    build_default_config_template,
     _resolve_deployment_code,
     apply_runtime_environment,
     assert_tapdb_version,
@@ -76,7 +76,7 @@ spec = CliSpec(
     ),
     config=ConfigSpec(
         xdg_relative_path=f"bloom-config-{_resolve_deployment_code()}.yaml",
-        template_bytes=_load_template_text().encode("utf-8"),
+        template_bytes=build_default_config_template(),
         validator=_validate_bloom_config,
     ),
     plugins=PluginSpec(

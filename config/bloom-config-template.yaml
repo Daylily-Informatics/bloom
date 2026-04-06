@@ -50,7 +50,7 @@ tapdb:
 # Storage Configuration
 # -----------------------------------------------------------------------------
 storage:
-  upload_dir: "/var/lib/bloom/uploads"
+  upload_dir: ""               # Defaults to the deployment-scoped local TapDB runtime uploads dir
   temp_dir: "/tmp/bloom"
   max_file_size_mb: 100
   allowed_extensions:
@@ -114,9 +114,10 @@ auth:
     - "lsmc.com"
     - "lsmc.bio"
     - "lsmc.life"
-    - "dyly.bio"
-    - "daylilyinformatics.bio"
-    - "inflectionmedicine.com"
+    - "daylilyinformatics.com"
+  cognito_default_tenant_id: "00000000-0000-0000-0000-000000000000"
+  auto_provision_allowed_domains:
+    - "lsmc.com"
 
   # JWT settings
   jwt_secret: ""                # REQUIRED for production
