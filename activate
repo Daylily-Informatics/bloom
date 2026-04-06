@@ -30,6 +30,7 @@ _BLUE='\033[0;34m'
 _CYAN='\033[0;36m'
 _NC='\033[0m'
 _BLOOM_PYTHON=""
+_BLOOM_CONDA_ENV_CREATED="0"
 _BLOOM_CONDA_ENV_BASE="BLOOM"
 _BLOOM_LEGACY_REBIND_VARS=(
     USE_LOCAL_DAYLILY_TAPDB
@@ -173,41 +174,38 @@ _bloom_distribution_is_editable_from_repo() {
     [[ "$editable_location" == "$repo_root" ]]
 }
 
-_bloom_ensure_editable_repo() {
-    local label="$1"
-    local module_name="$2"
-    local repo_root="$3"
-    local extras="${4:-}"
-    local dist_name="${5:-}"
-    local install_target=""
-    if [[ -z "$repo_root" ]]; then
-        return 0
-    fi
-    if [[ -n "$dist_name" ]]; then
-        if _bloom_distribution_is_editable_from_repo "$dist_name" "$repo_root"; then
-            echo -e "  ${_GREEN}✓${_NC} Using local ${label} checkout: ${repo_root}"
-            return 0
-        fi
-    elif _bloom_module_is_from_repo "$module_name" "$repo_root"; then
-        echo -e "  ${_GREEN}✓${_NC} Using local ${label} checkout: ${repo_root}"
-        return 0
-    fi
-    install_target="${repo_root}${extras}"
-    echo -e "  ${_CYAN}→${_NC} Installing local ${label} checkout..."
-    if ! "${_BLOOM_PYTHON:-python}" -m pip install --no-deps -e "$install_target" -q; then
-        echo -e "  ${_YELLOW}⚠${_NC} Failed to install local ${label} checkout from ${repo_root}"
+_bloom_dev_runtime_ready() {
+    _bloom_require_python_import "daylily_tapdb" "daylily-tapdb" || return 1
+    _bloom_require_python_import "daylily_cognito" "daylily-cognito" || return 1
+    _bloom_require_python_import "cli_core_yo" "cli-core-yo" || return 1
+    _bloom_require_python_import "pytest" "pytest" || return 1
+}
+
+_bloom_install_main_repo() {
+    echo -e "  ${_CYAN}→${_NC} Installing local Bloom checkout..."
+    if ! "${_BLOOM_PYTHON:-python}" -m pip install -e "${BLOOM_ROOT}[dev]" -q; then
+        echo -e "  ${_YELLOW}⚠${_NC} Failed to install local Bloom checkout from ${BLOOM_ROOT}"
         return 1
     fi
-    if [[ -n "$dist_name" ]]; then
-        if ! _bloom_distribution_is_editable_from_repo "$dist_name" "$repo_root"; then
-            echo -e "  ${_YELLOW}⚠${_NC} ${label} is not installed editable from ${repo_root}"
-            return 1
-        fi
-    elif ! _bloom_module_is_from_repo "$module_name" "$repo_root"; then
-        echo -e "  ${_YELLOW}⚠${_NC} ${label} still resolves outside ${repo_root}"
+    if ! _bloom_distribution_is_editable_from_repo "bloom_lims" "$BLOOM_ROOT"; then
+        echo -e "  ${_YELLOW}⚠${_NC} Bloom is not installed editable from ${BLOOM_ROOT}"
         return 1
     fi
-    echo -e "  ${_GREEN}✓${_NC} Using local ${label} checkout: ${repo_root}"
+    if ! _bloom_dev_runtime_ready; then
+        return 1
+    fi
+    echo -e "  ${_GREEN}✓${_NC} Using local Bloom checkout: ${BLOOM_ROOT}"
+}
+
+_bloom_validate_main_repo_install() {
+    if ! _bloom_distribution_is_editable_from_repo "bloom_lims" "$BLOOM_ROOT"; then
+        echo -e "  ${_YELLOW}⚠${_NC} Bloom is not installed editable from ${BLOOM_ROOT}"
+        return 1
+    fi
+    if ! _bloom_dev_runtime_ready; then
+        return 1
+    fi
+    echo -e "  ${_GREEN}✓${_NC} Using local Bloom checkout: ${BLOOM_ROOT}"
 }
 
 echo -e "${_BLUE}Activating BLOOM LIMS environment (${_BLOOM_CONDA_ENV_NAME})...${_NC}"
@@ -237,6 +235,7 @@ if command -v conda &> /dev/null; then
                 if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
                     export PATH="$CONDA_PREFIX/bin:$PATH"
                 fi
+                _BLOOM_CONDA_ENV_CREATED="1"
             else
                 echo -e "  ${_YELLOW}⚠${_NC} Failed to create conda environment."
             fi
@@ -259,17 +258,20 @@ _BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
 _BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
 export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
 
-if ! _bloom_ensure_editable_repo "Bloom" "bloom_lims" "$BLOOM_ROOT" "" "bloom_lims"; then
-    return 1
+if [[ "${_BLOOM_CONDA_ENV_CREATED}" == "1" ]]; then
+    if ! _bloom_install_main_repo; then
+        return 1
+    fi
+elif ! _bloom_validate_main_repo_install; then
+    echo -e "  ${_CYAN}→${_NC} Refreshing Bloom install in ${_BLOOM_CONDA_ENV_NAME}..."
+    if ! _bloom_install_main_repo; then
+        return 1
+    fi
 fi
 
 echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
 echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-cognito from ${_BLOOM_CONDA_ENV_NAME}"
 echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
-
-_bloom_require_python_import "daylily_tapdb" "daylily-tapdb" || return 1
-_bloom_require_python_import "daylily_cognito" "daylily-cognito" || return 1
-_bloom_require_python_import "cli_core_yo" "cli-core-yo" || return 1
 
 if command -v rehash >/dev/null 2>&1; then
     rehash
@@ -366,3 +368,4 @@ echo ""
 unset _BLOOM_CLI_CORE_REPO
 unset _BLOOM_DAYCOG_REPO
 unset _BLOOM_TAPDB_REPO
+unset _BLOOM_CONDA_ENV_CREATED

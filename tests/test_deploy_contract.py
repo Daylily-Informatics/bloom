@@ -22,7 +22,8 @@ def test_activate_only_references_root_environment_yaml() -> None:
     assert "environment.yaml" in activate
     assert "environment" + ".yml" not in activate
     assert "requirements.txt" not in activate
-    assert "pip install --no-deps -e" in activate
+    assert 'pip install -e "${BLOOM_ROOT}[dev]" -q' in activate
+    assert "--no-deps" not in activate
     assert "-e ." not in environment
     assert "MERIDIAN_DOMAIN_CODE=B" in root_template
     assert "TAPDB_APP_CODE=B" in root_template
