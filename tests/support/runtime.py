@@ -96,6 +96,8 @@ def ensure_test_runtime_environment() -> Path:
     """Prepare deterministic Bloom config needed for strict app startup in tests."""
     os.environ.setdefault("MERIDIAN_ENVIRONMENT", "production")
     os.environ.setdefault("MERIDIAN_SANDBOX_PREFIX", "")
+    os.environ.setdefault("MERIDIAN_DOMAIN_CODE", "B")
+    os.environ.setdefault("TAPDB_APP_CODE", "B")
     os.environ.setdefault("BLOOM_TAPDB__CLIENT_ID", "bloom")
     os.environ.setdefault("BLOOM_TAPDB__DATABASE_NAME", "bloom")
     os.environ.setdefault("BLOOM_TAPDB__STRICT_NAMESPACE", "1")

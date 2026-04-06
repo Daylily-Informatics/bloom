@@ -165,6 +165,8 @@ jobs:
     env:
       MERIDIAN_ENVIRONMENT: production
       MERIDIAN_SANDBOX_PREFIX: ""
+      MERIDIAN_DOMAIN_CODE: B
+      TAPDB_APP_CODE: B
     steps:
       - uses: actions/checkout@v4
 
