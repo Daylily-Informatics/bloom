@@ -5,6 +5,7 @@ import pytest
 
 from auth.cognito.client import CognitoAuth, CognitoConfigurationError
 
+
 def _auth_settings(**overrides):
     payload = {
         "cognito_user_pool_id": "us-east-1_POOL123",
@@ -43,6 +44,19 @@ def test_authorize_url_uses_authorization_code_flow():
     assert query["response_type"] == ["code"]
     assert query["redirect_uri"] == ["https://localhost:8912/auth/callback"]
     assert query["scope"] == ["openid email profile"]
+
+
+def test_logout_url_uses_managed_login_redirect_contract():
+    auth = CognitoAuth.from_settings(_auth_settings())
+
+    parsed = urlparse(auth.config.logout_url)
+    query = parse_qs(parsed.query)
+
+    assert parsed.path == "/logout"
+    assert query["client_id"] == ["bloom-client"]
+    assert query["redirect_uri"] == ["https://localhost:8912/auth/callback"]
+    assert query["response_type"] == ["code"]
+    assert "logout_uri" not in query
 
 
 def test_from_settings_rejects_missing_yaml_values():

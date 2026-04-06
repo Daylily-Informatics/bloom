@@ -31,9 +31,9 @@ class CognitoConfig:
         """Domain without protocol prefix for URL construction."""
         d = (self.domain or "").strip().rstrip("/")
         if d.startswith("https://"):
-            d = d[len("https://"):]
+            d = d[len("https://") :]
         elif d.startswith("http://"):
-            d = d[len("http://"):]
+            d = d[len("http://") :]
         return d
 
     @property
@@ -65,7 +65,12 @@ class CognitoConfig:
         query = urlencode(
             {
                 "client_id": self.client_id,
-                "logout_uri": self.logout_redirect_uri.rstrip("/"),
+                # Cognito managed-login logout validates redirect_uri against
+                # CallbackURLs. Using logout_uri can fall through to Cognito's
+                # generic hosted error page even when the local app can explain
+                # the contract mismatch more clearly.
+                "redirect_uri": self.redirect_uri.rstrip("/"),
+                "response_type": "code",
             }
         )
         return f"https://{self._bare_domain}/logout?{query}"
@@ -140,7 +145,7 @@ class CognitoAuth:
         required_client_name: str = "",
     ) -> "CognitoAuth":
         """Create CognitoAuth from BloomSettings.auth instance.
-        
+
         Args:
             auth_settings: AuthSettings instance from bloom_lims.config
         """
@@ -235,7 +240,9 @@ class CognitoAuth:
         try:
             token_payload = response.json()
         except ValueError as exc:
-            raise CognitoTokenError("Token exchange returned non-JSON response") from exc
+            raise CognitoTokenError(
+                "Token exchange returned non-JSON response"
+            ) from exc
 
         if not token_payload.get("id_token") and not token_payload.get("access_token"):
             raise CognitoTokenError("Token exchange returned no usable tokens")
@@ -258,8 +265,7 @@ class CognitoAuth:
 
 @lru_cache(maxsize=1)
 def get_cognito_auth() -> CognitoAuth:
-    """Create (and cache) a CognitoAuth instance from YAML config.
-    """
+    """Create (and cache) a CognitoAuth instance from YAML config."""
     from bloom_lims.config import get_settings
 
     settings = get_settings()

@@ -34,6 +34,27 @@ from bloom_lims.gui.web_session import (
 
 router = APIRouter()
 
+_AUTH_ERROR_MESSAGES: dict[str, str] = {
+    "authentication_failed": "Bloom could not complete authentication. Start sign-in again.",
+    "invalid_state": "Bloom could not verify the sign-in session. Start sign-in again.",
+    "missing_code": "Bloom did not receive an authorization code from Cognito. Start sign-in again.",
+    "missing_tokens": "Bloom did not receive the tokens required to complete sign-in.",
+    "token_exchange_failed": "Bloom could not exchange the Cognito authorization code for tokens. Start sign-in again.",
+    "invalid_cognito_token": "Bloom received an invalid Cognito token. Start sign-in again.",
+    "missing_email": "Bloom could not determine the email address for this sign-in.",
+    "email_domain_auth_disabled": "Bloom sign-in is disabled for this deployment's allowed email domains.",
+    "email_domain_not_allowed": "Your email domain is not allowed to access this Bloom deployment.",
+    "session_bootstrap_failed": "Bloom signed you in, but could not initialize your local access profile.",
+    "cognito_sign_in_misconfigured": (
+        "Bloom Cognito sign-in is misconfigured. The shared app client callback/logout URLs "
+        "or redirect URI do not match this Bloom deployment."
+    ),
+    "cognito_logout_misconfigured": (
+        "Bloom cleared your local session, but the shared Cognito logout contract is misconfigured. "
+        "Update the shared app client redirect URLs for this Bloom deployment."
+    ),
+}
+
 
 class SessionBootstrapError(RuntimeError):
     """Raised when Bloom cannot establish the post-login session context."""
@@ -79,7 +100,8 @@ async def auth_login(request: Request, next: str = "/"):
             _next_path(next),
         )
     except CognitoConfigurationError as exc:
-        raise MissingCognitoEnvVarsException(str(exc)) from exc
+        logging.error("Bloom Cognito sign-in is misconfigured: %s", exc)
+        return _auth_error_redirect("cognito_sign_in_misconfigured", next_path=next)
 
 
 def _auth_error_redirect(reason: str, *, next_path: str = "/") -> RedirectResponse:
@@ -89,6 +111,21 @@ def _auth_error_redirect(reason: str, *, next_path: str = "/") -> RedirectRespon
         url=f"/auth/error?reason={quote(safe_reason)}&next={quote(safe_next, safe='/')}",
         status_code=303,
     )
+
+
+def _auth_error_message(reason: str | None) -> str:
+    normalized = str(reason or "").strip()
+    if not normalized:
+        return _AUTH_ERROR_MESSAGES["authentication_failed"]
+    mapped = _AUTH_ERROR_MESSAGES.get(normalized)
+    if mapped:
+        return mapped
+    if " " in normalized:
+        return normalized
+    fallback = normalized.replace("_", " ").strip()
+    if not fallback:
+        return _AUTH_ERROR_MESSAGES["authentication_failed"]
+    return fallback[:1].upper() + fallback[1:]
 
 
 def _callback_error_response(error_message: str, *, status_code: int) -> JSONResponse:
@@ -374,7 +411,7 @@ async def auth_error(
         "udat": load_bloom_user_data(request) or {},
         "cognito_login_url": f"/auth/login?next={quote(next_path, safe='/')}",
         "auth_primary_href": f"/auth/login?next={quote(next_path, safe='/')}",
-        "auth_error": reason,
+        "auth_error": _auth_error_message(reason),
         "version": "1.0.0",
     }
     return HTMLResponse(content=template.render(context), status_code=403)
@@ -403,10 +440,12 @@ async def _logout_response(request: Request, response: Response):
         logging.warning("Logging out user: clearing session data")
 
         cognito_logout_url = "/login"
+        logout_reason: str | None = None
         try:
             cognito_logout_url = _get_request_cognito_auth(request).config.logout_url
         except CognitoConfigurationError as exc:
             logging.error("Cognito configuration missing during logout: %s", exc)
+            logout_reason = "cognito_logout_misconfigured"
 
         clear_bloom_session(request)
         logging.info("User session cleared.")
@@ -418,7 +457,12 @@ async def _logout_response(request: Request, response: Response):
         )
 
     logout_response = RedirectResponse(
-        url=cognito_logout_url, status_code=status.HTTP_303_SEE_OTHER
+        url=(
+            _auth_error_redirect(logout_reason, next_path="/").headers["location"]
+            if logout_reason
+            else cognito_logout_url
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
     )
     logout_response.delete_cookie("bloom_session", path="/")
     logout_response.delete_cookie("session", path="/")
