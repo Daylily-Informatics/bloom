@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from pathlib import Path
 
-import logging
-
 from bloom_lims.app import create_app
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
-    DEFAULT_BLOOM_WEB_PORT,
     BloomSettings,
     StorageSettings,
     _deployment_scoped_tapdb_config_path,
-    atlas_webhook_secret_warning,
     generate_example_webhook_secret,
     get_settings,
     get_tapdb_runtime_context,
