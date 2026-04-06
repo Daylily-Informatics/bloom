@@ -33,15 +33,14 @@ def test_storage_temp_dir_uses_system_tempdir():
 def test_storage_upload_dir_defaults_to_deployment_scoped_runtime(
     monkeypatch, tmp_path: Path
 ):
-    monkeypatch.setenv("HOME", str(tmp_path))
+    xdg_config_home = tmp_path / ".config"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
     monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
     monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
     get_settings.cache_clear()
 
     settings = BloomSettings()
-    expected = (
-        tmp_path / ".config" / "tapdb" / "bloom" / "bloom-local2" / "dev" / "uploads"
-    )
+    expected = xdg_config_home / "tapdb" / "bloom" / "bloom-local2" / "dev" / "uploads"
 
     assert Path(settings.storage.upload_dir) == expected
     assert expected.is_dir()
@@ -208,7 +207,8 @@ def test_create_app_logs_atlas_webhook_secret_warning(
 def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(
     monkeypatch, tmp_path: Path
 ):
-    monkeypatch.setenv("HOME", str(tmp_path))
+    xdg_config_home = tmp_path / ".config"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
     monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
     monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
     get_settings.cache_clear()
@@ -216,10 +216,12 @@ def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(
     settings = BloomSettings()
     ctx = get_tapdb_runtime_context(settings)
 
-    assert ctx.config_path == _deployment_scoped_tapdb_config_path("bloom", "bloom")
-    assert ctx.config_path.endswith(
-        "/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml"
+    expected = str(
+        xdg_config_home / "tapdb" / "bloom" / "bloom-local2" / "tapdb-config.yaml"
     )
+
+    assert ctx.config_path == _deployment_scoped_tapdb_config_path("bloom", "bloom")
+    assert ctx.config_path == expected
 
 
 def test_tapdb_version_contract_defaults_match_shipped_templates():
