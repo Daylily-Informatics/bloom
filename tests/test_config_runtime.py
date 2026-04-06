@@ -146,3 +146,20 @@ def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(monkeypatch,
 
     assert ctx.config_path == _deployment_scoped_tapdb_config_path("bloom", "bloom")
     assert ctx.config_path.endswith("/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml")
+
+
+def test_tapdb_version_contract_defaults_match_shipped_templates():
+    settings = BloomSettings()
+
+    assert settings.tapdb.min_version == "4.1.1"
+    assert settings.tapdb.max_version_exclusive == "4.1.2"
+
+    root_template = Path("config/bloom-config-template.yaml").read_text(encoding="utf-8")
+    packaged_template = Path("bloom_lims/etc/bloom-config-template.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'min_version: "4.1.1"' in root_template
+    assert 'max_version_exclusive: "4.1.2"' in root_template
+    assert 'min_version: "4.1.1"' in packaged_template
+    assert 'max_version_exclusive: "4.1.2"' in packaged_template
