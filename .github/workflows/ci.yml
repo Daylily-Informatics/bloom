@@ -180,7 +180,7 @@ jobs:
       - name: Install bloom in editable mode
         shell: bash -el {0}
         run: |
-          pip install -e .
+          pip install -e '.[dev]'
 
       - name: Initialize local Bloom database
         shell: bash -el {0}

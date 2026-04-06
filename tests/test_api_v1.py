@@ -6,9 +6,10 @@ Tests for the REST API endpoints.
 
 import os
 import sys
-import pytest
-from unittest.mock import patch, MagicMock
 from types import SimpleNamespace
+from unittest.mock import patch
+
+import pytest
 
 # Set up auth bypass BEFORE importing FastAPI app
 # Uses the dev-only bypass (blocked when APP_ENV=production)
@@ -34,7 +35,7 @@ def _assert_items_do_not_expose_uuid(payload):
 
 class TestAPIRoot:
     """Tests for API root endpoints."""
-    
+
     def test_api_v1_info(self, client):
         """Test API v1 info endpoint."""
         response = client.get("/api/v1/")
@@ -59,9 +60,9 @@ class TestRetiredAPIRoutes:
         assert response.status_code == 404
 
 
-class TestObjectsAPI:
+class TestObjectsAPILegacyAliases:
     """Tests for /api/v1/objects endpoints."""
-    
+
     def test_list_objects(self, client):
         """Test listing objects."""
         response = client.get("/api/v1/objects/")
@@ -71,14 +72,14 @@ class TestObjectsAPI:
         assert "total" in data
         assert "page" in data
         _assert_items_do_not_expose_uuid(data)
-    
+
     def test_list_objects_with_filters(self, client):
         """Test listing objects with filters."""
         response = client.get("/api/v1/objects/?category=container&page_size=10")
         assert response.status_code == 200
         data = response.json()
         assert data["page_size"] == 10
-    
+
     def test_get_object_not_found(self, client):
         """Test getting non-existent object."""
         response = client.get("/api/v1/objects/NONEXISTENT_EUID")
@@ -87,7 +88,7 @@ class TestObjectsAPI:
 
 class TestContainersAPI:
     """Tests for /api/v1/containers endpoints."""
-    
+
     def test_list_containers(self, client):
         """Test listing containers."""
         response = client.get("/api/v1/containers/")
@@ -96,7 +97,7 @@ class TestContainersAPI:
         assert "items" in data
         assert "total" in data
         _assert_items_do_not_expose_uuid(data)
-    
+
     def test_get_container_not_found(self, client):
         """Test getting non-existent container."""
         response = client.get("/api/v1/containers/NONEXISTENT_EUID")
@@ -104,12 +105,17 @@ class TestContainersAPI:
 
     def test_put_container_accepts_metadata(self, client):
         """Test canonical PUT /containers update and metadata mapping."""
-        subtypes_resp = client.get("/api/v1/object-creation/subtypes?category=container&type=tube")
+        subtypes_resp = client.get(
+            "/api/v1/object-creation/subtypes?category=container&type=tube"
+        )
         assert subtypes_resp.status_code == 200
         subtypes = subtypes_resp.json().get("subtypes", [])
         assert subtypes
 
-        subtype = next((item for item in subtypes if item.get("name") == "tube-generic-10ml"), subtypes[0])
+        subtype = next(
+            (item for item in subtypes if item.get("name") == "tube-generic-10ml"),
+            subtypes[0],
+        )
         versions = subtype.get("versions", [])
         assert versions
         version = "1.0" if "1.0" in versions else versions[0]
@@ -145,7 +151,7 @@ class TestContainersAPI:
 
 class TestContentAPI:
     """Tests for /api/v1/content endpoints."""
-    
+
     def test_list_content(self, client):
         """Test listing content."""
         response = client.get("/api/v1/content/")
@@ -154,7 +160,7 @@ class TestContentAPI:
         assert "items" in data
         assert "total" in data
         _assert_items_do_not_expose_uuid(data)
-    
+
     def test_get_content_not_found(self, client):
         """Test getting non-existent content."""
         response = client.get("/api/v1/content/NONEXISTENT_EUID")
@@ -164,7 +170,7 @@ class TestContentAPI:
 @pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
 class TestWorkflowsAPI:
     """Tests for /api/v1/workflows endpoints."""
-    
+
     def test_list_workflows(self, client):
         """Test listing workflows."""
         response = client.get("/api/v1/workflows/")
@@ -173,7 +179,7 @@ class TestWorkflowsAPI:
         assert "items" in data
         assert "total" in data
         _assert_items_do_not_expose_uuid(data)
-    
+
     def test_get_workflow_not_found(self, client):
         """Test getting non-existent workflow."""
         response = client.get("/api/v1/workflows/NONEXISTENT_EUID")
@@ -189,12 +195,18 @@ class TestWorkflowsAPI:
             def commit(self):
                 self.committed = True
 
-        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+        fake_db = SimpleNamespace(
+            session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace())
+        )
         fake_workflow = SimpleNamespace(euid="WF_ADV", bstatus="in_progress")
 
         with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
-            with patch("bloom_lims.core.workflows.advance_workflow", return_value=fake_workflow):
-                response = client.post("/api/v1/workflows/WF_ADV/advance", json={"ok": True})
+            with patch(
+                "bloom_lims.core.workflows.advance_workflow", return_value=fake_workflow
+            ):
+                response = client.post(
+                    "/api/v1/workflows/WF_ADV/advance", json={"ok": True}
+                )
 
         assert response.status_code == 200
         payload = response.json()
@@ -220,17 +232,23 @@ class TestWorkflowsAPI:
                 self.user = (user_id, email)
 
             def create_instances(self, _template_euid):
-                wf = SimpleNamespace(euid="WF_NEW", name="new-workflow", bstatus="queued")
+                wf = SimpleNamespace(
+                    euid="WF_NEW", name="new-workflow", bstatus="queued"
+                )
                 return [[wf]]
 
             def track_user_interaction(self, *_args, **_kwargs):
                 return None
 
-        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+        fake_db = SimpleNamespace(
+            session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace())
+        )
 
         with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
             with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
-                response = client.post("/api/v1/workflows/?template_euid=TEMPLATE1&name=renamed")
+                response = client.post(
+                    "/api/v1/workflows/?template_euid=TEMPLATE1&name=renamed"
+                )
 
         assert response.status_code == 200
         payload = response.json()
@@ -265,11 +283,16 @@ class TestWorkflowsAPI:
             def track_user_interaction(self, *_args, **_kwargs):
                 return None
 
-        fake_db = SimpleNamespace(session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace()))
+        fake_db = SimpleNamespace(
+            session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace())
+        )
 
         with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
             with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
-                with patch("sqlalchemy.orm.attributes.flag_modified", lambda *_args, **_kwargs: None):
+                with patch(
+                    "sqlalchemy.orm.attributes.flag_modified",
+                    lambda *_args, **_kwargs: None,
+                ):
                     response = client.put(
                         "/api/v1/workflows/WF_UPD?name=after&status=completed",
                         json={"reviewed": True},
@@ -310,7 +333,9 @@ class TestWorkflowsAPI:
             def get_by_euid(self, _euid):
                 return SimpleNamespace(euid="WF_STEPS")
 
-        fake_db = SimpleNamespace(session=SimpleNamespace(), Base=SimpleNamespace(classes=SimpleNamespace()))
+        fake_db = SimpleNamespace(
+            session=SimpleNamespace(), Base=SimpleNamespace(classes=SimpleNamespace())
+        )
 
         with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
             with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
@@ -328,7 +353,7 @@ class TestWorkflowsAPI:
 
 class TestTemplatesAPI:
     """Tests for /api/v1/templates endpoints."""
-    
+
     def test_list_templates(self, client):
         """Test listing templates."""
         response = client.get("/api/v1/templates/")
@@ -337,7 +362,7 @@ class TestTemplatesAPI:
         assert "items" in data
         assert "total" in data
         _assert_items_do_not_expose_uuid(data)
-    
+
     def test_list_templates_by_category(self, client):
         """Test listing templates by category."""
         response = client.get("/api/v1/templates/by-category/container")
@@ -347,9 +372,9 @@ class TestTemplatesAPI:
         assert data["category"] == "container"
 
 
-class TestSubjectsAPI:
+class TestSubjectsAPILegacyAliases:
     """Tests for /api/v1/subjects endpoints."""
-    
+
     def test_list_subjects(self, client):
         """Test listing subjects."""
         response = client.get("/api/v1/subjects/")
@@ -358,7 +383,7 @@ class TestSubjectsAPI:
         assert "items" in data
         assert "total" in data
         _assert_items_do_not_expose_uuid(data)
-    
+
     def test_get_subject_not_found(self, client):
         """Test getting non-existent subject."""
         response = client.get("/api/v1/subjects/NONEXISTENT_EUID")
@@ -411,46 +436,32 @@ class TestStatsAPI:
 
 
 class TestSearchAPI:
-    """Tests for /api/v1/search endpoints."""
+    """Legacy /api/v1/search endpoints are retired."""
 
     def test_search_requires_query(self, client):
-        """Test search requires a query parameter."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/")
-        assert response.status_code == 422  # Validation error - missing required param
+        assert response.status_code == 404
 
     def test_search_with_query(self, client):
-        """Test search with a query returns results."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/?q=test")
-        assert response.status_code == 200
-        assert response.headers.get("deprecation") == "true"
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
-        assert "page" in data
-        assert "page_size" in data
+        assert response.status_code == 404
 
     def test_search_with_type_filter(self, client):
-        """Test search with type filter."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/?q=test&types=container,content")
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
+        assert response.status_code == 404
 
     def test_search_export_tsv(self, client):
-        """Test search export as TSV."""
+        """Legacy search export endpoint is removed."""
         response = client.get("/api/v1/search/export?q=test&format=tsv")
-        assert response.status_code == 200
-        # TSV should have content-disposition header
-        assert "text/tab-separated-values" in response.headers.get("content-type", "")
+        assert response.status_code == 404
 
     def test_search_export_json(self, client):
-        """Test search export as JSON."""
+        """Legacy search export endpoint is removed."""
         response = client.get("/api/v1/search/export?q=test&format=json")
-        assert response.status_code == 200
-        assert response.headers.get("deprecation") == "true"
-        assert "application/json" in response.headers.get("content-type", "")
-        data = response.json()
-        assert "items" in data
+        assert response.status_code == 404
 
 
 class TestSearchAPIV2:
@@ -517,8 +528,15 @@ class TestBulkContainerAPI:
     def test_bulk_create_with_empty_file(self, client):
         """Test bulk create with empty TSV file."""
         import io
+
         empty_tsv = "container_template_euid\tcontainer_type\tcontainer_name\n"
-        files = {"file": ("test.tsv", io.BytesIO(empty_tsv.encode()), "text/tab-separated-values")}
+        files = {
+            "file": (
+                "test.tsv",
+                io.BytesIO(empty_tsv.encode()),
+                "text/tab-separated-values",
+            )
+        }
         response = client.post("/api/v1/containers/bulk-create", files=files)
         assert response.status_code == 200
         data = response.json()
@@ -529,8 +547,15 @@ class TestBulkContainerAPI:
     def test_bulk_create_returns_correct_structure(self, client):
         """Test bulk create response has correct structure."""
         import io
+
         tsv_content = "container_template_euid\tcontainer_type\tcontainer_name\n"
-        files = {"file": ("test.tsv", io.BytesIO(tsv_content.encode()), "text/tab-separated-values")}
+        files = {
+            "file": (
+                "test.tsv",
+                io.BytesIO(tsv_content.encode()),
+                "text/tab-separated-values",
+            )
+        }
         response = client.post("/api/v1/containers/bulk-create", files=files)
         assert response.status_code == 200
         data = response.json()
@@ -643,8 +668,12 @@ class TestObjectCreationAPI:
         response = client.get("/api/v1/object-creation/categories")
         assert response.status_code == 200
         categories = response.json().get("categories", [])
-        display_names = [item.get("display_name", item.get("name", "")) for item in categories]
-        assert display_names == sorted(display_names, key=lambda value: str(value).casefold())
+        display_names = [
+            item.get("display_name", item.get("name", "")) for item in categories
+        ]
+        assert display_names == sorted(
+            display_names, key=lambda value: str(value).casefold()
+        )
 
     def test_get_types_for_category(self, client):
         """Test getting types for a category."""
@@ -663,7 +692,9 @@ class TestObjectCreationAPI:
 
     def test_get_subtypes(self, client):
         """Test getting subtypes."""
-        response = client.get("/api/v1/object-creation/subtypes?category=container&type=plate")
+        response = client.get(
+            "/api/v1/object-creation/subtypes?category=container&type=plate"
+        )
         assert response.status_code in [200, 404, 422]
 
 
@@ -678,13 +709,17 @@ class TestObjectCreationPathTraversal:
 
     def test_types_rejects_path_traversal_slash(self, client):
         """Test that /types rejects / in category."""
-        response = client.get("/api/v1/object-creation/types?category=container/../../etc")
+        response = client.get(
+            "/api/v1/object-creation/types?category=container/../../etc"
+        )
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
     def test_types_rejects_path_traversal_backslash(self, client):
         """Test that /types rejects \\ in category."""
-        response = client.get("/api/v1/object-creation/types?category=container\\..\\etc")
+        response = client.get(
+            "/api/v1/object-creation/types?category=container\\..\\etc"
+        )
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
@@ -696,7 +731,9 @@ class TestObjectCreationPathTraversal:
 
     def test_subtypes_rejects_path_traversal_type(self, client):
         """Test that /subtypes rejects .. in type."""
-        response = client.get("/api/v1/object-creation/subtypes?category=container&type=../../../etc/passwd")
+        response = client.get(
+            "/api/v1/object-creation/subtypes?category=container&type=../../../etc/passwd"
+        )
         assert response.status_code == 400
         assert "path separator" in response.json().get("detail", "").lower()
 
@@ -724,7 +761,9 @@ class TestObjectCreationPathTraversal:
 
     def test_subtypes_accepts_valid_params(self, client):
         """Test that /subtypes accepts valid parameter values."""
-        response = client.get("/api/v1/object-creation/subtypes?category=container&type=plate")
+        response = client.get(
+            "/api/v1/object-creation/subtypes?category=container&type=plate"
+        )
         # Should be 200 or 404, but NOT 400
         assert response.status_code in [200, 404]
 
@@ -797,7 +836,7 @@ class TestContainersAPIExtended:
         _assert_items_do_not_expose_uuid(data)
 
 
-class TestContentAPIExtended:
+class TestContentAPILegacyAliases:
     """Extended tests for content API endpoints."""
 
     def test_list_content_with_pagination(self, client):
@@ -852,30 +891,27 @@ class TestBatchAPIExtended:
 
 
 class TestSearchAPIExtended:
-    """Extended tests for search API endpoints."""
+    """Legacy search endpoints remain retired."""
 
     def test_search_empty_query(self, client):
-        """Test search with empty query returns error."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/?q=")
-        # Should return 422 for validation error
-        assert response.status_code in [200, 422]
+        assert response.status_code == 404
 
     def test_search_with_type_filter_content(self, client):
-        """Test search filtering by content type."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/?q=test&types=content")
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data or "results" in data or isinstance(data, list)
+        assert response.status_code == 404
 
     def test_search_with_multiple_types(self, client):
-        """Test search filtering by multiple types."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/?q=sample&types=container,content")
-        assert response.status_code == 200
+        assert response.status_code == 404
 
     def test_search_pagination(self, client):
-        """Test search with pagination."""
+        """Legacy search endpoint is removed."""
         response = client.get("/api/v1/search/?q=test&page=1&page_size=5")
-        assert response.status_code == 200
+        assert response.status_code == 404
 
 
 class TestFileSetsAPIExtended:
@@ -1029,7 +1065,9 @@ class TestWorkflowsAPIDeep:
 
     def test_workflow_steps_by_invalid_uuid(self, client):
         """Test getting workflow steps for invalid UUID."""
-        response = client.get("/api/v1/workflows/00000000-0000-0000-0000-000000000000/steps")
+        response = client.get(
+            "/api/v1/workflows/00000000-0000-0000-0000-000000000000/steps"
+        )
         assert response.status_code in [404, 422, 500]
 
 
@@ -1103,7 +1141,9 @@ class TestContainersAPIDeep:
 
     def test_container_children(self, client):
         """Test getting container children."""
-        response = client.get("/api/v1/containers/00000000-0000-0000-0000-000000000000/children")
+        response = client.get(
+            "/api/v1/containers/00000000-0000-0000-0000-000000000000/children"
+        )
         assert response.status_code in [404, 422, 500]
 
 
@@ -1160,7 +1200,7 @@ class TestSubjectsAPI:
         assert response.status_code in [404, 405, 422, 500]
 
 
-class TestContentAPI:
+class TestContentAPIExtended:
     """Tests for content API endpoints."""
 
     def test_list_content(self, client):
@@ -1177,7 +1217,7 @@ class TestContentAPI:
         assert response.status_code in [404, 405, 422, 500]
 
 
-class TestFilesAPI:
+class TestFilesAPILegacyAliases:
     """Tests for files API endpoints."""
 
     def test_list_files(self, client):
@@ -1195,7 +1235,7 @@ class TestFilesAPI:
 
 
 @pytest.mark.skip(reason="Workflow APIs are retired in queue-centric Bloom beta.")
-class TestWorkflowsAPIDeep:
+class TestWorkflowsAPILegacyDeep:
     """Extended tests for workflows API."""
 
     def test_list_workflows(self, client):
@@ -1235,11 +1275,13 @@ class TestDependenciesModule:
     def test_import_dependencies(self):
         """Test dependencies module import."""
         from bloom_lims.api.v1 import dependencies
+
         assert dependencies is not None
 
     def test_import_api_user(self):
         """Test APIUser class import."""
         from bloom_lims.api.v1.dependencies import APIUser
+
         assert APIUser is not None
 
 
@@ -1249,6 +1291,7 @@ class TestVersioningModule:
     def test_import_versioning(self):
         """Test versioning module import."""
         from bloom_lims.api import versioning
+
         assert versioning is not None
 
 
@@ -1401,7 +1444,9 @@ class TestAsyncTasks:
 
     def test_task_cancel(self, client):
         """Test task cancel endpoint."""
-        response = client.post("/api/v1/tasks/00000000-0000-0000-0000-000000000000/cancel")
+        response = client.post(
+            "/api/v1/tasks/00000000-0000-0000-0000-000000000000/cancel"
+        )
         assert response.status_code in [200, 400, 404, 422, 500]
 
 
@@ -1457,7 +1502,7 @@ class TestWorksetsAPI:
             json={
                 "anchor_euid": "WSX1",  # Use a likely existing workflow step
                 "workset_type": "accession",
-            }
+            },
         )
         # Should return 200 with success structure or 400/500 on error
         assert response.status_code in [200, 400, 500]
@@ -1471,7 +1516,7 @@ class TestWorksetsAPI:
         """Test adding members to non-existent workset."""
         response = client.post(
             "/api/v1/worksets/ZZZZZ_DOES_NOT_EXIST_99999/members",
-            json={"member_euids": ["CX1", "CX2"]}
+            json={"member_euids": ["CX1", "CX2"]},
         )
         assert response.status_code == 404
 
@@ -1484,7 +1529,7 @@ class TestWorksetsAPI:
         """Test completing non-existent workset."""
         response = client.put(
             "/api/v1/worksets/ZZZZZ_DOES_NOT_EXIST_99999/complete",
-            json={"status": "complete"}
+            json={"status": "complete"},
         )
         assert response.status_code == 404
 
@@ -1492,6 +1537,7 @@ class TestWorksetsAPI:
         """Test finding workset by anchor returns expected structure."""
         # Use a unique anchor that likely doesn't have a workset
         import secrets
+
         unique_anchor = f"TEST_ANCHOR_{secrets.token_hex(4)}"
         response = client.get(f"/api/v1/worksets/by-anchor/{unique_anchor}")
         # Should return 404 for non-existent anchor, or 200 with workset info
@@ -1522,7 +1568,9 @@ class TestTrackingAPI:
                     }
                 ]
 
-        with patch("bloom_lims.api.v1.tracking._get_fedex_tracker", return_value=TrackerNew()):
+        with patch(
+            "bloom_lims.api.v1.tracking._get_fedex_tracker", return_value=TrackerNew()
+        ):
             response = client.get("/api/v1/tracking/track/123456789?carrier=FedEx")
 
         assert response.status_code == 200
@@ -1549,7 +1597,10 @@ class TestTrackingAPI:
                     }
                 ]
 
-        with patch("bloom_lims.api.v1.tracking._get_fedex_tracker", return_value=TrackerLegacy()):
+        with patch(
+            "bloom_lims.api.v1.tracking._get_fedex_tracker",
+            return_value=TrackerLegacy(),
+        ):
             response = client.get("/api/v1/tracking/track/987654321?carrier=FedEx")
 
         assert response.status_code == 200

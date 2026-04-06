@@ -56,6 +56,11 @@ def _opaque(prefix: str) -> str:
     return f"{prefix}-{secrets.token_hex(8)}"
 
 
+def _assert_domain_scoped_euid(euid: str, legacy_prefix: str) -> None:
+    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "B").strip() or "B"
+    assert euid.startswith(f"{domain_code}:{legacy_prefix}")
+
+
 def _props(instance) -> dict:
     payload = instance.json_addl or {}
     props = payload.get("properties") if isinstance(payload, dict) else {}
@@ -80,7 +85,10 @@ def _clear_current_queue(bdb, euid: str) -> None:
 
 
 def test_action_key_slug_normalization():
-    assert _normalize_action_slug("/workflow/step/set-object-status/") == "set_object_status"
+    assert (
+        _normalize_action_slug("/workflow/step/set-object-status/")
+        == "set_object_status"
+    )
     assert _normalize_action_slug("custom-action") == "custom_action"
     assert _normalize_action_slug("") == ""
 
@@ -206,9 +214,15 @@ def test_bloom_dispatcher_updates_nested_action_groups(monkeypatch):
             }
         }
     )
-    monkeypatch.setattr("bloom_lims.core.tapdb_action_dispatcher.flag_modified", lambda *_: None)
-    dispatcher._update_action_tracking(instance, "state", "/set-status/", {"status": "success"})
-    action_entry = instance.json_addl["action_groups"]["state"]["actions"]["/set-status/"]
+    monkeypatch.setattr(
+        "bloom_lims.core.tapdb_action_dispatcher.flag_modified", lambda *_: None
+    )
+    dispatcher._update_action_tracking(
+        instance, "state", "/set-status/", {"status": "success"}
+    )
+    action_entry = instance.json_addl["action_groups"]["state"]["actions"][
+        "/set-status/"
+    ]
     assert action_entry["action_executed"] == "1"
     assert len(action_entry["executed_datetime"]) == 1
 
@@ -271,7 +285,9 @@ def test_action_required_field_extraction_and_missing_detection():
     )
     assert ui_required == ["status"]
 
-    assert action_exec._missing_required_fields({"status": ""}, ["status"]) == ["status"]
+    assert action_exec._missing_required_fields({"status": ""}, ["status"]) == [
+        "status"
+    ]
     assert action_exec._missing_required_fields({"status": "ready"}, ["status"]) == []
 
 
@@ -293,7 +309,9 @@ def test_action_safe_get_by_euid_raises_unexpected_errors():
 
 
 def test_action_required_field_extractors_handle_non_schema():
-    assert action_exec._extract_required_fields_from_ui_schema({"ui_schema": None}) == []
+    assert (
+        action_exec._extract_required_fields_from_ui_schema({"ui_schema": None}) == []
+    )
 
 
 def test_action_missing_required_handles_collections():
@@ -307,7 +325,9 @@ def test_action_missing_required_handles_collections():
 def test_action_definition_resolution_errors():
     instance = SimpleNamespace(
         euid="OB3",
-        json_addl={"action_groups": {"state": {"actions": {"go": {"captured_data": {}}}}}},
+        json_addl={
+            "action_groups": {"state": {"actions": {"go": {"captured_data": {}}}}}
+        },
     )
 
     with pytest.raises(action_exec.ActionExecutionError) as missing_group:
@@ -396,14 +416,21 @@ def test_action_execute_success_and_not_found(monkeypatch):
         action_exec,
         "_resolve_action_definition",
         lambda *args, **kwargs: (
-            {"action_template_uid": str(uuid.uuid4()), "captured_data": {}, "ui_schema": {"fields": []}},
+            {
+                "action_template_uid": str(uuid.uuid4()),
+                "captured_data": {},
+                "ui_schema": {"fields": []},
+            },
             "/set-status/",
         ),
     )
     monkeypatch.setattr(
         action_exec,
         "_build_action_ds",
-        lambda *_args, **_kwargs: {"action_template_uid": str(uuid.uuid4()), "captured_data": {}},
+        lambda *_args, **_kwargs: {
+            "action_template_uid": str(uuid.uuid4()),
+            "captured_data": {},
+        },
     )
 
     class _Executor:
@@ -492,7 +519,10 @@ def test_action_execute_missing_required_fields_and_message_fallback(monkeypatch
     monkeypatch.setattr(
         action_exec,
         "_build_action_ds",
-        lambda *_args, **_kwargs: {"action_template_uid": str(uuid.uuid4()), "captured_data": {}},
+        lambda *_args, **_kwargs: {
+            "action_template_uid": str(uuid.uuid4()),
+            "captured_data": {},
+        },
     )
 
     class _Executor:
@@ -565,7 +595,9 @@ def test_action_execute_success_with_real_dispatcher_non_dict_result(monkeypatch
         def set_actor_context(self, **_kwargs):
             return None
 
-        def do_action_set_object_status(self, euid, _action_ds, _action_group, _raw_key):
+        def do_action_set_object_status(
+            self, euid, _action_ds, _action_group, _raw_key
+        ):
             return SimpleNamespace(euid=euid)
 
     created_records = []
@@ -615,11 +647,15 @@ def test_action_map_exception_variants():
     assert mapped_validation.status_code == 400
     assert mapped_validation.error_fields == ["status"]
 
-    mapped_ref = action_exec._map_exception(Exception("No instance refs were provided for action"))
+    mapped_ref = action_exec._map_exception(
+        Exception("No instance refs were provided for action")
+    )
     assert mapped_ref.status_code == 400
     assert mapped_ref.error_fields == ["instance_refs"]
 
-    mapped_missing_field = action_exec._map_exception(Exception("Missing required field: alpha"))
+    mapped_missing_field = action_exec._map_exception(
+        Exception("Missing required field: alpha")
+    )
     assert mapped_missing_field.status_code == 400
     assert mapped_missing_field.error_fields == ["alpha"]
 
@@ -645,7 +681,9 @@ def test_action_resolve_executor_returns_bloom_obj(monkeypatch):
     monkeypatch.setattr(action_exec, "BloomObj", _Obj)
 
     fake_bdb = object()
-    obj_exec = action_exec._resolve_executor(SimpleNamespace(category="container"), fake_bdb)
+    obj_exec = action_exec._resolve_executor(
+        SimpleNamespace(category="container"), fake_bdb
+    )
 
     assert isinstance(obj_exec, _Obj)
 
@@ -770,7 +808,9 @@ def test_beta_flow_records_modern_action_instances(bdb):
                 "well_name": "A1",
                 "extraction_type": "cfdna",
                 "output_name": "beta-action-output",
-                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][
+                    0
+                ]["atlas_test_fulfillment_item_euid"],
             },
         )
         assert extraction.status_code == 200, extraction.text
@@ -799,7 +839,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
         assert library_prep.status_code == 200, library_prep.text
         lib_output_euid = library_prep.json()["library_prep_output_euid"]
         library_material_euid = library_prep.json()["library_material_euid"]
-        assert library_material_euid.startswith("BCT-")
+        _assert_domain_scoped_euid(library_material_euid, "BCT-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
@@ -838,7 +878,9 @@ def test_beta_flow_records_modern_action_instances(bdb):
     subtypes = {
         row.subtype
         for row in bdb.session.query(action_instance)
-        .filter(action_instance.type == "beta_lab", action_instance.is_deleted.is_(False))
+        .filter(
+            action_instance.type == "beta_lab", action_instance.is_deleted.is_(False)
+        )
         .all()
     }
     assert {
@@ -952,7 +994,9 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
                 "plate_name": "beta-graph-plate",
                 "well_name": "A1",
                 "extraction_type": "gdna",
-                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
+                "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][
+                    0
+                ]["atlas_test_fulfillment_item_euid"],
             },
         )
         assert extraction.status_code == 200, extraction.text
@@ -1039,7 +1083,9 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
     finally:
         service.close()
 
-    qc_worker = workers["worker://bloom/service/beta-modern-actions@example.com/post_extract_qc"]
+    qc_worker = workers[
+        "worker://bloom/service/beta-modern-actions@example.com/post_extract_qc"
+    ]
     ont_lib_prep_worker = workers[
         "worker://bloom/service/beta-modern-actions@example.com/ont_lib_prep"
     ]

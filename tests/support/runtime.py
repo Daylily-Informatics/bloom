@@ -164,16 +164,16 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     from bloom_lims.cli import db as db_commands
 
     try:
-        db_commands.db_init(force=False)
+        db_commands.db_build(force=False)
     except SystemExit as exc:
-        raise RuntimeError(f"`bloom db init` exited with status {exc.code}") from exc
+        raise RuntimeError(f"`bloom db build` exited with status {exc.code}") from exc
     except Exception as exc:
-        raise RuntimeError(f"`bloom db init` failed: {exc}") from exc
+        raise RuntimeError(f"`bloom db build` failed: {exc}") from exc
 
     if not tapdb_local_available(env_name=env_name):
         raise RuntimeError(
-            "Local TapDB is still unavailable after `bloom db init`. "
-            "Fix the runtime and retry `source ./activate <deploy-name> && bloom db init`."
+            "Local TapDB is still unavailable after `bloom db build`. "
+            "Fix the runtime and retry `source ./activate <deploy-name> && bloom db build`."
         )
 
     return True

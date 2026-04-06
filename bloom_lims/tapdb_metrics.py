@@ -11,6 +11,7 @@ avoid impacting request latency.
 
 from __future__ import annotations
 
+import os
 import queue
 import re
 import sys
@@ -22,12 +23,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
+from daylily_tapdb.cli.db_config import get_admin_settings_for_env
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 from bloom_lims.config import apply_runtime_environment, get_settings
-from daylily_tapdb.cli.db_config import get_admin_settings_for_env
-
 
 request_path_var: ContextVar[str] = ContextVar("tapdb_request_path", default="")
 request_method_var: ContextVar[str] = ContextVar("tapdb_request_method", default="")
@@ -58,7 +58,9 @@ def _parse_bool(value: object, *, default: bool) -> bool:
     return default
 
 
-def _resolved_bloom_runtime(env_name: str | None = None) -> tuple[str, Path, dict[str, object]]:
+def _resolved_bloom_runtime(
+    env_name: str | None = None,
+) -> tuple[str, Path, dict[str, object]]:
     ctx = apply_runtime_environment(get_settings())
     resolved_env = str(env_name or ctx.env).strip().lower() or ctx.env
     config_path = Path(ctx.config_path).expanduser().resolve()
@@ -67,7 +69,6 @@ def _resolved_bloom_runtime(env_name: str | None = None) -> tuple[str, Path, dic
         config_path=config_path,
         client_id=ctx.client_id,
         database_name=ctx.database_name,
-        allow_namespace_fallback=False,
     )
     return resolved_env, config_path, admin_settings
 
@@ -133,7 +134,9 @@ def two_week_period_start_utc(now_utc: datetime) -> datetime:
     iso_year, iso_week, _iso_weekday = now_utc.isocalendar()
     start_week = iso_week - ((iso_week - 1) % 2)
     start_date = datetime.fromisocalendar(iso_year, start_week, 1).date()
-    return datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
+    return datetime(
+        start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc
+    )
 
 
 def current_metrics_path(
@@ -286,14 +289,18 @@ def maybe_install_engine_metrics(engine: Engine, *, env_name: str) -> None:
     if writer is None:
         return
 
-    def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def _before_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ):
         _ = parameters, context, executemany
         start = time.perf_counter()
         op = _extract_op(statement)
         table_hint = _extract_table_hint(statement, op)
         conn.info.setdefault("_tapdb_metrics", {})[id(cursor)] = (start, op, table_hint)
 
-    def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def _after_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ):
         _ = statement, parameters, context, executemany
         start, op, table_hint = conn.info.get("_tapdb_metrics", {}).pop(
             id(cursor), (None, "OTHER", "")
@@ -325,7 +332,9 @@ def maybe_install_engine_metrics(engine: Engine, *, env_name: str) -> None:
         start, op, table_hint = conn.info.get("_tapdb_metrics", {}).pop(
             id(cursor), (None, "OTHER", "")
         )
-        duration_ms = (time.perf_counter() - start) * 1000.0 if start is not None else 0.0
+        duration_ms = (
+            (time.perf_counter() - start) * 1000.0 if start is not None else 0.0
+        )
         err = getattr(exception_context, "original_exception", None)
         error_type = err.__class__.__name__ if err is not None else "Error"
         writer.enqueue(
