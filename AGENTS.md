@@ -24,7 +24,7 @@ source ./activate <deploy-name>
 ## Bloom Examples
 
 - Start with `source ./activate <deploy-name>`
-- Use `bloom db init`
+- Use `bloom db build`
 - Use `bloom db seed`
 - Use `bloom server start --port 8912`
 - Use `tapdb ...` and `daycog ...` only where Bloom docs or Bloom CLI explicitly delegate to them
