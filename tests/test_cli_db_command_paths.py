@@ -28,7 +28,17 @@ def cli_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
 def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(db_commands, "_tapdb_base_cmd", lambda: ["tapdb"])
-    monkeypatch.setattr(db_commands, "_runtime_env", lambda: {})
+    monkeypatch.setattr(
+        db_commands,
+        "_runtime_env",
+        lambda: {
+            "AWS_PROFILE": "lsmc",
+            "AWS_REGION": "us-west-2",
+            "AWS_DEFAULT_REGION": "us-west-2",
+            "MERIDIAN_DOMAIN_CODE": "B",
+            "TAPDB_APP_CODE": "B",
+        },
+    )
     monkeypatch.setattr(
         db_commands,
         "apply_runtime_environment",
@@ -37,16 +47,20 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
             env="dev",
         ),
     )
-    monkeypatch.setattr(
-        db_commands.subprocess,
-        "run",
-        lambda *_args, **_kwargs: SimpleNamespace(returncode=7),
-    )
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_run(cmd, env=None, **_kwargs):
+        captured["env"] = env
+        return SimpleNamespace(returncode=7)
+
+    monkeypatch.setattr(db_commands.subprocess, "run", fake_run)
 
     with pytest.raises(SystemExit) as exc:
         db_commands._run_tapdb(["db", "setup"], check=True)
 
     assert exc.value.code == 7
+    assert captured["env"]["MERIDIAN_DOMAIN_CODE"] == "B"
+    assert captured["env"]["TAPDB_APP_CODE"] == "B"
 
 
 def test_run_tapdb_returns_nonzero_when_check_false(monkeypatch: pytest.MonkeyPatch) -> None:

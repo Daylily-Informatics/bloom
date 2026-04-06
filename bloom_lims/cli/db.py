@@ -32,6 +32,8 @@ _DEFAULT_AUDIT_LOG_EUID_PREFIX = "BGX"
 _DEFAULT_TAPDB_CLIENT_ID = "bloom"
 _DEFAULT_TAPDB_DATABASE_NAME = "bloom"
 _DEFAULT_TAPDB_EUID_CLIENT_CODE = "B"
+_DEFAULT_MERIDIAN_DOMAIN_CODE = "B"
+_DEFAULT_TAPDB_APP_CODE = "B"
 
 
 def _bloom_root() -> Path:
@@ -108,6 +110,10 @@ def _runtime_env() -> dict[str, str]:
     env["AWS_PROFILE"] = ctx.aws_profile
     env["AWS_REGION"] = ctx.aws_region
     env["AWS_DEFAULT_REGION"] = ctx.aws_region
+    env["MERIDIAN_DOMAIN_CODE"] = os.environ.get(
+        "MERIDIAN_DOMAIN_CODE", _DEFAULT_MERIDIAN_DOMAIN_CODE
+    )
+    env["TAPDB_APP_CODE"] = os.environ.get("TAPDB_APP_CODE", _DEFAULT_TAPDB_APP_CODE)
     return env
 
 
