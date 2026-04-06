@@ -214,7 +214,7 @@ def start(
         for err in preflight_errors:
             console.print(f"   • {err}")
         console.print(
-            "\n   Fix your config ([cyan]bloom config edit[/cyan]) or run [cyan]bloom db init[/cyan]."
+            "\n   Fix your config ([cyan]bloom config edit[/cyan]) or run [cyan]bloom db build[/cyan]."
         )
         raise typer.Exit(1)
 

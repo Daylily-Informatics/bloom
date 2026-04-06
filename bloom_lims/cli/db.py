@@ -235,11 +235,11 @@ def _seed_tapdb_templates(
     _run_tapdb(args)
 
 
-@db_app.command("init")
-def db_init(
+@db_app.command("build")
+def db_build(
     force: bool = typer.Option(False, "--force", "-f", help="Force re-initialization"),
 ) -> None:
-    """Initialize database/runtime via tapdb orchestration."""
+    """Build database/runtime via tapdb orchestration."""
     env_name = _current_env()
     console.print(
         f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]"
