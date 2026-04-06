@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -48,7 +49,6 @@ class DeweyArtifactClient:
         metadata: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> str:
-        url = f"{_require_https_url(self.base_url, field_name='Dewey base URL')}/api/v1/artifacts/import"
         payload = {
             "artifact_type": str(artifact_type or "").strip(),
             "storage_uri": str(storage_uri or "").strip(),
@@ -58,16 +58,36 @@ class DeweyArtifactClient:
             raise DeweyClientError("artifact_type is required")
         if not payload["storage_uri"]:
             raise DeweyClientError("storage_uri is required")
+        parsed = urlparse(payload["storage_uri"])
+        if str(parsed.scheme or "").strip().lower() != "s3":
+            raise DeweyClientError("storage_uri must use an s3:// URL")
+        bucket = str(parsed.netloc or "").strip()
+        key = str(parsed.path or "").lstrip("/")
+        if not bucket or not key:
+            raise DeweyClientError("storage_uri must include both bucket and key")
 
         headers = self._headers()
         clean_idempotency = str(idempotency_key or "").strip()
         if clean_idempotency:
             headers["Idempotency-Key"] = clean_idempotency
+        request_payload = {
+            "artifact_type": payload["artifact_type"],
+            "storage_backend": "s3",
+            "bucket": bucket,
+            "key": key,
+            "producer_system": str((payload["metadata"] or {}).get("producer_system") or "").strip()
+            or None,
+            "producer_object_euid": str(
+                (payload["metadata"] or {}).get("producer_object_euid") or ""
+            ).strip()
+            or None,
+            "metadata": payload["metadata"],
+        }
 
         try:
             response = requests.post(
-                url,
-                json=payload,
+                f"{_require_https_url(self.base_url, field_name='Dewey base URL')}/api/v1/artifacts",
+                json=request_payload,
                 headers=headers,
                 timeout=max(1, int(self.timeout_seconds)),
                 verify=self.verify_ssl,

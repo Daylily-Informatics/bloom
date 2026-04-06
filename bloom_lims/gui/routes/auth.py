@@ -32,6 +32,7 @@ from bloom_lims.gui.web_session import (
     load_bloom_user_data,
     store_bloom_session,
 )
+from bloom_lims.config import get_settings
 
 router = APIRouter()
 

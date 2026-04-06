@@ -90,6 +90,7 @@ function createFieldInput(field, options) {
   input.name = String(field.name || "").trim();
   input.required = !!field.required;
   input.className = "action-field-input";
+  input.setAttribute("data-testid", `action-field-${sanitizeIdSegment(input.name)}`);
   if (type !== "file" && field.default !== undefined && field.default !== null) {
     input.value = String(field.default);
   }
@@ -210,6 +211,7 @@ async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName
 
   const formContainer = document.createElement("div");
   formContainer.id = uniqueFormId;
+  formContainer.setAttribute("data-testid", `action-form-${sanitizeIdSegment(actionGroup)}-${sanitizeIdSegment(actionName)}`);
   formContainer.style.display = "block";
   formContainer.style.marginTop = "0.75rem";
   formContainer.style.padding = "0.75rem";
@@ -241,6 +243,7 @@ async function showCapturedDataForm(button, actionDataJson, stepEuid, actionName
   submit.type = "submit";
   submit.className = "action-submit-btn";
   submit.textContent = "Submit";
+  submit.setAttribute("data-testid", `action-submit-${sanitizeIdSegment(actionGroup)}-${sanitizeIdSegment(actionName)}`);
   form.appendChild(submit);
 
   form.addEventListener("submit", async (evt) => {

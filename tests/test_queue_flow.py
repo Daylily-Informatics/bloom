@@ -596,3 +596,26 @@ def test_metadata_normalization_and_execution_lineage_validation():
         assert ("beta_used_reagent", reagent_euid) in lineage_targets
     finally:
         bdb.close()
+
+
+def test_external_specimen_lookup_finds_queue_ready_material_by_container_refs():
+    app.dependency_overrides[require_external_token_auth] = _external_rw_user
+
+    with TestClient(app) as client:
+        material, atlas_context = _create_material_and_queue(client)
+        lookup = client.get(
+            "/api/v1/external/specimens/by-reference",
+            params={
+                "atlas_tenant_id": atlas_context["atlas_tenant_id"],
+                "atlas_trf_euid": atlas_context["atlas_trf_euid"],
+                "atlas_test_euid": atlas_context["atlas_test_euid"],
+            },
+        )
+        assert lookup.status_code == 200, lookup.text
+        payload = lookup.json()
+        assert payload["total"] >= 1
+        assert any(
+            item["specimen_euid"] == material["specimen_euid"]
+            and item["container_euid"] == material["container_euid"]
+            for item in payload["items"]
+        )

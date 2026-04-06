@@ -226,6 +226,7 @@
       <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
         {% for action_key, action_value in group_value.actions.items() %}
         <button class="btn btn-outline btn-sm action-button"
+          data-testid="action-button-{{ group_key|replace('/', '-')|replace('_', '-') }}-{{ action_key|replace('/', '-')|replace('_', '-') }}"
           data-action-json="{{ action_value | tojson | e }}"
           data-euid="{{ obj.euid }}"
           data-action-name="{{ action_key }}"

@@ -33,14 +33,65 @@ class ExternalSpecimenService:
         "atlas_trf_euid",
         "atlas_test_euid",
     )
+    _REFERENCE_QUERY_SPECS: dict[str, dict[str, Any]] = {
+        "trf_euid": {
+            "reference_types": ("trf_euid",),
+            "value_field": "reference_value",
+        },
+        "patient_id": {
+            "reference_types": ("patient_id",),
+            "value_field": "reference_value",
+        },
+        "shipment_number": {
+            "reference_types": ("shipment_number",),
+            "value_field": "reference_value",
+        },
+        "kit_barcode": {
+            "reference_types": ("kit_barcode",),
+            "value_field": "reference_value",
+        },
+        "atlas_tenant_id": {
+            "reference_types": None,
+            "value_field": "atlas_tenant_id",
+        },
+        "atlas_trf_euid": {
+            "reference_types": ("atlas_trf_euid", "atlas_trf"),
+            "value_field": "atlas_trf_euid",
+        },
+        "atlas_test_euid": {
+            "reference_types": ("atlas_test_euid", "atlas_test"),
+            "value_field": "atlas_test_euid",
+        },
+    }
+    _REFERENCE_RESPONSE_NORMALIZATION: dict[str, tuple[str, str]] = {
+        "atlas_trf": ("atlas_trf_euid", "atlas_trf_euid"),
+        "atlas_test": ("atlas_test_euid", "atlas_test_euid"),
+        "atlas_patient": ("atlas_patient_euid", "atlas_patient_euid"),
+        "atlas_testkit": ("atlas_testkit_euid", "atlas_testkit_euid"),
+        "atlas_shipment": ("atlas_shipment_euid", "atlas_shipment_euid"),
+        "atlas_organization_site": (
+            "atlas_organization_site_euid",
+            "atlas_organization_site_euid",
+        ),
+        "atlas_collection_event": (
+            "atlas_collection_event_euid",
+            "atlas_collection_event_euid",
+        ),
+    }
 
     def __init__(self, *, app_username: str):
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
-        self.atlas = AtlasService()
+        self._atlas: AtlasService | None = None
 
     def close(self) -> None:
         self.bdb.close()
+
+    @property
+    def atlas(self) -> AtlasService:
+        if self._atlas is None:
+            self._atlas = AtlasService()
+        return self._atlas
 
     def create_specimen(
         self,
@@ -184,11 +235,15 @@ class ExternalSpecimenService:
         if not matching_parent_uids:
             return []
 
+        specimen_uids = self._expand_parent_uids_to_specimen_uids(matching_parent_uids)
+        if not specimen_uids:
+            return []
+
         rows = (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
                 self.bdb.Base.classes.generic_instance.uid.in_(
-                    sorted(matching_parent_uids)
+                    sorted(specimen_uids)
                 ),
                 self.bdb.Base.classes.generic_instance.category == "content",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -477,7 +532,78 @@ class ExternalSpecimenService:
 
     def _atlas_refs_for_specimen(self, specimen) -> dict[str, str]:
         refs: dict[str, str] = {}
-        for lineage in get_parent_lineages(specimen):
+        for payload in self._reachable_atlas_reference_payloads(specimen):
+            key, value = self._normalize_reference_payload(payload)
+            if key and value:
+                refs[key] = value
+        return refs
+
+    def _expand_parent_uids_to_specimen_uids(self, parent_uids: set[int]) -> set[int]:
+        if not parent_uids:
+            return set()
+
+        instance_cls = self.bdb.Base.classes.generic_instance
+        lineage_cls = self.bdb.Base.classes.generic_instance_lineage
+        specimen_uids = {
+            uid
+            for (uid,) in (
+                self.bdb.session.query(instance_cls.uid)
+                .filter(
+                    instance_cls.uid.in_(sorted(parent_uids)),
+                    instance_cls.is_deleted.is_(False),
+                    instance_cls.category == "content",
+                )
+                .all()
+            )
+            if uid is not None
+        }
+        specimen_uids.update(
+            child_uid
+            for (child_uid,) in (
+                self.bdb.session.query(lineage_cls.child_instance_uid)
+                .join(instance_cls, lineage_cls.child_instance_uid == instance_cls.uid)
+                .filter(
+                    lineage_cls.is_deleted.is_(False),
+                    lineage_cls.parent_instance_uid.in_(sorted(parent_uids)),
+                    lineage_cls.relationship_type == "contains",
+                    instance_cls.is_deleted.is_(False),
+                    instance_cls.category == "content",
+                )
+                .all()
+            )
+            if child_uid is not None
+        )
+        return specimen_uids
+
+    def _reachable_atlas_reference_payloads(self, specimen) -> list[dict[str, Any]]:
+        payloads: dict[tuple[str, str], dict[str, Any]] = {}
+        visited: set[int | None] = set()
+        to_visit = [specimen]
+        while to_visit:
+            current = to_visit.pop(0)
+            current_uid = getattr(current, "uid", None)
+            if current_uid in visited:
+                continue
+            visited.add(current_uid)
+            for payload in self._atlas_reference_payloads_for_instance(current):
+                ref_key = (
+                    str(payload.get("reference_type") or "").strip(),
+                    str(payload.get("reference_value") or "").strip(),
+                )
+                if ref_key[0] and ref_key[1]:
+                    payloads[ref_key] = payload
+            for lineage in get_child_lineages(current):
+                if lineage.is_deleted:
+                    continue
+                parent = lineage.parent_instance
+                if parent is None or parent.is_deleted:
+                    continue
+                to_visit.append(parent)
+        return list(payloads.values())
+
+    def _atlas_reference_payloads_for_instance(self, instance) -> list[dict[str, Any]]:
+        payloads: list[dict[str, Any]] = []
+        for lineage in get_parent_lineages(instance):
             if lineage.is_deleted:
                 continue
             if lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP:
@@ -494,11 +620,8 @@ class ExternalSpecimenService:
             payload = self._props(external_ref)
             if str(payload.get("provider") or "").strip() != "atlas":
                 continue
-            key = str(payload.get("reference_type") or "").strip()
-            value = str(payload.get("reference_value") or "").strip()
-            if key and value:
-                refs[key] = value
-        return refs
+            payloads.append(payload)
+        return payloads
 
     def _find_parent_uids_for_reference(
         self,
@@ -506,34 +629,49 @@ class ExternalSpecimenService:
         reference_type: str,
         reference_value: str,
     ) -> set[int]:
+        spec = self._REFERENCE_QUERY_SPECS.get(str(reference_type).strip())
+        if spec is None:
+            return set()
+
         lineage_cls = self.bdb.Base.classes.generic_instance_lineage
         instance_cls = self.bdb.Base.classes.generic_instance
-        rows = (
-            self.bdb.session.query(lineage_cls.parent_instance_uid)
-            .join(instance_cls, lineage_cls.child_instance_uid == instance_cls.uid)
-            .filter(
-                lineage_cls.is_deleted.is_(False),
-                lineage_cls.relationship_type == self.EXTERNAL_REFERENCE_RELATIONSHIP,
-                instance_cls.is_deleted.is_(False),
-                instance_cls.category == "generic",
-                instance_cls.type == "generic",
-                instance_cls.subtype == "external_object_link",
-                func.jsonb_extract_path_text(
-                    instance_cls.json_addl["properties"], "provider"
-                )
-                == "atlas",
+        filters = [
+            lineage_cls.is_deleted.is_(False),
+            lineage_cls.relationship_type == self.EXTERNAL_REFERENCE_RELATIONSHIP,
+            instance_cls.is_deleted.is_(False),
+            instance_cls.category == "generic",
+            instance_cls.type == "generic",
+            instance_cls.subtype == "external_object_link",
+            func.jsonb_extract_path_text(
+                instance_cls.json_addl["properties"], "provider"
+            )
+            == "atlas",
+            func.jsonb_extract_path_text(
+                instance_cls.json_addl["properties"], str(spec["value_field"])
+            )
+            == str(reference_value).strip(),
+        ]
+        reference_types = spec.get("reference_types")
+        query = self.bdb.session.query(lineage_cls.parent_instance_uid).join(
+            instance_cls, lineage_cls.child_instance_uid == instance_cls.uid
+        )
+        if reference_types:
+            query = query.filter(
                 func.jsonb_extract_path_text(
                     instance_cls.json_addl["properties"], "reference_type"
-                )
-                == str(reference_type).strip(),
-                func.jsonb_extract_path_text(
-                    instance_cls.json_addl["properties"], "reference_value"
-                )
-                == str(reference_value).strip(),
+                ).in_([str(item).strip() for item in reference_types])
             )
-            .all()
-        )
+        rows = query.filter(*filters).all()
         return {parent_uid for (parent_uid,) in rows if parent_uid is not None}
+
+    def _normalize_reference_payload(self, payload: dict[str, Any]) -> tuple[str, str]:
+        reference_type = str(payload.get("reference_type") or "").strip()
+        normalized = self._REFERENCE_RESPONSE_NORMALIZATION.get(reference_type)
+        if normalized is not None:
+            key, value_field = normalized
+            value = str(payload.get(value_field) or payload.get("reference_value") or "").strip()
+            return key, value
+        return reference_type, str(payload.get("reference_value") or "").strip()
 
     def _replace_external_references(
         self,

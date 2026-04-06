@@ -8,8 +8,11 @@ from sqlalchemy.orm import Session
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
+    BLOOM_ADMIN_GROUP,
     BLOOM_AUDITOR_GROUP,
     BLOOM_CLINICAL_GROUP,
+    BLOOM_READONLY_GROUP,
+    BLOOM_READWRITE_GROUP,
     BLOOM_RND_GROUP,
     ENABLE_ATLAS_API_GROUP,
     ENABLE_URSA_API_GROUP,
@@ -23,6 +26,9 @@ from bloom_lims.auth.repositories.tapdb.groups import (
 )
 
 SYSTEM_GROUP_CODES = [
+    BLOOM_READONLY_GROUP,
+    BLOOM_READWRITE_GROUP,
+    BLOOM_ADMIN_GROUP,
     BLOOM_RND_GROUP,
     BLOOM_CLINICAL_GROUP,
     BLOOM_AUDITOR_GROUP,

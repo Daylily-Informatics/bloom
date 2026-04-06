@@ -154,7 +154,11 @@
           <p class="login-info" style="margin-top: 0; text-align: left;">
             <i class="fas fa-lock"></i> Secure authentication via AWS Cognito
           </p>
-          <a href="{{ auth_primary_href | default('/auth/login') }}" class="btn btn-primary login-btn">
+          <a
+            href="{{ auth_primary_href | default('/auth/login') }}"
+            class="btn btn-primary login-btn"
+            data-testid="app-login-link"
+          >
             <i class="fas fa-sign-in-alt"></i>
             {{ "Return to Sign In" if auth_error else "Sign in with AWS Cognito" }}
           </a>

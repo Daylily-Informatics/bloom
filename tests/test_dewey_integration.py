@@ -72,10 +72,14 @@ def test_dewey_client_registers_artifact_with_bearer_auth(monkeypatch):
     )
 
     assert artifact_euid == "AT-1"
-    assert captured["url"] == "https://dewey.example/api/v1/artifacts/import"
+    assert captured["url"] == "https://dewey.example/api/v1/artifacts"
     assert captured["json"] == {
         "artifact_type": "vcf",
-        "storage_uri": "s3://bucket/RUN-1/sample.vcf.gz",
+        "storage_backend": "s3",
+        "bucket": "bucket",
+        "key": "RUN-1/sample.vcf.gz",
+        "producer_system": None,
+        "producer_object_euid": None,
         "metadata": {"run_euid": "RUN-1"},
     }
     headers = captured["headers"]

@@ -5,12 +5,15 @@ import os
 import sys
 from datetime import datetime, timedelta
 from time import time_ns
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth, require_write
+from bloom_lims.domain.external_specimens import ExternalSpecimenService
+from bloom_lims.schemas.external_specimens import AtlasReferences
 
 # Ensure auth bypass is active for API-client tests.
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
@@ -86,6 +89,30 @@ def test_external_specimen_endpoints_require_external_token_auth(client):
     response = client.get("/api/v1/external/specimens/by-reference?order_number=ORD-1")
     assert response.status_code == 401
     assert "requires Bloom API bearer token" in response.json()["detail"]
+
+
+def test_external_specimen_lookup_does_not_require_atlas_client(monkeypatch):
+    def _unexpected_atlas_service():
+        raise AssertionError("AtlasService should not be constructed for lookup-only queries")
+
+    monkeypatch.setattr(
+        "bloom_lims.domain.external_specimens.AtlasService",
+        _unexpected_atlas_service,
+    )
+
+    service = object.__new__(ExternalSpecimenService)
+    service._atlas = None
+    service.bdb = SimpleNamespace()
+    service.bobj = SimpleNamespace()
+    service._find_parent_uids_for_reference = lambda **_kwargs: set()
+
+    result = ExternalSpecimenService.find_by_references(
+        service,
+        AtlasReferences(atlas_tenant_id="tenant-1"),
+    )
+
+    assert result == []
+    assert service._atlas is None
 
 
 def test_user_tokens_endpoints_create_list_usage_revoke(client):
