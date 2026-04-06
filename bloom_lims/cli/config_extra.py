@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from bloom_lims.config import (
     apply_runtime_environment,
     assert_tapdb_version,
+    expected_conda_env_name,
     get_settings,
     get_template_config_path,
     get_user_config_path,
@@ -36,9 +37,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def _tapdb_schema_drift_check(env_name: str) -> tuple[int, dict[str, object], str]:
     """Run the TapDB schema drift check in report-only mode."""
     result = run_schema_drift_check(env_name)
-    returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(str(result.get("status") or ""), 2)
+    returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(
+        str(result.get("status") or ""), 2
+    )
     payload = result.get("report")
-    return returncode, payload if isinstance(payload, dict) else {}, str(result.get("stderr") or "")
+    return (
+        returncode,
+        payload if isinstance(payload, dict) else {},
+        str(result.get("stderr") or ""),
+    )
 
 
 def _schema_drift_summary(payload: dict[str, object]) -> str:
@@ -106,6 +113,7 @@ def _status() -> None:
     table.add_column("Value")
 
     rows = [
+        ("deploy-name", settings.deployment.name),
         ("environment", settings.environment),
         ("tapdb.env", settings.tapdb.env),
         ("tapdb.database_name", settings.tapdb.database_name),
@@ -150,12 +158,17 @@ def _doctor() -> None:
         )
 
     conda_env = os.environ.get("CONDA_DEFAULT_ENV")
-    if conda_env == "BLOOM":
-        console.print("[green]✓[/green] Conda environment: BLOOM")
+    expected_env = expected_conda_env_name()
+    if conda_env == expected_env:
+        console.print(f"[green]✓[/green] Conda environment: {expected_env}")
     else:
-        warnings.append(f"Not in BLOOM conda environment (current: {conda_env})")
+        warnings.append(
+            f"Not in expected deployment-scoped conda environment "
+            f"(current: {conda_env}, expected: {expected_env})"
+        )
         console.print(
-            f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} (expected: BLOOM)"
+            f"[yellow]⚠[/yellow] Conda environment: {conda_env or 'none'} "
+            f"(expected: {expected_env})"
         )
 
     for module_name in ["bloom_lims.db", "bloom_lims.config", "daylily_tapdb"]:
@@ -188,7 +201,9 @@ def _doctor() -> None:
         console.print("[green]✓[/green] TapDB connectivity and schema drift report")
     elif drift_returncode == 1:
         summary = _schema_drift_summary(drift_payload)
-        console.print(f"[yellow]⚠[/yellow] TapDB schema drift detected (report only): {summary}")
+        console.print(
+            f"[yellow]⚠[/yellow] TapDB schema drift detected (report only): {summary}"
+        )
         warnings.append(f"TapDB schema drift detected ({summary})")
     else:
         issues.append("TapDB schema drift check failed")

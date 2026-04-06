@@ -17,6 +17,7 @@ from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService, map_legacy_role
+from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import (
     _get_request_cognito_auth,
@@ -142,6 +143,7 @@ def _resolve_login_roles_and_groups(
     normalized_email = str(email or "").strip()
     normalized_sub = str(cognito_sub or "").strip()
     bdb = None
+    bloom_settings = get_settings()
     try:
         bdb = BLOOMdb3(app_username=normalized_email or "cognito-login")
         service = GroupService(bdb.session)
@@ -170,6 +172,23 @@ def _resolve_login_roles_and_groups(
 
         if found_user_id:
             return [found_fallback], [], found_user_id, found_fallback
+
+        allowed_domains = [
+            str(domain or "").strip().lower()
+            for domain in bloom_settings.auth.auto_provision_allowed_domains
+            if str(domain or "").strip()
+        ]
+        normalized_domain = normalized_email.rsplit("@", 1)[-1].lower()
+        if not allowed_domains:
+            raise SessionBootstrapError(
+                "Bloom access is restricted to approved auto-provision domains. "
+                "Please contact your administrator for an invitation."
+            )
+        if allowed_domains != ["*"] and normalized_domain not in allowed_domains:
+            raise SessionBootstrapError(
+                "Bloom access is restricted to approved auto-provision domains. "
+                "Please contact your administrator for an invitation."
+            )
 
         default_user_id = normalized_sub or normalized_email
         fallback = map_legacy_role(fallback_role)

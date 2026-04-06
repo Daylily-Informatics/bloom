@@ -14,6 +14,7 @@ from auth.cognito.client import (
     CognitoConfigurationError,
     get_cognito_auth,
 )
+from bloom_lims.config import get_user_config_path
 from bloom_lims.domain_access import APPROVED_WEB_DOMAIN_SUFFIXES
 from bloom_lims.gui.errors import (
     AuthenticationRequiredException,
@@ -204,8 +205,8 @@ async def require_auth(request: Request):
         _get_request_cognito_auth(request)
     except CognitoConfigurationError as exc:
         msg = (
-            "Cognito configuration missing. Check ~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml "
-            f"or BLOOM_AUTH__* env vars. ({exc})"
+            "Cognito configuration missing. Check the deployment YAML config at "
+            f"{get_user_config_path()}. ({exc})"
         )
         logging.error(msg)
         raise MissingCognitoEnvVarsException(msg)
