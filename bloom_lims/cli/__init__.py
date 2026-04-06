@@ -11,10 +11,10 @@ from cli_core_yo.app import run
 from cli_core_yo.spec import CliSpec, ConfigSpec, PluginSpec, XdgSpec
 
 from bloom_lims.config import (
-    build_default_config_template,
     _resolve_deployment_code,
     apply_runtime_environment,
     assert_tapdb_version,
+    build_default_config_template,
     get_settings,
     get_tapdb_db_config,
     validate_config_content,

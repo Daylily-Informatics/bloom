@@ -17,6 +17,7 @@ from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService, map_legacy_role
+from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import (
     _get_request_cognito_auth,
@@ -31,7 +32,6 @@ from bloom_lims.gui.web_session import (
     load_bloom_user_data,
     store_bloom_session,
 )
-from bloom_lims.config import get_settings
 
 router = APIRouter()
 
