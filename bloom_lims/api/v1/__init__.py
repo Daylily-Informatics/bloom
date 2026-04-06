@@ -26,7 +26,6 @@ from .graph import router as graph_router
 from .lineages import router as lineages_router
 from .object_creation import router as object_creation_router
 from .objects import router as objects_router
-from .search import router as search_router
 from .search_v2 import router as search_v2_router
 from .stats import router as stats_router
 from .subjects import router as subjects_router
@@ -50,7 +49,6 @@ router.include_router(templates_router)
 router.include_router(subjects_router)
 router.include_router(lineages_router)
 router.include_router(stats_router)
-router.include_router(search_router)
 router.include_router(search_v2_router)
 router.include_router(object_creation_router)
 router.include_router(tracking_router)
@@ -82,7 +80,6 @@ async def api_v1_info():
             "subjects": "/api/v1/subjects",
             "lineages": "/api/v1/lineages",
             "stats": "/api/v1/stats",
-            "search": "/api/v1/search",
             "search_v2": "/api/v1/search/v2",
             "object_creation": "/api/v1/object-creation",
             "user_tokens": "/api/v1/user-tokens",

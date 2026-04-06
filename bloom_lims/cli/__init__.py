@@ -75,7 +75,7 @@ spec = CliSpec(
         app_dir_name=f"bloom-{_resolve_deployment_code()}",
     ),
     config=ConfigSpec(
-        primary_filename=f"bloom-config-{_resolve_deployment_code()}.yaml",
+        xdg_relative_path=f"bloom-config-{_resolve_deployment_code()}.yaml",
         template_bytes=_load_template_text().encode("utf-8"),
         validator=_validate_bloom_config,
     ),
