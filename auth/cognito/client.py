@@ -31,9 +31,9 @@ class CognitoConfig:
         """Domain without protocol prefix for URL construction."""
         d = (self.domain or "").strip().rstrip("/")
         if d.startswith("https://"):
-            d = d[len("https://"):]
+            d = d[len("https://") :]
         elif d.startswith("http://"):
-            d = d[len("http://"):]
+            d = d[len("http://") :]
         return d
 
     @property
@@ -240,7 +240,9 @@ class CognitoAuth:
         try:
             token_payload = response.json()
         except ValueError as exc:
-            raise CognitoTokenError("Token exchange returned non-JSON response") from exc
+            raise CognitoTokenError(
+                "Token exchange returned non-JSON response"
+            ) from exc
 
         if not token_payload.get("id_token") and not token_payload.get("access_token"):
             raise CognitoTokenError("Token exchange returned no usable tokens")
@@ -263,8 +265,7 @@ class CognitoAuth:
 
 @lru_cache(maxsize=1)
 def get_cognito_auth() -> CognitoAuth:
-    """Create (and cache) a CognitoAuth instance from YAML config.
-    """
+    """Create (and cache) a CognitoAuth instance from YAML config."""
     from bloom_lims.config import get_settings
 
     settings = get_settings()

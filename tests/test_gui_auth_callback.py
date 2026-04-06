@@ -259,7 +259,10 @@ def test_auth_login_redirects_to_local_auth_error_when_cognito_is_misconfigured(
     response = client.get("/auth/login?next=/worksets", follow_redirects=False)
 
     assert response.status_code in (302, 303)
-    assert response.headers["location"] == "/auth/error?reason=cognito_sign_in_misconfigured&next=/worksets"
+    assert (
+        response.headers["location"]
+        == "/auth/error?reason=cognito_sign_in_misconfigured&next=/worksets"
+    )
 
 
 def test_auth_error_renders_human_readable_message(client: TestClient) -> None:
@@ -285,7 +288,10 @@ def test_auth_logout_redirects_to_local_auth_error_when_cognito_is_misconfigured
     response = client.get("/auth/logout", follow_redirects=False)
 
     assert response.status_code in (302, 303)
-    assert response.headers["location"] == "/auth/error?reason=cognito_logout_misconfigured&next=/"
+    assert (
+        response.headers["location"]
+        == "/auth/error?reason=cognito_logout_misconfigured&next=/"
+    )
 
 
 def test_auth_callback_post_requires_tokens(client: TestClient) -> None:
