@@ -94,10 +94,9 @@ def _default_upload_dir_for_runtime(
     env_name: str,
     config_path: str = "",
 ) -> str:
-    resolved_config_path = (
-        str(config_path or "").strip()
-        or _deployment_scoped_tapdb_config_path(client_id, namespace)
-    )
+    resolved_config_path = str(
+        config_path or ""
+    ).strip() or _deployment_scoped_tapdb_config_path(client_id, namespace)
     scoped_root = Path(resolved_config_path).expanduser().resolve().parent
     return str(scoped_root / env_name.strip().lower() / "uploads")
 
@@ -160,7 +159,9 @@ def build_default_config_template() -> bytes:
         count=1,
     )
     if rendered == template_text:
-        rendered = template_text.replace('jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1)
+        rendered = template_text.replace(
+            'jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1
+        )
     return rendered.encode("utf-8")
 
 
@@ -367,9 +368,7 @@ class TapDBRuntimeContext(BaseModel):
 class StorageSettings(BaseModel):
     """File storage configuration."""
 
-    upload_dir: str = Field(
-        default="", description="Upload directory"
-    )
+    upload_dir: str = Field(default="", description="Upload directory")
     temp_dir: str = Field(
         default_factory=lambda: str(Path(tempfile.gettempdir()) / "bloom"),
         description="Temporary file directory",
@@ -490,7 +489,12 @@ class AuthSettings(BaseModel):
         description="Cognito OAuth scopes",
     )
     cognito_allowed_domains: List[str] = Field(
-        default_factory=lambda: ["lsmc.com", "lsmc.bio", "lsmc.life", "daylilyinformatics.com"],
+        default_factory=lambda: [
+            "lsmc.com",
+            "lsmc.bio",
+            "lsmc.life",
+            "daylilyinformatics.com",
+        ],
         description="Allowed email domains",
     )
     cognito_default_tenant_id: str = Field(
@@ -982,9 +986,13 @@ def validate_settings() -> List[str]:
             f"Upload directory does not exist: {settings.storage.upload_dir}"
         )
     elif not upload_path.is_dir():
-        warnings.append(f"Upload path is not a directory: {settings.storage.upload_dir}")
+        warnings.append(
+            f"Upload path is not a directory: {settings.storage.upload_dir}"
+        )
     elif not os.access(upload_path, os.W_OK):
-        warnings.append(f"Upload directory is not writable: {settings.storage.upload_dir}")
+        warnings.append(
+            f"Upload directory is not writable: {settings.storage.upload_dir}"
+        )
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")

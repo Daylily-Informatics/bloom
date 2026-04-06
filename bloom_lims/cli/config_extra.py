@@ -37,9 +37,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def _tapdb_schema_drift_check(env_name: str) -> tuple[int, dict[str, object], str]:
     """Run the TapDB schema drift check in report-only mode."""
     result = run_schema_drift_check(env_name)
-    returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(str(result.get("status") or ""), 2)
+    returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(
+        str(result.get("status") or ""), 2
+    )
     payload = result.get("report")
-    return returncode, payload if isinstance(payload, dict) else {}, str(result.get("stderr") or "")
+    return (
+        returncode,
+        payload if isinstance(payload, dict) else {},
+        str(result.get("stderr") or ""),
+    )
 
 
 def _schema_drift_summary(payload: dict[str, object]) -> str:
@@ -195,7 +201,9 @@ def _doctor() -> None:
         console.print("[green]✓[/green] TapDB connectivity and schema drift report")
     elif drift_returncode == 1:
         summary = _schema_drift_summary(drift_payload)
-        console.print(f"[yellow]⚠[/yellow] TapDB schema drift detected (report only): {summary}")
+        console.print(
+            f"[yellow]⚠[/yellow] TapDB schema drift detected (report only): {summary}"
+        )
         warnings.append(f"TapDB schema drift detected ({summary})")
     else:
         issues.append("TapDB schema drift check failed")

@@ -28,6 +28,7 @@ except ImportError:
         key_path: Path
         source: str = "ensure_certs"
 
+
 server_commands = importlib.import_module("bloom_lims.cli.server")
 
 
@@ -137,19 +138,27 @@ class TestMainCommands:
         result = runner.invoke(cli_app, ["integrations", "--help"])
         assert result.exit_code == 0
 
-    def test_cli_requires_hyphenated_conda_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_cli_requires_hyphenated_conda_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM")
-        with pytest.raises(SystemExit, match="deployment-scoped conda environment name with '-'"):
+        with pytest.raises(
+            SystemExit, match="deployment-scoped conda environment name with '-'"
+        ):
             _enforce_conda_env_contract(["db", "init"])
 
-    def test_cli_requires_active_conda_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_cli_requires_active_conda_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
         with pytest.raises(
             SystemExit, match="requires an active deployment-scoped conda environment"
         ):
             _enforce_conda_env_contract(["db", "init"])
 
-    def test_cli_accepts_hyphenated_conda_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_cli_accepts_hyphenated_conda_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM-local2")
         _enforce_conda_env_contract(["db", "init"])
 
@@ -353,8 +362,12 @@ class TestServerTlsBehavior:
     def _patch_startup_dependencies(self, monkeypatch: pytest.MonkeyPatch) -> None:
         fake_settings = self._fake_settings()
         monkeypatch.setattr(server_commands, "get_settings", lambda: fake_settings)
-        monkeypatch.setattr(server_commands, "apply_runtime_environment", lambda settings: settings)
-        monkeypatch.setattr(server_commands, "atlas_webhook_secret_warning", lambda _settings: None)
+        monkeypatch.setattr(
+            server_commands, "apply_runtime_environment", lambda settings: settings
+        )
+        monkeypatch.setattr(
+            server_commands, "atlas_webhook_secret_warning", lambda _settings: None
+        )
         monkeypatch.setattr(
             server_commands,
             "get_tapdb_db_config",
@@ -390,26 +403,36 @@ class TestServerTlsBehavior:
             calls["env"] = kwargs.get("env")
             return SimpleNamespace(returncode=0)
 
-        monkeypatch.setattr(server_commands, "resolve_https_certs", fake_resolve_https_certs)
+        monkeypatch.setattr(
+            server_commands, "resolve_https_certs", fake_resolve_https_certs
+        )
         monkeypatch.setattr(server_commands.subprocess, "run", fake_run)
 
         result = runner.invoke(cli_app, ["server", "start", "--foreground"])
 
         assert result.exit_code == 0, result.output
         assert "https://localhost:8912" in result.output
-        assert calls["resolve_kwargs"]["shared_certs_dir"] == server_commands._deployment_shared_certs_dir()
-        assert calls["resolve_kwargs"]["fallback_certs_dir"] == server_commands.PROJECT_ROOT / "certs"
+        assert (
+            calls["resolve_kwargs"]["shared_certs_dir"]
+            == server_commands._deployment_shared_certs_dir()
+        )
+        assert (
+            calls["resolve_kwargs"]["fallback_certs_dir"]
+            == server_commands.PROJECT_ROOT / "certs"
+        )
         assert "--ssl-certfile" in calls["cmd"]
         assert str(cert_pair.cert_path) in calls["cmd"]
         assert "--ssl-keyfile" in calls["cmd"]
         assert str(cert_pair.key_path) in calls["cmd"]
-        assert json.loads(server_commands._runtime_meta_file().read_text(encoding="utf-8")) == {
-            "ssl_enabled": True
-        }
+        assert json.loads(
+            server_commands._runtime_meta_file().read_text(encoding="utf-8")
+        ) == {"ssl_enabled": True}
 
     def test_server_uses_shared_cli_core_cert_resolver(self) -> None:
         assert server_commands.resolve_https_certs.__module__ == "cli_core_yo.certs"
-        assert server_commands.shared_dayhoff_certs_dir.__module__ == "cli_core_yo.certs"
+        assert (
+            server_commands.shared_dayhoff_certs_dir.__module__ == "cli_core_yo.certs"
+        )
 
     def test_server_start_no_ssl_skips_cert_resolution_and_reports_http(
         self,
@@ -425,13 +448,17 @@ class TestServerTlsBehavior:
         def fake_resolve_https_certs(**_kwargs):
             nonlocal resolve_called
             resolve_called = True
-            raise AssertionError("resolve_https_certs should not be called for --no-ssl")
+            raise AssertionError(
+                "resolve_https_certs should not be called for --no-ssl"
+            )
 
         def fake_run(cmd, **kwargs):
             calls["cmd"] = cmd
             return SimpleNamespace(returncode=0)
 
-        monkeypatch.setattr(server_commands, "resolve_https_certs", fake_resolve_https_certs)
+        monkeypatch.setattr(
+            server_commands, "resolve_https_certs", fake_resolve_https_certs
+        )
         monkeypatch.setattr(server_commands.subprocess, "run", fake_run)
 
         result = runner.invoke(cli_app, ["server", "start", "--foreground", "--no-ssl"])
@@ -441,9 +468,9 @@ class TestServerTlsBehavior:
         assert resolve_called is False
         assert "--ssl-certfile" not in calls["cmd"]
         assert "--ssl-keyfile" not in calls["cmd"]
-        assert json.loads(server_commands._runtime_meta_file().read_text(encoding="utf-8")) == {
-            "ssl_enabled": False
-        }
+        assert json.loads(
+            server_commands._runtime_meta_file().read_text(encoding="utf-8")
+        ) == {"ssl_enabled": False}
 
     def test_server_status_uses_runtime_meta_scheme(
         self,

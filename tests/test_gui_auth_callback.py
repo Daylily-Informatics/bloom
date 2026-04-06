@@ -321,11 +321,15 @@ def test_resolve_login_roles_and_groups_blocks_missing_user_outside_autoprovisio
         def close(self):
             return None
 
-    monkeypatch.setattr("bloom_lims.gui.routes.auth.BLOOMdb3", lambda *_, **__: _FakeBDB())
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.BLOOMdb3", lambda *_, **__: _FakeBDB()
+    )
 
     from bloom_lims.gui.routes.auth import _resolve_login_roles_and_groups
 
-    with pytest.raises(SessionBootstrapError, match="could not initialize your local access profile"):
+    with pytest.raises(
+        SessionBootstrapError, match="could not initialize your local access profile"
+    ):
         _resolve_login_roles_and_groups(
             email="new@daylilyinformatics.com",
             cognito_sub="sub-123",
@@ -355,7 +359,9 @@ def test_resolve_login_roles_and_groups_allows_missing_user_on_autoprovision_dom
             return None
 
         def resolve_user_roles_and_groups(self, *, user_id, fallback_role):
-            return SimpleNamespace(roles=[fallback_role or "READ_WRITE"], groups=["API"])
+            return SimpleNamespace(
+                roles=[fallback_role or "READ_WRITE"], groups=["API"]
+            )
 
     monkeypatch.setattr("bloom_lims.gui.routes.auth.GroupService", _FakeGroupService)
 
@@ -365,7 +371,9 @@ def test_resolve_login_roles_and_groups_allows_missing_user_on_autoprovision_dom
         def close(self):
             return None
 
-    monkeypatch.setattr("bloom_lims.gui.routes.auth.BLOOMdb3", lambda *_, **__: _FakeBDB())
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.BLOOMdb3", lambda *_, **__: _FakeBDB()
+    )
 
     from bloom_lims.gui.routes.auth import _resolve_login_roles_and_groups
 

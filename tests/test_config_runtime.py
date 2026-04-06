@@ -40,13 +40,7 @@ def test_storage_upload_dir_defaults_to_deployment_scoped_runtime(
 
     settings = BloomSettings()
     expected = (
-        tmp_path
-        / ".config"
-        / "tapdb"
-        / "bloom"
-        / "bloom-local2"
-        / "dev"
-        / "uploads"
+        tmp_path / ".config" / "tapdb" / "bloom" / "bloom-local2" / "dev" / "uploads"
     )
 
     assert Path(settings.storage.upload_dir) == expected
@@ -94,7 +88,9 @@ def test_build_default_config_template_injects_fresh_jwt_secret():
             "lsmc.life",
             "daylilyinformatics.com",
         ]
-        assert auth["cognito_default_tenant_id"] == "00000000-0000-0000-0000-000000000000"
+        assert (
+            auth["cognito_default_tenant_id"] == "00000000-0000-0000-0000-000000000000"
+        )
         assert auth["auto_provision_allowed_domains"] == ["lsmc.com"]
         assert "daylilyinformatics.bio" not in template
 
