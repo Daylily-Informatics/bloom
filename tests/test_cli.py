@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
+import bloom_lims.cli as cli_module
 from bloom_lims.cli import (
     _enforce_conda_env_contract,
     _strip_skip_conda_env_check_flag,
@@ -48,6 +49,7 @@ class TestMainCommands:
         assert result.exit_code == 0
         assert "│ server" in result.output
         assert "│ config" in result.output
+        assert "│ env" in result.output
         assert "│ db" in result.output
         assert "│ gui" not in result.output
         assert "│ doctor" not in result.output
@@ -84,6 +86,12 @@ class TestMainCommands:
         assert result.exit_code == 0
         assert "Project Root" in result.output
         assert "Dev Server" in result.output
+
+    def test_env_help(self, runner: CliRunner, cli_app) -> None:
+        result = runner.invoke(cli_app, ["env", "--help"])
+        assert result.exit_code == 0
+        for command in ["status", "activate", "deactivate", "reset"]:
+            assert command in result.output
 
     def test_config_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "--help"])
@@ -159,6 +167,34 @@ class TestMainCommands:
         )
         assert skip is True
         assert args == ["db", "init"]
+
+    def test_cli_env_commands_are_exempt_from_conda_env_check(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
+        _enforce_conda_env_contract(["env", "status"])
+
+    def test_env_commands_render(self, runner: CliRunner, cli_app, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BLOOM_ACTIVE", "1")
+        monkeypatch.setenv("BLOOM_ROOT", "/tmp/bloom")
+
+        status_result = runner.invoke(cli_app, ["env", "status"])
+        assert status_result.exit_code == 0
+        assert "active" in status_result.output.lower()
+        assert "/tmp/bloom" in status_result.output
+
+        activate_result = runner.invoke(cli_app, ["env", "activate"])
+        assert activate_result.exit_code == 0
+        assert f"source {cli_module.ACTIVATE_SCRIPT} <deploy-name>" in activate_result.output
+
+        deactivate_result = runner.invoke(cli_app, ["env", "deactivate"])
+        assert deactivate_result.exit_code == 0
+        assert f"source {cli_module.DEACTIVATE_SCRIPT}" in deactivate_result.output
+
+        reset_result = runner.invoke(cli_app, ["env", "reset"])
+        assert reset_result.exit_code == 0
+        assert f"source {cli_module.DEACTIVATE_SCRIPT}" in reset_result.output
+        assert f"source {cli_module.ACTIVATE_SCRIPT} <deploy-name>" in reset_result.output
 
     def test_config_doctor_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "doctor", "--help"])

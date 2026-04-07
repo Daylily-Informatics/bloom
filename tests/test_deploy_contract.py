@@ -11,6 +11,7 @@ def test_root_environment_contract_uses_environment_yaml() -> None:
 
 def test_activate_only_references_root_environment_yaml() -> None:
     activate = (PROJECT_ROOT / "activate").read_text(encoding="utf-8")
+    deactivate = (PROJECT_ROOT / "bloom_deactivate").read_text(encoding="utf-8")
     environment = (PROJECT_ROOT / "environment.yaml").read_text(encoding="utf-8")
     root_template = (PROJECT_ROOT / "config" / "bloom-config-template.yaml").read_text(
         encoding="utf-8"
@@ -23,9 +24,13 @@ def test_activate_only_references_root_environment_yaml() -> None:
     assert "environment" + ".yml" not in activate
     assert "requirements.txt" not in activate
     assert 'pip install -e "${BLOOM_ROOT}[dev]" -q' in activate
+    assert "export BLOOM_ACTIVE=1" in activate
     assert "--no-deps" not in activate
+    assert (PROJECT_ROOT / "bloom_deactivate").is_file()
+    assert "unset BLOOM_ACTIVE" in deactivate
     assert "-e ." not in environment
     assert "MERIDIAN_DOMAIN_CODE=B" in root_template
     assert "TAPDB_APP_CODE=B" in root_template
     assert "MERIDIAN_DOMAIN_CODE=B" in packaged_template
     assert "TAPDB_APP_CODE=B" in packaged_template
+

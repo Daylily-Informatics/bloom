@@ -330,23 +330,7 @@ echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
 echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
 
 export BLOOM_ROOT
-
-deactivate_bloom() {
-    unset BLOOM_ROOT
-    unset BLOOM_DEPLOYMENT_CODE
-    unset DEPLOYMENT_CODE
-    unset LSMC_DEPLOYMENT_CODE
-    unset MERIDIAN_ENVIRONMENT
-    unset MERIDIAN_SANDBOX_PREFIX
-    unset MERIDIAN_DOMAIN_CODE
-    unset TAPDB_APP_CODE
-    unset BLOOM_COGNITO_APP_NAME
-    if [[ "${CONDA_DEFAULT_ENV:-}" == "${_BLOOM_CONDA_ENV_NAME}" ]]; then
-        conda deactivate 2>/dev/null
-    fi
-    echo "BLOOM LIMS environment deactivated."
-    unset -f deactivate_bloom
-}
+export BLOOM_ACTIVE=1
 
 echo ""
 echo -e "${_CYAN}BLOOM LIMS environment activated!${_NC}"
@@ -362,7 +346,7 @@ echo -e "  ${_CYAN}bloom info${_NC}      Show environment information"
 echo -e "  ${_CYAN}bloom version${_NC}   Show CLI version"
 echo ""
 echo -e "  ${_GREEN}bloom --help${_NC}          Show all available commands"
-echo -e "  ${_GREEN}deactivate_bloom${_NC}      Deactivate this environment"
+echo -e "  ${_GREEN}source ./bloom_deactivate${_NC}      Deactivate this environment"
 echo ""
 
 unset _BLOOM_CLI_CORE_REPO
