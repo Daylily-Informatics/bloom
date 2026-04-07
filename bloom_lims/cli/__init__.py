@@ -8,7 +8,14 @@ from pathlib import Path
 
 from cli_core_yo.app import create_app as _create_app
 from cli_core_yo.app import run
-from cli_core_yo.spec import CliSpec, ConfigSpec, EnvSpec, PluginSpec, PolicySpec, XdgSpec
+from cli_core_yo.spec import (
+    CliSpec,
+    ConfigSpec,
+    EnvSpec,
+    PluginSpec,
+    PolicySpec,
+    XdgSpec,
+)
 
 from bloom_lims.config import (
     _resolve_deployment_code,
