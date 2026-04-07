@@ -8,7 +8,14 @@ from pathlib import Path
 
 from cli_core_yo.app import create_app as _create_app
 from cli_core_yo.app import run
-from cli_core_yo.spec import CliSpec, ConfigSpec, EnvSpec, PluginSpec, XdgSpec
+from cli_core_yo.spec import (
+    CliSpec,
+    ConfigSpec,
+    EnvSpec,
+    PluginSpec,
+    PolicySpec,
+    XdgSpec,
+)
 
 from bloom_lims.config import (
     _resolve_deployment_code,
@@ -76,6 +83,7 @@ spec = CliSpec(
     xdg=XdgSpec(
         app_dir_name=f"bloom-{_resolve_deployment_code()}",
     ),
+    policy=PolicySpec(),
     config=ConfigSpec(
         xdg_relative_path=f"bloom-config-{_resolve_deployment_code()}.yaml",
         template_bytes=build_default_config_template(),

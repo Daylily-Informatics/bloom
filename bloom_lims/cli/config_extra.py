@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cli_core_yo.spec import CommandPolicy
 from rich.console import Console
 from rich.table import Table
 
@@ -32,6 +33,7 @@ from bloom_lims.schema_drift import (
 
 console = Console()
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REQUIRED_POLICY = CommandPolicy(runtime_guard="required")
 
 
 def _tapdb_schema_drift_check(env_name: str) -> tuple[int, dict[str, object], str]:
@@ -232,14 +234,23 @@ def _doctor() -> None:
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register extra config subcommands."""
     registry.add_command(
-        "config", "shell", _shell, "Open interactive Python shell with BLOOM loaded"
+        "config",
+        "shell",
+        _shell,
+        help_text="Open interactive Python shell with BLOOM loaded",
+        policy=REQUIRED_POLICY,
     )
     registry.add_command(
         "config",
         "doctor",
         _doctor,
-        "Verify environment, dependencies, and configuration",
+        help_text="Verify environment, dependencies, and configuration",
+        policy=REQUIRED_POLICY,
     )
     registry.add_command(
-        "config", "status", _status, "Show environment and configuration status"
+        "config",
+        "status",
+        _status,
+        help_text="Show environment and configuration status",
+        policy=REQUIRED_POLICY,
     )

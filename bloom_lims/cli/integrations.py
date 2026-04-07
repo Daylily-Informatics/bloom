@@ -12,6 +12,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from bloom_lims.cli._registry_v2 import EXEMPT, register_group_commands
 from bloom_lims.config import get_settings
 
 integrations_app = typer.Typer(
@@ -62,6 +63,14 @@ integrations_app.add_typer(atlas_app, name="atlas")
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the integrations command group."""
-    registry.add_typer_app(
-        None, integrations_app, "integrations", "External integration commands."
+    _ = spec
+    registry.add_group("integrations", help_text="External integration commands.")
+    register_group_commands(
+        registry,
+        "integrations/atlas",
+        "Atlas integration configuration and diagnostics.",
+        [
+            ("show", show_atlas_config, EXEMPT),
+            ("doctor", doctor_atlas_integration, EXEMPT),
+        ],
     )

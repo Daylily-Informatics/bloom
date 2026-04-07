@@ -14,6 +14,8 @@ from pathlib import Path
 
 import typer
 
+from bloom_lims.cli._registry_v2 import EXEMPT_LONG_RUNNING, register_group_commands
+
 test_app = typer.Typer(help="Test execution commands", no_args_is_help=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -37,4 +39,12 @@ def run(ctx: typer.Context) -> None:
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the test command group."""
-    registry.add_typer_app(None, test_app, "test", "Test execution commands.")
+    _ = spec
+    register_group_commands(
+        registry,
+        "test",
+        "Test execution commands.",
+        [
+            ("run", run, EXEMPT_LONG_RUNNING),
+        ],
+    )
