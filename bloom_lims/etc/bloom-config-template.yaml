@@ -43,8 +43,8 @@ tapdb:
   strict_namespace: true        # Require namespaced TapDB config semantics
   config_path: ""               # Optional explicit TapDB config path
   local_pg_port: __BLOOM_TAPDB_LOCAL_PG_PORT__           # Default local TapDB PostgreSQL port for dev/test
-  min_version: "4.1.1"         # Required minimum daylily-tapdb version
-  max_version_exclusive: "4.1.2"
+  min_version: "5.0.0"         # Required minimum daylily-tapdb version
+  max_version_exclusive: "5.0.1"
 
 # -----------------------------------------------------------------------------
 # Storage Configuration

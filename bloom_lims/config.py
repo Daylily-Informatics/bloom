@@ -312,11 +312,9 @@ class TapDBSettings(BaseModel):
         default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
-    min_version: str = Field(
-        default="4.1.1", description="Minimum supported daylily-tapdb"
-    )
+    min_version: str = Field(default="5.0.0", description="Minimum supported daylily-tapdb")
     max_version_exclusive: str = Field(
-        default="4.1.2",
+        default="5.0.1",
         description="Exclusive upper bound for daylily-tapdb",
     )
 
