@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "Error: This script must be sourced, not executed."
+    echo "Usage: source ./bloom_deactivate"
+    exit 1
+fi
+
+if type conda >/dev/null 2>&1; then
+    source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
+fi
+
+if [[ -n "${CONDA_DEFAULT_ENV:-}" ]]; then
+    conda deactivate 2>/dev/null || true
+fi
+
+unset BLOOM_ACTIVE
+unset BLOOM_ROOT
+unset BLOOM_DEPLOYMENT_CODE
+unset DEPLOYMENT_CODE
+unset LSMC_DEPLOYMENT_CODE
+unset MERIDIAN_ENVIRONMENT
+unset MERIDIAN_SANDBOX_PREFIX
+unset MERIDIAN_DOMAIN_CODE
+unset TAPDB_APP_CODE
+unset BLOOM_COGNITO_APP_NAME
+
+echo "BLOOM LIMS environment deactivated."

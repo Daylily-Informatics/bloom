@@ -8,7 +8,7 @@ from pathlib import Path
 
 from cli_core_yo.app import create_app as _create_app
 from cli_core_yo.app import run
-from cli_core_yo.spec import CliSpec, ConfigSpec, PluginSpec, XdgSpec
+from cli_core_yo.spec import CliSpec, ConfigSpec, EnvSpec, PluginSpec, XdgSpec
 
 from bloom_lims.config import (
     _resolve_deployment_code,
@@ -21,6 +21,8 @@ from bloom_lims.config import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ACTIVATE_SCRIPT = "./activate"
+DEACTIVATE_SCRIPT = "./bloom_deactivate"
 
 
 def _validate_bloom_config(content: str) -> list[str]:
@@ -79,6 +81,12 @@ spec = CliSpec(
         template_bytes=build_default_config_template(),
         validator=_validate_bloom_config,
     ),
+    env=EnvSpec(
+        active_env_var="BLOOM_ACTIVE",
+        project_root_env_var="BLOOM_ROOT",
+        activate_script_name=f"{ACTIVATE_SCRIPT} <deploy-name>",
+        deactivate_script_name=DEACTIVATE_SCRIPT,
+    ),
     plugins=PluginSpec(
         explicit=[
             "bloom_lims.cli.server.register",
@@ -102,7 +110,7 @@ def build_app():
 app = build_app()
 
 _SKIP_CONDA_ENV_CHECK_FLAG = "--skip-conda-env-check"
-_CONDA_ENV_CHECK_EXEMPT_COMMANDS = frozenset({"version", "info", "help"})
+_CONDA_ENV_CHECK_EXEMPT_COMMANDS = frozenset({"version", "info", "env", "help"})
 
 
 def _strip_skip_conda_env_check_flag(args: list[str]) -> tuple[list[str], bool]:
