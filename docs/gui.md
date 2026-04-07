@@ -2,9 +2,11 @@
 
 Bloom's GUI is the browser-facing operations surface for the service. It is where an authenticated operator inspects queue runtime, navigates material state, searches across the material graph, uses the graph explorer, and accesses admin-only observability and token-management pages. It is not a second application bolted on top of the API; it is part of the same FastAPI process and shares the same config, session, and RBAC vocabulary.
 
+Bloom now uses the `daylily-auth-cognito` 2.0 browser/session boundary. Browser sessions stay token-free, callback exchange is async in the web path, and runtime code should not depend on `daylily_auth_cognito.cli`.
+
 ## Session And Login Model
 
-The GUI auth flow is Cognito Hosted UI based and implemented through `daylily-cognito` session helpers.
+The GUI auth flow is Cognito Hosted UI based and implemented through `daylily-auth-cognito` session helpers.
 
 Current route family:
 

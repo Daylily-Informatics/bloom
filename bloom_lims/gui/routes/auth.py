@@ -4,7 +4,8 @@ import logging
 import os
 from urllib.parse import quote
 
-from daylily_cognito import (
+from daylily_auth_cognito.browser.oauth import build_logout_url
+from daylily_auth_cognito.browser.session import (
     CognitoWebAuthError,
     SessionPrincipal,
     complete_cognito_callback,
@@ -32,7 +33,6 @@ from bloom_lims.gui.web_session import (
     load_bloom_user_data,
     store_bloom_session,
 )
-from bloom_lims.config import get_settings
 
 router = APIRouter()
 
@@ -101,7 +101,7 @@ async def auth_login(request: Request, next: str = "/"):
             build_bloom_web_session_config(request),
             _next_path(next),
         )
-    except CognitoConfigurationError as exc:
+    except (CognitoConfigurationError, ValueError) as exc:
         logging.error("Bloom Cognito sign-in is misconfigured: %s", exc)
         return _auth_error_redirect("cognito_sign_in_misconfigured", next_path=next)
 
@@ -459,13 +459,21 @@ async def _logout_response(request: Request, response: Response):
     try:
         logging.warning("Logging out user: clearing session data")
 
-        cognito_logout_url = "/login"
+        session_config = build_bloom_web_session_config(request)
         logout_reason: str | None = None
-        try:
-            cognito_logout_url = _get_request_cognito_auth(request).config.logout_url
-        except CognitoConfigurationError as exc:
-            logging.error("Cognito configuration missing during logout: %s", exc)
+        if (
+            not session_config.domain
+            or not session_config.client_id
+            or not session_config.logout_uri
+        ):
             logout_reason = "cognito_logout_misconfigured"
+            cognito_logout_url = "/login"
+        else:
+            cognito_logout_url = build_logout_url(
+                domain=session_config.domain,
+                client_id=session_config.client_id,
+                logout_uri=session_config.logout_uri,
+            )
 
         clear_bloom_session(request)
         logging.info("User session cleared.")

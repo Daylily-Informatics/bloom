@@ -5,7 +5,7 @@ import secrets
 from typing import Any
 from urllib.parse import urlparse
 
-from daylily_cognito import (
+from daylily_auth_cognito.browser.session import (
     CognitoWebSessionConfig,
     SessionPrincipal,
     clear_session_principal,
@@ -15,7 +15,6 @@ from daylily_cognito import (
 )
 from fastapi import FastAPI, Request
 
-from auth.cognito.client import CognitoAuth
 from bloom_lims.config import get_settings
 
 _SERVER_INSTANCE_ID = secrets.token_urlsafe(16)
@@ -34,28 +33,28 @@ def build_bloom_web_session_config(
     request: Request | None = None,
 ) -> CognitoWebSessionConfig:
     settings = get_settings()
-    cognito = _resolve_cognito_auth(request)
-    public_base_url = _origin(cognito.config.redirect_uri or "https://localhost:8912")
+    auth_settings = settings.auth
+    public_base_url = _origin(auth_settings.cognito_redirect_uri or "https://localhost:8912")
     explicit_secret = str(os.environ.get("BLOOM_SESSION_SECRET") or "").strip()
     base_secret = (
         explicit_secret
-        or settings.auth.jwt_secret
-        or settings.auth.cognito_client_secret
+        or auth_settings.jwt_secret
+        or auth_settings.cognito_client_secret
         or _SESSION_SECRET_FALLBACK
     )
+    scopes = auth_settings.cognito_scopes or ["openid", "email", "profile"]
 
     return CognitoWebSessionConfig(
-        domain=cognito.config.domain,
-        client_id=cognito.config.client_id,
-        redirect_uri=cognito.config.redirect_uri,
-        logout_uri=cognito.config.logout_redirect_uri
-        or f"{public_base_url}/auth/logout",
+        domain=auth_settings.cognito_domain,
+        client_id=auth_settings.cognito_client_id,
+        redirect_uri=auth_settings.cognito_redirect_uri,
+        logout_uri=auth_settings.cognito_logout_redirect_uri or f"{public_base_url}/auth/logout",
         public_base_url=public_base_url,
         session_secret_key=base_secret,
         session_cookie_name="bloom_session",
-        session_max_age=max(int(settings.auth.session_timeout_minutes or 30) * 60, 300),
-        client_secret=cognito.config.client_secret or None,
-        scope=" ".join(cognito.config.scopes or ["openid", "email", "profile"]),
+        session_max_age=max(int(auth_settings.session_timeout_minutes or 30) * 60, 300),
+        client_secret=auth_settings.cognito_client_secret or None,
+        scope=" ".join(scopes),
         allow_insecure_http=public_base_url.startswith("http://"),
         server_instance_id=get_server_instance_id(),
     )
@@ -99,16 +98,6 @@ def clear_bloom_session(request: Request) -> None:
     request.session.pop("_cognito_post_auth_redirect", None)
     request.session.pop("user_data", None)
     request.session.pop("bloom_post_auth_redirect", None)
-
-
-def _resolve_cognito_auth(request: Request | None = None) -> CognitoAuth:
-    if request is not None:
-        from bloom_lims.gui.deps import _get_request_cognito_auth
-
-        return _get_request_cognito_auth(request)
-
-    settings = get_settings()
-    return CognitoAuth.from_settings(settings.auth)
 
 
 def _user_data_from_principal(principal: SessionPrincipal) -> dict[str, Any]:

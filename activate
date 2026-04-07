@@ -176,7 +176,7 @@ _bloom_distribution_is_editable_from_repo() {
 
 _bloom_dev_runtime_ready() {
     _bloom_require_python_import "daylily_tapdb" "daylily-tapdb" || return 1
-    _bloom_require_python_import "daylily_cognito" "daylily-cognito" || return 1
+    _bloom_require_python_import "daylily_auth_cognito" "daylily-auth-cognito" || return 1
     _bloom_require_python_import "cli_core_yo" "cli-core-yo" || return 1
     _bloom_require_python_import "pytest" "pytest" || return 1
 }
@@ -270,7 +270,7 @@ elif ! _bloom_validate_main_repo_install; then
 fi
 
 echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
-echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-cognito from ${_BLOOM_CONDA_ENV_NAME}"
+echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-auth-cognito from ${_BLOOM_CONDA_ENV_NAME}"
 echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
 
 if command -v rehash >/dev/null 2>&1; then

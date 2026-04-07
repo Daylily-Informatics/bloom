@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from daylily_cognito import SessionPrincipal
+from daylily_auth_cognito.browser.session import SessionPrincipal
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("BLOOM_DEV_AUTH_BYPASS", "true")
@@ -105,8 +106,8 @@ def test_auth_callback_get_completes_login(
         lambda _request: fake_auth,
     )
     monkeypatch.setattr(
-        "daylily_cognito.web_session.exchange_authorization_code",
-        lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
+        "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
+        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
@@ -142,8 +143,8 @@ def test_auth_callback_get_requires_prior_login_state(
         lambda _request: fake_auth,
     )
     monkeypatch.setattr(
-        "daylily_cognito.web_session.exchange_authorization_code",
-        lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
+        "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
+        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
     )
 
     response = client.get(
@@ -165,8 +166,8 @@ def test_auth_callback_get_redirects_when_session_bootstrap_fails(
         lambda _request: fake_auth,
     )
     monkeypatch.setattr(
-        "daylily_cognito.web_session.exchange_authorization_code",
-        lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
+        "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
+        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
@@ -195,7 +196,7 @@ def test_auth_callback_get_redirects_exchange_errors(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
     monkeypatch.setattr(
-        "daylily_cognito.web_session.exchange_authorization_code",
+        "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("code exchange failed")),
     )
 
@@ -221,8 +222,8 @@ def test_auth_callback_get_unexpected_error_redirects_cleanly(
         lambda _request: fake_auth,
     )
     monkeypatch.setattr(
-        "daylily_cognito.web_session.exchange_authorization_code",
-        lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
+        "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
+        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
     )
 
     def _explode(*_args, **_kwargs):
@@ -279,10 +280,8 @@ def test_auth_logout_redirects_to_local_auth_error_when_cognito_is_misconfigured
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
     monkeypatch.setattr(
-        "bloom_lims.gui.routes.auth._get_request_cognito_auth",
-        lambda _request: (_ for _ in ()).throw(
-            CognitoConfigurationError("logout redirect mismatch")
-        ),
+        "bloom_lims.gui.routes.auth.build_bloom_web_session_config",
+        lambda _request: SimpleNamespace(domain="", client_id="client-123", logout_uri="/"),
     )
 
     response = client.get("/auth/logout", follow_redirects=False)
@@ -507,8 +506,8 @@ def test_multiple_gui_clients_keep_distinct_sessions(
         lambda _request: fake_auth,
     )
     monkeypatch.setattr(
-        "daylily_cognito.web_session.exchange_authorization_code",
-        lambda **kwargs: fake_auth.exchange_authorization_code(kwargs["code"]),
+        "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
+        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]

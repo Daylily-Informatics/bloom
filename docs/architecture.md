@@ -2,6 +2,8 @@
 
 Bloom is a FastAPI application that combines a versioned HTTP API, a server-rendered GUI, health and observability endpoints, and a mounted TapDB admin sub-application. Its core architectural decision is narrow ownership: Bloom is authoritative for material primitives and lineage, but it deliberately delegates identity, shared DB/runtime lifecycle, deployment orchestration, and adjacent service concerns to other parts of the Dayhoff bundle.
 
+As of the 2.0 Cognito refactor, browser/session auth lives in `daylily-auth-cognito.browser.session`, Hosted UI URL and code-exchange helpers live in `browser.oauth` and `browser.google`, bearer verification lives in `runtime.verifier` and `runtime.m2m`, and Cognito lifecycle stays in `daycog` via `admin.*`. Bloom runtime code should not import `daylily_auth_cognito.cli`.
+
 ```mermaid
 flowchart TB
     classDef entry fill:#eaf4e8,stroke:#4d7a34,color:#15200f,stroke-width:1.5px;
@@ -21,7 +23,7 @@ flowchart TB
     Domain --> Atlas["Atlas"]
     Domain --> Dewey["Dewey"]
     Domain --> Zebra["Zebra Day"]
-    Domain --> daycog["daylily-cognito / daycog"]
+    Domain --> daycog["daylily-auth-cognito / daycog"]
 
     class Browser,Client entry
     class GUI,API,App,Health,Obs,Admin app
@@ -138,7 +140,7 @@ The domain layer is where Bloom's narrow ownership becomes concrete:
 
 Bloom's current auth split is:
 
-- browser session auth through Cognito Hosted UI helpers from `daylily-cognito`
+- browser session auth through Cognito Hosted UI helpers from `daylily-auth-cognito`
 - API token auth resolved by Bloom's own token service and RBAC
 - group service wrappers around TapDB-backed group membership
 

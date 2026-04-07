@@ -4,6 +4,8 @@ BLOOM is the material-state service in the Dayhoff lab-software bundle. It track
 
 In practice that makes Bloom a foundation service. Atlas can accession and coordinate intake, Dewey can register and search artifacts, Ursa can provide adjacent service logic, Zebra Day can handle label printing, daycog can manage shared Cognito, and Dayhoff can deploy the stack, but Bloom remains the place where material primitives and lineage become first-class, queryable state.
 
+Bloom's Cognito integration now follows the `daylily-auth-cognito` 2.0 split: browser sessions live in `browser.session`, Hosted UI helpers live in `browser.oauth` and `browser.google`, bearer verification lives in `runtime.verifier` and `runtime.m2m`, and Cognito lifecycle stays in `daycog` via `admin.*`. Service runtime code should not import `daylily_auth_cognito.cli`.
+
 ## Bloom In The Dayhoff Ecology
 
 ```mermaid
@@ -15,7 +17,7 @@ flowchart LR
 
     subgraph Control["Control Plane And Shared Runtime"]
         Dayhoff["Dayhoff<br/>deploys and locates services"]
-        daycog["daycog / daylily-cognito<br/>shared Cognito lifecycle"]
+        daycog["daycog / daylily-auth-cognito<br/>shared Cognito lifecycle"]
         TapDB["TapDB<br/>namespaced runtime and admin surface"]
     end
 
@@ -60,7 +62,7 @@ flowchart LR
 
 ## Architecture, Stack, And Philosophy
 
-Bloom is a FastAPI service with a mounted GUI and a mounted TapDB admin sub-application. The runtime is configured through deployment-scoped YAML and TapDB namespace config rather than ad hoc shell state. Persistence and object identity are TapDB-backed. Browser authentication is Cognito-hosted-UI based through `daylily-cognito`. The GUI is mostly server-rendered Jinja templates with a modern operations surface, while graph exploration is powered by a Cytoscape-based client under `static/js/graph.js`.
+Bloom is a FastAPI service with a mounted GUI and a mounted TapDB admin sub-application. The runtime is configured through deployment-scoped YAML and TapDB namespace config rather than ad hoc shell state. Persistence and object identity are TapDB-backed. Browser authentication is Cognito-hosted-UI based through `daylily-auth-cognito`. The GUI is mostly server-rendered Jinja templates with a modern operations surface, while graph exploration is powered by a Cytoscape-based client under `static/js/graph.js`.
 
 The design philosophy is narrower than a classic monolith:
 
@@ -250,7 +252,7 @@ Deep dive: [docs/gui.md](docs/gui.md)
 
 ## Security And Auth
 
-Bloom uses YAML-first Cognito configuration for normal startup. If required TapDB or Cognito config is missing, startup validation fails fast. Browser auth uses `daylily-cognito` Hosted UI session helpers and stores a normalized principal in the session rather than raw OAuth tokens. API access uses bearer tokens with Bloom-side RBAC and token-scope privilege caps.
+Bloom uses YAML-first Cognito configuration for normal startup. If required TapDB or Cognito config is missing, startup validation fails fast. Browser auth uses `daylily-auth-cognito` Hosted UI session helpers and stores a normalized principal in the session rather than raw OAuth tokens. API access uses bearer tokens with Bloom-side RBAC and token-scope privilege caps.
 
 Security-relevant current behavior:
 
@@ -321,7 +323,7 @@ These are worth reading for background, but they are not the current contract. C
 - **Bloom**: the service in this repo; authoritative for material primitives, lineage, and related queue/runtime state.
 - **Dayhoff**: the deployment control plane that pins repos, activates them, starts services, and checks readiness.
 - **TapDB**: the shared runtime/database layer Bloom delegates to for namespaced config, DB lifecycle, and the mounted admin app.
-- **daycog / daylily-cognito**: the shared Cognito library and CLI Bloom uses for browser auth and shared pool/app lifecycle.
+- **daycog / daylily-auth-cognito**: the shared Cognito library and CLI Bloom uses for browser auth and shared pool/app lifecycle.
 - **Atlas**: the order, intake, and accession-oriented service that exchanges external references and status information with Bloom.
 - **Dewey**: the artifact-oriented service Bloom calls when it needs to register or refer to analysis/storage outputs.
 - **Ursa**: an adjacent Dayhoff service with its own integration gate in Bloom's RBAC/group model.

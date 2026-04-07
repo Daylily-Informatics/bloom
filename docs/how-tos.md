@@ -2,6 +2,8 @@
 
 This file is the practical companion to the higher-level docs. Every command here is intended to be copy-pastable and aligned with Bloom's current CLI surface.
 
+Bloom's shared Cognito workflow now comes from `daycog` plus `daylily-auth-cognito` 2.0. Use the browser/session and runtime helper split from that package, and keep service runtime code out of `daylily_auth_cognito.cli`.
+
 ## First-Run Local Setup
 
 From the repo root:

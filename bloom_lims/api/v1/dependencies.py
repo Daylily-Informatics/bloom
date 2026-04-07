@@ -8,6 +8,8 @@ from typing import Any
 
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from daylily_auth_cognito.runtime.fastapi import create_auth_dependency
+from daylily_auth_cognito.runtime.verifier import CognitoTokenVerifier
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
@@ -110,20 +112,15 @@ def _is_dev_bypass_active() -> bool:
 def _build_cognito_dependency():
     """Create the Cognito auth dependency if available."""
     try:
-        from daylily_cognito.auth import CognitoAuth
-        from daylily_cognito.fastapi import create_auth_dependency
-
-        from auth.cognito.client import get_cognito_auth
-
-        auth_cfg = get_cognito_auth().config
-        cognito = CognitoAuth(
-            region=auth_cfg.region,
-            user_pool_id=auth_cfg.user_pool_id,
-            app_client_id=auth_cfg.client_id,
+        auth_cfg = get_settings().auth
+        cognito = CognitoTokenVerifier(
+            region=auth_cfg.cognito_region,
+            user_pool_id=auth_cfg.cognito_user_pool_id,
+            app_client_id=auth_cfg.cognito_client_id,
         )
         return create_auth_dependency(cognito)
     except Exception as exc:
-        logger.debug("daylily-cognito auth not available: %s", exc)
+        logger.debug("daylily-auth-cognito auth not available: %s", exc)
         return None
 
 

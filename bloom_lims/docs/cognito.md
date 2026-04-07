@@ -1,6 +1,6 @@
 # AWS Cognito Authentication for Bloom LIMS
 
-Bloom LIMS uses [AWS Cognito](https://aws.amazon.com/cognito/) for single sign-on (SSO) authentication via the hosted UI. This replaces the previous Supabase integration and provides enterprise-grade authentication with support for social identity providers (Google, etc.) and SAML/OIDC federation.
+Bloom LIMS uses [AWS Cognito](https://aws.amazon.com/cognito/) for single sign-on (SSO) authentication via the hosted UI. In the 2.0 refactor, Bloom depends on `daylily-auth-cognito` as the shared auth boundary: browser session handling lives in `browser.session`, Hosted UI URL and code-exchange helpers live in `browser.oauth` and `browser.google`, bearer verification lives in `runtime.verifier` and `runtime.m2m`, and Cognito lifecycle stays in `daycog` via `admin.*`. Session storage remains token-free.
 
 ---
 
@@ -471,23 +471,26 @@ sequenceDiagram
 
 The authentication is handled by these components:
 
-1. **`auth/cognito/client.py`** - Core Cognito integration:
-   - `CognitoConfig`: Dataclass holding all configuration
-   - `CognitoAuth`: Handles token validation via JWKS
-   - `get_cognito_auth()`: Singleton factory function
+1. **`daylily_auth_cognito.browser.session`** - Shared browser-session contract:
+   - `CognitoWebSessionConfig`: Dataclass holding the Hosted UI session contract
+   - `start_cognito_login()`: Persists CSRF state and redirects to Cognito
+   - `complete_cognito_callback()`: Exchanges the authorization code asynchronously and stores a normalized session principal
+   - `SessionPrincipal`: Normalized browser session identity
 
-2. **`main.py`** - Route handlers:
-   - `GET /login`: Renders login page with Cognito authorize URL
-   - `GET /auth/callback`: Exchanges authorization code and creates session
-   - `POST /oauth_callback`: Legacy fragment-token fallback for Hosted UI responses that arrive with tokens
-   - `GET /logout`: Clears session and redirects to Cognito logout
+2. **`daylily_auth_cognito.browser.oauth`** - Cognito URL and token-exchange helpers:
+   - `build_authorization_url()`: Builds the Hosted UI login URL
+   - `exchange_authorization_code_async()`: Async code exchange used by the web callback path
 
-3. **`templates/login.html`** - Login UI:
+3. **`daylily_auth_cognito.runtime.verifier`** - API bearer-token verification:
+   - `CognitoTokenVerifier`: Verification-only JWT boundary for API auth
+
+4. **`bloom_lims.gui.routes.auth`** and **`bloom_lims.gui.web_session`** - Bloom-specific browser glue:
+   - `/login` renders the login UI
+   - `/auth/callback` completes the browser login flow
+   - `/logout` clears the local browser session and redirects to Cognito logout
+
+5. **`templates/login.html`** - Login UI:
    - "Login with Cognito" button triggers redirect
-
-4. **`/auth/callback` fallback page**:
-   - If Cognito returns fragment tokens instead of `?code=...`, JavaScript extracts them
-   - Posts tokens to `/oauth_callback`
 
 ### Session Data Structure
 
@@ -496,11 +499,11 @@ After successful authentication, `request.session["user_data"]` contains:
 ```python
 {
     "email": "user@example.com",
-    "id_token": "eyJhbGciOiJSUzI1NiIs...",
-    "access_token": "eyJhbGciOiJSUzI1NiIs...",
     "cognito_username": "google_123456789",  # For federated users
     "cognito_sub": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    # ... additional user preferences
+    "roles": ["READ_WRITE"],
+    "service_groups": ["API_ACCESS"],
+    # ... additional user preferences and normalized profile data
 }
 ```
 
