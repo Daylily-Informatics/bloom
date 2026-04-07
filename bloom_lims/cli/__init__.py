@@ -21,7 +21,7 @@ from bloom_lims.config import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ACTIVATE_SCRIPT = "./activate"
+ACTIVATE_SCRIPT = "./activate [deploy-name] [--debug]"
 DEACTIVATE_SCRIPT = "./bloom_deactivate"
 
 
@@ -84,7 +84,7 @@ spec = CliSpec(
     env=EnvSpec(
         active_env_var="BLOOM_ACTIVE",
         project_root_env_var="BLOOM_ROOT",
-        activate_script_name=f"{ACTIVATE_SCRIPT} <deploy-name>",
+        activate_script_name=ACTIVATE_SCRIPT,
         deactivate_script_name=DEACTIVATE_SCRIPT,
     ),
     plugins=PluginSpec(

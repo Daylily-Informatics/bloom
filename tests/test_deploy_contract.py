@@ -26,6 +26,7 @@ def test_activate_only_references_root_environment_yaml() -> None:
     assert 'pip install -e "${BLOOM_ROOT}[dev]" -q' in activate
     assert "export BLOOM_ACTIVE=1" in activate
     assert "--no-deps" not in activate
+    assert "Usage: source ./activate [deploy-name] [--debug]" in activate
     assert (PROJECT_ROOT / "bloom_deactivate").is_file()
     assert "unset BLOOM_ACTIVE" in deactivate
     assert "-e ." not in environment
@@ -33,4 +34,3 @@ def test_activate_only_references_root_environment_yaml() -> None:
     assert "TAPDB_APP_CODE=B" in root_template
     assert "MERIDIAN_DOMAIN_CODE=B" in packaged_template
     assert "TAPDB_APP_CODE=B" in packaged_template
-

@@ -5,7 +5,7 @@
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "Error: This script must be sourced, not executed."
-    echo "Usage: source ./activate <deploy-name>"
+    echo "Usage: source ./activate [deploy-name] [--debug]"
     exit 1
 fi
 
@@ -28,10 +28,11 @@ _GREEN='\033[0;32m'
 _YELLOW='\033[1;33m'
 _BLUE='\033[0;34m'
 _CYAN='\033[0;36m'
+_RED='\033[0;31m'
 _NC='\033[0m'
 _BLOOM_PYTHON=""
-_BLOOM_CONDA_ENV_CREATED="0"
 _BLOOM_CONDA_ENV_BASE="BLOOM"
+_BLOOM_DEPLOY_NAME_MAX_LEN=8
 _BLOOM_LEGACY_REBIND_VARS=(
     USE_LOCAL_DAYLILY_TAPDB
     USE_LOCAL_DAYLILY_COGNITO
@@ -68,6 +69,13 @@ PY
         echo -e "  ${_YELLOW}⚠${_NC} Missing packaged dependency: ${package_name}"
         return 1
     fi
+}
+
+_bloom_dev_runtime_ready() {
+    _bloom_require_python_import "daylily_tapdb" "daylily-tapdb" || return 1
+    _bloom_require_python_import "daylily_auth_cognito" "daylily-auth-cognito" || return 1
+    _bloom_require_python_import "cli_core_yo" "cli-core-yo" || return 1
+    _bloom_require_python_import "pytest" "pytest" || return 1
 }
 
 _bloom_default_web_port() {
@@ -123,42 +131,88 @@ _bloom_prepare_tapdb_config_path() {
     printf '%s\n' "$user_path"
 }
 
-if [[ "$#" -ne 1 ]]; then
-    echo -e "  ${_YELLOW}⚠${_NC} Bloom activation requires exactly one positional deploy-name."
-    echo "Usage: source ./activate <deploy-name>"
-    return 1
-fi
+_bloom_pyproject_static_version() {
+    python - "$BLOOM_ROOT/pyproject.toml" <<'PY'
+from __future__ import annotations
 
-_bloom_deployment_code="$1"
-if ! _bloom_validate_deploy_name "${_bloom_deployment_code}"; then
-    return 1
-fi
-export BLOOM_DEPLOYMENT_CODE="${_bloom_deployment_code}"
-export DEPLOYMENT_CODE="${_bloom_deployment_code}"
-export LSMC_DEPLOYMENT_CODE="${_bloom_deployment_code}"
-_BLOOM_CONDA_ENV_NAME="${_BLOOM_CONDA_ENV_BASE}-${_bloom_deployment_code}"
-unset _bloom_deployment_code
-
-if ! _bloom_reject_legacy_local_rebind_env; then
-    return 1
-fi
-
-_bloom_module_is_from_repo() {
-    local module_name="$1"
-    local repo_root="$2"
-    "${_BLOOM_PYTHON:-python}" - "$module_name" "$repo_root" <<'PY' >/dev/null 2>&1
-import importlib
 import pathlib
 import sys
 
-module = importlib.import_module(sys.argv[1])
-repo_root = pathlib.Path(sys.argv[2]).resolve()
-module_file = getattr(module, "__file__", "")
-if not module_file:
+try:
+    import tomllib
+except Exception:
     raise SystemExit(1)
-module_path = pathlib.Path(module_file).resolve()
-raise SystemExit(0 if module_path == repo_root or repo_root in module_path.parents else 1)
+
+pyproject_path = pathlib.Path(sys.argv[1])
+try:
+    data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+
+project = data.get("project")
+if not isinstance(project, dict):
+    raise SystemExit(0)
+
+dynamic = project.get("dynamic")
+if isinstance(dynamic, list) and "version" in dynamic:
+    raise SystemExit(0)
+
+version = project.get("version")
+if isinstance(version, str) and version.strip():
+    print(version.strip())
 PY
+}
+
+_bloom_repo_local_version() {
+    python - "$BLOOM_ROOT" <<'PY'
+from __future__ import annotations
+
+import pathlib
+import sys
+
+repo_root = pathlib.Path(sys.argv[1]).resolve()
+sys.path.insert(0, str(repo_root))
+
+from bloom_lims._version import get_version  # noqa: E402
+
+version = get_version().strip()
+if version and version != "0.0.0.dev0":
+    print(version)
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+_bloom_setuptools_scm_version() {
+    python - "$BLOOM_ROOT" <<'PY'
+from __future__ import annotations
+
+import pathlib
+import sys
+
+repo_root = pathlib.Path(sys.argv[1]).resolve()
+try:
+    from setuptools_scm import get_version
+except Exception:
+    raise SystemExit(1)
+
+try:
+    version = get_version(root=str(repo_root), fallback_version="")
+except Exception:
+    raise SystemExit(1)
+
+version = str(version).strip()
+if version and version != "0.0.0.dev0":
+    print(version)
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+_bloom_exact_numeric_git_tag() {
+    git -C "$BLOOM_ROOT" tag --points-at HEAD 2>/dev/null | awk '
+        /^[0-9]+(\.[0-9]+)*$/ { print; exit }
+    '
 }
 
 _bloom_distribution_is_editable_from_repo() {
@@ -174,11 +228,130 @@ _bloom_distribution_is_editable_from_repo() {
     [[ "$editable_location" == "$repo_root" ]]
 }
 
-_bloom_dev_runtime_ready() {
-    _bloom_require_python_import "daylily_tapdb" "daylily-tapdb" || return 1
-    _bloom_require_python_import "daylily_auth_cognito" "daylily-auth-cognito" || return 1
-    _bloom_require_python_import "cli_core_yo" "cli-core-yo" || return 1
-    _bloom_require_python_import "pytest" "pytest" || return 1
+_bloom_normalize_default_deploy_name() {
+    local raw_value="${1:-0.0.0}"
+    local sanitized=""
+    sanitized="$(_bloom_sanitize_deployment_code "$raw_value")"
+    sanitized="${sanitized:0:${_BLOOM_DEPLOY_NAME_MAX_LEN}}"
+    sanitized="${sanitized:-local}"
+    printf '%s\n' "$sanitized"
+}
+
+_bloom_resolve_default_deploy_name() {
+    local raw_version=""
+
+    raw_version="$(_bloom_pyproject_static_version 2>/dev/null || true)"
+    if [[ -z "$raw_version" ]]; then
+        raw_version="$(_bloom_repo_local_version 2>/dev/null || true)"
+    fi
+    if [[ -z "$raw_version" ]]; then
+        raw_version="$(_bloom_setuptools_scm_version 2>/dev/null || true)"
+    fi
+    if [[ -z "$raw_version" ]]; then
+        raw_version="$(_bloom_exact_numeric_git_tag 2>/dev/null || true)"
+    fi
+    if [[ -z "$raw_version" ]]; then
+        raw_version="0.0.0"
+    fi
+
+    _bloom_normalize_default_deploy_name "$raw_version"
+}
+
+_bloom_unset_activation_exports() {
+    unset BLOOM_ACTIVE
+    unset BLOOM_ROOT
+    unset BLOOM_DEPLOYMENT_CODE
+    unset DEPLOYMENT_CODE
+    unset LSMC_DEPLOYMENT_CODE
+    unset MERIDIAN_ENVIRONMENT
+    unset MERIDIAN_SANDBOX_PREFIX
+    unset MERIDIAN_DOMAIN_CODE
+    unset TAPDB_APP_CODE
+    unset BLOOM_COGNITO_APP_NAME
+    unset AWS_PROFILE
+    unset AWS_REGION
+    unset AWS_DEFAULT_REGION
+    unset BLOOM_UI_PORT
+    unset BLOOM_TAPDB_LOCAL_PG_PORT
+}
+
+_bloom_print_activation_failure_block() {
+    local rc="$1"
+    local deploy_name="${_BLOOM_CONDA_ENV_NAME:-"(not resolved)"}"
+    echo ""
+    echo -e "${_RED}╭────────────────────────────────────────────────────╮${_NC}"
+    echo -e "${_RED}│${_NC} BLOOM activation failed"
+    echo -e "${_RED}│${_NC} status: ${rc}"
+    echo -e "${_RED}│${_NC} deploy-name: ${deploy_name}"
+    echo -e "${_RED}│${_NC} debug: ${_BLOOM_ACTIVATE_DEBUG}"
+    echo -e "${_RED}╰────────────────────────────────────────────────────╯${_NC}"
+}
+
+_bloom_cleanup_activation() {
+    local rc="$1"
+    if [[ "${_BLOOM_ACTIVATE_CLEANUP_DONE:-0}" == "1" ]]; then
+        return 0
+    fi
+    _BLOOM_ACTIVATE_CLEANUP_DONE="1"
+
+    _bloom_print_activation_failure_block "$rc"
+
+    if [[ "${_BLOOM_TARGET_ENV_ACTIVATED:-0}" == "1" ]]; then
+        if command -v conda >/dev/null 2>&1; then
+            conda deactivate >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if [[ "${_BLOOM_CREATED_CONDA_ENV:-0}" == "1" && "${_BLOOM_ACTIVATE_DEBUG:-0}" != "1" ]]; then
+        if command -v conda >/dev/null 2>&1; then
+            conda env remove -n "${_BLOOM_CONDA_ENV_NAME}" -y >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if [[ -n "${_BLOOM_PREVIOUS_CONDA_ENV:-}" && "${_BLOOM_PREVIOUS_CONDA_ENV}" != "${_BLOOM_CONDA_ENV_NAME}" ]]; then
+        if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_PREVIOUS_CONDA_ENV}" ]]; then
+            if command -v conda >/dev/null 2>&1; then
+                conda activate "${_BLOOM_PREVIOUS_CONDA_ENV}" >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+
+    _bloom_unset_activation_exports
+}
+
+_bloom_activation_return_hook() {
+    local rc="$1"
+    trap - RETURN
+    if [[ "$rc" -ne 0 ]]; then
+        _bloom_cleanup_activation "$rc"
+    fi
+}
+
+_bloom_parse_activate_args() {
+    local arg=""
+    _BLOOM_ACTIVATE_DEPLOY_NAME=""
+    _BLOOM_ACTIVATE_DEBUG="0"
+
+    for arg in "$@"; do
+        if [[ "$arg" == "--debug" ]]; then
+            _BLOOM_ACTIVATE_DEBUG="1"
+            continue
+        fi
+        if [[ -n "${_BLOOM_ACTIVATE_DEPLOY_NAME}" ]]; then
+            echo -e "  ${_YELLOW}⚠${_NC} Bloom activation accepts at most one positional deploy-name."
+            echo "Usage: source ./activate [deploy-name] [--debug]"
+            return 1
+        fi
+        _BLOOM_ACTIVATE_DEPLOY_NAME="$arg"
+    done
+
+    if [[ -n "${_BLOOM_ACTIVATE_DEPLOY_NAME}" ]]; then
+        if ! _bloom_validate_deploy_name "${_BLOOM_ACTIVATE_DEPLOY_NAME}"; then
+            return 1
+        fi
+    else
+        _BLOOM_ACTIVATE_DEPLOY_NAME="$(_bloom_resolve_default_deploy_name)"
+    fi
 }
 
 _bloom_install_main_repo() {
@@ -208,9 +381,7 @@ _bloom_validate_main_repo_install() {
     echo -e "  ${_GREEN}✓${_NC} Using local Bloom checkout: ${BLOOM_ROOT}"
 }
 
-echo -e "${_BLUE}Activating BLOOM LIMS environment (${_BLOOM_CONDA_ENV_NAME})...${_NC}"
-
-if command -v conda &> /dev/null; then
+_bloom_conda_hook() {
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         eval "$(conda shell.zsh hook)" 2>/dev/null || true
     elif [[ -n "${BASH_VERSION:-}" ]]; then
@@ -218,10 +389,42 @@ if command -v conda &> /dev/null; then
     else
         source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null || true
     fi
+}
+
+_bloom_activate_main() {
+    if [[ -n "${_BLOOM_ACTIVATE_CLEANUP_DONE:-}" ]]; then
+        :
+    fi
+
+    if ! _bloom_parse_activate_args "$@"; then
+        return 1
+    fi
+
+    _BLOOM_CONDA_ENV_NAME="${_BLOOM_CONDA_ENV_BASE}-${_BLOOM_ACTIVATE_DEPLOY_NAME}"
+    _BLOOM_PREVIOUS_CONDA_ENV="${CONDA_DEFAULT_ENV:-}"
+    _BLOOM_PREVIOUS_CONDA_PREFIX="${CONDA_PREFIX:-}"
+    _BLOOM_PREVIOUS_CONDA_PATH="${PATH:-}"
+    _BLOOM_CREATED_CONDA_ENV="0"
+    _BLOOM_TARGET_ENV_ACTIVATED="0"
+    _BLOOM_ACTIVATE_CLEANUP_DONE="0"
+
+    if ! _bloom_reject_legacy_local_rebind_env; then
+        return 1
+    fi
+
+    echo -e "${_BLUE}Activating BLOOM LIMS environment (${_BLOOM_CONDA_ENV_NAME})...${_NC}"
+
+    if ! command -v conda &> /dev/null; then
+        echo -e "  ${_YELLOW}⚠${_NC} Conda not found."
+        return 1
+    fi
+
+    _bloom_conda_hook
 
     if conda info --envs | grep -Eq "(^|[[:space:]])${_BLOOM_CONDA_ENV_NAME}([[:space:]]|$)"; then
         echo -e "  ${_GREEN}✓${_NC} Activating conda environment: ${_BLOOM_CONDA_ENV_NAME}"
         conda activate "${_BLOOM_CONDA_ENV_NAME}"
+        _BLOOM_TARGET_ENV_ACTIVATED="1"
         if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
             export PATH="$CONDA_PREFIX/bin:$PATH"
         fi
@@ -232,10 +435,11 @@ if command -v conda &> /dev/null; then
             if conda env create -n "${_BLOOM_CONDA_ENV_NAME}" -f "$BLOOM_ROOT/environment.yaml"; then
                 echo -e "  ${_GREEN}✓${_NC} Conda environment created successfully"
                 conda activate "${_BLOOM_CONDA_ENV_NAME}"
+                _BLOOM_CREATED_CONDA_ENV="1"
+                _BLOOM_TARGET_ENV_ACTIVATED="1"
                 if [[ -n "$CONDA_PREFIX" ]] && [[ -d "$CONDA_PREFIX/bin" ]]; then
                     export PATH="$CONDA_PREFIX/bin:$PATH"
                 fi
-                _BLOOM_CONDA_ENV_CREATED="1"
             else
                 echo -e "  ${_YELLOW}⚠${_NC} Failed to create conda environment."
             fi
@@ -243,113 +447,136 @@ if command -v conda &> /dev/null; then
             echo -e "  ${_YELLOW}⚠${_NC} environment.yaml not found."
         fi
     fi
-else
-    echo -e "  ${_YELLOW}⚠${_NC} Conda not found."
-    return 1
-fi
 
-if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_CONDA_ENV_NAME}" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
-    echo -e "  ${_YELLOW}⚠${_NC} ${_BLOOM_CONDA_ENV_NAME} conda environment is required."
-    echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f environment.yaml' if needed, then retry 'source ./activate <deploy-name>'."
-    return 1
-fi
-
-_BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
-_BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
-export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
-
-if [[ "${_BLOOM_CONDA_ENV_CREATED}" == "1" ]]; then
-    if ! _bloom_install_main_repo; then
+    if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_CONDA_ENV_NAME}" ]] || [[ -z "${CONDA_PREFIX:-}" ]] || [[ ! -x "${CONDA_PREFIX}/bin/python" ]]; then
+        echo -e "  ${_YELLOW}⚠${_NC} ${_BLOOM_CONDA_ENV_NAME} conda environment is required."
+        echo -e "  ${_CYAN}→${_NC} Run 'conda env create -n ${_BLOOM_CONDA_ENV_NAME} -f environment.yaml' if needed, then retry 'source ./activate [deploy-name] [--debug]'."
         return 1
     fi
-elif ! _bloom_validate_main_repo_install; then
-    echo -e "  ${_CYAN}→${_NC} Refreshing Bloom install in ${_BLOOM_CONDA_ENV_NAME}..."
-    if ! _bloom_install_main_repo; then
-        return 1
-    fi
-fi
 
-echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
-echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-auth-cognito from ${_BLOOM_CONDA_ENV_NAME}"
-echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
+    _BLOOM_PYTHON="${CONDA_PREFIX}/bin/python"
+    _BLOOM_PYTHON_BIN="$(dirname "${_BLOOM_PYTHON}")"
+    export PATH="${_BLOOM_PYTHON_BIN}:$PATH"
 
-if command -v rehash >/dev/null 2>&1; then
-    rehash
-elif command -v hash >/dev/null 2>&1; then
-    hash -r 2>/dev/null || true
-fi
-
-if [[ "$-" == *i* ]]; then
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        if eval "$(_BLOOM_COMPLETE=zsh_source bloom 2>/dev/null)" 2>/dev/null; then
-            echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (zsh)"
+    if [[ "${_BLOOM_CREATED_CONDA_ENV}" == "1" ]]; then
+        if ! _bloom_install_main_repo; then
+            return 1
         fi
-    elif [[ -n "${BASH_VERSION:-}" ]]; then
-        if eval "$(_BLOOM_COMPLETE=bash_source bloom 2>/dev/null)" 2>/dev/null; then
-            echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (bash)"
+    elif ! _bloom_validate_main_repo_install; then
+        echo -e "  ${_CYAN}→${_NC} Refreshing Bloom install in ${_BLOOM_CONDA_ENV_NAME}..."
+        if ! _bloom_install_main_repo; then
+            return 1
         fi
     fi
-fi
 
-# TapDB/AWS runtime defaults for BLOOM
-_BLOOM_TAPDB_ENV="dev"
-_BLOOM_TAPDB_CLIENT_ID="bloom"
-_BLOOM_TAPDB_DATABASE_NAME="bloom"
-_BLOOM_MERIDIAN_DOMAIN_CODE="B"
-_BLOOM_TAPDB_APP_CODE="B"
-export MERIDIAN_ENVIRONMENT="${MERIDIAN_ENVIRONMENT:-production}"
-export MERIDIAN_SANDBOX_PREFIX="${MERIDIAN_SANDBOX_PREFIX-}"
-export MERIDIAN_DOMAIN_CODE="${MERIDIAN_DOMAIN_CODE:-${_BLOOM_MERIDIAN_DOMAIN_CODE}}"
-export TAPDB_APP_CODE="${TAPDB_APP_CODE:-${_BLOOM_TAPDB_APP_CODE}}"
-export BLOOM_UI_PORT="${BLOOM_UI_PORT:-$(_bloom_default_web_port)}"
-_BLOOM_TAPDB_LOCAL_PG_PORT="$(_bloom_default_tapdb_local_pg_port)"
-_BLOOM_TAPDB_DEV_PORT="${_BLOOM_TAPDB_LOCAL_PG_PORT}"
-_BLOOM_TAPDB_TEST_PORT="${_BLOOM_TAPDB_LOCAL_PG_PORT}"
-_BLOOM_TAPDB_CONFIG_PATH="$(_bloom_prepare_tapdb_config_path "${_BLOOM_TAPDB_CLIENT_ID}" "${_BLOOM_TAPDB_DATABASE_NAME}")"
-export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
-export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
-export AWS_REGION="${AWS_REGION:-us-west-2}"
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-$AWS_REGION}"
+    echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-tapdb from ${_BLOOM_CONDA_ENV_NAME}"
+    echo -e "  ${_GREEN}✓${_NC} Using packaged daylily-auth-cognito from ${_BLOOM_CONDA_ENV_NAME}"
+    echo -e "  ${_GREEN}✓${_NC} Using packaged cli-core-yo from ${_BLOOM_CONDA_ENV_NAME}"
 
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB env=${_BLOOM_TAPDB_ENV}"
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB client=${_BLOOM_TAPDB_CLIENT_ID}"
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB namespace=${_BLOOM_TAPDB_DATABASE_NAME}"
-echo -e "  ${_GREEN}✓${_NC} MERIDIAN_DOMAIN_CODE=${MERIDIAN_DOMAIN_CODE}"
-echo -e "  ${_GREEN}✓${_NC} TAPDB_APP_CODE=${TAPDB_APP_CODE}"
-echo -e "  ${_GREEN}✓${_NC} MERIDIAN_ENVIRONMENT=${MERIDIAN_ENVIRONMENT}"
-echo -e "  ${_GREEN}✓${_NC} MERIDIAN_SANDBOX_PREFIX=${MERIDIAN_SANDBOX_PREFIX}"
-if [[ -n "${_BLOOM_TAPDB_CONFIG_PATH:-}" ]]; then
-    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB config path=${_BLOOM_TAPDB_CONFIG_PATH}"
-else
-    echo -e "  ${_YELLOW}⚠${_NC} Bloom TapDB config path is not set"
-fi
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB dev port=${_BLOOM_TAPDB_DEV_PORT}"
-echo -e "  ${_GREEN}✓${_NC} Bloom TapDB test port=${_BLOOM_TAPDB_TEST_PORT}"
-echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
-echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
-echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
+    if command -v rehash >/dev/null 2>&1; then
+        rehash
+    elif command -v hash >/dev/null 2>&1; then
+        hash -r 2>/dev/null || true
+    fi
 
-export BLOOM_ROOT
-export BLOOM_ACTIVE=1
+    if [[ "$-" == *i* ]]; then
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            if eval "$(_BLOOM_COMPLETE=zsh_source bloom 2>/dev/null)" 2>/dev/null; then
+                echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (zsh)"
+            fi
+        elif [[ -n "${BASH_VERSION:-}" ]]; then
+            if eval "$(_BLOOM_COMPLETE=bash_source bloom 2>/dev/null)" 2>/dev/null; then
+                echo -e "  ${_GREEN}✓${_NC} Enabled tab completion for 'bloom' (bash)"
+            fi
+        fi
+    fi
 
-echo ""
-echo -e "${_CYAN}BLOOM LIMS environment activated!${_NC}"
-echo ""
-echo "Command groups:"
-echo ""
-echo -e "  ${_CYAN}bloom server${_NC}    start, stop, status, logs"
-echo -e "  ${_CYAN}bloom db${_NC}        init, start, stop, status, migrate, seed, shell, reset"
-echo -e "  ${_CYAN}bloom config${_NC}    path, init, show, validate, edit, reset, shell, doctor, status"
-echo -e "  ${_CYAN}tapdb${_NC}           shared DB/runtime lifecycle"
-echo -e "  ${_CYAN}daycog${_NC}          shared Cognito lifecycle where Bloom delegates"
-echo -e "  ${_CYAN}bloom info${_NC}      Show environment information"
-echo -e "  ${_CYAN}bloom version${_NC}   Show CLI version"
-echo ""
-echo -e "  ${_GREEN}bloom --help${_NC}          Show all available commands"
-echo -e "  ${_GREEN}source ./bloom_deactivate${_NC}      Deactivate this environment"
-echo ""
+    # TapDB/AWS runtime defaults for BLOOM
+    _BLOOM_TAPDB_ENV="dev"
+    _BLOOM_TAPDB_CLIENT_ID="bloom"
+    _BLOOM_TAPDB_DATABASE_NAME="bloom"
+    _BLOOM_MERIDIAN_DOMAIN_CODE="B"
+    _BLOOM_TAPDB_APP_CODE="B"
+    export MERIDIAN_ENVIRONMENT="${MERIDIAN_ENVIRONMENT:-production}"
+    export MERIDIAN_SANDBOX_PREFIX="${MERIDIAN_SANDBOX_PREFIX-}"
+    export MERIDIAN_DOMAIN_CODE="${MERIDIAN_DOMAIN_CODE:-${_BLOOM_MERIDIAN_DOMAIN_CODE}}"
+    export TAPDB_APP_CODE="${TAPDB_APP_CODE:-${_BLOOM_TAPDB_APP_CODE}}"
+    export BLOOM_UI_PORT="${BLOOM_UI_PORT:-$(_bloom_default_web_port)}"
+    _BLOOM_TAPDB_LOCAL_PG_PORT="$(_bloom_default_tapdb_local_pg_port)"
+    _BLOOM_TAPDB_DEV_PORT="${_BLOOM_TAPDB_LOCAL_PG_PORT}"
+    _BLOOM_TAPDB_TEST_PORT="${_BLOOM_TAPDB_LOCAL_PG_PORT}"
+    _BLOOM_TAPDB_CONFIG_PATH="$(_bloom_prepare_tapdb_config_path "${_BLOOM_TAPDB_CLIENT_ID}" "${_BLOOM_TAPDB_DATABASE_NAME}")"
+    export BLOOM_COGNITO_APP_NAME="${BLOOM_COGNITO_APP_NAME:-bloom}"
+    export AWS_PROFILE="${AWS_PROFILE:-lsmc}"
+    export AWS_REGION="${AWS_REGION:-us-west-2}"
+    export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-$AWS_REGION}"
 
-unset _BLOOM_CLI_CORE_REPO
-unset _BLOOM_DAYCOG_REPO
-unset _BLOOM_TAPDB_REPO
-unset _BLOOM_CONDA_ENV_CREATED
+    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB env=${_BLOOM_TAPDB_ENV}"
+    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB client=${_BLOOM_TAPDB_CLIENT_ID}"
+    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB namespace=${_BLOOM_TAPDB_DATABASE_NAME}"
+    echo -e "  ${_GREEN}✓${_NC} MERIDIAN_DOMAIN_CODE=${MERIDIAN_DOMAIN_CODE}"
+    echo -e "  ${_GREEN}✓${_NC} TAPDB_APP_CODE=${TAPDB_APP_CODE}"
+    echo -e "  ${_GREEN}✓${_NC} MERIDIAN_ENVIRONMENT=${MERIDIAN_ENVIRONMENT}"
+    echo -e "  ${_GREEN}✓${_NC} MERIDIAN_SANDBOX_PREFIX=${MERIDIAN_SANDBOX_PREFIX}"
+    if [[ -n "${_BLOOM_TAPDB_CONFIG_PATH:-}" ]]; then
+        echo -e "  ${_GREEN}✓${_NC} Bloom TapDB config path=${_BLOOM_TAPDB_CONFIG_PATH}"
+    else
+        echo -e "  ${_YELLOW}⚠${_NC} Bloom TapDB config path is not set"
+    fi
+    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB dev port=${_BLOOM_TAPDB_DEV_PORT}"
+    echo -e "  ${_GREEN}✓${_NC} Bloom TapDB test port=${_BLOOM_TAPDB_TEST_PORT}"
+    echo -e "  ${_GREEN}✓${_NC} BLOOM_COGNITO_APP_NAME=${BLOOM_COGNITO_APP_NAME}"
+    echo -e "  ${_GREEN}✓${_NC} AWS_PROFILE=${AWS_PROFILE}"
+    echo -e "  ${_GREEN}✓${_NC} AWS_REGION=${AWS_REGION}"
+
+    export BLOOM_ROOT
+    export BLOOM_ACTIVE=1
+    export BLOOM_DEPLOYMENT_CODE="${_BLOOM_ACTIVATE_DEPLOY_NAME}"
+    export DEPLOYMENT_CODE="${_BLOOM_ACTIVATE_DEPLOY_NAME}"
+    export LSMC_DEPLOYMENT_CODE="${_BLOOM_ACTIVATE_DEPLOY_NAME}"
+
+    echo ""
+    echo -e "${_CYAN}BLOOM LIMS environment activated!${_NC}"
+    echo ""
+    echo "Command groups:"
+    echo ""
+    echo -e "  ${_CYAN}bloom server${_NC}    start, stop, status, logs"
+    echo -e "  ${_CYAN}bloom db${_NC}        init, start, stop, status, migrate, seed, shell, reset"
+    echo -e "  ${_CYAN}bloom config${_NC}    path, init, show, validate, edit, reset, shell, doctor, status"
+    echo -e "  ${_CYAN}tapdb${_NC}           shared DB/runtime lifecycle"
+    echo -e "  ${_CYAN}daycog${_NC}          shared Cognito lifecycle where Bloom delegates"
+    echo -e "  ${_CYAN}bloom info${_NC}      Show environment information"
+    echo -e "  ${_CYAN}bloom version${_NC}   Show CLI version"
+    echo ""
+    echo -e "  ${_GREEN}bloom --help${_NC}          Show all available commands"
+    echo -e "  ${_GREEN}source ./bloom_deactivate${_NC}      Deactivate this environment"
+    echo ""
+
+    unset _BLOOM_CLI_CORE_REPO
+    unset _BLOOM_DAYCOG_REPO
+    unset _BLOOM_TAPDB_REPO
+    unset _BLOOM_CONDA_ENV_CREATED
+    unset _BLOOM_PYTHON_BIN
+}
+
+_bloom_activate_wrapper() {
+    local rc=0
+
+    if [[ -n "${BASH_VERSION:-}" ]]; then
+        trap '_bloom_activation_return_hook "$?"' RETURN
+    fi
+
+    _bloom_activate_main "$@"
+    rc=$?
+
+    if [[ -z "${BASH_VERSION:-}" ]]; then
+        if [[ "$rc" -ne 0 ]]; then
+            _bloom_cleanup_activation "$rc"
+        fi
+    fi
+
+    return "$rc"
+}
+
+_bloom_activate_wrapper "$@"
+return $?
