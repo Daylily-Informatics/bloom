@@ -337,3 +337,4 @@ These are worth reading for background, but they are not the current contract. C
 - **workset / workflow**: older Bloom concepts that still exist historically in-repo but are not mounted as supported product API/GUI surfaces today.
 - **Hosted UI**: Cognito's browser-facing login/logout flow used by Bloom's GUI session path.
 - **discoverable service**: a service that follows Dayhoff's activation, bootstrap, start, and readiness conventions so the deployment bundle can locate and run it consistently.
+ 
