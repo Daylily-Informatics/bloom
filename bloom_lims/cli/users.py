@@ -15,12 +15,12 @@ if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
 
-from bloom_lims.cli._registry_v2 import EXEMPT_MUTATING, register_group_commands
 from bloom_lims.auth.rbac import API_ACCESS_GROUP, Role
 from bloom_lims.auth.services.user_api_tokens import (
     TokenCreateInput,
     UserAPITokenService,
 )
+from bloom_lims.cli._registry_v2 import EXEMPT_MUTATING, register_group_commands
 from bloom_lims.db import BLOOMdb3
 
 users_app = typer.Typer(
