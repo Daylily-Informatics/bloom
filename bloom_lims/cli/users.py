@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import typer
 from daylily_tapdb.user_store import get_by_login_or_email
 
+from bloom_lims.cli._registry_v2 import EXEMPT_MUTATING, register_group_commands
 from bloom_lims.auth.rbac import API_ACCESS_GROUP, Role
 from bloom_lims.auth.services.user_api_tokens import (
     TokenCreateInput,
@@ -85,4 +86,12 @@ def issue_token(
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the users command group."""
-    registry.add_typer_app(None, users_app, "users", "User management commands.")
+    _ = spec
+    register_group_commands(
+        registry,
+        "users",
+        "User management commands.",
+        [
+            ("issue-token", issue_token, EXEMPT_MUTATING),
+        ],
+    )

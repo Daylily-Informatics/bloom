@@ -18,6 +18,11 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from bloom_lims.cli._registry_v2 import (
+    EXEMPT_MUTATING,
+    EXEMPT_MUTATING_INTERACTIVE,
+    register_group_commands,
+)
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_BLOOM_WEB_PORT,
@@ -323,4 +328,15 @@ def db_nuke(
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the db command group."""
-    registry.add_typer_app(None, db_app, "db", "Database management commands.")
+    _ = spec
+    register_group_commands(
+        registry,
+        "db",
+        "Database management commands.",
+        [
+            ("build", db_build, EXEMPT_MUTATING),
+            ("seed", db_seed, EXEMPT_MUTATING),
+            ("reset", db_reset, EXEMPT_MUTATING_INTERACTIVE),
+            ("nuke", db_nuke, EXEMPT_MUTATING_INTERACTIVE),
+        ],
+    )

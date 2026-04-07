@@ -28,6 +28,13 @@ from cli_core_yo.server import (
 )
 from rich.console import Console
 
+from bloom_lims.cli._registry_v2 import (
+    EXEMPT,
+    EXEMPT_LONG_RUNNING,
+    EXEMPT_MUTATING,
+    EXEMPT_MUTATING_LONG_RUNNING,
+    register_group_commands,
+)
 from bloom_lims.config import (
     DEFAULT_BLOOM_WEB_PORT,
     apply_runtime_environment,
@@ -366,4 +373,15 @@ def logs(
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the server command group."""
-    registry.add_typer_app(None, server_app, "server", "Server lifecycle commands.")
+    _ = spec
+    register_group_commands(
+        registry,
+        "server",
+        "Server lifecycle commands.",
+        [
+            ("start", start, EXEMPT_MUTATING_LONG_RUNNING),
+            ("stop", stop, EXEMPT_MUTATING),
+            ("status", status, EXEMPT),
+            ("logs", logs, EXEMPT_LONG_RUNNING),
+        ],
+    )

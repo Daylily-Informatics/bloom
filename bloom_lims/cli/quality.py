@@ -14,6 +14,8 @@ from pathlib import Path
 
 import typer
 
+from bloom_lims.cli._registry_v2 import EXEMPT_LONG_RUNNING, register_group_commands
+
 quality_app = typer.Typer(
     help="Code-quality and validation commands", no_args_is_help=True
 )
@@ -66,4 +68,14 @@ def bandit(ctx: typer.Context) -> None:
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:
     """cli-core-yo plugin: register the quality command group."""
-    registry.add_typer_app(None, quality_app, "quality", "Code-quality commands.")
+    _ = spec
+    register_group_commands(
+        registry,
+        "quality",
+        "Code-quality commands.",
+        [
+            ("check", check, EXEMPT_LONG_RUNNING),
+            ("ruff", ruff, EXEMPT_LONG_RUNNING),
+            ("bandit", bandit, EXEMPT_LONG_RUNNING),
+        ],
+    )
