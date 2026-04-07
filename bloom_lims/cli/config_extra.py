@@ -7,13 +7,13 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cli_core_yo.spec import CommandPolicy
 from rich.console import Console
 from rich.table import Table
 
 if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
-from cli_core_yo.spec import CommandPolicy
 
 from bloom_lims.config import (
     apply_runtime_environment,

@@ -8,12 +8,12 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
+import typer
+from daylily_tapdb.user_store import get_by_login_or_email
+
 if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
-
-import typer
-from daylily_tapdb.user_store import get_by_login_or_email
 
 from bloom_lims.cli._registry_v2 import EXEMPT_MUTATING, register_group_commands
 from bloom_lims.auth.rbac import API_ACCESS_GROUP, Role
