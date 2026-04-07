@@ -177,7 +177,9 @@ def start(
     host, port = _runtime_host_and_port(port, host)
     shown_host = display_host(host)
     if not ssl and (cert or key):
-        console.print("[red]✗[/red] --cert and --key require HTTPS; omit them with --no-ssl")
+        console.print(
+            "[red]✗[/red] --cert and --key require HTTPS; omit them with --no-ssl"
+        )
         raise typer.Exit(1)
 
     protocol = "https" if ssl else "http"

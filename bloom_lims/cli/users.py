@@ -23,9 +23,7 @@ from bloom_lims.auth.services.user_api_tokens import (
 from bloom_lims.cli._registry_v2 import EXEMPT_MUTATING, register_group_commands
 from bloom_lims.db import BLOOMdb3
 
-users_app = typer.Typer(
-    help="Bloom-specific user commands.", no_args_is_help=True
-)
+users_app = typer.Typer(help="Bloom-specific user commands.", no_args_is_help=True)
 
 
 class TokenScope(str, Enum):
