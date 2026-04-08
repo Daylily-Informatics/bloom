@@ -340,15 +340,44 @@ def test_activate_defaults_to_normalized_version_name(
     result = _run_activate(
         shell_name,
         tmp_path,
-        repo_local_version="ab.cd/efgh",
+        repo_local_version="abc.def/ghij",
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "BLOOM-ab-cd-ef" in result.stdout
-    assert "CONDA_DEFAULT_ENV=BLOOM-ab-cd-ef" in result.stdout
-    assert "BLOOM_DEPLOYMENT_CODE=ab-cd-ef" in result.stdout
-    assert "env create BLOOM-ab-cd-ef" in result.stdout
-    assert (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-ab-cd-ef").is_dir()
+    assert "BLOOM-abc-def-g" in result.stdout
+    assert "CONDA_DEFAULT_ENV=BLOOM-abc-def-g" in result.stdout
+    assert "BLOOM_DEPLOYMENT_CODE=abc-def-g" in result.stdout
+    assert "env create BLOOM-abc-def-g" in result.stdout
+    assert (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-abc-def-g").is_dir()
+
+
+@pytest.mark.parametrize("shell_name", ["bash", "zsh"])
+def test_activate_rejects_too_short_deploy_name(
+    tmp_path: Path, shell_name: str
+) -> None:
+    result = _run_activate(
+        shell_name,
+        tmp_path,
+        args=["ab"],
+    )
+
+    assert result.returncode != 0
+    assert "deploy-name must match ^[A-Za-z0-9-]{3,9}$" in result.stdout
+
+
+@pytest.mark.parametrize("shell_name", ["bash", "zsh"])
+def test_activate_accepts_three_character_deploy_name(
+    tmp_path: Path, shell_name: str
+) -> None:
+    result = _run_activate(
+        shell_name,
+        tmp_path,
+        args=["abc"],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "BLOOM-abc" in result.stdout
+    assert "BLOOM_DEPLOYMENT_CODE=abc" in result.stdout
 
 
 @pytest.mark.parametrize("shell_name", ["bash", "zsh"])
@@ -358,35 +387,35 @@ def test_activate_cleans_up_created_env_on_failure(
     result = _run_activate(
         shell_name,
         tmp_path,
-        repo_local_version="ab.cd/efgh",
+        repo_local_version="abc.def/ghij",
         fail_install=True,
         active_env="LEGACY",
     )
 
     assert result.returncode != 0
     assert "BLOOM activation failed" in result.stdout
-    assert "deploy-name: BLOOM-ab-cd-ef" in result.stdout
+    assert "deploy-name: BLOOM-abc-def-g" in result.stdout
     assert "debug: 0" in result.stdout
     assert "CONDA_DEFAULT_ENV=LEGACY" in result.stdout
-    assert "env create BLOOM-ab-cd-ef" in result.stdout
-    assert "env remove BLOOM-ab-cd-ef" in result.stdout
-    assert not (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-ab-cd-ef").exists()
+    assert "env create BLOOM-abc-def-g" in result.stdout
+    assert "env remove BLOOM-abc-def-g" in result.stdout
+    assert not (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-abc-def-g").exists()
 
 
 def test_activate_preserves_preexisting_env_on_failure(tmp_path: Path) -> None:
     result = _run_activate(
         "bash",
         tmp_path,
-        repo_local_version="ab.cd/efgh",
+        repo_local_version="abc.def/ghij",
         fail_runtime_ready=True,
-        preexisting_env="BLOOM-ab-cd-ef",
+        preexisting_env="BLOOM-abc-def-g",
         active_env="LEGACY",
     )
 
     assert result.returncode != 0
-    assert "env create BLOOM-ab-cd-ef" not in result.stdout
-    assert "env remove BLOOM-ab-cd-ef" not in result.stdout
-    assert (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-ab-cd-ef").is_dir()
+    assert "env create BLOOM-abc-def-g" not in result.stdout
+    assert "env remove BLOOM-abc-def-g" not in result.stdout
+    assert (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-abc-def-g").is_dir()
 
 
 def test_activate_debug_skips_created_env_cleanup(tmp_path: Path) -> None:
@@ -394,13 +423,13 @@ def test_activate_debug_skips_created_env_cleanup(tmp_path: Path) -> None:
         "bash",
         tmp_path,
         args=["--debug"],
-        repo_local_version="ab.cd/efgh",
+        repo_local_version="abc.def/ghij",
         fail_install=True,
         active_env="LEGACY",
     )
 
     assert result.returncode != 0
     assert "debug: 1" in result.stdout
-    assert "env create BLOOM-ab-cd-ef" in result.stdout
-    assert "env remove BLOOM-ab-cd-ef" not in result.stdout
-    assert (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-ab-cd-ef").is_dir()
+    assert "env create BLOOM-abc-def-g" in result.stdout
+    assert "env remove BLOOM-abc-def-g" not in result.stdout
+    assert (tmp_path / "stubs" / "conda-root" / "envs" / "BLOOM-abc-def-g").is_dir()
