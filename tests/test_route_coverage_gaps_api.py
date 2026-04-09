@@ -40,7 +40,7 @@ def _get_template_euid(
 ) -> str:
     GT = bdb.Base.classes.generic_template
     q = bdb.session.query(GT).filter(GT.is_deleted == False).filter(GT.category == category)
-    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "B").strip().upper() or "B"
+    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "Z").strip().upper() or "Z"
     issuer_app_code = (os.environ.get("TAPDB_APP_CODE") or "B").strip().upper() or "B"
     q = q.filter(GT.domain_code == domain_code, GT.issuer_app_code == issuer_app_code)
     if type_name is not None:

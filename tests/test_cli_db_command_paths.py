@@ -35,7 +35,7 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
             "AWS_PROFILE": "lsmc",
             "AWS_REGION": "us-west-2",
             "AWS_DEFAULT_REGION": "us-west-2",
-            "MERIDIAN_DOMAIN_CODE": "B",
+            "MERIDIAN_DOMAIN_CODE": "Z",
             "TAPDB_APP_CODE": "B",
         },
     )
@@ -59,7 +59,7 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
         db_commands._run_tapdb(["db", "setup"], check=True)
 
     assert exc.value.code == 7
-    assert captured["env"]["MERIDIAN_DOMAIN_CODE"] == "B"
+    assert captured["env"]["MERIDIAN_DOMAIN_CODE"] == "Z"
     assert captured["env"]["TAPDB_APP_CODE"] == "B"
 
 

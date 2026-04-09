@@ -29,8 +29,7 @@ def test_activate_only_references_root_environment_yaml() -> None:
     assert (PROJECT_ROOT / "bloom_deactivate").is_file()
     assert "unset BLOOM_ACTIVE" in deactivate
     assert "-e ." not in environment
-    assert "MERIDIAN_DOMAIN_CODE=B" in root_template
+    assert "MERIDIAN_DOMAIN_CODE=Z" in root_template
     assert "TAPDB_APP_CODE=B" in root_template
-    assert "MERIDIAN_DOMAIN_CODE=B" in packaged_template
+    assert "MERIDIAN_DOMAIN_CODE=Z" in packaged_template
     assert "TAPDB_APP_CODE=B" in packaged_template
-

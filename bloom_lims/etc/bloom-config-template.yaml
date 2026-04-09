@@ -38,7 +38,7 @@ tapdb:
   client_id: "bloom"            # TapDB client namespace key for Bloom
   database_name: "bloom"        # TapDB database namespace key for Bloom
   # Explicit env contract for TapDB/Meridian subprocesses:
-  # MERIDIAN_DOMAIN_CODE=B
+  # MERIDIAN_DOMAIN_CODE=Z
   # TAPDB_APP_CODE=B
   strict_namespace: true        # Require namespaced TapDB config semantics
   config_path: ""               # Optional explicit TapDB config path
