@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import jsonschema
 from fastapi.testclient import TestClient
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
@@ -17,20 +18,19 @@ from bloom_lims.config import get_settings
 from bloom_lims.observability import EndpointRollup, ProjectionMetadata, _percentile
 
 
-DAYHOFF_SCHEMA_ROOT = Path("/Users/jmajor/.codex/worktrees/cbc5/dayhoff/contracts/observability")
+def _schema_root() -> Path:
+    root = os.environ.get("DAYHOFF_PROJECT_ROOT")
+    if not root:
+        raise RuntimeError("DAYHOFF_PROJECT_ROOT must point at the canonical Dayhoff repo root")
+    return Path(root) / "contracts" / "observability"
 
 
 def _load_schema(name: str) -> dict:
-    return json.loads((DAYHOFF_SCHEMA_ROOT / name).read_text())
+    return json.loads((_schema_root() / name).read_text(encoding="utf-8"))
 
 
-def _assert_required_shape(payload: dict, schema: dict) -> None:
-    for key in schema.get("required", []):
-        assert key in payload, f"missing required key {key}"
-    projection_schema = schema.get("properties", {}).get("projection")
-    if projection_schema and "projection" in payload:
-        for key in projection_schema.get("required", []):
-            assert key in payload["projection"], f"missing projection key {key}"
+def _validate(name: str, payload: dict) -> None:
+    jsonschema.validate(payload, _load_schema(name))
 
 
 def test_observability_contract_endpoints_match_shared_frame() -> None:
@@ -40,6 +40,8 @@ def test_observability_contract_endpoints_match_shared_frame() -> None:
         client.get("/obs_services")
 
         schema_map = {
+            "/healthz": "healthz.schema.json",
+            "/readyz": "readyz.schema.json",
             "/health": "health.schema.json",
             "/obs_services": "obs_services.schema.json",
             "/api_health": "api_health.schema.json",
@@ -51,9 +53,9 @@ def test_observability_contract_endpoints_match_shared_frame() -> None:
 
         for path, schema_name in schema_map.items():
             response = client.get(path)
-            assert response.status_code == 200, f"{path} returned {response.status_code}"
+            assert response.status_code in {200, 503}, f"{path} returned {response.status_code}"
             payload = response.json()
-            _assert_required_shape(payload, _load_schema(schema_name))
+            _validate(schema_name, payload)
             assert payload["service"] == "bloom"
             assert payload["contract_version"] == "v3"
 

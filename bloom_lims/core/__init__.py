@@ -7,9 +7,7 @@ focused submodules.
 Submodules:
     - base_objects: BloomObj base class and common methods
     - workflows: BloomWorkflow and BloomWorkflowStep classes
-    - containers: Container-related functionality
     - content: Content and sample management
-    - lineage: Lineage tracking
     - validation: Input validation utilities
     - exceptions: Custom exception hierarchy
     - cache: Caching utilities

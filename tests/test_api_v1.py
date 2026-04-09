@@ -993,12 +993,16 @@ class TestHealthEndpoints:
         response = client.get("/healthz")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "alive"
+        assert data["status"] == "ok"
+        assert data["checks"]["process"]["status"] == "ok"
 
     def test_readyz_endpoint(self, client):
         """Test /readyz endpoint."""
         response = client.get("/readyz")
         assert response.status_code in [200, 503]
+        data = response.json()
+        assert "ready" in data
+        assert "database" in data["checks"]
 
 
 class TestAPIVersionInfo:

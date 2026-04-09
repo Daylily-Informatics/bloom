@@ -15,7 +15,11 @@ from bloom_lims.config import (
 
 INTEGRATION_TEST_FILES = frozenset(
     {
+        "test_admin_auth.py",
         "test_api_v1.py",
+        "test_api_auth_rbac.py",
+        "test_beta_cross_repo_smoke.py",
+        "test_beta_lab.py",
         "test_gui_endpoints.py",
         "test_route_coverage_gaps_api.py",
         "test_route_coverage_gaps_gui.py",
@@ -160,17 +164,20 @@ def tapdb_local_available(*, env_name: str = "dev") -> bool:
 def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     """Bootstrap local TapDB via the Bloom CLI when DB-backed integration suites need it."""
     ensure_test_runtime_environment()
+    started_local = False
     if tapdb_local_available(env_name=env_name):
-        return False
+        started_local = False
+    else:
+        from bloom_lims.cli import db as db_commands
 
-    from bloom_lims.cli import db as db_commands
+        try:
+            db_commands.db_build(force=False)
+        except SystemExit as exc:
+            raise RuntimeError(f"`bloom db build` exited with status {exc.code}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"`bloom db build` failed: {exc}") from exc
 
-    try:
-        db_commands.db_build(force=False)
-    except SystemExit as exc:
-        raise RuntimeError(f"`bloom db build` exited with status {exc.code}") from exc
-    except Exception as exc:
-        raise RuntimeError(f"`bloom db build` failed: {exc}") from exc
+        started_local = True
 
     if not tapdb_local_available(env_name=env_name):
         raise RuntimeError(
@@ -178,4 +185,13 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
             "Fix the runtime and retry `source ./activate <deploy-name> && bloom db build`."
         )
 
-    return True
+    from bloom_lims.cli import db as db_commands
+
+    try:
+        db_commands.db_seed()
+    except SystemExit as exc:
+        raise RuntimeError(f"`bloom db seed` exited with status {exc.code}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"`bloom db seed` failed: {exc}") from exc
+
+    return started_local

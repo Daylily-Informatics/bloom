@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -17,6 +18,8 @@ import pytest
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 from fastapi.testclient import TestClient
+
+from bloom_lims.api.v1.dependencies import APIUser, require_external_atlas_api_enabled
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import app
@@ -37,6 +40,9 @@ def _get_template_euid(
 ) -> str:
     GT = bdb.Base.classes.generic_template
     q = bdb.session.query(GT).filter(GT.is_deleted == False).filter(GT.category == category)
+    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "B").strip().upper() or "B"
+    issuer_app_code = (os.environ.get("TAPDB_APP_CODE") or "B").strip().upper() or "B"
+    q = q.filter(GT.domain_code == domain_code, GT.issuer_app_code == issuer_app_code)
     if type_name is not None:
         q = q.filter(GT.type == type_name)
     if subtype is not None:
@@ -374,3 +380,104 @@ def test_file_sets_and_files_create_endpoints(client: TestClient) -> None:
         data={"file_metadata": "{\"name\": \"file-coverage\"}"},
     )
     assert resp.status_code == 404, resp.text
+
+
+def _external_rw_user() -> APIUser:
+    return APIUser(
+        email="atlas-beta-route-test@example.com",
+        user_id="atlas-beta-route-test",
+        roles=["READ_WRITE"],
+        auth_source="token",
+        token_scope="internal_rw",
+        token_id="token-atlas-beta-route-test",
+    )
+
+
+def test_beta_lab_patch_tube_and_consume_material_execute_handler_body(
+    client: TestClient,
+) -> None:
+    class _FakeBetaLabService:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def close(self) -> None:
+            return None
+
+        def update_tube(self, *, container_euid: str, payload):
+            return {
+                "container_euid": container_euid,
+                "status": payload.status or "active",
+                "atlas_context": (
+                    payload.atlas_context.model_dump(mode="json")
+                    if payload.atlas_context is not None
+                    else {}
+                ),
+                "properties": dict(payload.properties or {}),
+                "idempotency_key": None,
+                "current_queue": "extraction_prod",
+                "created": False,
+            }
+
+        def consume_material(
+            self, *, material_euid: str, reason: str | None, metadata: dict, idempotency_key: str | None
+        ):
+            return {
+                "consumption_event_euid": "BCE-ROUTE-COVERAGE",
+                "material_euid": material_euid,
+                "consumed": True,
+                "metadata": {"reason": reason, **dict(metadata or {})},
+                "idempotent_replay": False,
+            }
+
+    app.dependency_overrides[require_external_atlas_api_enabled] = _external_rw_user
+    try:
+        with patch("bloom_lims.api.v1.beta_lab.BetaLabService", _FakeBetaLabService):
+            patch_tube = client.patch(
+                "/api/v1/external/atlas/beta/tubes/BCN-TUBE-1",
+                json={
+                    "status": "queued",
+                    "properties": {"atlas_sync": "ok"},
+                    "atlas_context": {"atlas_tenant_id": "tenant-1"},
+                },
+            )
+            assert patch_tube.status_code == 200, patch_tube.text
+            assert patch_tube.json()["container_euid"] == "BCN-TUBE-1"
+
+            consume = client.post(
+                "/api/v1/external/atlas/beta/materials/BCS-MAT-1/consume",
+                headers={"Idempotency-Key": "idem-consume-route"},
+                json={
+                    "reason": "consumed for route coverage",
+                    "metadata": {"operator": "pytest"},
+                },
+            )
+            assert consume.status_code == 200, consume.text
+            assert consume.json()["material_euid"] == "BCS-MAT-1"
+    finally:
+        app.dependency_overrides.pop(require_external_atlas_api_enabled, None)
+
+
+def test_api_v1_graph_routes_execute_handler_body(client: TestClient) -> None:
+    fake_bobj = SimpleNamespace()
+    fake_db = SimpleNamespace()
+
+    with patch("bloom_lims.api.v1.graph.BLOOMdb3", return_value=fake_db), patch(
+        "bloom_lims.api.v1.graph.BloomObj", return_value=fake_bobj
+    ), patch(
+        "bloom_lims.api.v1.graph.build_graph_elements_for_start",
+        return_value=(
+            [{"data": {"id": "BCN-TEST-1", "category": "container"}}],
+            [{"data": {"id": "LN-1", "source": "BCN-TEST-1", "target": "BCN-TEST-2"}}],
+        ),
+    ), patch(
+        "bloom_lims.api.v1.graph.build_graph_object_payload",
+        return_value={"euid": "BCN-TEST-1", "category": "container", "type": "instance"},
+    ):
+        graph = client.get("/api/v1/graph/data?start_euid=BCN-TEST-1&depth=3")
+        assert graph.status_code == 200, graph.text
+        assert graph.json()["meta"]["start_euid"] == "BCN-TEST-1"
+
+        graph_object = client.get("/api/v1/graph/object/BCN-TEST-1")
+        assert graph_object.status_code == 200, graph_object.text
+        assert graph_object.json()["euid"] == "BCN-TEST-1"

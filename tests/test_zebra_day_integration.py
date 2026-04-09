@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from bloom_lims.config import BloomSettings, ZebraDaySettings
-from bloom_lims.integrations.zebra_day.client import ZebraDayService
+from bloom_lims.integrations.zebra_day.client import (
+    ZebraDayIntegrationError,
+    ZebraDayService,
+)
 from bloom_lims.observability import BloomObservabilityStore
 
 
@@ -138,6 +143,35 @@ def test_zebra_day_service_submits_server_side_print_jobs(monkeypatch):
         "alt_f": "f",
         "copies": 2,
     }
+
+
+def test_zebra_day_service_requires_optional_dependency_when_configured(monkeypatch):
+    settings = BloomSettings(
+        zebra_day=ZebraDaySettings(
+            base_url="https://zebra-day.example.org",
+            token="internal-token",
+        )
+    )
+    service = ZebraDayService(settings)
+
+    def _missing_client(_name: str):
+        raise ImportError("No module named 'zebra_day'")
+
+    monkeypatch.setattr(
+        "bloom_lims.integrations.zebra_day.client.importlib.import_module",
+        _missing_client,
+    )
+
+    with pytest.raises(
+        ZebraDayIntegrationError,
+        match=r"install bloom_lims\[zebra_day\]",
+    ):
+        service.submit_print_job(
+            lab="BLOOM",
+            printer_id="printer-7",
+            label_zpl_style="tube_2inX1in",
+            euid="E123",
+        )
 
 
 def test_observability_store_treats_zebra_day_as_dependency_not_managed_service(monkeypatch):

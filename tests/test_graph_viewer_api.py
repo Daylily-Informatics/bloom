@@ -407,7 +407,7 @@ class TestGraphViewerApis:
 
     def test_add_new_edge_rejects_legacy_uuid_keys(self, client):
         response = client.post(
-            "/add_new_edge",
+            "/api/lineage",
             json={"parent_uuid": "PARENT-1", "child_uuid": "CHILD-1"},
         )
 
@@ -415,14 +415,14 @@ class TestGraphViewerApis:
         assert "parent_euid and child_euid are required" in response.text
 
     def test_add_new_edge_accepts_euid_keys(self, client):
-        fake_bobj = MagicMock()
+        fake_bobj = _fake_bobj_for_lineage_create(existing_lineage=False)
         fake_bobj.create_generic_instance_lineage_by_euids.return_value = SimpleNamespace(euid="LN-EDGE")
 
         with patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB), patch(
             "bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj
         ):
             response = client.post(
-                "/add_new_edge",
+                "/api/lineage",
                 json={"parent_euid": "PARENT-1", "child_euid": "CHILD-1"},
             )
 

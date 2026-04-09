@@ -12,8 +12,10 @@ def test_project_dependencies_pin_release_train_versions() -> None:
     pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     dependencies = data["project"]["dependencies"]
+    optional_dependencies = data["project"]["optional-dependencies"]
 
     assert "cli-core-yo==2.0.0" in dependencies
     assert "daylily-auth-cognito==2.0.2" in dependencies
-    assert "daylily-tapdb==5.0.4" in dependencies
-    assert "zebra-day==5.1.3" in dependencies
+    assert "daylily-tapdb==5.1.0" in dependencies
+    assert "zebra-day==5.1.3" not in dependencies
+    assert optional_dependencies["zebra_day"] == ["zebra-day==5.1.3"]

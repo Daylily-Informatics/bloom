@@ -20,12 +20,17 @@ from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
 from bloom_lims.config import get_settings
-from bloom_lims.observability import build_health_payload
+from bloom_lims.observability import (
+    build_health_payload,
+    build_healthz_payload,
+    build_readyz_payload,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -317,16 +322,41 @@ async def readiness_probe() -> ReadinessResponse:
     return response
 
 
-@probe_router.get("/healthz", response_model=LivenessResponse)
-async def healthz_probe() -> LivenessResponse:
+@probe_router.get("/healthz")
+async def healthz_probe(request: Request) -> dict[str, Any]:
     """Top-level liveness alias for orchestration probes."""
-    return await liveness_probe()
+    return build_healthz_payload(
+        request,
+        started_at=request.app.state.observability.started_at,
+    )
 
 
-@probe_router.get("/readyz", response_model=ReadinessResponse)
-async def readyz_probe() -> ReadinessResponse:
+@probe_router.get("/readyz")
+async def readyz_probe(request: Request) -> JSONResponse:
     """Top-level readiness alias for orchestration probes."""
-    return await readiness_probe()
+    db_health = await check_database_health()
+    db_payload = {
+        "status": "ok" if db_health.status == "healthy" else "error",
+        "latency_ms": db_health.latency_ms,
+        "detail": db_health.message,
+        "details": db_health.details or {},
+        "observed_at": (db_health.details or {}).get("observed_at"),
+    }
+    request.app.state.observability.record_db_probe(
+        status=str(db_payload["status"]),
+        latency_ms=float(db_payload["latency_ms"] or 0.0),
+        detail=str(db_payload["detail"] or ""),
+    )
+    settings = get_settings()
+    ready = db_payload["status"] == "ok" and not settings.features.maintenance_mode
+    payload = build_readyz_payload(
+        request,
+        started_at=request.app.state.observability.started_at,
+        database_check=db_payload,
+        ready=ready,
+        process_details={"maintenance_mode": bool(settings.features.maintenance_mode)},
+    )
+    return JSONResponse(status_code=200 if ready else 503, content=payload)
 
 
 @health_router.get("/metrics")

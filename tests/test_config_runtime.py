@@ -227,8 +227,8 @@ def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(
 def test_tapdb_version_contract_defaults_match_shipped_templates():
     settings = BloomSettings()
 
-    assert settings.tapdb.min_version == "5.0.4"
-    assert settings.tapdb.max_version_exclusive == "5.0.5"
+    assert settings.tapdb.min_version == "5.1.0"
+    assert settings.tapdb.max_version_exclusive == "5.1.1"
 
     root_template = Path("config/bloom-config-template.yaml").read_text(
         encoding="utf-8"
@@ -237,7 +237,7 @@ def test_tapdb_version_contract_defaults_match_shipped_templates():
         encoding="utf-8"
     )
 
-    assert 'min_version: "5.0.4"' in root_template
-    assert 'max_version_exclusive: "5.0.5"' in root_template
-    assert 'min_version: "5.0.4"' in packaged_template
-    assert 'max_version_exclusive: "5.0.5"' in packaged_template
+    assert 'min_version: "5.1.0"' in root_template
+    assert 'max_version_exclusive: "5.1.1"' in root_template
+    assert 'min_version: "5.1.0"' in packaged_template
+    assert 'max_version_exclusive: "5.1.1"' in packaged_template

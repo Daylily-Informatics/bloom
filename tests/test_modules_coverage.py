@@ -214,12 +214,13 @@ class TestCoreCachedRepository:
 
 
 class TestCoreContainers:
-    """Tests for bloom_lims/core/containers.py"""
+    """Tests for the retired standalone containers core module."""
 
     def test_core_containers_imports(self):
-        """Test that core containers module can be imported."""
-        import bloom_lims.core.containers
-        assert bloom_lims.core.containers is not None
+        """The standalone containers module should remain retired."""
+        import importlib.util
+
+        assert importlib.util.find_spec("bloom_lims.core.containers") is None
 
 
 class TestCoreContent:
@@ -232,12 +233,13 @@ class TestCoreContent:
 
 
 class TestCoreLineage:
-    """Tests for bloom_lims/core/lineage.py"""
+    """Tests for the retired standalone lineage core module."""
 
     def test_core_lineage_imports(self):
-        """Test that core lineage module can be imported."""
-        import bloom_lims.core.lineage
-        assert bloom_lims.core.lineage is not None
+        """The standalone lineage module should remain retired."""
+        import importlib.util
+
+        assert importlib.util.find_spec("bloom_lims.core.lineage") is None
 
 
 class TestCoreReadReplicas:

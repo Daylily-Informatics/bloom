@@ -140,6 +140,10 @@ class BloomObservabilityStore:
         self._auth_status_counts: Counter[str] = Counter()
         self._obs_services_snapshot = self._build_obs_services_snapshot()
 
+    @property
+    def started_at(self) -> str:
+        return self._started_at
+
     def _configured_service_dependencies(self) -> list[str]:
         settings = get_settings()
         configured: list[str] = []
@@ -395,6 +399,60 @@ def _status_for_projection(projection: ProjectionMetadata, ready_status: str) ->
 def _with_projection(payload: dict[str, Any], projection: ProjectionMetadata) -> dict[str, Any]:
     payload["projection"] = projection.model_dump()
     return payload
+
+
+def _probe_projection(observed_at: str) -> ProjectionMetadata:
+    return ProjectionMetadata(
+        state="ready",
+        stale=False,
+        observed_at=observed_at,
+        last_synced_at=observed_at,
+        detail=None,
+    )
+
+
+def build_healthz_payload(
+    request: Request,
+    *,
+    started_at: str,
+) -> dict[str, Any]:
+    payload = base_frame(request, status="ok")
+    observed_at = str(payload.get("observed_at") or _utcnow())
+    payload["checks"] = {
+        "process": {
+            "status": "ok",
+            "started_at": started_at,
+        }
+    }
+    return _with_projection(payload, _probe_projection(observed_at))
+
+
+def build_readyz_payload(
+    request: Request,
+    *,
+    started_at: str,
+    database_check: dict[str, Any],
+    ready: bool,
+    process_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = base_frame(request, status="ok" if ready else "degraded")
+    observed_at = str(payload.get("observed_at") or _utcnow())
+    payload["ready"] = ready
+    payload["checks"] = {
+        "process": {
+            "status": "ok",
+            "started_at": started_at,
+            "details": dict(process_details or {}),
+        },
+        "database": {
+            "status": str(database_check.get("status") or "unknown"),
+            "latency_ms": database_check.get("latency_ms"),
+            "detail": database_check.get("detail"),
+            "observed_at": database_check.get("observed_at") or observed_at,
+            "details": dict(database_check.get("details") or {}),
+        },
+    }
+    return _with_projection(payload, _probe_projection(observed_at))
 
 
 def build_health_payload(request: Request, *, projection: ProjectionMetadata, health_snapshot: dict[str, Any]) -> dict[str, Any]:

@@ -70,21 +70,21 @@ class TestBaseSchemas:
         with pytest.raises(ValueError):
             validate_euid(bad_checksum)
 
-        # Sandbox EUIDs are not accepted by Bloom's public schema validators
-        sandbox = format_euid("BCN", 1, sandbox="X")
+        # Domain-scoped EUIDs are not accepted unless Bloom is configured for that domain
+        sandbox = format_euid("BCN", 1, domain_code="X")
         with pytest.raises(ValueError):
             validate_euid(sandbox)
 
     def test_euid_validation_accepts_only_configured_sandbox_prefix(self, monkeypatch):
-        monkeypatch.setenv("MERIDIAN_ENVIRONMENT", "sandbox")
-        monkeypatch.setenv("MERIDIAN_SANDBOX_PREFIX", "S")
+        monkeypatch.setenv("MERIDIAN_ENVIRONMENT", "domain")
+        monkeypatch.setenv("MERIDIAN_DOMAIN_CODE", "S")
 
         from daylily_tapdb.euid import format_euid
 
         from bloom_lims.schemas import validate_euid
 
-        sandbox = format_euid("BCN", 1, sandbox="S")
-        wrong_prefix = format_euid("BCN", 1, sandbox="T")
+        sandbox = format_euid("BCN", 1, domain_code="S")
+        wrong_prefix = format_euid("BCN", 1, domain_code="T")
         production = format_euid("BCN", 1)
 
         assert validate_euid(sandbox) == sandbox
@@ -835,10 +835,10 @@ class TestLineageImports:
     """Tests for lineage imports."""
 
     def test_import_lineage(self):
-        """Test lineage module import."""
-        from bloom_lims.core import lineage
+        """Lineage no longer has a standalone core module."""
+        import importlib.util
 
-        assert lineage is not None
+        assert importlib.util.find_spec("bloom_lims.core.lineage") is None
 
 
 class TestCachedRepositoryImports:
@@ -855,10 +855,10 @@ class TestContainersImports:
     """Tests for core containers imports."""
 
     def test_import_core_containers(self):
-        """Test core containers module import."""
-        from bloom_lims.core import containers
+        """Containers no longer has a standalone core module."""
+        import importlib.util
 
-        assert containers is not None
+        assert importlib.util.find_spec("bloom_lims.core.containers") is None
 
 
 class TestContentImports:

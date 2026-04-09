@@ -14,6 +14,10 @@ def base_url() -> str:
 
 @pytest.fixture(scope="session")
 def e2e_credentials():
+    if not os.getenv("E2E_COGNITO_USER_POOL_ID") or not os.getenv("E2E_COGNITO_REGION"):
+        pytest.skip(
+            "Bloom Playwright e2e requires E2E_COGNITO_USER_POOL_ID and E2E_COGNITO_REGION."
+        )
     return ensure_test_user()
 
 

@@ -4,31 +4,34 @@ from __future__ import annotations
 
 import importlib
 import logging
-import sys
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
-try:
+if TYPE_CHECKING:  # pragma: no cover
     from zebra_day.client import PrinterRecord, ZebraDayApiClient
-except ImportError:  # pragma: no cover - local sibling checkout fallback
-    sibling_repo = Path(__file__).resolve().parents[4] / "zebra_day"
-    if sibling_repo.exists():
-        sys.path.insert(0, str(sibling_repo))
-        sys.modules.pop("zebra_day", None)
-    client_mod = importlib.import_module("zebra_day.client")
-    PrinterRecord = client_mod.PrinterRecord
-    ZebraDayApiClient = client_mod.ZebraDayApiClient
+else:
+    PrinterRecord = Any
+    ZebraDayApiClient = Any
 
 from bloom_lims.config import BloomSettings, get_settings
-
 
 logger = logging.getLogger(__name__)
 
 
 class ZebraDayIntegrationError(RuntimeError):
     """Raised when Bloom cannot safely use the configured zebra_day service."""
+
+
+def _load_zebra_day_client_types() -> tuple[type[Any], type[Any]]:
+    try:
+        client_mod = importlib.import_module("zebra_day.client")
+    except ImportError as exc:
+        raise ZebraDayIntegrationError(
+            "zebra-day is not installed; install bloom_lims[zebra_day] to use printer integration"
+        ) from exc
+
+    return client_mod.PrinterRecord, client_mod.ZebraDayApiClient
 
 
 def _display_name(printer: PrinterRecord) -> str:
@@ -62,6 +65,7 @@ class ZebraDayService:
         if not self.is_configured:
             raise ZebraDayIntegrationError("zebra_day.base_url is not configured")
 
+        _, zebra_day_api_client_cls = _load_zebra_day_client_types()
         headers = {"accept": "application/json"}
         if self.has_service_token:
             headers["authorization"] = f"Bearer {self.config.token}"
@@ -73,7 +77,7 @@ class ZebraDayService:
             timeout=float(self.config.timeout_seconds),
             verify=self.config.verify_ssl,
         )
-        return ZebraDayApiClient(
+        return zebra_day_api_client_cls(
             base_url=self.base_url,
             api_key=self.config.token or None,
             verify_ssl=self.config.verify_ssl,
