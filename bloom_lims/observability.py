@@ -386,7 +386,7 @@ def base_frame(request: Request, *, status: str) -> dict[str, Any]:
         "request_id": getattr(request.state, "request_id", ""),
         "correlation_id": getattr(request.state, "correlation_id", ""),
         "build": {
-            "version": settings.api.version or __version__,
+            "version": __version__,
             "sha": _build_sha(),
         },
     }

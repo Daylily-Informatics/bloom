@@ -327,11 +327,12 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         atlas_webhook_secret = ""
 
     from bloom_lims.tapdb_metrics import build_metrics_page_context
-    from bloom_lims.config import get_settings
+    from bloom_lims.config import build_effective_config_summary, get_settings
 
     tapdb_metrics_summary = build_metrics_page_context(
         get_settings().tapdb.env, limit=1000
     )
+    config_summary = build_effective_config_summary(get_settings())
 
     template = templates.get_template("modern/admin.html")
     context = {
@@ -347,6 +348,7 @@ async def admin(request: Request, _auth=Depends(require_auth), dest="na"):
         "atlas_webhook_secret": atlas_webhook_secret,
         "atlas_webhook_secret_configured": bool(atlas_webhook_secret.strip()),
         "tapdb_metrics_summary": tapdb_metrics_summary,
+        "config_summary": config_summary,
         "saved": request.query_params.get("saved") == "1",
     }
     return HTMLResponse(content=template.render(context))

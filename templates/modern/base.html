@@ -32,14 +32,23 @@
       })();
     </script>
 </head>
-<body>
-    {% if deployment_chrome.name and not deployment_chrome.is_production %}
-    <div style="height: 18px; background: {{ deployment_chrome.color }}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;">
-        {{ deployment_chrome.name|upper }}
+<body class="{% if environment_chrome.enabled %}environment-chrome-enabled{% endif %}">
+    {% if environment_chrome.enabled %}
+    <div class="bloom-environment-chrome">
+        <div
+            class="bloom-deployment-bar"
+            style="background: {{ environment_chrome.deployment.color }};"
+            title="Deployment: {{ environment_chrome.deployment.name }}"
+        >
+            {{ environment_chrome.deployment.name|upper }}
+        </div>
+        <div
+            class="bloom-region-bar"
+            style="background: {{ environment_chrome.region.color }};"
+            title="Region: {{ environment_chrome.region.name }}"
+        ></div>
     </div>
     {% endif %}
-    <!-- Accent stripe bar -->
-    <div class="bloom-stripe-bar"></div>
     
     <!-- Header -->
     <header class="header">
@@ -118,7 +127,7 @@
                 <div class="footer-gitline">
                     <span class="footer-meta-chip">Branch: {{ gui_meta.branch }}</span>
                     <span class="footer-meta-chip">Tag: {{ gui_meta.tag }}</span>
-                    <span class="footer-meta-chip">Commit: {{ gui_meta.hash }}</span>
+                    <span class="footer-meta-chip">Commit: {{ gui_meta.commit }}</span>
                 </div>
             </div>
             <div class="footer-right">

@@ -8,6 +8,7 @@ Configuration precedence (highest to lowest):
 """
 
 import colorsys
+import json
 import hashlib
 import importlib.metadata
 import logging
@@ -43,6 +44,25 @@ TEMPLATE_CONFIG_FILE = (
 )
 DEFAULT_DEPLOYMENT_BANNER_COLOR = "#AFEEEE"
 PRODUCTION_DEPLOYMENT_NAMES = {"prod", "production"}
+SENSITIVE_CONFIG_KEYWORDS = (
+    "secret",
+    "token",
+    "password",
+    "passwd",
+    "key",
+    "credential",
+    "private",
+    "signing",
+    "session",
+    "cookie",
+    "authorization",
+    "client_secret",
+    "api_key",
+    "access_key",
+    "secret_key",
+)
+CONFIG_UNSET = "<unset>"
+CONFIG_REDACTED = "<redacted>"
 
 
 def _sanitize_deployment_code(value: str) -> str:
@@ -211,6 +231,70 @@ def _stable_deployment_color_hex(name: str) -> str:
         round(green * 255),
         round(blue * 255),
     )
+
+
+def _stable_region_color_hex(name: str) -> str:
+    digest = hashlib.sha256(name.encode("utf-8")).digest()
+    hue = (int.from_bytes(digest[:8], "big") % 360 + 180) % 360
+    red, green, blue = colorsys.hls_to_rgb(hue / 360.0, 0.62, 0.45)
+    return "#{:02x}{:02x}{:02x}".format(
+        round(red * 255),
+        round(green * 255),
+        round(blue * 255),
+    )
+
+
+def _is_sensitive_config_path(path: str) -> bool:
+    normalized = str(path or "").strip().lower()
+    return any(token in normalized for token in SENSITIVE_CONFIG_KEYWORDS)
+
+
+def _sanitize_config_structure(path: str, value: Any) -> Any:
+    if _is_sensitive_config_path(path):
+        if value in (None, "", [], {}, ()):
+            return CONFIG_UNSET
+        return CONFIG_REDACTED
+
+    if isinstance(value, dict):
+        return {
+            str(key): _sanitize_config_structure(
+                f"{path}.{key}" if path else str(key),
+                item,
+            )
+            for key, item in value.items()
+        }
+
+    if isinstance(value, list):
+        return [
+            _sanitize_config_structure(f"{path}[{index}]", item)
+            for index, item in enumerate(value)
+        ]
+
+    if value in (None, ""):
+        return CONFIG_UNSET
+
+    return value
+
+
+def _flatten_config_rows(value: Any, *, prefix: str = "") -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key in sorted(value):
+            child_prefix = f"{prefix}.{key}" if prefix else str(key)
+            rows.extend(_flatten_config_rows(value[key], prefix=child_prefix))
+        return rows
+
+    if isinstance(value, list):
+        rendered = json.dumps(value, sort_keys=True)
+    elif isinstance(value, bool):
+        rendered = "true" if value else "false"
+    elif value == CONFIG_UNSET:
+        rendered = CONFIG_UNSET
+    else:
+        rendered = str(value)
+
+    rows.append({"key": prefix, "value": rendered})
+    return rows
 
 
 def _resolve_deployment_chrome(
@@ -446,6 +530,10 @@ class UISettings(BaseModel):
     github_repo_url: str = Field(
         default="https://github.com/Daylily-Informatics/bloom",
         description="Repository URL shown in the GUI footer/help page",
+    )
+    show_environment_chrome: bool = Field(
+        default=True,
+        description="Show deployment and region chrome in GUI shells",
     )
 
 
@@ -1062,6 +1150,31 @@ def get_user_config_path() -> Path:
 
 def get_template_config_path() -> Path:
     return TEMPLATE_CONFIG_FILE
+
+
+def build_effective_config_summary(
+    settings: Optional["BloomSettings"] = None,
+) -> dict[str, Any]:
+    active_settings = settings or get_settings()
+    dumped = active_settings.model_dump(mode="python")
+    sanitized = _sanitize_config_structure("", dumped)
+    rows = _flatten_config_rows(sanitized)
+    return {
+        "user_config_path": str(get_user_config_path()),
+        "template_config_path": str(get_template_config_path()),
+        "tapdb_config_path": str(
+            active_settings.tapdb.config_path
+            or _deployment_scoped_tapdb_config_path(
+                active_settings.tapdb.client_id.strip(),
+                active_settings.tapdb.database_name.strip(),
+            )
+        ),
+        "deployment_name": str(active_settings.deployment.name or _resolve_deployment_code()),
+        "aws_region": str(active_settings.aws.region or "us-west-2"),
+        "build_version": _get_default_api_version(),
+        "show_environment_chrome": bool(active_settings.ui.show_environment_chrome),
+        "effective_rows": rows,
+    }
 
 
 def ensure_user_config_exists() -> Path:

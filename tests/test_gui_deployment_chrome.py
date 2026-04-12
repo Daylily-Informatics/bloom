@@ -12,6 +12,10 @@ def test_refresh_template_globals_exposes_deployment_banner(monkeypatch) -> None
         ui=SimpleNamespace(
             support_email="support@example.com",
             github_repo_url="https://github.com/Daylily-Informatics/bloom",
+            show_environment_chrome=True,
+        ),
+        aws=SimpleNamespace(
+            region="us-west-2",
         ),
         deployment=SimpleNamespace(
             name="staging",

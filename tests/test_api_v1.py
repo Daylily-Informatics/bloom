@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 # Add root to path for main import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from bloom_lims import __version__
 from main import app
 
 
@@ -42,6 +43,7 @@ class TestAPIRoot:
         assert response.status_code == 200
         data = response.json()
         assert "version" in data
+        assert data["version"] == __version__
         assert "endpoints" in data
         assert "search_v2" in data["endpoints"]
         assert "workflows" not in data["endpoints"]

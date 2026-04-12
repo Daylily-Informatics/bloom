@@ -11,6 +11,8 @@ Usage:
 
 from fastapi import APIRouter
 
+from bloom_lims import __version__
+
 from .admin_auth import router as admin_auth_router
 from .async_tasks import router as async_tasks_router
 from .atlas_bridge import router as atlas_bridge_router
@@ -64,7 +66,7 @@ router.include_router(graph_router)
 async def api_v1_info():
     """Get API v1 information."""
     return {
-        "version": "1.0.0",
+        "version": __version__,
         "status": "stable",
         "documentation": "/docs",
         "endpoints": {

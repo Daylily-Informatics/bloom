@@ -13,9 +13,15 @@ os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 os.environ["BLOOM_OAUTH"] = "no"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from bloom_lims import __version__
 from main import app
 from bloom_lims.config import get_settings
-from bloom_lims.observability import EndpointRollup, ProjectionMetadata, _percentile
+from bloom_lims.observability import (
+    EndpointRollup,
+    ProjectionMetadata,
+    _percentile,
+    base_frame,
+)
 
 
 def _schema_root() -> Path:
@@ -118,6 +124,16 @@ def test_endpoint_health_uses_route_templates_not_raw_instances() -> None:
     route_templates = {item["route_template"] for item in response.json()["items"]}
     assert "/api/v1/objects/{euid}" in route_templates
     assert all("NONEXISTENT_EUID" not in item for item in route_templates)
+
+
+def test_base_frame_reports_scm_version() -> None:
+    request = SimpleNamespace(
+        state=SimpleNamespace(request_id="req-1", correlation_id="corr-1")
+    )
+
+    payload = base_frame(request, status="ok")
+
+    assert payload["build"]["version"] == __version__
 
 
 def test_admin_observability_page_renders() -> None:

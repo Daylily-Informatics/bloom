@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims.auth.rbac import Role
+from bloom_lims import __version__
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService, map_legacy_role
 from bloom_lims.config import get_settings
@@ -85,7 +86,7 @@ async def get_login_page(request: Request, next: str = "/"):
         "cognito_login_url": cognito_login_url,
         "auth_primary_href": f"/auth/login?next={quote(next_path, safe='/')}",
         "auth_error": auth_error,
-        "version": "1.0.0",
+        "version": __version__,
     }
     return HTMLResponse(content=template.render(context))
 
@@ -432,7 +433,7 @@ async def auth_error(
         "cognito_login_url": f"/auth/login?next={quote(next_path, safe='/')}",
         "auth_primary_href": f"/auth/login?next={quote(next_path, safe='/')}",
         "auth_error": _auth_error_message(reason),
-        "version": "1.0.0",
+        "version": __version__,
     }
     return HTMLResponse(content=template.render(context), status_code=403)
 

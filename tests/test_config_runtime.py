@@ -10,11 +10,13 @@ from pathlib import Path
 
 import yaml
 
+from bloom_lims import __version__
 from bloom_lims.app import create_app
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     BloomSettings,
     StorageSettings,
+    build_effective_config_summary,
     _deployment_scoped_tapdb_config_path,
     build_default_config_template,
     expected_conda_env_name,
@@ -241,3 +243,43 @@ def test_tapdb_version_contract_defaults_match_shipped_templates():
     assert 'max_version_exclusive: "5.1.1"' in root_template
     assert 'min_version: "5.1.0"' in packaged_template
     assert 'max_version_exclusive: "5.1.1"' in packaged_template
+
+
+def test_effective_config_summary_redacts_sensitive_values(
+    monkeypatch, tmp_path: Path
+):
+    ensure_test_runtime_environment()
+    monkeypatch.setenv("BLOOM_UI__SHOW_ENVIRONMENT_CHROME", "false")
+    monkeypatch.setenv("BLOOM_AUTH__COGNITO_CLIENT_SECRET", "super-secret")
+    monkeypatch.setenv("BLOOM_AUTH__JWT_SECRET", "jwt-secret")
+    monkeypatch.setenv("BLOOM_ATLAS__WEBHOOK_SECRET", "atlas-secret")
+    monkeypatch.setenv("BLOOM_DEPLOYMENT__NAME", "510x2")
+    monkeypatch.setenv("BLOOM_AWS__REGION", "us-east-1")
+    monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "tapdb.yaml"))
+    get_settings.cache_clear()
+
+    summary = build_effective_config_summary()
+    rows = {row["key"]: row["value"] for row in summary["effective_rows"]}
+
+    assert summary["build_version"] == __version__
+    assert summary["show_environment_chrome"] is False
+    assert summary["deployment_name"] == "510x2"
+    assert summary["aws_region"] == "us-east-1"
+    assert summary["user_config_path"]
+    assert summary["template_config_path"]
+    assert rows["auth.cognito_client_secret"] == "<redacted>"
+    assert rows["auth.jwt_secret"] == "<redacted>"
+    assert rows["atlas.webhook_secret"] == "<redacted>"
+    assert rows["ui.show_environment_chrome"] == "false"
+
+
+def test_create_app_uses_scm_version(monkeypatch, tmp_path: Path):
+    monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
+    monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing.yaml"))
+
+    ensure_test_runtime_environment()
+    get_settings.cache_clear()
+
+    app = create_app()
+
+    assert app.version == __version__

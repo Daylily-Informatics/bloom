@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
+from bloom_lims import __version__
 from bloom_lims.config import atlas_webhook_secret_warning, get_settings
 from bloom_lims.domain_access import (
     build_allowed_origin_regex,
@@ -25,6 +26,7 @@ from bloom_lims.domain_access import (
     is_allowed_origin,
 )
 from bloom_lims.gui.errors import register_exception_handlers
+from bloom_lims.gui.jinja import refresh_template_globals
 from bloom_lims.gui.web_session import setup_bloom_session_middleware
 from bloom_lims.health import health_router, probe_router
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
@@ -92,8 +94,9 @@ def create_app() -> FastAPI:
             # Best-effort shutdown to flush/stop metrics writer.
             stop_all_writers()
 
-    app = FastAPI(lifespan=_lifespan)
+    app = FastAPI(lifespan=_lifespan, version=__version__)
     app.state.observability = BloomObservabilityStore()
+    refresh_template_globals()
 
     @app.middleware("http")
     async def _observability_request_context(request, call_next):
