@@ -93,6 +93,7 @@ def test_build_default_config_template_injects_fresh_jwt_secret():
             auth["cognito_default_tenant_id"] == "00000000-0000-0000-0000-000000000000"
         )
         assert auth["auto_provision_allowed_domains"] == ["lsmc.com"]
+        assert data["network"]["allowed_hosts"] == []
         assert "daylilyinformatics.bio" not in template
 
 
@@ -243,6 +244,14 @@ def test_tapdb_version_contract_defaults_match_shipped_templates():
     assert 'max_version_exclusive: "5.1.1"' in root_template
     assert 'min_version: "5.1.0"' in packaged_template
     assert 'max_version_exclusive: "5.1.1"' in packaged_template
+    assert "allowed_hosts: []" in root_template
+    assert "allowed_hosts: []" in packaged_template
+
+
+def test_settings_accept_network_allowed_hosts() -> None:
+    settings = BloomSettings(network={"allowed_hosts": ["bloom.dev2.lsmc.life", "54.218.100.68"]})
+
+    assert settings.network.allowed_hosts == ["bloom.dev2.lsmc.life", "54.218.100.68"]
 
 
 def test_effective_config_summary_redacts_sensitive_values(

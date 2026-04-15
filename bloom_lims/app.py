@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
     if atlas_secret_warning:
         logging.getLogger(__name__).warning(atlas_secret_warning)
     allow_local_domain_access = not settings.is_production
+    configured_allowed_hosts = settings.network.allowed_hosts
 
     @asynccontextmanager
     async def _lifespan(_app: FastAPI):
@@ -143,13 +144,17 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=build_trusted_hosts(allow_local=allow_local_domain_access),
+        allowed_hosts=build_trusted_hosts(
+            allow_local=allow_local_domain_access,
+            additional_hosts=configured_allowed_hosts,
+        ),
     )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[],
         allow_origin_regex=build_allowed_origin_regex(
-            allow_local=allow_local_domain_access
+            allow_local=allow_local_domain_access,
+            additional_hosts=configured_allowed_hosts,
         ),
         allow_credentials=settings.api.cors_allow_credentials,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -159,7 +164,11 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _enforce_origin_allowlist(request, call_next):
         origin = request.headers.get("origin")
-        if origin and not is_allowed_origin(origin, allow_local=allow_local_domain_access):
+        if origin and not is_allowed_origin(
+            origin,
+            allow_local=allow_local_domain_access,
+            additional_hosts=configured_allowed_hosts,
+        ):
             return PlainTextResponse("Origin not allowed", status_code=403)
         return await call_next(request)
 

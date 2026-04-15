@@ -520,6 +520,15 @@ class AWSSettings(BaseModel):
     region: str = Field(default="us-west-2", description="Default AWS region")
 
 
+class NetworkSettings(BaseModel):
+    """Inbound host allowlist extensions."""
+
+    allowed_hosts: List[str] = Field(
+        default_factory=list,
+        description="Additional hostnames or IPs trusted by middleware",
+    )
+
+
 class UISettings(BaseModel):
     """UI metadata configuration."""
 
@@ -862,6 +871,7 @@ class BloomSettings(BaseSettings):
     dewey: DeweySettings = Field(default_factory=DeweySettings)
     zebra_day: ZebraDaySettings = Field(default_factory=ZebraDaySettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
+    network: NetworkSettings = Field(default_factory=NetworkSettings)
     ui: UISettings = Field(default_factory=UISettings)
     deployment: DeploymentSettings = Field(default_factory=DeploymentSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
