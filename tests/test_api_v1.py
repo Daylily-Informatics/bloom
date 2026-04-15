@@ -358,7 +358,7 @@ class TestTemplatesAPI:
 
     def test_list_templates(self, client):
         """Test listing templates."""
-        response = client.get("/api/v1/templates/")
+        response = client.get("/api/v1/templates/", params={"domain_code": "Z"})
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
@@ -367,7 +367,10 @@ class TestTemplatesAPI:
 
     def test_list_templates_by_category(self, client):
         """Test listing templates by category."""
-        response = client.get("/api/v1/templates/by-category/container")
+        response = client.get(
+            "/api/v1/templates/by-category/container",
+            params={"domain_code": "Z"},
+        )
         assert response.status_code == 200
         data = response.json()
         assert "templates" in data
@@ -781,7 +784,9 @@ class TestTemplatesAPIExtended:
 
     def test_list_templates_with_pagination(self, client):
         """Test listing templates with pagination."""
-        response = client.get("/api/v1/templates/?page=1&page_size=5")
+        response = client.get(
+            "/api/v1/templates/?page=1&page_size=5", params={"domain_code": "Z"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
@@ -790,14 +795,14 @@ class TestTemplatesAPIExtended:
     def test_get_template_by_euid(self, client):
         """Test getting template by EUID."""
         # First get a list of templates to find a valid EUID
-        response = client.get("/api/v1/templates/?page_size=1")
+        response = client.get("/api/v1/templates/?page_size=1", params={"domain_code": "Z"})
         assert response.status_code == 200
         data = response.json()
         _assert_items_do_not_expose_uuid(data)
         if data["items"]:
             euid = data["items"][0].get("euid")
             if euid:
-                response = client.get(f"/api/v1/templates/{euid}")
+                response = client.get(f"/api/v1/templates/{euid}", params={"domain_code": "Z"})
                 assert response.status_code in [200, 404]
                 if response.status_code == 200:
                     assert "uuid" not in response.json()

@@ -65,6 +65,7 @@ def redact_context(value: Any) -> Any:
 class TapdbAnomalyRepository:
     def __init__(self, db: Session):
         self.db = db
+        self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
         self.factory = InstanceFactory(self.templates)
         self._templates_ready = False
@@ -159,6 +160,7 @@ class TapdbAnomalyRepository:
             self.db,
             [(ANOMALY_TEMPLATE_CODE, ANOMALY_PREFIX)],
             app_name="Bloom",
+            domain_code=self.domain_code,
             template_manager=self.templates,
         )
         self._templates_ready = True
@@ -187,6 +189,7 @@ class TapdbAnomalyRepository:
         stmt = (
             select(generic_instance)
             .where(
+                generic_instance.domain_code == self.domain_code,
                 generic_instance.category == category,
                 generic_instance.type == type_name,
                 generic_instance.subtype == subtype,

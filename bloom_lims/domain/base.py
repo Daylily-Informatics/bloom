@@ -80,6 +80,14 @@ class BloomObj:
         self.is_deleted = is_deleted
         self.session = bdb.session
         self.Base = bdb.Base
+        self.domain_code = str(
+            getattr(bdb, "domain_code", "")
+            or os.environ.get("MERIDIAN_DOMAIN_CODE")
+            or os.environ.get("TAPDB_DOMAIN_CODE")
+            or ""
+        ).strip().upper()
+        if not self.domain_code:
+            raise ValueError("domain_code is required for Bloom template resolution")
         app_username = str(getattr(bdb, "app_username", "") or "").strip()
         self._actor_user_id = None
         self._actor_email = app_username if "@" in app_username else None
@@ -891,6 +899,9 @@ class BloomObj:
         query = self.session.query(self.Base.classes.generic_instance)
 
         # Apply filters conditionally
+        query = query.filter(
+            self.Base.classes.generic_instance.domain_code == self.domain_code
+        )
         if category is not None:
             query = query.filter(
                 self.Base.classes.generic_instance.category == category
@@ -919,6 +930,9 @@ class BloomObj:
         query = self.session.query(self.Base.classes.generic_instance)
 
         # Add filters based on the provided arguments
+        query = query.filter(
+            self.Base.classes.generic_instance.domain_code == self.domain_code
+        )
         if category:
             query = query.filter(
                 self.Base.classes.generic_instance.category == category
@@ -958,6 +972,9 @@ class BloomObj:
         query = self.session.query(self.Base.classes.generic_template)
 
         # Apply filters conditionally
+        query = query.filter(
+            self.Base.classes.generic_template.domain_code == self.domain_code
+        )
         if category is not None:
             query = query.filter(
                 self.Base.classes.generic_template.category == category

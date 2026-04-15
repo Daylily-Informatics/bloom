@@ -14,8 +14,13 @@ from bloom_lims import __version__
 from bloom_lims.app import create_app
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
+    DEFAULT_TAPDB_DOMAIN_CODE,
+    DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH,
+    DEFAULT_TAPDB_OWNER_REPO_NAME,
+    DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH,
     BloomSettings,
     StorageSettings,
+    assert_tapdb_version,
     build_effective_config_summary,
     _deployment_scoped_tapdb_config_path,
     build_default_config_template,
@@ -25,7 +30,10 @@ from bloom_lims.config import (
     get_tapdb_runtime_context,
     validate_settings,
 )
-from tests.support.runtime import ensure_test_runtime_environment
+from tests.support.runtime import (
+    ensure_test_runtime_environment,
+    read_pyproject_pinned_version,
+)
 
 
 def test_storage_temp_dir_uses_system_tempdir():
@@ -227,23 +235,48 @@ def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(
     assert ctx.config_path == expected
 
 
-def test_tapdb_version_contract_defaults_match_shipped_templates():
+def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
+    for key in (
+        "MERIDIAN_DOMAIN_CODE",
+        "TAPDB_OWNER_REPO",
+        "TAPDB_DOMAIN_CODE",
+        "TAPDB_DOMAIN_REGISTRY_PATH",
+        "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH",
+        "BLOOM_TAPDB__CONFIG_PATH",
+        "BLOOM_TAPDB__OWNER_REPO_NAME",
+        "BLOOM_TAPDB__DOMAIN_CODE",
+        "BLOOM_TAPDB__DOMAIN_REGISTRY_PATH",
+        "BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
     settings = BloomSettings()
+    expected_tapdb_version = read_pyproject_pinned_version("daylily-tapdb")
 
-    assert settings.tapdb.min_version == "5.1.0"
-    assert settings.tapdb.max_version_exclusive == "5.1.1"
+    assert assert_tapdb_version() == expected_tapdb_version
+    assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
+    assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
+    assert settings.tapdb.domain_registry_path == str(DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH)
+    assert settings.tapdb.prefix_ownership_registry_path == str(
+        DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
+    )
 
-    root_template = Path("config/bloom-config-template.yaml").read_text(
+    project_root = Path(__file__).resolve().parents[1]
+    root_template = (project_root / "config" / "bloom-config-template.yaml").read_text(
         encoding="utf-8"
     )
-    packaged_template = Path("bloom_lims/etc/bloom-config-template.yaml").read_text(
-        encoding="utf-8"
-    )
+    packaged_template = (
+        project_root / "bloom_lims" / "etc" / "bloom-config-template.yaml"
+    ).read_text(encoding="utf-8")
 
-    assert 'min_version: "5.1.0"' in root_template
-    assert 'max_version_exclusive: "5.1.1"' in root_template
-    assert 'min_version: "5.1.0"' in packaged_template
-    assert 'max_version_exclusive: "5.1.1"' in packaged_template
+    assert 'owner_repo_name: "bloom"' in root_template
+    assert 'domain_code: "Z"' in root_template
+    assert 'domain_registry_path: "~/.config/tapdb/domain_code_registry.json"' in root_template
+    assert 'prefix_ownership_registry_path: "~/.config/tapdb/prefix_ownership_registry.json"' in root_template
+    assert 'owner_repo_name: "bloom"' in packaged_template
+    assert 'domain_code: "Z"' in packaged_template
+    assert 'domain_registry_path: "~/.config/tapdb/domain_code_registry.json"' in packaged_template
+    assert 'prefix_ownership_registry_path: "~/.config/tapdb/prefix_ownership_registry.json"' in packaged_template
     assert "allowed_hosts: []" in root_template
     assert "allowed_hosts: []" in packaged_template
 

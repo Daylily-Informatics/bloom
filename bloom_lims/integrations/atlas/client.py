@@ -58,11 +58,14 @@ class AtlasClient:
     def get_trf(self, trf_euid: str) -> dict[str, Any]:
         return self._get_json(f"/api/integrations/bloom/v1/lookups/trfs/{trf_euid}")
 
+    def get_order(self, order_euid: str) -> dict[str, Any]:
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/orders/{order_euid}")
+
     def get_patient(self, patient_id: str) -> dict[str, Any]:
         return self._get_json(f"/api/integrations/bloom/v1/lookups/patients/{patient_id}")
 
-    def get_shipment(self, shipment_number: str) -> dict[str, Any]:
-        return self._get_json(f"/api/integrations/bloom/v1/lookups/shipments/{shipment_number}")
+    def get_shipment(self, shipment_euid: str) -> dict[str, Any]:
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/shipments/{shipment_euid}")
 
     def get_testkit(self, kit_barcode: str) -> dict[str, Any]:
         return self._get_json(f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}")

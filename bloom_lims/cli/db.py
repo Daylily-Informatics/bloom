@@ -26,6 +26,10 @@ from bloom_lims.cli._registry_v2 import (
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_BLOOM_WEB_PORT,
+    DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH,
+    DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH,
+    DEFAULT_TAPDB_DOMAIN_CODE,
+    DEFAULT_TAPDB_OWNER_REPO_NAME,
     apply_runtime_environment,
     get_settings,
 )
@@ -36,9 +40,6 @@ console = Console()
 _DEFAULT_AUDIT_LOG_EUID_PREFIX = "BGX"
 _DEFAULT_TAPDB_CLIENT_ID = "bloom"
 _DEFAULT_TAPDB_DATABASE_NAME = "bloom"
-_DEFAULT_TAPDB_EUID_CLIENT_CODE = "B"
-_DEFAULT_MERIDIAN_DOMAIN_CODE = "Z"
-_DEFAULT_TAPDB_APP_CODE = "B"
 
 
 def _bloom_root() -> Path:
@@ -110,15 +111,29 @@ def _runtime_env() -> dict[str, str]:
     """Build normalized runtime env for tapdb commands."""
     settings = get_settings()
     ctx = apply_runtime_environment(settings)
+    domain_registry_path = str(
+        ctx.domain_registry_path or DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH
+    ).strip()
+    prefix_registry_path = str(
+        ctx.prefix_ownership_registry_path
+        or DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
+    ).strip()
 
     env = os.environ.copy()
     env["AWS_PROFILE"] = ctx.aws_profile
     env["AWS_REGION"] = ctx.aws_region
     env["AWS_DEFAULT_REGION"] = ctx.aws_region
-    env["MERIDIAN_DOMAIN_CODE"] = os.environ.get(
-        "MERIDIAN_DOMAIN_CODE", _DEFAULT_MERIDIAN_DOMAIN_CODE
+    env["MERIDIAN_DOMAIN_CODE"] = os.environ.get("MERIDIAN_DOMAIN_CODE", ctx.domain_code)
+    env["TAPDB_DOMAIN_CODE"] = os.environ.get("TAPDB_DOMAIN_CODE", ctx.domain_code)
+    env["TAPDB_OWNER_REPO"] = os.environ.get(
+        "TAPDB_OWNER_REPO", ctx.owner_repo_name or DEFAULT_TAPDB_OWNER_REPO_NAME
     )
-    env["TAPDB_APP_CODE"] = os.environ.get("TAPDB_APP_CODE", _DEFAULT_TAPDB_APP_CODE)
+    env["TAPDB_DOMAIN_REGISTRY_PATH"] = os.environ.get(
+        "TAPDB_DOMAIN_REGISTRY_PATH", domain_registry_path
+    )
+    env["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] = os.environ.get(
+        "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH", prefix_registry_path
+    )
     return env
 
 
@@ -206,8 +221,14 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
         _DEFAULT_TAPDB_CLIENT_ID,
         "--database-name",
         _DEFAULT_TAPDB_DATABASE_NAME,
-        "--euid-client-code",
-        _DEFAULT_TAPDB_EUID_CLIENT_CODE,
+        "--owner-repo-name",
+        ctx.owner_repo_name,
+        "--domain-code",
+        f"{env_name}={ctx.domain_code}",
+        "--domain-registry-path",
+        str(ctx.domain_registry_path),
+        "--prefix-ownership-registry-path",
+        str(ctx.prefix_ownership_registry_path),
         "--env",
         env_name,
     ]

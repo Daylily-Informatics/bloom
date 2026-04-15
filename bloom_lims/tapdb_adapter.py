@@ -61,6 +61,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session, object_session
 
 from bloom_lims.config import get_tapdb_db_config
+from bloom_lims.config import apply_runtime_environment, get_settings
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
 
 
@@ -237,6 +238,9 @@ class BLOOMdb3:
     ):
         self.logger = logging.getLogger(__name__ + ".BLOOMdb3")
         self.app_username = app_username
+        runtime_ctx = apply_runtime_environment(get_settings())
+        self.domain_code = runtime_ctx.domain_code
+        self.owner_repo_name = runtime_ctx.owner_repo_name
 
         # Best-effort attribution for TapDB-style DB metrics.
         # (The request middleware sets path/method; the DB adapter tags username.)
@@ -266,6 +270,8 @@ class BLOOMdb3:
             engine_type="aurora" if engine_type == "aurora" else None,
             region=region,
             iam_auth=iam_auth,
+            domain_code=self.domain_code,
+            owner_repo_name=self.owner_repo_name,
         )
 
         self.engine = self._conn.engine

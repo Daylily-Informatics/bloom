@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from bloom_lims.config import get_settings
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from .dependencies import require_api_auth, APIUser
 
@@ -102,6 +103,10 @@ def _sort_key(value: str | None) -> tuple[str, str]:
     return text.casefold(), text
 
 
+def _tapdb_domain_code() -> str:
+    return str(get_settings().tapdb.domain_code).strip().upper()
+
+
 def _is_template_visible(template_row) -> bool:
     category = str(getattr(template_row, "category", "") or "").strip().lower()
     if not category or category in RETIRED_TEMPLATE_CATEGORIES:
@@ -124,9 +129,13 @@ async def list_categories(user: APIUser = Depends(require_api_auth)):
     try:
         bdb = get_bdb(user.email)
         template = bdb.Base.classes.generic_template
+        domain_code = _tapdb_domain_code()
         rows = (
             bdb.session.query(template.category, template.type, template.json_addl)
-            .filter(template.is_deleted == False)  # noqa: E712
+            .filter(
+                template.is_deleted == False,  # noqa: E712
+                template.domain_code == domain_code,
+            )
             .all()
         )
         categories_to_types: dict[str, set[str]] = {}
@@ -172,6 +181,7 @@ async def list_types(
     try:
         bdb = get_bdb(user.email)
         template = bdb.Base.classes.generic_template
+        domain_code = _tapdb_domain_code()
         rows = (
             bdb.session.query(
                 template.type,
@@ -182,6 +192,7 @@ async def list_types(
             .filter(
                 template.is_deleted == False,  # noqa: E712
                 template.category == category,
+                template.domain_code == domain_code,
             )
             .all()
         )
@@ -234,6 +245,7 @@ async def list_subtypes(
     try:
         bdb = get_bdb(user.email)
         template = bdb.Base.classes.generic_template
+        domain_code = _tapdb_domain_code()
         rows = (
             bdb.session.query(
                 template.subtype,
@@ -245,6 +257,7 @@ async def list_subtypes(
                 template.is_deleted == False,  # noqa: E712
                 template.category == category,
                 template.type == type,
+                template.domain_code == domain_code,
             )
             .all()
         )
@@ -306,12 +319,14 @@ async def get_template_details(
     try:
         bdb = get_bdb(user.email)
         template = bdb.Base.classes.generic_template
+        domain_code = _tapdb_domain_code()
         type_rows = (
             bdb.session.query(template.euid)
             .filter(
                 template.is_deleted == False,  # noqa: E712
                 template.category == category,
                 template.type == type,
+                template.domain_code == domain_code,
             )
             .limit(1)
             .all()
@@ -325,6 +340,7 @@ async def get_template_details(
                 template.category == category,
                 template.type == type,
                 template.subtype == subtype,
+                template.domain_code == domain_code,
             )
             .limit(1)
             .all()
@@ -339,6 +355,7 @@ async def get_template_details(
                 template.type == type,
                 template.subtype == subtype,
                 template.version == version,
+                template.domain_code == domain_code,
             )
             .first()
         )

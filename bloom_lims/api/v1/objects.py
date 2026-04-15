@@ -161,15 +161,6 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
             subtype=data.subtype,
             version=version,
         )
-        if not templates and data.subtype:
-            # Fallback: if subtype doesn't exist, allow creating from the first
-            # matching category/type template.
-            templates = bo.query_template_by_component_v2(
-                category=category,
-                type=data.type,
-                subtype=None,
-                version=version,
-            )
         if not templates:
             raise HTTPException(
                 status_code=400,

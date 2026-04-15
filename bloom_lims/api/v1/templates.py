@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from bloom_lims.config import get_settings
 from .dependencies import require_api_auth, APIUser
 
 
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
+
+
+def _tapdb_domain_code() -> str:
+    return str(get_settings().tapdb.domain_code).strip().upper()
 
 
 def get_bdb(username: str = "api-user"):
@@ -26,6 +31,7 @@ def get_bdb(username: str = "api-user"):
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_templates(
+    domain_code: str = Query(..., description="Meridian domain code"),
     category: Optional[str] = Query(None, description="Filter by category (container, content, equipment)"),
     type: Optional[str] = Query(None, description="Filter by type"),
     subtype: Optional[str] = Query(None, description="Filter by subtype"),
@@ -36,8 +42,12 @@ async def list_templates(
     """List available templates."""
     try:
         bdb = get_bdb(user.email)
+        domain_code = _tapdb_domain_code()
 
         query = bdb.session.query(bdb.Base.classes.generic_template)
+        query = query.filter(
+            bdb.Base.classes.generic_template.domain_code == domain_code
+        )
 
         if category:
             query = query.filter(bdb.Base.classes.generic_template.category == category.lower())
@@ -74,13 +84,19 @@ async def list_templates(
 
 
 @router.get("/{euid}")
-async def get_template(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_template(
+    euid: str,
+    domain_code: str = Query(..., description="Meridian domain code"),
+    user: APIUser = Depends(require_api_auth),
+):
     """Get a template by EUID."""
     try:
         bdb = get_bdb(user.email)
+        domain_code = _tapdb_domain_code()
 
         template = bdb.session.query(bdb.Base.classes.generic_template).filter(
-            bdb.Base.classes.generic_template.euid == euid
+            bdb.Base.classes.generic_template.euid == euid,
+            bdb.Base.classes.generic_template.domain_code == domain_code,
         ).first()
 
         if not template:
@@ -105,13 +121,16 @@ async def get_template(euid: str, user: APIUser = Depends(require_api_auth)):
 @router.get("/by-category/{category}", response_model=Dict[str, Any])
 async def list_templates_by_category(
     category: str,
+    domain_code: str = Query(..., description="Meridian domain code"),
     user: APIUser = Depends(require_api_auth),
 ):
     """List templates by category (container, content, equipment, workflow)."""
     try:
         bdb = get_bdb(user.email)
+        domain_code = _tapdb_domain_code()
 
         query = bdb.session.query(bdb.Base.classes.generic_template).filter(
+            bdb.Base.classes.generic_template.domain_code == domain_code,
             bdb.Base.classes.generic_template.category == category.lower(),
             bdb.Base.classes.generic_template.is_deleted == False,
         )
@@ -134,4 +153,3 @@ async def list_templates_by_category(
     except Exception as e:
         logger.error(f"Error listing templates by category {category}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

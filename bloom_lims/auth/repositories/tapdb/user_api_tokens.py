@@ -21,6 +21,7 @@ from bloom_lims.auth.repositories.tapdb.identity import (
     normalize_public_id,
     resolve_public_id,
 )
+from bloom_lims.config import get_settings
 
 TOKEN_TEMPLATE_CODE = "bloom/auth/user-api-token/1.0/"
 TOKEN_REVISION_TEMPLATE_CODE = "bloom/auth/user-api-token-revision/1.0/"
@@ -105,6 +106,7 @@ class TapdbUserAPITokenRepository:
 
     def __init__(self, db: Session):
         self.db = db
+        self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
         self.factory = InstanceFactory(self.templates)
         self._templates_bootstrapped = False
@@ -425,6 +427,7 @@ class TapdbUserAPITokenRepository:
         stmt = (
             select(generic_instance)
             .where(
+                generic_instance.domain_code == self.domain_code,
                 generic_instance.category == category,
                 generic_instance.type == type_name,
                 generic_instance.subtype == subtype,
@@ -446,6 +449,7 @@ class TapdbUserAPITokenRepository:
                 (TOKEN_USAGE_LOG_TEMPLATE_CODE, TOKEN_USAGE_PREFIX),
             ],
             app_name="Bloom",
+            domain_code=self.domain_code,
             template_manager=self.templates,
         )
         self._templates_bootstrapped = True

@@ -36,7 +36,10 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
             "AWS_REGION": "us-west-2",
             "AWS_DEFAULT_REGION": "us-west-2",
             "MERIDIAN_DOMAIN_CODE": "Z",
-            "TAPDB_APP_CODE": "B",
+            "TAPDB_DOMAIN_CODE": "Z",
+            "TAPDB_OWNER_REPO": "bloom",
+            "TAPDB_DOMAIN_REGISTRY_PATH": "/tmp/domain_code_registry.json",
+            "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH": "/tmp/prefix_ownership_registry.json",
         },
     )
     monkeypatch.setattr(
@@ -45,6 +48,10 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
         lambda _settings: SimpleNamespace(
             config_path="/tmp/bloom-tapdb.yaml",
             env="dev",
+            owner_repo_name="bloom",
+            domain_code="Z",
+            domain_registry_path="/tmp/domain_code_registry.json",
+            prefix_ownership_registry_path="/tmp/prefix_ownership_registry.json",
         ),
     )
     captured: dict[str, dict[str, str]] = {}
@@ -60,7 +67,8 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert exc.value.code == 7
     assert captured["env"]["MERIDIAN_DOMAIN_CODE"] == "Z"
-    assert captured["env"]["TAPDB_APP_CODE"] == "B"
+    assert captured["env"]["TAPDB_DOMAIN_CODE"] == "Z"
+    assert captured["env"]["TAPDB_OWNER_REPO"] == "bloom"
 
 
 def test_run_tapdb_returns_nonzero_when_check_false(
@@ -134,6 +142,10 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
             env="dev",
             aws_profile="lsmc",
             aws_region="us-west-2",
+            owner_repo_name="bloom",
+            domain_code="Z",
+            domain_registry_path="/tmp/domain_code_registry.json",
+            prefix_ownership_registry_path="/tmp/prefix_ownership_registry.json",
         ),
     )
     monkeypatch.setattr(
@@ -165,8 +177,14 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
                 "bloom",
                 "--database-name",
                 "bloom",
-                "--euid-client-code",
-                "B",
+                "--owner-repo-name",
+                "bloom",
+                "--domain-code",
+                "dev=Z",
+                "--domain-registry-path",
+                "/tmp/domain_code_registry.json",
+                "--prefix-ownership-registry-path",
+                "/tmp/prefix_ownership_registry.json",
                 "--env",
                 "dev",
                 "--db-port",
@@ -208,6 +226,10 @@ def test_ensure_tapdb_namespace_config_creates_scoped_parent(
             env="dev",
             aws_profile="lsmc",
             aws_region="us-west-2",
+            owner_repo_name="bloom",
+            domain_code="Z",
+            domain_registry_path="/tmp/domain_code_registry.json",
+            prefix_ownership_registry_path="/tmp/prefix_ownership_registry.json",
         ),
     )
     monkeypatch.setattr(

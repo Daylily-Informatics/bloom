@@ -21,6 +21,7 @@ from bloom_lims.auth.repositories.tapdb.identity import (
     normalize_public_id,
     resolve_public_id,
 )
+from bloom_lims.config import get_settings
 
 
 GROUP_TEMPLATE_CODE = "bloom/auth/user-group/1.0/"
@@ -89,6 +90,7 @@ class TapdbGroupRepository:
 
     def __init__(self, db: Session):
         self.db = db
+        self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
         self.factory = InstanceFactory(self.templates)
         self._templates_bootstrapped = False
@@ -403,6 +405,7 @@ class TapdbGroupRepository:
         stmt = (
             select(generic_instance)
             .where(
+                generic_instance.domain_code == self.domain_code,
                 generic_instance.category == category,
                 generic_instance.type == type_name,
                 generic_instance.subtype == subtype,
@@ -424,6 +427,7 @@ class TapdbGroupRepository:
                 (GROUP_MEMBERSHIP_TEMPLATE_CODE, GROUP_MEMBERSHIP_PREFIX),
             ],
             app_name="Bloom",
+            domain_code=self.domain_code,
             template_manager=self.templates,
         )
         self._templates_bootstrapped = True

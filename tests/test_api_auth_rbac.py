@@ -86,7 +86,7 @@ def test_api_root_lists_new_auth_endpoints(client):
 
 
 def test_external_specimen_endpoints_require_external_token_auth(client):
-    response = client.get("/api/v1/external/specimens/by-reference?order_number=ORD-1")
+    response = client.get("/api/v1/external/specimens/by-reference?order_euid=ORD-1")
     assert response.status_code == 401
     assert "requires Bloom API bearer token" in response.json()["detail"]
 

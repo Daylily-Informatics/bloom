@@ -64,13 +64,17 @@ class AtlasService:
         key = f"trf:{trf_euid}"
         return self._cached_lookup(key, lambda: self.client.get_trf(trf_euid))
 
+    def get_order(self, order_euid: str) -> AtlasLookupResult:
+        key = f"order:{order_euid}"
+        return self._cached_lookup(key, lambda: self.client.get_order(order_euid))
+
     def get_patient(self, patient_id: str) -> AtlasLookupResult:
         key = f"patient:{patient_id}"
         return self._cached_lookup(key, lambda: self.client.get_patient(patient_id))
 
-    def get_shipment(self, shipment_number: str) -> AtlasLookupResult:
-        key = f"shipment:{shipment_number}"
-        return self._cached_lookup(key, lambda: self.client.get_shipment(shipment_number))
+    def get_shipment(self, shipment_euid: str) -> AtlasLookupResult:
+        key = f"shipment:{shipment_euid}"
+        return self._cached_lookup(key, lambda: self.client.get_shipment(shipment_euid))
 
     def get_testkit(self, kit_barcode: str) -> AtlasLookupResult:
         key = f"testkit:{kit_barcode}"

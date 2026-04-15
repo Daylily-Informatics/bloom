@@ -126,7 +126,8 @@ async def create_external_specimen(
 async def find_external_specimens_by_reference(
     trf_euid: str | None = Query(None),
     patient_id: str | None = Query(None),
-    shipment_number: str | None = Query(None),
+    order_euid: str | None = Query(None),
+    shipment_euid: str | None = Query(None),
     kit_barcode: str | None = Query(None),
     atlas_tenant_id: str | None = Query(None),
     atlas_trf_euid: str | None = Query(None),
@@ -136,7 +137,8 @@ async def find_external_specimens_by_reference(
     refs = AtlasReferences(
         trf_euid=trf_euid,
         patient_id=patient_id,
-        shipment_number=shipment_number,
+        order_euid=order_euid,
+        shipment_euid=shipment_euid,
         kit_barcode=kit_barcode,
         atlas_tenant_id=atlas_tenant_id,
         atlas_trf_euid=atlas_trf_euid,

@@ -14,6 +14,7 @@ import importlib.metadata
 import logging
 import os
 import re
+import tomllib
 import secrets
 import string
 import tempfile
@@ -23,6 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from packaging.version import Version
+from packaging.requirements import Requirement
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import (
@@ -38,6 +40,17 @@ DEFAULT_BLOOM_WEB_PORT = 8912
 DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT = 5566
 DEFAULT_BLOOM_CONDA_ENV_BASE = "BLOOM"
 LEGACY_UPLOAD_DIR = "/var/lib/bloom/uploads"
+DEFAULT_TAPDB_OWNER_REPO_NAME = "bloom"
+DEFAULT_TAPDB_DOMAIN_CODE = "Z"
+DEFAULT_TAPDB_CONFIG_DIR = Path.home() / ".config" / "tapdb"
+DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH = (
+    DEFAULT_TAPDB_CONFIG_DIR / "domain_code_registry.json"
+)
+DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH = (
+    DEFAULT_TAPDB_CONFIG_DIR / "prefix_ownership_registry.json"
+)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
 
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
@@ -79,6 +92,31 @@ def _resolve_deployment_code() -> str:
         or os.environ.get("LSMC_DEPLOYMENT_CODE")
         or "local"
     )
+
+
+@lru_cache()
+def _read_pyproject_dependency_spec(package_name: str) -> str:
+    if not PYPROJECT_TOML.exists():
+        raise RuntimeError(f"pyproject.toml not found at {PYPROJECT_TOML}")
+
+    payload = tomllib.loads(PYPROJECT_TOML.read_text(encoding="utf-8"))
+    dependencies = (
+        payload.get("project", {}).get("dependencies", [])
+        if isinstance(payload, dict)
+        else []
+    )
+    if not isinstance(dependencies, list):
+        raise RuntimeError("pyproject.toml project.dependencies must be a list")
+
+    for entry in dependencies:
+        try:
+            requirement = Requirement(str(entry))
+        except Exception:
+            continue
+        if requirement.name == package_name:
+            return str(requirement.specifier)
+
+    raise RuntimeError(f"Dependency {package_name!r} is not declared in pyproject.toml")
 
 
 def expected_conda_env_name() -> str:
@@ -384,6 +422,22 @@ class TapDBSettings(BaseModel):
         default="bloom",
         description="TapDB database namespace key for Bloom runtime config",
     )
+    owner_repo_name: str = Field(
+        default=DEFAULT_TAPDB_OWNER_REPO_NAME,
+        description="TapDB owner repo name for Meridian governance",
+    )
+    domain_code: str = Field(
+        default=DEFAULT_TAPDB_DOMAIN_CODE,
+        description="Meridian domain code for TapDB runtime config",
+    )
+    domain_registry_path: str = Field(
+        default=str(DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH),
+        description="Shared Meridian domain registry path",
+    )
+    prefix_ownership_registry_path: str = Field(
+        default=str(DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH),
+        description="Shared Meridian prefix ownership registry path",
+    )
     strict_namespace: bool = Field(
         default=True,
         description="Enable strict namespace mode for namespaced TapDB config",
@@ -395,13 +449,6 @@ class TapDBSettings(BaseModel):
     local_pg_port: int = Field(
         default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
-    )
-    min_version: str = Field(
-        default="5.1.0", description="Minimum supported daylily-tapdb"
-    )
-    max_version_exclusive: str = Field(
-        default="5.1.1",
-        description="Exclusive upper bound for daylily-tapdb",
     )
 
     @field_validator("env")
@@ -428,6 +475,30 @@ class TapDBSettings(BaseModel):
             raise ValueError("tapdb.database_name cannot be empty")
         return cleaned
 
+    @field_validator("owner_repo_name")
+    @classmethod
+    def validate_owner_repo_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("tapdb.owner_repo_name cannot be empty")
+        return cleaned
+
+    @field_validator("domain_code")
+    @classmethod
+    def validate_domain_code(cls, value: str) -> str:
+        cleaned = value.strip().upper()
+        if not cleaned:
+            raise ValueError("tapdb.domain_code cannot be empty")
+        return cleaned
+
+    @field_validator("domain_registry_path", "prefix_ownership_registry_path")
+    @classmethod
+    def validate_registry_path(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            raise ValueError("tapdb registry paths cannot be empty")
+        return cleaned
+
     @field_validator("local_pg_port")
     @classmethod
     def validate_local_pg_port(cls, value: int) -> int:
@@ -442,6 +513,12 @@ class TapDBRuntimeContext(BaseModel):
     env: str
     client_id: str
     database_name: str
+    owner_repo_name: str = DEFAULT_TAPDB_OWNER_REPO_NAME
+    domain_code: str = DEFAULT_TAPDB_DOMAIN_CODE
+    domain_registry_path: str = str(DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH)
+    prefix_ownership_registry_path: str = str(
+        DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
+    )
     strict_namespace: bool = True
     config_path: str = ""
     aws_profile: str = "lsmc"
@@ -968,6 +1045,12 @@ def get_tapdb_runtime_context(
         env=settings.tapdb.env.strip().lower(),
         client_id=settings.tapdb.client_id.strip(),
         database_name=settings.tapdb.database_name.strip(),
+        owner_repo_name=settings.tapdb.owner_repo_name.strip(),
+        domain_code=settings.tapdb.domain_code.strip().upper(),
+        domain_registry_path=str(settings.tapdb.domain_registry_path).strip(),
+        prefix_ownership_registry_path=str(
+            settings.tapdb.prefix_ownership_registry_path
+        ).strip(),
         strict_namespace=settings.tapdb.strict_namespace,
         config_path=(
             settings.tapdb.config_path
@@ -1011,24 +1094,22 @@ def get_tapdb_db_config(
     )
 
 
-def assert_tapdb_version(
-    min_version: Optional[str] = None,
-    max_version_exclusive: Optional[str] = None,
-) -> str:
-    """Assert installed daylily-tapdb version is within the supported range."""
-    settings = get_settings()
-    min_v = Version(min_version or settings.tapdb.min_version)
-    max_v = Version(max_version_exclusive or settings.tapdb.max_version_exclusive)
+def assert_tapdb_version() -> str:
+    """Assert installed daylily-tapdb version matches the Bloom pin."""
+    pinned_spec = _read_pyproject_dependency_spec("daylily-tapdb")
 
     try:
         installed = Version(importlib.metadata.version("daylily-tapdb"))
     except importlib.metadata.PackageNotFoundError as exc:
         raise RuntimeError("daylily-tapdb is not installed") from exc
 
-    if installed < min_v or installed >= max_v:
-        raise RuntimeError(
-            f"Unsupported daylily-tapdb version {installed}; expected >= {min_v} and < {max_v}"
-        )
+    if pinned_spec:
+        from packaging.specifiers import SpecifierSet
+
+        if installed not in SpecifierSet(pinned_spec):
+            raise RuntimeError(
+                f"Unsupported daylily-tapdb version {installed}; expected {pinned_spec}"
+            )
 
     return str(installed)
 
@@ -1178,6 +1259,12 @@ def build_effective_config_summary(
                 active_settings.tapdb.client_id.strip(),
                 active_settings.tapdb.database_name.strip(),
             )
+        ),
+        "tapdb_owner_repo_name": str(active_settings.tapdb.owner_repo_name),
+        "tapdb_domain_code": str(active_settings.tapdb.domain_code),
+        "tapdb_domain_registry_path": str(active_settings.tapdb.domain_registry_path),
+        "tapdb_prefix_ownership_registry_path": str(
+            active_settings.tapdb.prefix_ownership_registry_path
         ),
         "deployment_name": str(active_settings.deployment.name or _resolve_deployment_code()),
         "aws_region": str(active_settings.aws.region or "us-west-2"),

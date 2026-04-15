@@ -217,7 +217,7 @@ curl -k https://localhost:8912/api/v1/external/specimens \
     "container_template_code": "container/tube/tube-generic-10ml/1.0",
     "properties": {"source": "atlas-contract-test"},
     "atlas_refs": {
-      "order_number": "ORD-123",
+      "order_euid": "ORD-123",
       "patient_id": "PAT-123",
       "kit_barcode": "KIT-123"
     }

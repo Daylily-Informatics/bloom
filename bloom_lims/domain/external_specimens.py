@@ -9,6 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
+from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 from bloom_lims.schemas.external_specimens import (
@@ -27,7 +28,8 @@ class ExternalSpecimenService:
     _ATLAS_REFERENCE_FIELDS = (
         "trf_euid",
         "patient_id",
-        "shipment_number",
+        "order_euid",
+        "shipment_euid",
         "kit_barcode",
         "atlas_tenant_id",
         "atlas_trf_euid",
@@ -42,8 +44,12 @@ class ExternalSpecimenService:
             "reference_types": ("patient_id",),
             "value_field": "reference_value",
         },
-        "shipment_number": {
-            "reference_types": ("shipment_number",),
+        "order_euid": {
+            "reference_types": ("order_euid",),
+            "value_field": "reference_value",
+        },
+        "shipment_euid": {
+            "reference_types": ("shipment_euid",),
             "value_field": "reference_value",
         },
         "kit_barcode": {
@@ -82,6 +88,7 @@ class ExternalSpecimenService:
     def __init__(self, *, app_username: str):
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
+        self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self._atlas: AtlasService | None = None
 
     def close(self) -> None:
@@ -242,6 +249,7 @@ class ExternalSpecimenService:
         rows = (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
+                self.bdb.Base.classes.generic_instance.domain_code == self.domain_code,
                 self.bdb.Base.classes.generic_instance.uid.in_(
                     sorted(specimen_uids)
                 ),
@@ -302,6 +310,7 @@ class ExternalSpecimenService:
         return (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
+                self.bdb.Base.classes.generic_instance.domain_code == self.domain_code,
                 self.bdb.Base.classes.generic_instance.category == "content",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
                 func.jsonb_extract_path_text(
@@ -322,7 +331,8 @@ class ExternalSpecimenService:
         payload = {
             "trf_euid": refs.trf_euid,
             "patient_id": refs.patient_id,
-            "shipment_number": refs.shipment_number,
+            "order_euid": refs.order_euid,
+            "shipment_euid": refs.shipment_euid,
             "kit_barcode": refs.kit_barcode,
             "atlas_tenant_id": refs.atlas_tenant_id,
             "atlas_trf_euid": refs.atlas_trf_euid,
@@ -343,7 +353,8 @@ class ExternalSpecimenService:
                 for key in (
                     "trf_euid",
                     "patient_id",
-                    "shipment_number",
+                    "order_euid",
+                    "shipment_euid",
                     "kit_barcode",
                 )
             ):
@@ -380,8 +391,15 @@ class ExternalSpecimenService:
                     "stale": result.stale,
                     "fetched_at": result.fetched_at.isoformat(),
                 }
-            if "shipment_number" in normalized:
-                result = self.atlas.get_shipment(normalized["shipment_number"])
+            if "order_euid" in normalized:
+                result = self.atlas.get_order(normalized["order_euid"])
+                validation_meta["order"] = {
+                    "from_cache": result.from_cache,
+                    "stale": result.stale,
+                    "fetched_at": result.fetched_at.isoformat(),
+                }
+            if "shipment_euid" in normalized:
+                result = self.atlas.get_shipment(normalized["shipment_euid"])
                 validation_meta["shipment"] = {
                     "from_cache": result.from_cache,
                     "stale": result.stale,
@@ -409,12 +427,14 @@ class ExternalSpecimenService:
         patient = (
             context.get("patient") if isinstance(context.get("patient"), dict) else {}
         )
+        order = context.get("order") if isinstance(context.get("order"), dict) else {}
         links = context.get("links") if isinstance(context.get("links"), dict) else {}
 
         context_values = {
             "trf_euid": str(trf.get("trf_euid") or "").strip(),
             "patient_id": str(patient.get("patient_id") or "").strip(),
-            "shipment_number": str(links.get("shipment_number") or "").strip(),
+            "order_euid": str(order.get("order_euid") or "").strip(),
+            "shipment_euid": str(links.get("shipment_euid") or "").strip(),
             "kit_barcode": str(links.get("testkit_barcode") or "").strip(),
         }
 
@@ -438,6 +458,7 @@ class ExternalSpecimenService:
         patient = (
             context.get("patient") if isinstance(context.get("patient"), dict) else {}
         )
+        order = context.get("order") if isinstance(context.get("order"), dict) else {}
         links = context.get("links") if isinstance(context.get("links"), dict) else {}
         tests = context.get("tests") if isinstance(context.get("tests"), list) else []
         test_euids = []
@@ -452,8 +473,9 @@ class ExternalSpecimenService:
             "tenant_id": context.get("tenant_id"),
             "trf_euid": trf.get("trf_euid"),
             "patient_id": patient.get("patient_id"),
+            "order_euid": order.get("order_euid"),
             "testkit_barcode": links.get("testkit_barcode"),
-            "shipment_number": links.get("shipment_number"),
+            "shipment_euid": links.get("shipment_euid"),
             "test_count": len(test_euids),
             "test_euids": test_euids,
         }
@@ -549,6 +571,7 @@ class ExternalSpecimenService:
             for (uid,) in (
                 self.bdb.session.query(instance_cls.uid)
                 .filter(
+                    instance_cls.domain_code == self.domain_code,
                     instance_cls.uid.in_(sorted(parent_uids)),
                     instance_cls.is_deleted.is_(False),
                     instance_cls.category == "content",
@@ -566,6 +589,7 @@ class ExternalSpecimenService:
                     lineage_cls.is_deleted.is_(False),
                     lineage_cls.parent_instance_uid.in_(sorted(parent_uids)),
                     lineage_cls.relationship_type == "contains",
+                    instance_cls.domain_code == self.domain_code,
                     instance_cls.is_deleted.is_(False),
                     instance_cls.category == "content",
                 )
@@ -638,6 +662,7 @@ class ExternalSpecimenService:
         filters = [
             lineage_cls.is_deleted.is_(False),
             lineage_cls.relationship_type == self.EXTERNAL_REFERENCE_RELATIONSHIP,
+            instance_cls.domain_code == self.domain_code,
             instance_cls.is_deleted.is_(False),
             instance_cls.category == "generic",
             instance_cls.type == "generic",

@@ -46,13 +46,13 @@ class _FakeAtlasLookupService:
     def get_required_tenant_id(self):
         return "00000000-0000-0000-0000-000000000001"
 
-    def get_order(self, order_number: str):
+    def get_order(self, order_euid: str):
         return self._result()
 
     def get_patient(self, patient_id: str):
         return self._result()
 
-    def get_shipment(self, shipment_number: str):
+    def get_shipment(self, shipment_euid: str):
         return self._result()
 
     def get_testkit(self, kit_barcode: str):
@@ -133,7 +133,7 @@ def _create_container(client: TestClient, *, name: str) -> dict:
 
 def _create_specimen_payload(
     *,
-    order_number: str,
+    order_euid: str,
     patient_id: str,
     container_euid: str | None = None,
 ) -> dict:
@@ -143,7 +143,7 @@ def _create_specimen_payload(
         "status": "active",
         "properties": {"source": "atlas-contract-test"},
         "atlas_refs": {
-            "order_number": order_number,
+            "order_euid": order_euid,
             "patient_id": patient_id,
             "kit_barcode": f"KIT-{_suffix(3)}",
         },
@@ -204,7 +204,7 @@ def test_create_specimen_with_existing_container_contract(monkeypatch):
         specimen = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{_suffix()}",
+                order_euid=f"ORD-{_suffix()}",
                 patient_id=f"PAT-{_suffix()}",
                 container_euid=container["euid"],
             ),
@@ -212,7 +212,7 @@ def test_create_specimen_with_existing_container_contract(monkeypatch):
         )
         assert specimen["specimen_euid"]
         assert specimen["container_euid"] == container["euid"]
-        assert specimen["atlas_refs"]["order_number"].startswith("ORD-")
+        assert specimen["atlas_refs"]["order_euid"].startswith("ORD-")
         assert "atlas_refs" not in specimen["properties"]
         assert "atlas_validation" not in specimen["properties"]
 
@@ -225,7 +225,7 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
             return SimpleNamespace(
                 payload={
                     "tenant_id": "00000000-0000-0000-0000-000000000001",
-                    "order": {"order_number": "ORD-CONTEXT"},
+                    "order": {"order_euid": "ORD-CONTEXT"},
                     "patient": {"patient_id": "PAT-CONTEXT"},
                     "test_orders": [],
                     "links": {"testkit_barcode": "KIT-CONTEXT"},
@@ -250,7 +250,7 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
                 "status": "active",
                 "properties": {"source": "atlas-contract-test"},
                 "atlas_refs": {
-                    "order_number": "ORD-DIFFERENT",
+                    "order_euid": "ORD-DIFFERENT",
                     "patient_id": "PAT-DIFFERENT",
                     "kit_barcode": "KIT-DIFFERENT",
                 },
@@ -269,10 +269,10 @@ def test_container_context_summary_is_projected_through_explicit_reference_objec
             return SimpleNamespace(
                 payload={
                     "tenant_id": "00000000-0000-0000-0000-000000000001",
-                    "order": {"order_number": "ORD-MATCH"},
+                    "order": {"order_euid": "ORD-MATCH"},
                     "patient": {"patient_id": "PAT-MATCH"},
                     "test_orders": [{"test_order_id": "TO-1"}, {"test_order_id": "TO-2"}],
-                    "links": {"testkit_barcode": "KIT-MATCH", "shipment_number": "SHIP-MATCH"},
+                    "links": {"testkit_barcode": "KIT-MATCH", "shipment_euid": "SHIP-MATCH"},
                 },
                 from_cache=False,
                 stale=False,
@@ -293,19 +293,19 @@ def test_container_context_summary_is_projected_through_explicit_reference_objec
                 "status": "active",
                 "properties": {"source": "atlas-contract-test"},
                 "atlas_refs": {
-                    "order_number": "ORD-MATCH",
+                    "order_euid": "ORD-MATCH",
                     "patient_id": "PAT-MATCH",
                     "kit_barcode": "KIT-MATCH",
-                    "shipment_number": "SHIP-MATCH",
+                    "shipment_euid": "SHIP-MATCH",
                 },
             },
             idempotency_key=_opaque("idem", 16),
         )
 
-    assert created["atlas_refs"]["order_number"] == "ORD-MATCH"
+    assert created["atlas_refs"]["order_euid"] == "ORD-MATCH"
     assert created["atlas_refs"]["patient_id"] == "PAT-MATCH"
     assert created["atlas_refs"]["kit_barcode"] == "KIT-MATCH"
-    assert created["atlas_refs"]["shipment_number"] == "SHIP-MATCH"
+    assert created["atlas_refs"]["shipment_euid"] == "SHIP-MATCH"
     assert "atlas_refs" not in created["properties"]
     assert "atlas_validation" not in created["properties"]
 
@@ -315,7 +315,7 @@ def test_create_specimen_auto_container_contract(monkeypatch):
         specimen = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{_suffix()}",
+                order_euid=f"ORD-{_suffix()}",
                 patient_id=f"PAT-{_suffix()}",
             ),
             idempotency_key=_opaque("idem", 16),
@@ -329,7 +329,7 @@ def test_get_patch_delete_specimen_contract_sequence(monkeypatch):
         created = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{_suffix()}",
+                order_euid=f"ORD-{_suffix()}",
                 patient_id=f"PAT-{_suffix()}",
             ),
             idempotency_key=_opaque("idem", 16),
@@ -355,20 +355,20 @@ def test_get_patch_delete_specimen_contract_sequence(monkeypatch):
         assert missing.status_code == 404
 
 
-def test_lookup_specimens_by_reference_order_number(monkeypatch):
+def test_lookup_specimens_by_reference_order_euid(monkeypatch):
     with _build_client(monkeypatch) as client:
-        order_number = f"ORD-{_suffix()}"
+        order_euid = f"ORD-{_suffix()}"
         created = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=order_number,
+                order_euid=order_euid,
                 patient_id=f"PAT-{_suffix()}",
             ),
             idempotency_key=_opaque("idem", 16),
         )
         lookup = client.get(
             "/api/v1/external/specimens/by-reference",
-            params={"order_number": order_number},
+            params={"order_euid": order_euid},
         )
         assert lookup.status_code == 200
         items = lookup.json()["items"]
