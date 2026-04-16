@@ -70,6 +70,8 @@ def _load_bloom_template_prefixes() -> set[str]:
         payload = json.loads(_BLOOM_TEMPLATE_CONFIG.read_text(encoding="utf-8"))
     except Exception:
         return set()
+    if isinstance(payload, dict):
+        payload = payload.get("templates", [])
     if not isinstance(payload, list):
         return set()
     prefixes: set[str] = set()
@@ -242,33 +244,27 @@ def create_temp_tapdb_config(
 
 def ensure_test_runtime_environment() -> Path:
     """Prepare deterministic Bloom config needed for strict app startup in tests."""
-    os.environ.setdefault("MERIDIAN_ENVIRONMENT", "production")
-    os.environ.setdefault("MERIDIAN_SANDBOX_PREFIX", "")
-    os.environ.setdefault("MERIDIAN_DOMAIN_CODE", "Z")
-    os.environ.setdefault("TAPDB_OWNER_REPO", "bloom")
-    os.environ.setdefault("TAPDB_DOMAIN_CODE", "Z")
-    os.environ.setdefault("BLOOM_TAPDB__CLIENT_ID", "bloom")
-    os.environ.setdefault("BLOOM_TAPDB__DATABASE_NAME", "bloom")
-    os.environ.setdefault("BLOOM_TAPDB__OWNER_REPO_NAME", "bloom")
-    os.environ.setdefault("BLOOM_TAPDB__DOMAIN_CODE", "Z")
-    os.environ.setdefault("BLOOM_TAPDB__STRICT_NAMESPACE", "1")
-    os.environ.setdefault(
-        "BLOOM_TAPDB__LOCAL_PG_PORT", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
-    )
+    os.environ["MERIDIAN_ENVIRONMENT"] = "production"
+    os.environ["MERIDIAN_SANDBOX_PREFIX"] = ""
+    os.environ["MERIDIAN_DOMAIN_CODE"] = "Z"
+    os.environ["TAPDB_OWNER_REPO"] = "bloom"
+    os.environ["TAPDB_DOMAIN_CODE"] = "Z"
+    os.environ["BLOOM_TAPDB__CLIENT_ID"] = "bloom"
+    os.environ["BLOOM_TAPDB__DATABASE_NAME"] = "bloom"
+    os.environ["BLOOM_TAPDB__OWNER_REPO_NAME"] = "bloom"
+    os.environ["BLOOM_TAPDB__DOMAIN_CODE"] = "Z"
+    os.environ["BLOOM_TAPDB__STRICT_NAMESPACE"] = "1"
+    os.environ["BLOOM_TAPDB__LOCAL_PG_PORT"] = str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
 
     for key, value in TEST_COGNITO_ENV_DEFAULTS.items():
-        os.environ.setdefault(key, value)
+        os.environ[key] = value
 
-    current_path = os.environ.get("BLOOM_TAPDB__CONFIG_PATH")
-    if tapdb_config_path_needs_bootstrap(current_path):
-        config_path = create_temp_tapdb_config()
-        os.environ["BLOOM_TAPDB__CONFIG_PATH"] = str(config_path)
-    else:
-        config_path = Path(str(current_path)).expanduser()
+    config_path = create_temp_tapdb_config()
+    os.environ["BLOOM_TAPDB__CONFIG_PATH"] = str(config_path)
 
     os.environ.setdefault("ECHO_SQL", "False")
     os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
-    os.environ.setdefault("BLOOM_RATE_LIMIT", "no")
+    os.environ["BLOOM_RATE_LIMIT"] = "no"
 
     from bloom_lims.config import get_settings
 

@@ -16,7 +16,18 @@ import sys
 from pathlib import Path
 
 import typer
+from daylily_tapdb import (
+    find_tapdb_core_config_dir,
+    seed_templates,
+    validate_template_configs,
+)
+from daylily_tapdb.euid import (
+    AUDIT_LOG_PREFIX,
+    GENERIC_INSTANCE_LINEAGE_PREFIX,
+    GENERIC_TEMPLATE_PREFIX,
+)
 from rich.console import Console
+from sqlalchemy import text
 
 from bloom_lims.cli._registry_v2 import (
     EXEMPT_MUTATING,
@@ -33,13 +44,18 @@ from bloom_lims.config import (
     apply_runtime_environment,
     get_settings,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_DEFAULT_AUDIT_LOG_EUID_PREFIX = "BGX"
 _DEFAULT_TAPDB_CLIENT_ID = "bloom"
 _DEFAULT_TAPDB_DATABASE_NAME = "bloom"
+_IDENTITY_PREFIXES: dict[str, str] = {
+    "generic_template": GENERIC_TEMPLATE_PREFIX,
+    "generic_instance_lineage": GENERIC_INSTANCE_LINEAGE_PREFIX,
+    "audit_log": AUDIT_LOG_PREFIX,
+}
 
 
 def _bloom_root() -> Path:
@@ -160,11 +176,6 @@ def _local_ui_port(env_name: str) -> str:
     return str(DEFAULT_BLOOM_WEB_PORT).strip()
 
 
-def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
-    _ = env_name
-    return _DEFAULT_AUDIT_LOG_EUID_PREFIX
-
-
 def _tapdb_support_email(env_name: str) -> str:
     _ = env_name
     return get_settings().ui.support_email.strip()
@@ -177,8 +188,6 @@ def _update_tapdb_namespace_config(env_name: str) -> None:
             "update",
             "--env",
             env_name,
-            "--audit-log-euid-prefix",
-            _tapdb_audit_log_euid_prefix(env_name),
             "--support-email",
             _tapdb_support_email(env_name),
         ]
@@ -251,22 +260,101 @@ def _seed_tapdb_templates(
     include_workflow: bool = False,
     overwrite: bool = False,
 ) -> None:
-    """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
-    tapdb_config_dir = str(_bloom_root() / "config" / "tapdb_templates")
-    args = ["db", "data", "seed", env_name]
-    if tapdb_config_dir:
-        args.extend(["--config", tapdb_config_dir])
-        console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
-    else:
-        console.print(
-            "[cyan]TapDB template seed:[/cyan] using built-in TapDB core config"
-        )
+    """Seed TapDB templates with strict per-owner prefix validation."""
+    tapdb_config_dir = (_bloom_root() / "config" / "tapdb_templates").resolve()
+    console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
     if include_workflow:
         console.print(
             "[yellow]Workflow overlay seeding is not supported in Bloom.[/yellow]"
         )
-    args.append("--overwrite" if overwrite else "--skip-existing")
-    _run_tapdb(args)
+    core_config_dir = find_tapdb_core_config_dir().resolve()
+    templates, issues = validate_template_configs(
+        [core_config_dir, tapdb_config_dir],
+        strict=True,
+    )
+    errors = [issue for issue in issues if issue.level == "error"]
+    if errors:
+        joined = "; ".join(issue.message for issue in errors)
+        raise RuntimeError(f"Bloom template pack validation failed: {joined}")
+
+    core_templates: list[dict[str, object]] = []
+    client_templates: list[dict[str, object]] = []
+    for template in templates:
+        source_file = str(template.get("_source_file") or "").strip()
+        source_path = Path(source_file).resolve() if source_file else tapdb_config_dir
+        target_batch = (
+            core_templates
+            if source_path.is_relative_to(core_config_dir)
+            else client_templates
+        )
+        target_batch.append(template)
+
+    ctx = apply_runtime_environment(get_settings())
+    domain_registry_path = Path(str(ctx.domain_registry_path)).expanduser().resolve()
+    prefix_registry_path = Path(
+        str(ctx.prefix_ownership_registry_path)
+    ).expanduser().resolve()
+    bdb = BLOOMdb3(app_username="bloom-cli")
+    try:
+        if core_templates:
+            _ensure_identity_prefix_config(
+                bdb.session,
+                owner_repo_name="daylily-tapdb",
+                domain_code=ctx.domain_code,
+            )
+            seed_templates(
+                bdb.session,
+                core_templates,
+                overwrite=overwrite,
+                core_config_dir=core_config_dir,
+                domain_code=ctx.domain_code,
+                owner_repo_name="daylily-tapdb",
+                domain_registry_path=domain_registry_path,
+                prefix_registry_path=prefix_registry_path,
+            )
+        if client_templates:
+            _ensure_identity_prefix_config(
+                bdb.session,
+                owner_repo_name=ctx.owner_repo_name,
+                domain_code=ctx.domain_code,
+            )
+            seed_templates(
+                bdb.session,
+                client_templates,
+                overwrite=overwrite,
+                core_config_dir=core_config_dir,
+                domain_code=ctx.domain_code,
+                owner_repo_name=ctx.owner_repo_name,
+                domain_registry_path=domain_registry_path,
+                prefix_registry_path=prefix_registry_path,
+            )
+        bdb.session.commit()
+    except Exception:
+        bdb.session.rollback()
+        raise
+    finally:
+        bdb.session.close()
+        bdb.engine.dispose()
+
+
+def _ensure_identity_prefix_config(session, *, owner_repo_name: str, domain_code: str) -> None:
+    values_sql = ",\n        ".join(
+        f"('{entity}', '{domain_code}', '{owner_repo_name}', '{prefix}')"
+        for entity, prefix in _IDENTITY_PREFIXES.items()
+    )
+    sequence_sql = "\n    ".join(
+        f'CREATE SEQUENCE IF NOT EXISTS "{prefix.lower()}_instance_seq";'
+        for prefix in sorted(set(_IDENTITY_PREFIXES.values()))
+    )
+    sql = f"""
+    INSERT INTO tapdb_identity_prefix_config(entity, domain_code, issuer_app_code, prefix)
+    VALUES {values_sql}
+    ON CONFLICT (entity, domain_code, issuer_app_code) DO UPDATE
+      SET prefix = EXCLUDED.prefix, updated_dt = NOW();
+
+    {sequence_sql}
+    """
+    session.execute(text(sql))
 
 
 @db_app.command("build")

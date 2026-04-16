@@ -49,9 +49,12 @@ async def list_lineages(
     """List lineages with optional filters."""
     try:
         bdb = get_bdb(user.email)
-        
-        query = bdb.session.query(bdb.Base.classes.generic_instance_lineage)
-        query = query.filter(bdb.Base.classes.generic_instance_lineage.is_deleted == False)
+        lineage = bdb.Base.classes.generic_instance_lineage
+        query = (
+            bdb.session.query(lineage)
+            .filter(lineage.is_deleted == False)
+            .filter(lineage.polymorphic_discriminator == "generic_instance_lineage")
+        )
         
         if parent_euid:
             parent = bdb.session.query(bdb.Base.classes.generic_instance).filter(
@@ -142,9 +145,12 @@ async def delete_lineage(
     """Delete a lineage (soft delete by default)."""
     try:
         bdb = get_bdb(user.email)
+        lineage_model = bdb.Base.classes.generic_instance_lineage
         lineage = (
-            bdb.session.query(bdb.Base.classes.generic_instance_lineage)
-            .filter(bdb.Base.classes.generic_instance_lineage.euid == lineage_euid)
+            bdb.session.query(lineage_model)
+            .filter(lineage_model.is_deleted == False)
+            .filter(lineage_model.polymorphic_discriminator == "generic_instance_lineage")
+            .filter(lineage_model.euid == lineage_euid)
             .first()
         )
         

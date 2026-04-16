@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from bloom_lims.db import get_child_lineages, get_parent_lineages
+from bloom_lims.template_identity import instance_semantic_category
 from bloom_lims.schemas.beta_lab import (
     BetaClaimResponse,
     BetaConsumeMaterialResponse,
@@ -433,7 +434,7 @@ class _BetaLabQueueMixin:
         instrument_euid = normalized.get("instrument_euid")
         if instrument_euid is not None:
             instrument = self._require_instance(str(instrument_euid))
-            if instrument.category != "equipment":
+            if instance_semantic_category(instrument) != "equipment":
                 raise ValueError(
                     "metadata.instrument_euid must reference an equipment object"
                 )
@@ -442,7 +443,7 @@ class _BetaLabQueueMixin:
         reagent_euid = normalized.get("reagent_euid")
         if reagent_euid is not None:
             reagent = self._require_instance(str(reagent_euid))
-            if reagent.category != "content" or (
+            if instance_semantic_category(reagent) != "content" or (
                 str(reagent.type or "").strip() != "reagent"
                 and "reagent" not in str(reagent.subtype or "").strip()
             ):
@@ -480,7 +481,7 @@ class _BetaLabQueueMixin:
         if instance is None or instance.is_deleted:
             return False
         if (
-            instance.category != "generic"
+            instance_semantic_category(instance) != "data"
             or instance.type != "generic"
             or instance.subtype != "generic"
         ):
@@ -728,7 +729,11 @@ class _BetaLabQueueMixin:
             if lineage.is_deleted or lineage.relationship_type != "contains":
                 continue
             parent = lineage.parent_instance
-            if parent is None or parent.is_deleted or parent.category != "container":
+            if (
+                parent is None
+                or parent.is_deleted
+                or instance_semantic_category(parent) != "container"
+            ):
                 continue
             return parent
         return None

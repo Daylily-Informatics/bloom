@@ -26,6 +26,7 @@ from bloom_lims.core.cache import (
     LRUCache,
     create_cache,
 )
+from bloom_lims.template_identity import template_category_filter
 
 logger = logging.getLogger(__name__)
 
@@ -138,9 +139,11 @@ class CachedRepository:
         query = self._session.query(self._Base.classes.generic_template)
 
         if category is not None:
-            query = query.filter(
-                self._Base.classes.generic_template.category == category
+            category_filter = template_category_filter(
+                self._Base.classes.generic_template, category
             )
+            if category_filter is not None:
+                query = query.filter(category_filter)
         if type is not None:
             query = query.filter(self._Base.classes.generic_template.type == type)
         if subtype is not None:
@@ -199,4 +202,3 @@ class CachedRepository:
         """Clear all cache entries."""
         self._cache.clear()
         logger.info("Cleared all cache entries")
-

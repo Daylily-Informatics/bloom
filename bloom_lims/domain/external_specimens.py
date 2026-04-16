@@ -18,6 +18,10 @@ from bloom_lims.schemas.external_specimens import (
     ExternalSpecimenResponse,
     ExternalSpecimenUpdateRequest,
 )
+from bloom_lims.template_identity import (
+    instance_category_filter,
+    instance_semantic_category,
+)
 
 
 class ExternalSpecimenService:
@@ -159,7 +163,7 @@ class ExternalSpecimenService:
         specimen = self._safe_get_by_euid(specimen_euid)
         if specimen is None or specimen.is_deleted:
             raise ValueError(f"Specimen not found: {specimen_euid}")
-        if specimen.category != "content":
+        if instance_semantic_category(specimen) != "content":
             raise ValueError(f"EUID is not a specimen content object: {specimen_euid}")
         return self._to_response(specimen, created=True)
 
@@ -172,7 +176,7 @@ class ExternalSpecimenService:
         specimen = self._safe_get_by_euid(specimen_euid)
         if specimen is None or specimen.is_deleted:
             raise ValueError(f"Specimen not found: {specimen_euid}")
-        if specimen.category != "content":
+        if instance_semantic_category(specimen) != "content":
             raise ValueError(f"EUID is not a specimen content object: {specimen_euid}")
 
         if payload.specimen_name:
@@ -198,7 +202,7 @@ class ExternalSpecimenService:
             container = self._safe_get_by_euid(payload.container_euid)
             if container is None or container.is_deleted:
                 raise ValueError(f"Container not found: {payload.container_euid}")
-            if container.category != "container":
+            if instance_semantic_category(container) != "container":
                 raise ValueError(f"EUID is not a container: {payload.container_euid}")
             self._ensure_container_link(container.euid, specimen.euid)
 
@@ -253,7 +257,9 @@ class ExternalSpecimenService:
                 self.bdb.Base.classes.generic_instance.uid.in_(
                     sorted(specimen_uids)
                 ),
-                self.bdb.Base.classes.generic_instance.category == "content",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "content"
+                ),
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
             )
             .order_by(self.bdb.Base.classes.generic_instance.euid.asc())
@@ -272,7 +278,7 @@ class ExternalSpecimenService:
             container = self._safe_get_by_euid(container_euid)
             if container is None or container.is_deleted:
                 raise ValueError(f"Container not found: {container_euid}")
-            if container.category != "container":
+            if instance_semantic_category(container) != "container":
                 raise ValueError(f"EUID is not a container: {container_euid}")
             return container
 
@@ -311,7 +317,9 @@ class ExternalSpecimenService:
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
                 self.bdb.Base.classes.generic_instance.domain_code == self.domain_code,
-                self.bdb.Base.classes.generic_instance.category == "content",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "content"
+                ),
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
                 func.jsonb_extract_path_text(
                     self.bdb.Base.classes.generic_instance.json_addl["properties"],
@@ -501,7 +509,7 @@ class ExternalSpecimenService:
             parent = lineage.parent_instance
             if parent is None or parent.is_deleted:
                 continue
-            if parent.category == "container":
+            if instance_semantic_category(parent) == "container":
                 return parent.euid
         return None
 
@@ -574,7 +582,7 @@ class ExternalSpecimenService:
                     instance_cls.domain_code == self.domain_code,
                     instance_cls.uid.in_(sorted(parent_uids)),
                     instance_cls.is_deleted.is_(False),
-                    instance_cls.category == "content",
+                    instance_category_filter(instance_cls, "content"),
                 )
                 .all()
             )
@@ -591,7 +599,7 @@ class ExternalSpecimenService:
                     lineage_cls.relationship_type == "contains",
                     instance_cls.domain_code == self.domain_code,
                     instance_cls.is_deleted.is_(False),
-                    instance_cls.category == "content",
+                    instance_category_filter(instance_cls, "content"),
                 )
                 .all()
             )
@@ -636,7 +644,7 @@ class ExternalSpecimenService:
             if external_ref is None or external_ref.is_deleted:
                 continue
             if (
-                external_ref.category != "generic"
+                instance_semantic_category(external_ref) != "generic"
                 or external_ref.type != "generic"
                 or external_ref.subtype != "external_object_link"
             ):
@@ -664,7 +672,7 @@ class ExternalSpecimenService:
             lineage_cls.relationship_type == self.EXTERNAL_REFERENCE_RELATIONSHIP,
             instance_cls.domain_code == self.domain_code,
             instance_cls.is_deleted.is_(False),
-            instance_cls.category == "generic",
+            instance_category_filter(instance_cls, "generic"),
             instance_cls.type == "generic",
             instance_cls.subtype == "external_object_link",
             func.jsonb_extract_path_text(

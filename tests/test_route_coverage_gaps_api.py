@@ -20,6 +20,7 @@ os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 from fastapi.testclient import TestClient
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_atlas_api_enabled
+from bloom_lims.template_identity import template_category_filter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from main import app
@@ -39,7 +40,10 @@ def _get_template_euid(
     version: str | None = None,
 ) -> str:
     GT = bdb.Base.classes.generic_template
-    q = bdb.session.query(GT).filter(GT.is_deleted == False).filter(GT.category == category)
+    q = bdb.session.query(GT).filter(GT.is_deleted == False)
+    category_filter = template_category_filter(GT, category)
+    if category_filter is not None:
+        q = q.filter(category_filter)
     domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "Z").strip().upper() or "Z"
     q = q.filter(GT.domain_code == domain_code)
     if type_name is not None:

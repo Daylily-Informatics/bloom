@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.tapdb_adapter import action_instance, action_instance_lineage, generic_instance
+from bloom_lims.tapdb_adapter import generic_template
 
 
 def _normalize_action_slug(action_key: str) -> str:
@@ -151,13 +152,25 @@ class BloomTapDBActionDispatcher(ActionDispatcher):
         if not action_template_uid:
             raise ValueError("action_ds is missing required 'action_template_uid'")
         action_template_uid = _coerce_action_template_uid(action_template_uid)
+        template = (
+            session.query(generic_template)
+            .filter(generic_template.uid == action_template_uid)
+            .one_or_none()
+        )
+        if template is None:
+            raise ValueError(f"Action template not found for uid {action_template_uid}")
+        category = str(template.category or "").strip()
+        if not category:
+            raise ValueError(
+                f"Seeded action template is missing a category: {action_template_uid}"
+            )
 
         action_subtype = _normalize_action_slug(action_key) or "unknown_action"
         executed_at = datetime.now(UTC).isoformat()
         action_record = action_instance(
             name=f"{action_subtype}@{instance.euid}",
             polymorphic_discriminator="action_instance",
-            category="action",
+            category=category,
             type="action",
             subtype=action_subtype,
             version="1.0",

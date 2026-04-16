@@ -11,7 +11,24 @@ from sqlalchemy import and_, cast, func, or_
 from sqlalchemy.sql.sqltypes import String
 
 from bloom_lims.db import BLOOMdb3
+from bloom_lims.template_identity import template_semantic_category
 from bloom_lims.search.contracts import SearchJSONFilter, SearchRequest, SearchResultItem
+
+_KNOWN_LINEAGE_IDENTITIES = (
+    "generic_instance_lineage",
+    "workflow_instance_lineage",
+    "workflow_step_instance_lineage",
+    "container_instance_lineage",
+    "content_instance_lineage",
+    "equipment_instance_lineage",
+    "data_instance_lineage",
+    "test_requisition_instance_lineage",
+    "actor_instance_lineage",
+    "action_instance_lineage",
+    "health_event_instance_lineage",
+    "file_instance_lineage",
+    "subject_instance_lineage",
+)
 
 
 class SearchRepository:
@@ -121,7 +138,7 @@ class SearchRepository:
                 record_type="template",
                 euid=str(getattr(row, "euid", "") or ""),
                 name=str(getattr(row, "name", "") or ""),
-                category=str(getattr(row, "category", "") or ""),
+                category=template_semantic_category(row),
                 type=str(getattr(row, "type", "") or ""),
                 subtype=str(getattr(row, "subtype", "") or ""),
                 status=str(getattr(row, "bstatus", "") or ""),
@@ -138,7 +155,9 @@ class SearchRepository:
 
     def _search_lineages(self, request: SearchRequest) -> Tuple[List[SearchResultItem], int, bool]:
         model = self._classes.generic_instance_lineage
-        query = self._session.query(model)
+        query = self._session.query(model).filter(
+            model.polymorphic_discriminator.in_(_KNOWN_LINEAGE_IDENTITIES)
+        )
 
         query = self._apply_common_filters(query, model, request, include_type_filters=False)
         query = self._apply_query_text_filter(
@@ -189,7 +208,19 @@ class SearchRepository:
             query = query.filter(model.is_deleted.is_(False))
 
         if request.categories and hasattr(model, "category"):
-            query = query.filter(func.lower(model.category).in_([c.lower() for c in request.categories]))
+            categories = [c.lower() for c in request.categories]
+            semantic_category = func.lower(
+                func.coalesce(
+                    func.jsonb_extract_path_text(model.json_addl, "semantic_category"),
+                    "",
+                )
+            )
+            query = query.filter(
+                or_(
+                    func.lower(model.category).in_(categories),
+                    semantic_category.in_(categories),
+                )
+            )
 
         if request.statuses:
             query = query.filter(func.lower(model.operation_type).in_([s.lower() for s in request.statuses]))

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bloom_lims.core.exceptions import BloomValidationError
+from bloom_lims.template_identity import template_category_filter
 from bloom_lims.core.tapdb_action_dispatcher import BloomTapDBActionDispatcher
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
@@ -236,17 +237,16 @@ def _upgrade_active_action_definition(
         )
 
     template = query_obj.Base.classes.generic_template
-    action_template = (
-        query_obj.session.query(template)
-        .filter(
-            template.is_deleted == False,  # noqa: E712
-            template.category == "action",
-            template.type == parts[1],
-            template.subtype == parts[2],
-            template.version == parts[3],
-        )
-        .one_or_none()
+    category_filter = template_category_filter(template, "action")
+    action_query = query_obj.session.query(template).filter(
+        template.is_deleted == False,  # noqa: E712
+        template.type == parts[1],
+        template.subtype == parts[2],
+        template.version == parts[3],
     )
+    if category_filter is not None:
+        action_query = action_query.filter(category_filter)
+    action_template = action_query.one_or_none()
     if action_template is None:
         raise ActionExecutionError(
             status_code=409,

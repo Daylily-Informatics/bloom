@@ -58,7 +58,7 @@ def _opaque(prefix: str) -> str:
 
 def _assert_domain_scoped_euid(euid: str, legacy_prefix: str) -> None:
     domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "Z").strip() or "Z"
-    assert euid.startswith(f"{domain_code}:{legacy_prefix}")
+    assert euid.startswith(f"{domain_code}-{legacy_prefix}")
 
 
 def _props(instance) -> dict:

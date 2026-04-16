@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from bloom_lims.config import get_settings
+from bloom_lims.template_identity import (
+    template_category_filter,
+    template_semantic_category,
+)
 from .dependencies import require_api_auth, APIUser
 
 
@@ -50,7 +54,11 @@ async def list_templates(
         )
 
         if category:
-            query = query.filter(bdb.Base.classes.generic_template.category == category.lower())
+            category_filter = template_category_filter(
+                bdb.Base.classes.generic_template, category
+            )
+            if category_filter is not None:
+                query = query.filter(category_filter)
         if type:
             query = query.filter(bdb.Base.classes.generic_template.type == type.lower())
         if subtype:
@@ -67,7 +75,7 @@ async def list_templates(
                 {
                     "euid": t.euid,
                     "name": t.name,
-                    "category": t.category,
+                    "category": template_semantic_category(t),
                     "type": t.type,
                     "subtype": t.subtype,
                     "polymorphic_discriminator": t.polymorphic_discriminator,
@@ -105,7 +113,7 @@ async def get_template(
         return {
             "euid": template.euid,
             "name": template.name,
-            "category": template.category,
+            "category": template_semantic_category(template),
             "type": template.type,
             "subtype": template.subtype,
             "polymorphic_discriminator": template.polymorphic_discriminator,
@@ -131,14 +139,19 @@ async def list_templates_by_category(
 
         query = bdb.session.query(bdb.Base.classes.generic_template).filter(
             bdb.Base.classes.generic_template.domain_code == domain_code,
-            bdb.Base.classes.generic_template.category == category.lower(),
             bdb.Base.classes.generic_template.is_deleted == False,
         )
+        category_filter = template_category_filter(
+            bdb.Base.classes.generic_template, category
+        )
+        if category_filter is not None:
+            query = query.filter(category_filter)
 
         items = query.all()
+        resolved_category = template_semantic_category(items[0]) if items else category
 
         return {
-            "category": category,
+            "category": resolved_category,
             "templates": [
                 {
                     "euid": t.euid,

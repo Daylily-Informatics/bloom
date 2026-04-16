@@ -11,6 +11,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from bloom_lims.db import get_parent_lineages
+from bloom_lims.template_identity import (
+    instance_category_filter,
+    instance_semantic_category,
+)
 from .dependencies import require_api_auth, APIUser
 
 
@@ -54,7 +58,9 @@ async def list_subjects(
         bdb = get_bdb(user.email)
 
         query = bdb.session.query(bdb.Base.classes.generic_instance)
-        query = query.filter(bdb.Base.classes.generic_instance.category == "subject")
+        query = query.filter(
+            instance_category_filter(bdb.Base.classes.generic_instance, "subject")
+        )
 
         if subtype:
             query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
@@ -95,7 +101,7 @@ async def get_subject(euid: str, user: APIUser = Depends(require_api_auth)):
         
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.category == "subject",
+            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
         ).first()
 
         if not subject:
@@ -184,7 +190,7 @@ async def update_subject(
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.category == "subject",
+            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
         ).first()
 
         if not subject:
@@ -232,7 +238,7 @@ async def delete_subject(
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.category == "subject",
+            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
         ).first()
 
         if not subject:
@@ -265,7 +271,7 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
 
         subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
             bdb.Base.classes.generic_instance.euid == euid,
-            bdb.Base.classes.generic_instance.category == "subject",
+            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
         ).first()
 
         if not subject:
@@ -276,7 +282,10 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if child.category == "content" and child.type in ["specimen", "sample"]:
+            if (
+                instance_semantic_category(child) == "content"
+                and child.type in ["specimen", "sample"]
+            ):
                 specimens.append({
                     "euid": child.euid,
                     "name": child.name,

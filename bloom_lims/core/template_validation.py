@@ -77,9 +77,6 @@ class TemplateValidator:
         "generic",
         "subject",
     }
-    # Backward compatibility alias
-    VALID_SUPER_TYPES = VALID_CATEGORIES
-
     # Required fields for different template types
     REQUIRED_FIELDS = {
         "action": ["action_definition"],

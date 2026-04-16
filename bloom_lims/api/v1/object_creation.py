@@ -4,7 +4,6 @@ BLOOM LIMS API v1 - Object Creation Wizard Endpoints
 Endpoints to support the multi-step object creation workflow.
 """
 
-import json
 import logging
 import re
 from typing import Any, Dict, List, Optional
@@ -13,6 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from bloom_lims.config import get_settings
+from bloom_lims.template_identity import (
+    instance_semantic_category,
+    template_category_filter,
+    template_payload,
+    template_semantic_category,
+)
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from .dependencies import require_api_auth, APIUser
 
@@ -87,15 +92,7 @@ def get_bdb(username: str = "api-user"):
 
 def _template_payload(template_row) -> Dict[str, Any]:
     """Return template json_addl as a dict."""
-    payload = template_row.json_addl or {}
-    if isinstance(payload, str):
-        try:
-            payload = json.loads(payload)
-        except Exception:
-            payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
-    return payload
+    return template_payload(template_row)
 
 
 def _sort_key(value: str | None) -> tuple[str, str]:
@@ -108,7 +105,7 @@ def _tapdb_domain_code() -> str:
 
 
 def _is_template_visible(template_row) -> bool:
-    category = str(getattr(template_row, "category", "") or "").strip().lower()
+    category = template_semantic_category(template_row).strip().lower()
     if not category or category in RETIRED_TEMPLATE_CATEGORIES:
         return False
 
@@ -142,7 +139,7 @@ async def list_categories(user: APIUser = Depends(require_api_auth)):
         for row in rows:
             if not _is_template_visible(row):
                 continue
-            category_name = str(row.category or "").strip()
+            category_name = template_semantic_category(row).strip()
             type_name = str(row.type or "").strip()
             if not category_name:
                 continue
@@ -191,7 +188,7 @@ async def list_types(
             )
             .filter(
                 template.is_deleted == False,  # noqa: E712
-                template.category == category,
+                template_category_filter(template, category),
                 template.domain_code == domain_code,
             )
             .all()
@@ -199,6 +196,7 @@ async def list_types(
         visible_rows = [row for row in rows if _is_template_visible(row)]
         if not visible_rows:
             raise HTTPException(status_code=404, detail=f"Category not found: {category}")
+        resolved_category = template_semantic_category(visible_rows[0]).strip()
 
         type_to_subtypes: dict[str, set[str]] = {}
         for row in visible_rows:
@@ -219,7 +217,7 @@ async def list_types(
             for type_name in sorted(type_to_subtypes.keys(), key=_sort_key)
         ]
 
-        return {"category": category, "types": types}
+        return {"category": resolved_category or category, "types": types}
     except HTTPException:
         raise
     except Exception as e:
@@ -255,7 +253,7 @@ async def list_subtypes(
             )
             .filter(
                 template.is_deleted == False,  # noqa: E712
-                template.category == category,
+                template_category_filter(template, category),
                 template.type == type,
                 template.domain_code == domain_code,
             )
@@ -264,6 +262,7 @@ async def list_subtypes(
         visible_rows = [row for row in rows if _is_template_visible(row)]
         if not visible_rows:
             raise HTTPException(status_code=404, detail=f"Type not found: {category}/{type}")
+        resolved_category = template_semantic_category(visible_rows[0]).strip()
 
         subtype_map: Dict[str, Dict[str, Any]] = {}
         for row in visible_rows:
@@ -291,7 +290,7 @@ async def list_subtypes(
             entry["versions"] = sorted(set(entry["versions"]), key=_sort_key)
             subtypes.append(entry)
 
-        return {"category": category, "type": type, "subtypes": subtypes}
+        return {"category": resolved_category or category, "type": type, "subtypes": subtypes}
     except HTTPException:
         raise
     except Exception as e:
@@ -324,7 +323,7 @@ async def get_template_details(
             bdb.session.query(template.euid)
             .filter(
                 template.is_deleted == False,  # noqa: E712
-                template.category == category,
+                template_category_filter(template, category),
                 template.type == type,
                 template.domain_code == domain_code,
             )
@@ -337,7 +336,7 @@ async def get_template_details(
             bdb.session.query(template.euid)
             .filter(
                 template.is_deleted == False,  # noqa: E712
-                template.category == category,
+                template_category_filter(template, category),
                 template.type == type,
                 template.subtype == subtype,
                 template.domain_code == domain_code,
@@ -351,7 +350,7 @@ async def get_template_details(
             bdb.session.query(template)
             .filter(
                 template.is_deleted == False,  # noqa: E712
-                template.category == category,
+                template_category_filter(template, category),
                 template.type == type,
                 template.subtype == subtype,
                 template.version == version,
@@ -365,7 +364,7 @@ async def get_template_details(
         template_data = _template_payload(row)
 
         return {
-            "category": category,
+            "category": template_semantic_category(row) or category,
             "type": type,
             "subtype": subtype,
             "version": version,
@@ -443,7 +442,7 @@ async def create_object(
             email=user.email,
         )
 
-        if new_instance.category == "container":
+        if instance_semantic_category(new_instance) == "container":
             emit_bloom_event(
                 "container.created",
                 {

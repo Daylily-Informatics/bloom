@@ -785,7 +785,8 @@ class TestTemplatesAPIExtended:
     def test_list_templates_with_pagination(self, client):
         """Test listing templates with pagination."""
         response = client.get(
-            "/api/v1/templates/?page=1&page_size=5", params={"domain_code": "Z"}
+            "/api/v1/templates/",
+            params={"domain_code": "Z", "page": 1, "page_size": 5},
         )
         assert response.status_code == 200
         data = response.json()
@@ -795,7 +796,10 @@ class TestTemplatesAPIExtended:
     def test_get_template_by_euid(self, client):
         """Test getting template by EUID."""
         # First get a list of templates to find a valid EUID
-        response = client.get("/api/v1/templates/?page_size=1", params={"domain_code": "Z"})
+        response = client.get(
+            "/api/v1/templates/",
+            params={"domain_code": "Z", "page_size": 1},
+        )
         assert response.status_code == 200
         data = response.json()
         _assert_items_do_not_expose_uuid(data)

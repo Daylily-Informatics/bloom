@@ -9,12 +9,17 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.domain.execution_actions import ExecutionQueueActionRecorder
+from bloom_lims.template_identity import (
+    instance_category_filter,
+    instance_semantic_category,
+    template_semantic_category,
+)
 from bloom_lims.schemas.execution_queue import (
     CancelSubjectExecutionRequest,
     ClaimQueueItemRequest,
@@ -189,7 +194,10 @@ class ExecutionQueueService:
         self.bdb = bdb if bdb is not None else BLOOMdb3(app_username=app_username)
         self._owns_bdb = bdb is None
         self.bobj = BloomObj(self.bdb)
-        self.action_recorder = ExecutionQueueActionRecorder(self.bdb.session)
+        self.action_recorder = ExecutionQueueActionRecorder(
+            self.bdb.session,
+            domain_code=self.bdb.domain_code,
+        )
         self.clock = clock or (lambda: datetime.now(UTC))
 
     def close(self) -> None:
@@ -1143,7 +1151,11 @@ class ExecutionQueueService:
             if lineage.is_deleted or lineage.relationship_type != "contains":
                 continue
             parent = lineage.parent_instance
-            if parent is None or parent.is_deleted or parent.category != "container":
+            if (
+                parent is None
+                or parent.is_deleted
+                or instance_semantic_category(parent) != "container"
+            ):
                 continue
             container_queue = self.current_queue_for_instance(parent)
             if container_queue:
@@ -1283,7 +1295,9 @@ class ExecutionQueueService:
             worker
             for worker in self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "actor",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "actor"
+                ),
                 self.bdb.Base.classes.generic_instance.type == "system",
                 self.bdb.Base.classes.generic_instance.subtype == "worker",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -1295,7 +1309,9 @@ class ExecutionQueueService:
         return list(
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "data",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "data"
+                ),
                 self.bdb.Base.classes.generic_instance.type == "execution",
                 self.bdb.Base.classes.generic_instance.subtype == subtype,
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -1337,13 +1353,19 @@ class ExecutionQueueService:
         return items
 
     def _candidate_subjects(self) -> list[Any]:
-        return [
-            instance
-            for instance in self.bdb.session.query(self.bdb.Base.classes.generic_instance)
-            .filter(self.bdb.Base.classes.generic_instance.is_deleted.is_(False))
+        model = self.bdb.Base.classes.generic_instance
+        return list(
+            self.bdb.session.query(model)
+            .filter(
+                model.is_deleted.is_(False),
+                or_(
+                    instance_category_filter(model, "content"),
+                    instance_category_filter(model, "container"),
+                    instance_category_filter(model, "data"),
+                ),
+            )
             .all()
-            if str(instance.category or "") not in {"action"}
-        ]
+        )
 
     def _next_visible_subject_euid(self, queue, now: datetime) -> str | None:
         items = self._visible_queue_items(queue, now)
@@ -1515,7 +1537,22 @@ class ExecutionQueueService:
         )
 
     def _is_visible_in_queue(self, subject, queue, now: datetime) -> bool:
-        return any(item.uid == subject.uid for item in self._visible_queue_items(queue, now))
+        visible_uids = {item.uid for item in self._visible_queue_items(queue, now)}
+        if subject.uid in visible_uids:
+            return True
+        for lineage in get_child_lineages(subject):
+            if lineage.is_deleted or lineage.relationship_type != "contains":
+                continue
+            parent = lineage.parent_instance
+            if (
+                parent is None
+                or parent.is_deleted
+                or instance_semantic_category(parent) != "container"
+            ):
+                continue
+            if parent.uid in visible_uids:
+                return True
+        return False
 
     def _scopes_match(self, instance, queue) -> bool:
         props = self._props(instance)
@@ -1849,7 +1886,7 @@ class ExecutionQueueService:
         return (
             self.bdb.session.query(GI)
             .filter(
-                GI.category == category,
+                instance_category_filter(GI, category),
                 GI.type == type_name,
                 GI.subtype == subtype,
                 GI.is_deleted.is_(False),
@@ -1918,7 +1955,7 @@ class ExecutionQueueService:
             self.bdb.session.query(GI)
             .filter(
                 GI.euid == worker_euid,
-                GI.category == "actor",
+                instance_category_filter(GI, "actor"),
                 GI.type == "system",
                 GI.subtype == "worker",
                 GI.is_deleted.is_(False),
@@ -1956,17 +1993,35 @@ class ExecutionQueueService:
         return bool(
             instance is not None
             and not instance.is_deleted
-            and str(instance.category or "") == "data"
+            and instance_semantic_category(instance) == "data"
             and str(instance.type or "") == "execution"
             and str(instance.subtype or "") == subtype
         )
 
     def _template_code(self, instance) -> str:
-        category = str(getattr(instance, "category", "") or "")
+        template = getattr(instance, "parent_template", None)
+        if template is None:
+            template = self._require_template(
+                f"{getattr(instance, 'category', '')}/{getattr(instance, 'type', '')}/"
+                f"{getattr(instance, 'subtype', '')}/{getattr(instance, 'version', '')}"
+            )
+        category = template_semantic_category(template)
         type_name = str(getattr(instance, "type", "") or "")
         subtype = str(getattr(instance, "subtype", "") or "")
         version = str(getattr(instance, "version", "") or "")
         return f"{category}/{type_name}/{subtype}/{version}"
+
+    def _require_template(self, template_code: str):
+        clean = str(template_code or "").strip().strip("/")
+        parts = clean.split("/")
+        if len(parts) != 4:
+            raise ValueError(
+                f"Template code must be category/type/subtype/version: {template_code}"
+            )
+        templates = self.bobj.query_template_by_component_v2(*parts)
+        if not templates:
+            raise ValueError(f"Template not found: {template_code}")
+        return templates[0]
 
     def _props(self, instance) -> dict[str, Any]:
         payload = instance.json_addl if isinstance(instance.json_addl, dict) else {}
@@ -1993,7 +2048,7 @@ class ExecutionQueueService:
             **dict(envelope.get("queue_cache") or {}),
             **dict(queue_cache or {}),
         }
-        if write or not current:
+        if write:
             self._set_execution_envelope(instance, envelope)
         return envelope
 

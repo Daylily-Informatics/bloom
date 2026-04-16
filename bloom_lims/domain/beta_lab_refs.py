@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from bloom_lims.db import get_child_lineages, get_parent_lineages
+from bloom_lims.template_identity import instance_semantic_category
 
 
 class _BetaLabReferenceMixin:
@@ -98,7 +99,7 @@ class _BetaLabReferenceMixin:
             if external_ref is None or external_ref.is_deleted:
                 continue
             if (
-                external_ref.category != "generic"
+                instance_semantic_category(external_ref) != "generic"
                 or external_ref.type != "generic"
                 or external_ref.subtype != "external_object_link"
             ):

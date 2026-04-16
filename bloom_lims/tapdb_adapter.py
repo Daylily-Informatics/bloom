@@ -64,6 +64,22 @@ from bloom_lims.config import get_tapdb_db_config
 from bloom_lims.config import apply_runtime_environment, get_settings
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
 
+_KNOWN_LINEAGE_IDENTITIES = (
+    "generic_instance_lineage",
+    "workflow_instance_lineage",
+    "workflow_step_instance_lineage",
+    "container_instance_lineage",
+    "content_instance_lineage",
+    "equipment_instance_lineage",
+    "data_instance_lineage",
+    "test_requisition_instance_lineage",
+    "actor_instance_lineage",
+    "action_instance_lineage",
+    "health_event_instance_lineage",
+    "file_instance_lineage",
+    "subject_instance_lineage",
+)
+
 
 class _LineageQueryProxy:
     """Lightweight proxy that preserves iterable/.all() behavior for lineage access."""
@@ -113,7 +129,15 @@ def _query_lineages_for_instance(instance, *, fk_attr_name: str):
         return _LineageQueryProxy([])
 
     lineage_attr = getattr(generic_instance_lineage, fk_attr_name)
-    query = session.query(generic_instance_lineage).filter(lineage_attr == instance.uid)
+    query = (
+        session.query(generic_instance_lineage)
+        .filter(lineage_attr == instance.uid)
+        .filter(
+            generic_instance_lineage.polymorphic_discriminator.in_(
+                _KNOWN_LINEAGE_IDENTITIES
+            )
+        )
+    )
     return _LineageQueryProxy(query)
 
 
@@ -279,8 +303,6 @@ class BLOOMdb3:
         self.Base = Base
         # Install TapDB-style per-query metrics once per engine.
         try:
-            from bloom_lims.config import get_settings
-
             maybe_install_engine_metrics(self.engine, env_name=get_settings().tapdb.env)
         except Exception:
             # Metrics are best-effort; never block DB init.

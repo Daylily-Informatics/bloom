@@ -24,9 +24,9 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 from bloom_lims.config import get_settings
 
 
-GROUP_TEMPLATE_CODE = "bloom/auth/user-group/1.0/"
-GROUP_REVISION_TEMPLATE_CODE = "bloom/auth/user-group-revision/1.0/"
-GROUP_MEMBERSHIP_TEMPLATE_CODE = "bloom/auth/user-group-membership/1.0/"
+GROUP_TEMPLATE_CODE = "BBX/auth/user-group/1.0/"
+GROUP_REVISION_TEMPLATE_CODE = "BBX/auth/user-group-revision/1.0/"
+GROUP_MEMBERSHIP_TEMPLATE_CODE = "BBX/auth/user-group-membership/1.0/"
 
 GROUP_PREFIX = "BBX"
 GROUP_REVISION_PREFIX = "BBX"
@@ -92,7 +92,10 @@ class TapdbGroupRepository:
         self.db = db
         self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
-        self.factory = InstanceFactory(self.templates)
+        self.factory = InstanceFactory(
+            self.templates,
+            domain_code=self.domain_code,
+        )
         self._templates_bootstrapped = False
 
     def ensure_system_groups(self, group_codes: list[str]) -> None:

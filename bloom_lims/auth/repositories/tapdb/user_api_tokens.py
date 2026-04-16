@@ -23,9 +23,9 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 )
 from bloom_lims.config import get_settings
 
-TOKEN_TEMPLATE_CODE = "bloom/auth/user-api-token/1.0/"
-TOKEN_REVISION_TEMPLATE_CODE = "bloom/auth/user-api-token-revision/1.0/"
-TOKEN_USAGE_LOG_TEMPLATE_CODE = "bloom/auth/user-api-token-usage-log/1.0/"
+TOKEN_TEMPLATE_CODE = "BBX/auth/user-api-token/1.0/"
+TOKEN_REVISION_TEMPLATE_CODE = "BBX/auth/user-api-token-revision/1.0/"
+TOKEN_USAGE_LOG_TEMPLATE_CODE = "BBX/auth/user-api-token-usage-log/1.0/"
 
 TOKEN_PREFIX = "BBX"
 TOKEN_REVISION_PREFIX = "BBX"
@@ -108,7 +108,10 @@ class TapdbUserAPITokenRepository:
         self.db = db
         self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
-        self.factory = InstanceFactory(self.templates)
+        self.factory = InstanceFactory(
+            self.templates,
+            domain_code=self.domain_code,
+        )
         self._templates_bootstrapped = False
 
     def create_token(

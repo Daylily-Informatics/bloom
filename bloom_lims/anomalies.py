@@ -67,7 +67,10 @@ class TapdbAnomalyRepository:
         self.db = db
         self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
-        self.factory = InstanceFactory(self.templates)
+        self.factory = InstanceFactory(
+            self.templates,
+            domain_code=self.domain_code,
+        )
         self._templates_ready = False
 
     def projection(self, *, observed_at: str | None = None) -> ProjectionMetadata:

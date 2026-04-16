@@ -44,9 +44,9 @@ class TestBaseSchemas:
 
         from bloom_lims.schemas import validate_euid
 
-        cx1 = format_euid("BCN", 1)
-        cx123 = format_euid("BCN", 123)
-        wx1000 = format_euid("BWF", 1000)
+        cx1 = format_euid("BCN", 1, domain_code="Z")
+        cx123 = format_euid("BCN", 123, domain_code="Z")
+        wx1000 = format_euid("BWF", 1000, domain_code="Z")
 
         # Valid EUIDs (TapDB/Meridian)
         assert validate_euid(cx1) == cx1
@@ -85,7 +85,7 @@ class TestBaseSchemas:
 
         sandbox = format_euid("BCN", 1, domain_code="S")
         wrong_prefix = format_euid("BCN", 1, domain_code="T")
-        production = format_euid("BCN", 1)
+        production = format_euid("BCN", 1, domain_code="Z")
 
         assert validate_euid(sandbox) == sandbox
         with pytest.raises(ValueError):
@@ -135,7 +135,7 @@ class TestContainerSchemas:
             name="Test Plate",
             container_type="plate",
             subtype="96-well",
-            template_euid=format_euid("GT", 1),
+            template_euid=format_euid("GT", 1, domain_code="Z"),
         )
         assert data.name == "Test Plate"
         assert data.container_type == "plate"
@@ -165,7 +165,7 @@ class TestContentSchemas:
         data = SampleCreateSchema(
             name="Test Sample",
             sample_type="blood",
-            template_euid=format_euid("GT", 2),
+            template_euid=format_euid("GT", 2, domain_code="Z"),
         )
         assert data.name == "Test Sample"
         assert data.sample_type == "blood"
@@ -179,7 +179,7 @@ class TestContentSchemas:
         data = ReagentCreateSchema(
             name="Test Reagent",
             reagent_type="buffer",
-            template_euid=format_euid("GT", 3),
+            template_euid=format_euid("GT", 3, domain_code="Z"),
             lot_number="LOT001",
         )
         assert data.lot_number == "LOT001"
@@ -197,7 +197,7 @@ class TestWorkflowSchemas:
         data = WorkflowCreateSchema(
             name="Test Workflow",
             workflow_type="sequencing",
-            template_euid=format_euid("GT", 4),
+            template_euid=format_euid("GT", 4, domain_code="Z"),
         )
         assert data.name == "Test Workflow"
 

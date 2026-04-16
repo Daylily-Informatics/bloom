@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bloom_lims.template_identity import template_semantic_category
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaMaterialResponse,
@@ -143,7 +144,10 @@ class _BetaLabMaterialsMixin:
         payload,
     ):
         container = self._require_instance(container_euid)
-        if container.category != "container":
+        template = self._require_template(
+            f"{container.category}/{container.type}/{container.subtype}/{container.version}"
+        )
+        if template_semantic_category(template) != "container":
             raise ValueError(f"EUID is not a container: {container_euid}")
 
         if payload.status is not None:
@@ -190,7 +194,10 @@ class _BetaLabMaterialsMixin:
         payload,
     ):
         specimen = self._require_instance(specimen_euid)
-        if specimen.category != "content":
+        template = self._require_template(
+            f"{specimen.category}/{specimen.type}/{specimen.subtype}/{specimen.version}"
+        )
+        if template_semantic_category(template) != "content":
             raise ValueError(f"EUID is not a specimen/content object: {specimen_euid}")
 
         if payload.status is not None:
@@ -237,11 +244,27 @@ class _BetaLabMaterialsMixin:
         return self._material_response(specimen, created=True)
 
     def _material_response(self, specimen, *, created: bool) -> BetaMaterialResponse:
+        atlas_context = dict(self._atlas_context_for_instance(specimen))
+        container_euid = self._linked_container_euid(specimen)
+        if container_euid:
+            container = self._require_instance(container_euid)
+            container_context = self._atlas_context_for_instance(container)
+            for key, value in container_context.items():
+                if key == "fulfillment_items":
+                    if value and not atlas_context.get(key):
+                        atlas_context[key] = value
+                    continue
+                if isinstance(value, str):
+                    if value.strip() and not str(atlas_context.get(key) or "").strip():
+                        atlas_context[key] = value
+                    continue
+                if value not in (None, {}, []) and key not in atlas_context:
+                    atlas_context[key] = value
         return BetaMaterialResponse(
             specimen_euid=specimen.euid,
-            container_euid=self._linked_container_euid(specimen),
+            container_euid=container_euid,
             status=specimen.bstatus,
-            atlas_context=self._atlas_context_for_instance(specimen),
+            atlas_context=atlas_context,
             properties=self._props(specimen),
             idempotency_key=str(self._props(specimen).get("idempotency_key") or "")
             or None,

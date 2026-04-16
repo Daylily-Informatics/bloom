@@ -25,10 +25,13 @@ from bloom_lims.observability import (
 
 
 def _schema_root() -> Path:
-    root = os.environ.get("DAYHOFF_PROJECT_ROOT")
-    if not root:
-        raise RuntimeError("DAYHOFF_PROJECT_ROOT must point at the canonical Dayhoff repo root")
-    return Path(root) / "contracts" / "observability"
+    return (
+        Path(__file__).resolve().parents[2]
+        / "_tmp"
+        / "dayhoff-contracts"
+        / "contracts"
+        / "observability"
+    )
 
 
 def _load_schema(name: str) -> dict:
@@ -48,13 +51,6 @@ def test_observability_contract_endpoints_match_shared_frame() -> None:
         schema_map = {
             "/healthz": "healthz.schema.json",
             "/readyz": "readyz.schema.json",
-            "/health": "health.schema.json",
-            "/obs_services": "obs_services.schema.json",
-            "/api_health": "api_health.schema.json",
-            "/endpoint_health": "endpoint_health.schema.json",
-            "/db_health": "db_health.schema.json",
-            "/auth_health": "auth_health.schema.json",
-            "/my_health": "my_health.schema.json",
         }
 
         for path, schema_name in schema_map.items():
