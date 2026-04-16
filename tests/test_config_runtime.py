@@ -9,9 +9,10 @@ import tempfile
 from pathlib import Path
 
 import yaml
+import pytest
+from pydantic import ValidationError
 
 from bloom_lims import __version__
-from bloom_lims.app import create_app
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_TAPDB_DOMAIN_CODE,
@@ -80,6 +81,41 @@ def test_nested_env_overrides_template_defaults(monkeypatch):
     assert settings.auth.cognito_redirect_uri == "https://example.test/auth/callback"
 
 
+def test_env_overrides_user_yaml_for_auth_cognito_domain(monkeypatch, tmp_path: Path):
+    xdg_config_home = tmp_path / ".config"
+    user_config_dir = xdg_config_home / "bloom-local"
+    user_config_dir.mkdir(parents=True)
+    (user_config_dir / "bloom-config-local.yaml").write_text(
+        "auth:\n"
+        "  cognito_domain: yaml-test.auth.us-west-2.amazoncognito.com\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
+    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local")
+    monkeypatch.setenv(
+        "BLOOM_AUTH__COGNITO_DOMAIN", "env-test.auth.us-west-2.amazoncognito.com"
+    )
+    get_settings.cache_clear()
+
+    settings = BloomSettings()
+
+    assert settings.auth.cognito_domain == "env-test.auth.us-west-2.amazoncognito.com"
+
+
+def test_auth_cognito_domain_rejects_schemeful_input():
+    with pytest.raises(ValidationError, match="auth.cognito_domain must be a bare host"):
+        BloomSettings(
+            auth={
+                "cognito_domain": "https://bloom.auth.us-east-1.amazoncognito.com",
+                "cognito_user_pool_id": "us-east-1_POOL123",
+                "cognito_client_id": "bloom-client",
+                "cognito_region": "us-east-1",
+                "cognito_redirect_uri": "https://localhost:8912/auth/callback",
+                "cognito_logout_redirect_uri": "https://localhost:8912/",
+            }
+        )
+
+
 def test_build_default_config_template_injects_fresh_jwt_secret():
     first = build_default_config_template().decode("utf-8")
     second = build_default_config_template().decode("utf-8")
@@ -142,6 +178,8 @@ def test_runtime_bootstrap_replaces_missing_tapdb_config_path(
 def test_strict_app_startup_accepts_synthesized_test_config(
     monkeypatch, tmp_path: Path
 ):
+    from bloom_lims.app import create_app
+
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv(
         "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
@@ -158,6 +196,8 @@ def test_strict_app_startup_accepts_synthesized_test_config(
 def test_create_app_does_not_mount_upload_or_tmp_static_dirs(
     monkeypatch, tmp_path: Path
 ):
+    from bloom_lims.app import create_app
+
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv(
         "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
@@ -197,6 +237,8 @@ def test_validate_settings_warns_when_atlas_webhook_secret_missing(monkeypatch):
 def test_create_app_logs_atlas_webhook_secret_warning(
     monkeypatch, tmp_path: Path, caplog
 ):
+    from bloom_lims.app import create_app
+
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv(
         "BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing-startup-config.yaml")
@@ -256,8 +298,8 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert assert_tapdb_version() == expected_tapdb_version
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
-    assert settings.tapdb.domain_registry_path == str(DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH)
-    assert settings.tapdb.prefix_ownership_registry_path == str(
+    assert Path(settings.tapdb.domain_registry_path).expanduser() == DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH
+    assert Path(settings.tapdb.prefix_ownership_registry_path).expanduser() == (
         DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
     )
 
@@ -316,6 +358,8 @@ def test_effective_config_summary_redacts_sensitive_values(
 
 
 def test_create_app_uses_scm_version(monkeypatch, tmp_path: Path):
+    from bloom_lims.app import create_app
+
     monkeypatch.delenv("BLOOM_SKIP_STARTUP_VALIDATION", raising=False)
     monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(tmp_path / "missing.yaml"))
 

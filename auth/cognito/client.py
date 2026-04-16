@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import List, Optional
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlparse, urlsplit
 
 import httpx
 import jwt
@@ -29,12 +29,7 @@ class CognitoConfig:
     @property
     def _bare_domain(self) -> str:
         """Domain without protocol prefix for URL construction."""
-        d = (self.domain or "").strip().rstrip("/")
-        if d.startswith("https://"):
-            d = d[len("https://") :]
-        elif d.startswith("http://"):
-            d = d[len("http://") :]
-        return d
+        return CognitoAuth._validate_bare_domain(self.domain)
 
     @property
     def issuer(self) -> str:
@@ -80,6 +75,37 @@ class CognitoAuth:
     def __init__(self, config: CognitoConfig):
         self.config = config
         self._jwks_client = jwt.PyJWKClient(config.jwks_url)
+
+    @staticmethod
+    def _validate_bare_domain(domain: str) -> str:
+        normalized = str(domain or "").strip()
+        if not normalized:
+            raise CognitoConfigurationError("Missing Cognito configuration: cognito_domain")
+        if "://" in normalized:
+            raise CognitoConfigurationError(
+                "Cognito domain must be a bare host without a scheme"
+            )
+
+        parsed = urlsplit(f"//{normalized}")
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise CognitoConfigurationError(
+                "Cognito domain must be a bare host without a path or port"
+            ) from exc
+        if (
+            not parsed.netloc
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+            or port is not None
+        ):
+            raise CognitoConfigurationError(
+                "Cognito domain must be a bare host without a path or port"
+            )
+        return normalized
 
     @classmethod
     def _extract_port(cls, url: str) -> Optional[int]:
@@ -154,7 +180,7 @@ class CognitoAuth:
         client_id = (auth_settings.cognito_client_id or "").strip()
         client_secret = (auth_settings.cognito_client_secret or "").strip()
         client_name = (required_client_name or "bloom").strip()
-        domain = (auth_settings.cognito_domain or "").strip()
+        domain = cls._validate_bare_domain(auth_settings.cognito_domain)
         redirect_uri = (auth_settings.cognito_redirect_uri or "").strip()
         logout_uri = (auth_settings.cognito_logout_redirect_uri or redirect_uri).strip()
         expected_callback_url = (expected_callback_url or "").strip()

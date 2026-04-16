@@ -79,3 +79,14 @@ def test_from_settings_flags_runtime_port_mismatch_against_yaml_urls():
         )
 
     assert "port mismatch" in str(exc.value)
+
+
+def test_from_settings_rejects_schemeful_cognito_domain():
+    with pytest.raises(CognitoConfigurationError) as exc:
+        CognitoAuth.from_settings(
+            _auth_settings(cognito_domain="https://bloom.auth.us-east-1.amazoncognito.com"),
+            expected_callback_url="https://localhost:8912/auth/callback",
+            expected_logout_url="https://localhost:8912/",
+        )
+
+    assert "bare host" in str(exc.value)

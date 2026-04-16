@@ -22,6 +22,7 @@ from functools import lru_cache
 from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
 from packaging.version import Version
 from packaging.requirements import Requirement
@@ -175,6 +176,27 @@ def _validate_optional_https_url(value: str, *, field_name: str) -> str:
     if not normalized.startswith("https://"):
         raise ValueError(f"{field_name} must use an absolute https:// URL")
     return normalized.rstrip("/")
+
+
+def _validate_bare_host(value: str, *, field_name: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if "://" in normalized:
+        raise ValueError(f"{field_name} must be a bare host without a scheme")
+
+    parsed = urlsplit(f"//{normalized}")
+    if not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
+        raise ValueError(f"{field_name} must be a bare host without a path")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(
+            f"{field_name} must be a bare host without credentials or a port"
+        ) from exc
+    if parsed.username or parsed.password or port is not None:
+        raise ValueError(f"{field_name} must be a bare host without credentials or a port")
+    return normalized
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -654,7 +676,9 @@ class AuthSettings(BaseModel):
         default="", description="Cognito app client secret"
     )
     cognito_region: str = Field(default="", description="AWS region for Cognito")
-    cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
+    cognito_domain: str = Field(
+        default="", description="Cognito hosted UI domain (bare host only)"
+    )
     cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
     cognito_logout_redirect_uri: str = Field(
         default="", description="Cognito logout redirect URI"
@@ -682,6 +706,11 @@ class AuthSettings(BaseModel):
 
     session_timeout_minutes: int = Field(default=30, description="Session timeout")
     max_sessions_per_user: int = Field(default=5, description="Max concurrent sessions")
+
+    @field_validator("cognito_domain")
+    @classmethod
+    def validate_cognito_domain(cls, value: str) -> str:
+        return _validate_bare_host(value, field_name="auth.cognito_domain")
 
 
 class AtlasSettings(BaseModel):

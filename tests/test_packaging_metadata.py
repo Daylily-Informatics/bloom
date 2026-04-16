@@ -19,7 +19,7 @@ def test_project_dependencies_pin_release_train_versions() -> None:
     zebra_spec = read_pyproject_dependency_spec("zebra-day")
 
     assert "cli-core-yo==2.0.0" in dependencies
-    assert "daylily-auth-cognito==2.0.2" in dependencies
+    assert "daylily-auth-cognito==2.0.3" in dependencies
     assert f"daylily-tapdb{tapdb_spec}" in dependencies
     assert f"zebra-day{zebra_spec}" not in dependencies
     assert optional_dependencies["zebra_day"] == [f"zebra-day{zebra_spec}"]
