@@ -25,7 +25,7 @@ license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
     "cli-core-yo==2.1.0",
-    "daylily-tapdb==6.0.3",
+    "daylily-tapdb==6.0.4",
     "daylily-auth-cognito==2.1.1",
     "boto3>=1.34.0",
     "fastapi>=0.110.0",
@@ -81,7 +81,7 @@ dev = [
     "mypy>=1.0",
 ]
 zebra_day = [
-    "zebra-day==0.7.1",
+    "zebra-day==5.2.0",
 ]
 
 [project.scripts]
@@ -96,7 +96,7 @@ where = ["."]
 include = ["bloom_lims*"]
 
 [tool.setuptools.package-data]
-bloom_lims = ["etc/*.yaml"]
+bloom_lims = ["etc/*.yaml", "etc/*.json"]
 
 # =============================================================================
 # BLOOM Environment Configuration

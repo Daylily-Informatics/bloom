@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ import sys
 from pathlib import Path
 
 import typer
-from daylily_tapdb import (
+from daylily_tapdb.templates.loader import (
     find_tapdb_core_config_dir,
     seed_templates,
     validate_template_configs,
@@ -264,9 +265,7 @@ def _seed_tapdb_templates(
     tapdb_config_dir = (_bloom_root() / "config" / "tapdb_templates").resolve()
     console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
     if include_workflow:
-        console.print(
-            "[yellow]Workflow overlay seeding is not supported in Bloom.[/yellow]"
-        )
+        raise RuntimeError("Workflow overlay seeding is not supported in Bloom.")
     core_config_dir = find_tapdb_core_config_dir().resolve()
     templates, issues = validate_template_configs(
         [core_config_dir, tapdb_config_dir],
@@ -313,6 +312,12 @@ def _seed_tapdb_templates(
                 prefix_registry_path=prefix_registry_path,
             )
         if client_templates:
+            _claim_client_template_prefixes(
+                prefix_registry_path=prefix_registry_path,
+                domain_code=ctx.domain_code,
+                owner_repo_name=ctx.owner_repo_name,
+                templates=client_templates,
+            )
             _ensure_identity_prefix_config(
                 bdb.session,
                 owner_repo_name=ctx.owner_repo_name,
@@ -335,6 +340,102 @@ def _seed_tapdb_templates(
     finally:
         bdb.session.close()
         bdb.engine.dispose()
+
+
+def _load_prefix_ownership_registry(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {"version": "0.4.0", "ownership": {}}
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Prefix ownership registry must be a JSON object: {path}")
+    ownership = payload.get("ownership")
+    if ownership is None:
+        payload["ownership"] = {}
+    elif not isinstance(ownership, dict):
+        raise ValueError(f"Prefix ownership registry must define object ownership: {path}")
+    payload.setdefault("version", "0.4.0")
+    return payload
+
+
+def _write_prefix_ownership_registry(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        path.chmod(0o600)
+    except Exception:
+        pass
+
+
+def _claim_client_template_prefixes(
+    *,
+    prefix_registry_path: Path,
+    domain_code: str,
+    owner_repo_name: str,
+    templates: list[dict[str, object]],
+) -> None:
+    normalized_domain_code = str(domain_code or "").strip().upper()
+    normalized_owner_repo_name = str(owner_repo_name or "").strip()
+    if not normalized_domain_code:
+        raise ValueError("domain_code is required to claim client template prefixes")
+    if not normalized_owner_repo_name:
+        raise ValueError("owner_repo_name is required to claim client template prefixes")
+
+    prefixes = sorted(
+        {
+            str(template.get("instance_prefix") or "").strip().upper()
+            for template in templates
+            if str(template.get("instance_prefix") or "").strip()
+        }
+    )
+    if not prefixes:
+        return
+
+    registry = _load_prefix_ownership_registry(prefix_registry_path)
+    ownership = registry.setdefault("ownership", {})
+    if not isinstance(ownership, dict):
+        raise ValueError(
+            f"Prefix ownership registry must define object ownership: {prefix_registry_path}"
+        )
+    domain_claims = ownership.setdefault(normalized_domain_code, {})
+    if not isinstance(domain_claims, dict):
+        raise ValueError(
+            f"Prefix ownership registry must define object ownership for domain "
+            f"{normalized_domain_code!r}: {prefix_registry_path}"
+        )
+
+    changed = False
+    for prefix in prefixes:
+        existing = domain_claims.get(prefix)
+        if isinstance(existing, dict):
+            claimed_owner = str(
+                existing.get("issuer_app_code")
+                or existing.get("owner_repo_name")
+                or existing.get("repo_name")
+                or ""
+            ).strip()
+            if claimed_owner and claimed_owner != normalized_owner_repo_name:
+                raise ValueError(
+                    f"Prefix {prefix!r} for domain {normalized_domain_code!r} is claimed by "
+                    f"{claimed_owner!r}, not {normalized_owner_repo_name!r}"
+                )
+            if claimed_owner != normalized_owner_repo_name or existing.get("issuer_app_code") != normalized_owner_repo_name:
+                domain_claims[prefix] = {"issuer_app_code": normalized_owner_repo_name}
+                changed = True
+            continue
+        if existing is not None:
+            raise ValueError(
+                f"Prefix {prefix!r} for domain {normalized_domain_code!r} has an invalid "
+                f"claim entry in {prefix_registry_path}"
+            )
+        domain_claims[prefix] = {"issuer_app_code": normalized_owner_repo_name}
+        changed = True
+
+    if changed:
+        _write_prefix_ownership_registry(prefix_registry_path, registry)
 
 
 def _ensure_identity_prefix_config(session, *, owner_repo_name: str, domain_code: str) -> None:

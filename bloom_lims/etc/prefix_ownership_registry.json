@@ -1,0 +1,46 @@
+{
+  "ownership": {
+    "Z": {
+      "BAC": {
+        "issuer_app_code": "bloom"
+      },
+      "BAR": {
+        "issuer_app_code": "bloom"
+      },
+      "BBX": {
+        "issuer_app_code": "bloom"
+      },
+      "BCN": {
+        "issuer_app_code": "bloom"
+      },
+      "BCT": {
+        "issuer_app_code": "bloom"
+      },
+      "BDT": {
+        "issuer_app_code": "bloom"
+      },
+      "BEQ": {
+        "issuer_app_code": "bloom"
+      },
+      "BFX": {
+        "issuer_app_code": "bloom"
+      },
+      "BGT": {
+        "issuer_app_code": "bloom"
+      },
+      "BHE": {
+        "issuer_app_code": "bloom"
+      },
+      "BSJ": {
+        "issuer_app_code": "bloom"
+      },
+      "BWF": {
+        "issuer_app_code": "bloom"
+      },
+      "BWS": {
+        "issuer_app_code": "bloom"
+      }
+    }
+  },
+  "version": "0.4.0"
+}

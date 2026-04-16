@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 import tempfile
+import tomllib
 from pathlib import Path
 
 import yaml
@@ -310,6 +312,17 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     packaged_template = (
         project_root / "bloom_lims" / "etc" / "bloom-config-template.yaml"
     ).read_text(encoding="utf-8")
+    packaged_domain_registry = json.loads(
+        (project_root / "bloom_lims" / "etc" / "domain_code_registry.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    packaged_prefix_registry = json.loads(
+        (
+            project_root / "bloom_lims" / "etc" / "prefix_ownership_registry.json"
+        ).read_text(encoding="utf-8")
+    )
+    pyproject = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
 
     assert 'owner_repo_name: "bloom"' in root_template
     assert 'domain_code: "Z"' in root_template
@@ -321,6 +334,30 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert 'prefix_ownership_registry_path: "~/.config/tapdb/prefix_ownership_registry.json"' in packaged_template
     assert "allowed_hosts: []" in root_template
     assert "allowed_hosts: []" in packaged_template
+    assert pyproject["tool"]["setuptools"]["package-data"]["bloom_lims"] == [
+        "etc/*.yaml",
+        "etc/*.json",
+    ]
+    assert packaged_domain_registry["domains"] == {"Z": {"name": "bloom"}}
+    assert set(packaged_prefix_registry["ownership"]["Z"]) == {
+        "BAC",
+        "BAR",
+        "BBX",
+        "BCN",
+        "BCT",
+        "BDT",
+        "BEQ",
+        "BFX",
+        "BGT",
+        "BHE",
+        "BSJ",
+        "BWF",
+        "BWS",
+    }
+    assert {
+        claim["issuer_app_code"]
+        for claim in packaged_prefix_registry["ownership"]["Z"].values()
+    } == {"bloom"}
 
 
 def test_settings_accept_network_allowed_hosts() -> None:

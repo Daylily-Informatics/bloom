@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import importlib
 from pathlib import Path
 from types import SimpleNamespace
@@ -346,10 +347,30 @@ def test_seed_templates_split_core_and_client_ownership(
         ),
     )
 
-    calls: list[tuple[list[dict[str, object]], dict[str, object]]] = []
+    events: list[tuple[str, object]] = []
 
     def fake_seed_templates(session, templates, **kwargs):  # noqa: ANN001 - test double
-        calls.append((templates, kwargs))
+        events.append(
+            (
+                "seed",
+                {
+                    "owner_repo_name": kwargs["owner_repo_name"],
+                    "templates": [template["instance_prefix"] for template in templates],
+                },
+            )
+        )
+
+    def fake_claim_client_template_prefixes(**kwargs):  # noqa: ANN001 - test double
+        events.append(
+            (
+                "claim",
+                {
+                    "owner_repo_name": kwargs["owner_repo_name"],
+                    "domain_code": kwargs["domain_code"],
+                    "templates": [template["instance_prefix"] for template in kwargs["templates"]],
+                },
+            )
+        )
 
     class FakeSession:
         committed = 0
@@ -379,6 +400,9 @@ def test_seed_templates_split_core_and_client_ownership(
     fake_engine = FakeEngine()
     monkeypatch.setattr(db_commands, "seed_templates", fake_seed_templates)
     monkeypatch.setattr(
+        db_commands, "_claim_client_template_prefixes", fake_claim_client_template_prefixes
+    )
+    monkeypatch.setattr(
         db_commands,
         "BLOOMdb3",
         lambda **_kwargs: SimpleNamespace(session=fake_session, engine=fake_engine),
@@ -386,16 +410,99 @@ def test_seed_templates_split_core_and_client_ownership(
 
     db_commands._seed_tapdb_templates("dev", overwrite=False)
 
-    assert len(calls) == 2
-    assert calls[0][0][0]["category"] == "SYS"
-    assert calls[0][1]["owner_repo_name"] == "daylily-tapdb"
-    assert calls[1][0][0]["category"] == "BAC"
-    assert calls[1][1]["owner_repo_name"] == "bloom"
+    assert events == [
+        ("seed", {"owner_repo_name": "daylily-tapdb", "templates": ["SYS"]}),
+        (
+            "claim",
+            {"owner_repo_name": "bloom", "domain_code": "Z", "templates": ["BAC"]},
+        ),
+        ("seed", {"owner_repo_name": "bloom", "templates": ["BAC"]}),
+    ]
     assert any("tapdb_identity_prefix_config" in sql for sql in fake_session.executed)
     assert fake_session.committed == 1
     assert fake_session.rolled_back == 0
     assert fake_session.closed == 1
     assert fake_engine.disposed == 1
+
+
+def test_claim_client_template_prefixes_writes_registry(
+    tmp_path: Path,
+) -> None:
+    prefix_registry = tmp_path / "prefix_ownership_registry.json"
+
+    db_commands._claim_client_template_prefixes(
+        prefix_registry_path=prefix_registry,
+        domain_code="Z",
+        owner_repo_name="bloom",
+        templates=[
+            {"instance_prefix": "BAC"},
+            {"instance_prefix": "BEX"},
+        ],
+    )
+
+    payload = json.loads(prefix_registry.read_text(encoding="utf-8"))
+    assert payload["version"] == "0.4.0"
+    assert payload["ownership"]["Z"]["BAC"]["issuer_app_code"] == "bloom"
+    assert payload["ownership"]["Z"]["BEX"]["issuer_app_code"] == "bloom"
+
+
+def test_claim_client_template_prefixes_rejects_collision(
+    tmp_path: Path,
+) -> None:
+    prefix_registry = tmp_path / "prefix_ownership_registry.json"
+    repo_root = Path(__file__).resolve().parents[1]
+    prefix_registry.write_text(
+        (repo_root / "bloom_lims" / "etc" / "prefix_ownership_registry.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    payload = json.loads(prefix_registry.read_text(encoding="utf-8"))
+    payload["ownership"]["Z"]["BAC"]["issuer_app_code"] = "other-repo"
+    prefix_registry.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="claimed by 'other-repo'"):
+        db_commands._claim_client_template_prefixes(
+            prefix_registry_path=prefix_registry,
+            domain_code="Z",
+            owner_repo_name="bloom",
+            templates=[{"instance_prefix": "BAC"}],
+        )
+
+
+def test_claim_client_template_prefixes_repairs_ownerless_claim(
+    tmp_path: Path,
+) -> None:
+    prefix_registry = tmp_path / "prefix_ownership_registry.json"
+    prefix_registry.write_text(
+        json.dumps(
+            {
+                "version": "0.4.0",
+                "ownership": {
+                    "Z": {
+                        "BAC": {},
+                    }
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    db_commands._claim_client_template_prefixes(
+        prefix_registry_path=prefix_registry,
+        domain_code="Z",
+        owner_repo_name="bloom",
+        templates=[{"instance_prefix": "BAC"}],
+    )
+
+    payload = json.loads(prefix_registry.read_text(encoding="utf-8"))
+    assert payload["ownership"]["Z"]["BAC"]["issuer_app_code"] == "bloom"
 
 
 @pytest.mark.parametrize(
