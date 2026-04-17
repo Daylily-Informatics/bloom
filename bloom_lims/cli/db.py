@@ -52,6 +52,7 @@ console = Console()
 
 _DEFAULT_TAPDB_CLIENT_ID = "bloom"
 _DEFAULT_TAPDB_DATABASE_NAME = "bloom"
+_TAPDB_CORE_TEMPLATE_PREFIXES = {"SYS", "MSG"}
 _IDENTITY_PREFIXES: dict[str, str] = {
     "generic_template": GENERIC_TEMPLATE_PREFIX,
     "generic_instance_lineage": GENERIC_INSTANCE_LINEAGE_PREFIX,
@@ -279,11 +280,10 @@ def _seed_tapdb_templates(
     core_templates: list[dict[str, object]] = []
     client_templates: list[dict[str, object]] = []
     for template in templates:
-        source_file = str(template.get("_source_file") or "").strip()
-        source_path = Path(source_file).resolve() if source_file else tapdb_config_dir
+        instance_prefix = str(template.get("instance_prefix") or "").strip().upper()
         target_batch = (
             core_templates
-            if source_path.is_relative_to(core_config_dir)
+            if instance_prefix in _TAPDB_CORE_TEMPLATE_PREFIXES
             else client_templates
         )
         target_batch.append(template)
@@ -312,6 +312,12 @@ def _seed_tapdb_templates(
                 prefix_registry_path=prefix_registry_path,
             )
         if client_templates:
+            client_templates = [
+                template
+                for template in client_templates
+                if str(template.get("instance_prefix") or "").strip().upper()
+                not in _TAPDB_CORE_TEMPLATE_PREFIXES
+            ]
             _claim_client_template_prefixes(
                 prefix_registry_path=prefix_registry_path,
                 domain_code=ctx.domain_code,
@@ -389,6 +395,8 @@ def _claim_client_template_prefixes(
             str(template.get("instance_prefix") or "").strip().upper()
             for template in templates
             if str(template.get("instance_prefix") or "").strip()
+            and str(template.get("instance_prefix") or "").strip().upper()
+            not in _TAPDB_CORE_TEMPLATE_PREFIXES
         }
     )
     if not prefixes:
@@ -477,10 +485,14 @@ def db_build(
         )
         _run_tapdb(["pg", "init", env_name], check=False)
         _run_tapdb(["pg", "start-local", env_name, "--port", local_port])
-        setup_args = ["db", "setup", env_name]
         if force:
-            setup_args.append("--force")
-        _run_tapdb(setup_args)
+            _run_tapdb(["db", "delete", env_name, "--force"], check=False)
+        _run_tapdb(["db", "create", env_name], check=False)
+        schema_args = ["db", "schema", "apply", env_name]
+        if force:
+            schema_args.append("--reinitialize")
+        _run_tapdb(schema_args)
+        _run_tapdb(["db", "schema", "migrate", env_name])
         _seed_tapdb_templates(env_name, overwrite=force)
         return
 

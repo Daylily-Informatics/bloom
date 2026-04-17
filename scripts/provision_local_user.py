@@ -41,7 +41,7 @@ def main() -> int:
             role="admin" if role == "ADMIN" else "user",
             cognito_username=email,
         )
-        if not set_user_role(bdb.session, username, role):
+        if not set_user_role(bdb.session, user.uid, role):
             raise RuntimeError("Failed to persist canonical role")
         group_service = GroupService(bdb.session)
         group_service.ensure_system_groups()

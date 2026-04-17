@@ -136,7 +136,15 @@ def test_provision_local_emits_user_payload(
             True,
         ),
     )
-    monkeypatch.setattr(users_cli, "set_user_role", lambda *_args, **_kwargs: True)
+    set_role_calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        users_cli,
+        "set_user_role",
+        lambda _session, identifier, role: (
+            set_role_calls.append((identifier, role)),
+            True,
+        )[1],
+    )
     monkeypatch.setattr(users_cli, "GroupService", FakeGroupService)
 
     result = runner.invoke(
@@ -163,6 +171,7 @@ def test_provision_local_emits_user_payload(
     assert payload["username"] == "dayhoff@lsmc.bio"
     assert payload["role"] == "ADMIN"
     assert payload["groups"] == ["API_ACCESS", "ENABLE_ATLAS_API"]
+    assert set_role_calls == [(42, "ADMIN")]
     assert added_groups == [("ENABLE_ATLAS_API", "42", "42")]
     assert committed == ["commit"]
     assert closed == ["close"]

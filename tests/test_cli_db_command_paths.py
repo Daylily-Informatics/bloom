@@ -302,7 +302,7 @@ def test_seed_templates_split_core_and_client_ownership(
     client_dir = tmp_path / "config" / "tapdb_templates"
     core_dir.mkdir(parents=True)
     client_dir.mkdir(parents=True)
-    core_template_path = core_dir / "system" / "system.json"
+    core_template_path = tmp_path / "relocated_core" / "system" / "system.json"
     client_template_path = client_dir / "bloom" / "templates.json"
     core_template_path.parent.mkdir(parents=True)
     client_template_path.parent.mkdir(parents=True)
@@ -446,6 +446,26 @@ def test_claim_client_template_prefixes_writes_registry(
     assert payload["ownership"]["Z"]["BEX"]["issuer_app_code"] == "bloom"
 
 
+def test_claim_client_template_prefixes_ignores_reserved_core_prefixes(
+    tmp_path: Path,
+) -> None:
+    prefix_registry = tmp_path / "prefix_ownership_registry.json"
+
+    db_commands._claim_client_template_prefixes(
+        prefix_registry_path=prefix_registry,
+        domain_code="Z",
+        owner_repo_name="bloom",
+        templates=[
+            {"instance_prefix": "SYS"},
+            {"instance_prefix": "MSG"},
+            {"instance_prefix": "BAC"},
+        ],
+    )
+
+    payload = json.loads(prefix_registry.read_text(encoding="utf-8"))
+    assert payload["ownership"]["Z"] == {"BAC": {"issuer_app_code": "bloom"}}
+
+
 def test_claim_client_template_prefixes_rejects_collision(
     tmp_path: Path,
 ) -> None:
@@ -503,6 +523,64 @@ def test_claim_client_template_prefixes_repairs_ownerless_claim(
 
     payload = json.loads(prefix_registry.read_text(encoding="utf-8"))
     assert payload["ownership"]["Z"]["BAC"]["issuer_app_code"] == "bloom"
+
+
+@pytest.mark.parametrize(
+    ("force", "expected_calls"),
+    [
+        (
+            False,
+            [
+                (["pg", "init", "dev"], False),
+                (["pg", "start-local", "dev", "--port", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)], True),
+                (["db", "create", "dev"], False),
+                (["db", "schema", "apply", "dev"], True),
+                (["db", "schema", "migrate", "dev"], True),
+            ],
+        ),
+        (
+            True,
+            [
+                (["pg", "init", "dev"], False),
+                (["pg", "start-local", "dev", "--port", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)], True),
+                (["db", "delete", "dev", "--force"], False),
+                (["db", "create", "dev"], False),
+                (["db", "schema", "apply", "dev", "--reinitialize"], True),
+                (["db", "schema", "migrate", "dev"], True),
+            ],
+        ),
+    ],
+)
+def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
+    monkeypatch: pytest.MonkeyPatch,
+    force: bool,
+    expected_calls: list[tuple[list[str], bool]],
+) -> None:
+    calls: list[tuple[list[str], bool]] = []
+    seeded: list[tuple[str, bool]] = []
+    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(db_commands, "_ensure_tapdb_namespace_config", lambda _env: None)
+    monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+    monkeypatch.setattr(
+        db_commands,
+        "_local_pg_port",
+        lambda _env: str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
+    )
+    monkeypatch.setattr(
+        db_commands,
+        "_run_tapdb",
+        lambda args, check=True: calls.append((args, check)) or 0,
+    )
+    monkeypatch.setattr(
+        db_commands,
+        "_seed_tapdb_templates",
+        lambda env_name, overwrite=False, **_kwargs: seeded.append((env_name, overwrite)),
+    )
+
+    db_commands.db_build(force=force)
+
+    assert calls == expected_calls
+    assert seeded == [("dev", force)]
 
 
 @pytest.mark.parametrize(

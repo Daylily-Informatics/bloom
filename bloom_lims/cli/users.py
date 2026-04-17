@@ -76,7 +76,7 @@ def provision_local(
             role="admin" if normalized_role == "ADMIN" else "user",
             cognito_username=normalized_email,
         )
-        if not set_user_role(bdb.session, normalized_username, normalized_role):
+        if not set_user_role(bdb.session, user.uid, normalized_role):
             raise RuntimeError("Failed to persist canonical role")
 
         group_service = GroupService(bdb.session)
