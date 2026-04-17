@@ -9,9 +9,7 @@ if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
 
-import importlib
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -38,8 +36,6 @@ from bloom_lims.cli._registry_v2 import (
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_BLOOM_WEB_PORT,
-    DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH,
-    DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH,
     DEFAULT_TAPDB_DOMAIN_CODE,
     DEFAULT_TAPDB_OWNER_REPO_NAME,
     apply_runtime_environment,
@@ -50,8 +46,6 @@ from bloom_lims.tapdb_adapter import BLOOMdb3
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_DEFAULT_TAPDB_CLIENT_ID = "bloom"
-_DEFAULT_TAPDB_DATABASE_NAME = "bloom"
 _TAPDB_CORE_TEMPLATE_PREFIXES = {"SYS", "MSG"}
 _IDENTITY_PREFIXES: dict[str, str] = {
     "generic_template": GENERIC_TEMPLATE_PREFIX,
@@ -64,60 +58,16 @@ def _bloom_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _is_dayhoff_artifact_path(path: Path) -> bool:
-    return ".dayhoff/local" in str(path)
-
-
-def _resolve_tapdb_schema_source() -> Path | None:
-    """Locate tapdb_schema.sql from installed package or local dev checkouts."""
-    candidates: list[Path] = []
-
-    root = _bloom_root()
-    candidates.extend(
-        [
-            root.parent / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-            root.parent / "daylily" / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-        ]
-    )
-
-    try:
-        tapdb_pkg = importlib.import_module("daylily_tapdb")
-        pkg_file = Path(tapdb_pkg.__file__).resolve()
-        candidates.extend(
-            [
-                pkg_file.parents[1] / "schema" / "tapdb_schema.sql",
-                pkg_file.parents[2] / "schema" / "tapdb_schema.sql",
-            ]
-        )
-    except Exception:
-        pass
-
-    for candidate in candidates:
-        if candidate.exists() and not _is_dayhoff_artifact_path(candidate):
-            return candidate
-    return None
-
-
 def _ensure_schema_available_for_bloom_root() -> None:
-    """Ensure tapdb schema is visible when running tapdb from bloom repo root."""
-    target = _bloom_root() / "schema" / "tapdb_schema.sql"
-    if target.exists():
+    """Require the repo-local TapDB schema file instead of discovering fallback copies."""
+    schema_path = (_bloom_root() / "schema" / "tapdb_schema.sql").resolve()
+    if schema_path.is_file():
         return
-
-    source = _resolve_tapdb_schema_source()
-    if source is None:
-        return
-
-    if target.is_symlink():
-        target.unlink()
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        target.symlink_to(source)
-    except Exception:
-        if target.exists() or target.is_symlink():
-            target.unlink()
-        shutil.copy2(source, target)
+    raise RuntimeError(
+        "Bloom db bootstrap requires the repo-local schema file "
+        f"{schema_path}. Bloom will not guess schema sources from sibling repos, "
+        "site-packages, or Dayhoff artifacts."
+    )
 
 
 def _tapdb_base_cmd() -> list[str]:
@@ -129,29 +79,18 @@ def _runtime_env() -> dict[str, str]:
     """Build normalized runtime env for tapdb commands."""
     settings = get_settings()
     ctx = apply_runtime_environment(settings)
-    domain_registry_path = str(
-        ctx.domain_registry_path or DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH
-    ).strip()
-    prefix_registry_path = str(
-        ctx.prefix_ownership_registry_path
-        or DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
-    ).strip()
+    domain_registry_path = str(ctx.domain_registry_path).strip()
+    prefix_registry_path = str(ctx.prefix_ownership_registry_path).strip()
 
     env = os.environ.copy()
     env["AWS_PROFILE"] = ctx.aws_profile
     env["AWS_REGION"] = ctx.aws_region
     env["AWS_DEFAULT_REGION"] = ctx.aws_region
-    env["MERIDIAN_DOMAIN_CODE"] = os.environ.get("MERIDIAN_DOMAIN_CODE", ctx.domain_code)
-    env["TAPDB_DOMAIN_CODE"] = os.environ.get("TAPDB_DOMAIN_CODE", ctx.domain_code)
-    env["TAPDB_OWNER_REPO"] = os.environ.get(
-        "TAPDB_OWNER_REPO", ctx.owner_repo_name or DEFAULT_TAPDB_OWNER_REPO_NAME
-    )
-    env["TAPDB_DOMAIN_REGISTRY_PATH"] = os.environ.get(
-        "TAPDB_DOMAIN_REGISTRY_PATH", domain_registry_path
-    )
-    env["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] = os.environ.get(
-        "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH", prefix_registry_path
-    )
+    env["MERIDIAN_DOMAIN_CODE"] = ctx.domain_code
+    env["TAPDB_DOMAIN_CODE"] = ctx.domain_code
+    env["TAPDB_OWNER_REPO"] = ctx.owner_repo_name or DEFAULT_TAPDB_OWNER_REPO_NAME
+    env["TAPDB_DOMAIN_REGISTRY_PATH"] = domain_registry_path
+    env["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] = prefix_registry_path
     return env
 
 
@@ -204,6 +143,10 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
             "TapDB config path is required. Resolve it via Bloom settings and pass it explicitly "
             "to TapDB with --config."
         )
+    if config_path.startswith("~") or not Path(config_path).is_absolute():
+        raise RuntimeError(
+            f"TapDB config path must be a full absolute path. Got: {config_path}"
+        )
     cmd = _tapdb_base_cmd() + [
         "--config",
         config_path,
@@ -221,17 +164,15 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
 def _ensure_tapdb_namespace_config(env_name: str) -> None:
     """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
     ctx = apply_runtime_environment(get_settings())
-    if not str(ctx.config_path or "").strip():
-        return
     _ensure_runtime_config_parent()
 
     args = [
         "db-config",
         "init",
         "--client-id",
-        _DEFAULT_TAPDB_CLIENT_ID,
+        ctx.client_id,
         "--database-name",
-        _DEFAULT_TAPDB_DATABASE_NAME,
+        ctx.database_name,
         "--owner-repo-name",
         ctx.owner_repo_name,
         "--domain-code",

@@ -10,7 +10,7 @@
 #
 # Prefer editing the deployment YAML file directly. Environment overrides remain
 # available for non-TapDB settings, but TapDB runtime selection should be driven
-# by the config file plus explicit `--config` / `--env` at the TapDB CLI layer.
+# by the config file plus explicit absolute `--config` / `--env` at the TapDB CLI layer.
 # =============================================================================
 
 # AWS SETTINGS
@@ -39,10 +39,10 @@ tapdb:
   database_name: "bloom"        # TapDB database namespace stored in config
   owner_repo_name: "bloom"      # TapDB owner repo token for governance checks
   domain_code: "Z"              # Meridian domain code required for runtime
-  domain_registry_path: "~/.config/tapdb/domain_code_registry.json"
-  prefix_ownership_registry_path: "~/.config/tapdb/prefix_ownership_registry.json"
+  domain_registry_path: ""      # REQUIRED absolute path to the domain registry JSON
+  prefix_ownership_registry_path: ""  # REQUIRED absolute path to the prefix ownership registry JSON
   strict_namespace: true        # Require namespaced TapDB config semantics
-  config_path: ""               # Optional explicit TapDB config path
+  config_path: ""               # REQUIRED absolute path to the TapDB config YAML
   local_pg_port: __BLOOM_TAPDB_LOCAL_PG_PORT__           # Default local TapDB PostgreSQL port for dev/test
 
 # -----------------------------------------------------------------------------

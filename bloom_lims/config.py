@@ -43,13 +43,6 @@ DEFAULT_BLOOM_CONDA_ENV_BASE = "BLOOM"
 LEGACY_UPLOAD_DIR = "/var/lib/bloom/uploads"
 DEFAULT_TAPDB_OWNER_REPO_NAME = "bloom"
 DEFAULT_TAPDB_DOMAIN_CODE = "Z"
-DEFAULT_TAPDB_CONFIG_DIR = Path.home() / ".config" / "tapdb"
-DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH = (
-    DEFAULT_TAPDB_CONFIG_DIR / "domain_code_registry.json"
-)
-DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH = (
-    DEFAULT_TAPDB_CONFIG_DIR / "prefix_ownership_registry.json"
-)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
 
@@ -158,14 +151,21 @@ def _user_config_file() -> Path:
     return _user_config_dir() / f"bloom-config-{deployment}.yaml"
 
 
-def _deployment_scoped_tapdb_config_path(client_id: str, namespace: str) -> str:
-    xdg_config_home = Path(
-        os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
-    )
-    scoped_namespace = f"{namespace}-{_resolve_deployment_code()}"
-    return str(
-        xdg_config_home / "tapdb" / client_id / scoped_namespace / "tapdb-config.yaml"
-    )
+def _require_explicit_absolute_path(value: str, *, field_name: str) -> str:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        raise RuntimeError(
+            f"{field_name} is required and must be passed as a full absolute path."
+        )
+    if cleaned.startswith("~"):
+        raise RuntimeError(
+            f"{field_name} must be a full absolute path; '~' is not allowed."
+        )
+    if not Path(cleaned).is_absolute():
+        raise RuntimeError(
+            f"{field_name} must be a full absolute path. Got: {cleaned}"
+        )
+    return cleaned
 
 
 def _default_upload_dir_for_runtime(
@@ -175,9 +175,11 @@ def _default_upload_dir_for_runtime(
     env_name: str,
     config_path: str = "",
 ) -> str:
-    resolved_config_path = (
-        str(config_path or "").strip()
-        or _deployment_scoped_tapdb_config_path(client_id, namespace)
+    _ = client_id
+    _ = namespace
+    resolved_config_path = _require_explicit_absolute_path(
+        config_path,
+        field_name="tapdb.config_path",
     )
     scoped_root = Path(resolved_config_path).expanduser().resolve().parent
     return str(scoped_root / env_name.strip().lower() / "uploads")
@@ -475,11 +477,11 @@ class TapDBSettings(BaseModel):
         description="Meridian domain code for TapDB runtime config",
     )
     domain_registry_path: str = Field(
-        default=str(DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH),
+        default="",
         description="Shared Meridian domain registry path",
     )
     prefix_ownership_registry_path: str = Field(
-        default=str(DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH),
+        default="",
         description="Shared Meridian prefix ownership registry path",
     )
     strict_namespace: bool = Field(
@@ -488,7 +490,7 @@ class TapDBSettings(BaseModel):
     )
     config_path: str = Field(
         default="",
-        description="Optional explicit TapDB config path override",
+        description="Required explicit absolute TapDB config path",
     )
     local_pg_port: int = Field(
         default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
@@ -540,7 +542,19 @@ class TapDBSettings(BaseModel):
     def validate_registry_path(cls, value: str) -> str:
         cleaned = str(value or "").strip()
         if not cleaned:
-            raise ValueError("tapdb registry paths cannot be empty")
+            return ""
+        if cleaned.startswith("~") or not Path(cleaned).is_absolute():
+            raise ValueError("tapdb registry paths must be full absolute paths")
+        return cleaned
+
+    @field_validator("config_path")
+    @classmethod
+    def validate_config_path(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            return ""
+        if cleaned.startswith("~") or not Path(cleaned).is_absolute():
+            raise ValueError("tapdb.config_path must be a full absolute path")
         return cleaned
 
     @field_validator("local_pg_port")
@@ -559,10 +573,8 @@ class TapDBRuntimeContext(BaseModel):
     database_name: str
     owner_repo_name: str = DEFAULT_TAPDB_OWNER_REPO_NAME
     domain_code: str = DEFAULT_TAPDB_DOMAIN_CODE
-    domain_registry_path: str = str(DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH)
-    prefix_ownership_registry_path: str = str(
-        DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
-    )
+    domain_registry_path: str = ""
+    prefix_ownership_registry_path: str = ""
     strict_namespace: bool = True
     config_path: str = ""
     aws_profile: str = "lsmc"
@@ -1040,7 +1052,10 @@ class BloomSettings(BaseSettings):
     @model_validator(mode="after")
     def normalize_local_storage_paths(self) -> "BloomSettings":
         configured_upload_dir = str(self.storage.upload_dir or "").strip()
-        if not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR:
+        if (
+            (not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR)
+            and str(self.tapdb.config_path or "").strip()
+        ):
             self.storage.upload_dir = _default_upload_dir_for_runtime(
                 client_id=self.tapdb.client_id.strip(),
                 namespace=self.tapdb.database_name.strip(),
@@ -1048,7 +1063,8 @@ class BloomSettings(BaseSettings):
                 config_path=self.tapdb.config_path,
             )
 
-        _ensure_directory(self.storage.upload_dir)
+        if str(self.storage.upload_dir or "").strip():
+            _ensure_directory(self.storage.upload_dir)
         return self
 
     @field_validator("environment")
@@ -1092,24 +1108,28 @@ def get_tapdb_runtime_context(
 ) -> TapDBRuntimeContext:
     """Resolve active TapDB runtime context from Bloom config."""
     settings = settings or get_settings()
+    config_path = _require_explicit_absolute_path(
+        settings.tapdb.config_path,
+        field_name="tapdb.config_path",
+    )
+    domain_registry_path = _require_explicit_absolute_path(
+        settings.tapdb.domain_registry_path,
+        field_name="tapdb.domain_registry_path",
+    )
+    prefix_ownership_registry_path = _require_explicit_absolute_path(
+        settings.tapdb.prefix_ownership_registry_path,
+        field_name="tapdb.prefix_ownership_registry_path",
+    )
     return TapDBRuntimeContext(
         env=settings.tapdb.env.strip().lower(),
         client_id=settings.tapdb.client_id.strip(),
         database_name=settings.tapdb.database_name.strip(),
         owner_repo_name=settings.tapdb.owner_repo_name.strip(),
         domain_code=settings.tapdb.domain_code.strip().upper(),
-        domain_registry_path=str(settings.tapdb.domain_registry_path).strip(),
-        prefix_ownership_registry_path=str(
-            settings.tapdb.prefix_ownership_registry_path
-        ).strip(),
+        domain_registry_path=domain_registry_path,
+        prefix_ownership_registry_path=prefix_ownership_registry_path,
         strict_namespace=settings.tapdb.strict_namespace,
-        config_path=(
-            settings.tapdb.config_path
-            or _deployment_scoped_tapdb_config_path(
-                settings.tapdb.client_id.strip(),
-                settings.tapdb.database_name.strip(),
-            )
-        ).strip(),
+        config_path=config_path,
         aws_profile=(settings.aws.profile or "lsmc").strip(),
         aws_region=(settings.aws.region or "us-west-2").strip(),
     )
@@ -1206,15 +1226,17 @@ def validate_settings() -> List[str]:
     if not settings.auth.jwt_secret and settings.is_production:
         warnings.append("JWT secret is not set in production")
 
-    upload_path = Path(settings.storage.upload_dir).expanduser()
-    if not upload_path.exists():
-        warnings.append(
-            f"Upload directory does not exist: {settings.storage.upload_dir}"
-        )
-    elif not upload_path.is_dir():
-        warnings.append(f"Upload path is not a directory: {settings.storage.upload_dir}")
-    elif not os.access(upload_path, os.W_OK):
-        warnings.append(f"Upload directory is not writable: {settings.storage.upload_dir}")
+    upload_dir = str(settings.storage.upload_dir or "").strip()
+    if upload_dir:
+        upload_path = Path(upload_dir).expanduser()
+        if not upload_path.exists():
+            warnings.append(
+                f"Upload directory does not exist: {settings.storage.upload_dir}"
+            )
+        elif not upload_path.is_dir():
+            warnings.append(f"Upload path is not a directory: {settings.storage.upload_dir}")
+        elif not os.access(upload_path, os.W_OK):
+            warnings.append(f"Upload directory is not writable: {settings.storage.upload_dir}")
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
@@ -1304,13 +1326,7 @@ def build_effective_config_summary(
     return {
         "user_config_path": str(get_user_config_path()),
         "template_config_path": str(get_template_config_path()),
-        "tapdb_config_path": str(
-            active_settings.tapdb.config_path
-            or _deployment_scoped_tapdb_config_path(
-                active_settings.tapdb.client_id.strip(),
-                active_settings.tapdb.database_name.strip(),
-            )
-        ),
+        "tapdb_config_path": str(active_settings.tapdb.config_path),
         "tapdb_owner_repo_name": str(active_settings.tapdb.owner_repo_name),
         "tapdb_domain_code": str(active_settings.tapdb.domain_code),
         "tapdb_domain_registry_path": str(active_settings.tapdb.domain_registry_path),

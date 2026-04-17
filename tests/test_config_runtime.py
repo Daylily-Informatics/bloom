@@ -18,14 +18,11 @@ from bloom_lims import __version__
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_TAPDB_DOMAIN_CODE,
-    DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH,
     DEFAULT_TAPDB_OWNER_REPO_NAME,
-    DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH,
     BloomSettings,
     StorageSettings,
     assert_tapdb_version,
     build_effective_config_summary,
-    _deployment_scoped_tapdb_config_path,
     build_default_config_template,
     expected_conda_env_name,
     generate_example_webhook_secret,
@@ -46,14 +43,12 @@ def test_storage_temp_dir_uses_system_tempdir():
 def test_storage_upload_dir_defaults_to_deployment_scoped_runtime(
     monkeypatch, tmp_path: Path
 ):
-    xdg_config_home = tmp_path / ".config"
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
-    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
-    monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
+    config_path = tmp_path / "tapdb" / "bloom-local2" / "tapdb-config.yaml"
+    monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(config_path))
     get_settings.cache_clear()
 
     settings = BloomSettings()
-    expected = xdg_config_home / "tapdb" / "bloom" / "bloom-local2" / "dev" / "uploads"
+    expected = config_path.parent / "dev" / "uploads"
 
     assert Path(settings.storage.upload_dir) == expected
     assert expected.is_dir()
@@ -148,6 +143,9 @@ def test_build_default_config_template_injects_fresh_jwt_secret():
         )
         assert auth["auto_provision_allowed_domains"] == ["lsmc.com"]
         assert data["network"]["allowed_hosts"] == []
+        assert data["tapdb"]["domain_registry_path"] == ""
+        assert data["tapdb"]["prefix_ownership_registry_path"] == ""
+        assert data["tapdb"]["config_path"] == ""
         assert "daylilyinformatics.bio" not in template
 
 
@@ -168,21 +166,41 @@ def test_settings_sources_do_not_include_dotenv():
     assert dotenv_settings not in sources
 
 
-def test_runtime_bootstrap_replaces_missing_tapdb_config_path(
-    monkeypatch, tmp_path: Path
+def test_runtime_context_requires_explicit_tapdb_paths(monkeypatch):
+    temp_home = Path(tempfile.mkdtemp())
+    monkeypatch.setenv("HOME", str(temp_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(temp_home / ".config"))
+    monkeypatch.delenv("BLOOM_DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("LSMC_DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
+    monkeypatch.delenv("BLOOM_TAPDB__DOMAIN_REGISTRY_PATH", raising=False)
+    monkeypatch.delenv("BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH", raising=False)
+    get_settings.cache_clear()
+
+    with pytest.raises(
+        RuntimeError,
+        match="tapdb.config_path is required and must be passed as a full absolute path",
+    ):
+        get_tapdb_runtime_context(BloomSettings())
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "message"),
+    [
+        ("config_path", "relative/tapdb-config.yaml", "tapdb.config_path must be a full absolute path"),
+        ("config_path", "~/tapdb-config.yaml", "tapdb.config_path must be a full absolute path"),
+        ("domain_registry_path", "relative/domain_code_registry.json", "tapdb registry paths must be full absolute paths"),
+        ("prefix_ownership_registry_path", "~/prefix_ownership_registry.json", "tapdb registry paths must be full absolute paths"),
+    ],
+)
+def test_tapdb_path_fields_reject_non_absolute_values(
+    field_name: str,
+    field_value: str,
+    message: str,
 ):
-    missing_path = tmp_path / "missing-tapdb-config.yaml"
-    monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(missing_path))
-    monkeypatch.delenv("BLOOM_TAPDB__LOCAL_PG_PORT", raising=False)
-
-    config_path = ensure_test_runtime_environment()
-
-    assert config_path.exists()
-    assert config_path != missing_path
-    assert Path(os.environ["BLOOM_TAPDB__CONFIG_PATH"]).exists()
-    assert os.environ["BLOOM_TAPDB__LOCAL_PG_PORT"] == str(
-        os.environ.get("BLOOM_TAPDB__LOCAL_PG_PORT", DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)
-    )
+    with pytest.raises(ValidationError, match=message):
+        BloomSettings(tapdb={field_name: field_value})
 
 
 def test_strict_app_startup_accepts_synthesized_test_config(
@@ -267,27 +285,32 @@ def test_create_app_logs_atlas_webhook_secret_warning(
     )
 
 
-def test_runtime_context_defaults_to_deployment_scoped_tapdb_config(
-    monkeypatch, tmp_path: Path
-):
-    xdg_config_home = tmp_path / ".config"
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
-    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "local2")
-    monkeypatch.delenv("BLOOM_TAPDB__CONFIG_PATH", raising=False)
-    get_settings.cache_clear()
+def test_runtime_context_preserves_explicit_tapdb_paths(tmp_path: Path):
+    config_path = tmp_path / "tapdb" / "bloom" / "tapdb-config.yaml"
+    domain_registry_path = tmp_path / "domain_code_registry.json"
+    prefix_registry_path = tmp_path / "prefix_ownership_registry.json"
 
-    settings = BloomSettings()
+    settings = BloomSettings(
+        tapdb={
+            "config_path": str(config_path),
+            "domain_registry_path": str(domain_registry_path),
+            "prefix_ownership_registry_path": str(prefix_registry_path),
+        }
+    )
     ctx = get_tapdb_runtime_context(settings)
 
-    expected = str(
-        xdg_config_home / "tapdb" / "bloom" / "bloom-local2" / "tapdb-config.yaml"
-    )
-
-    assert ctx.config_path == _deployment_scoped_tapdb_config_path("bloom", "bloom")
-    assert ctx.config_path == expected
+    assert ctx.config_path == str(config_path)
+    assert ctx.domain_registry_path == str(domain_registry_path)
+    assert ctx.prefix_ownership_registry_path == str(prefix_registry_path)
 
 
 def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
+    temp_home = Path(tempfile.mkdtemp())
+    monkeypatch.setenv("HOME", str(temp_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(temp_home / ".config"))
+    monkeypatch.delenv("BLOOM_DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("LSMC_DEPLOYMENT_CODE", raising=False)
     for key in (
         "MERIDIAN_DOMAIN_CODE",
         "TAPDB_OWNER_REPO",
@@ -308,10 +331,9 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert assert_tapdb_version() == expected_tapdb_version
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
-    assert Path(settings.tapdb.domain_registry_path).expanduser() == DEFAULT_TAPDB_DOMAIN_REGISTRY_PATH
-    assert Path(settings.tapdb.prefix_ownership_registry_path).expanduser() == (
-        DEFAULT_TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH
-    )
+    assert settings.tapdb.domain_registry_path == ""
+    assert settings.tapdb.prefix_ownership_registry_path == ""
+    assert settings.tapdb.config_path == ""
 
     project_root = Path(__file__).resolve().parents[1]
     root_template = (project_root / "config" / "bloom-config-template.yaml").read_text(
@@ -334,12 +356,14 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
 
     assert 'owner_repo_name: "bloom"' in root_template
     assert 'domain_code: "Z"' in root_template
-    assert 'domain_registry_path: "~/.config/tapdb/domain_code_registry.json"' in root_template
-    assert 'prefix_ownership_registry_path: "~/.config/tapdb/prefix_ownership_registry.json"' in root_template
+    assert 'domain_registry_path: ""' in root_template
+    assert 'prefix_ownership_registry_path: ""' in root_template
+    assert 'config_path: ""' in root_template
     assert 'owner_repo_name: "bloom"' in packaged_template
     assert 'domain_code: "Z"' in packaged_template
-    assert 'domain_registry_path: "~/.config/tapdb/domain_code_registry.json"' in packaged_template
-    assert 'prefix_ownership_registry_path: "~/.config/tapdb/prefix_ownership_registry.json"' in packaged_template
+    assert 'domain_registry_path: ""' in packaged_template
+    assert 'prefix_ownership_registry_path: ""' in packaged_template
+    assert 'config_path: ""' in packaged_template
     assert "allowed_hosts: []" in root_template
     assert "allowed_hosts: []" in packaged_template
     assert pyproject["tool"]["setuptools"]["package-data"]["bloom_lims"] == [
@@ -396,6 +420,7 @@ def test_effective_config_summary_redacts_sensitive_values(
     assert summary["aws_region"] == "us-east-1"
     assert summary["user_config_path"]
     assert summary["template_config_path"]
+    assert summary["tapdb_config_path"] == str(tmp_path / "tapdb.yaml")
     assert rows["auth.cognito_client_secret"] == "<redacted>"
     assert rows["auth.jwt_secret"] == "<redacted>"
     assert rows["atlas.webhook_secret"] == "<redacted>"

@@ -94,6 +94,58 @@ def test_run_tapdb_returns_nonzero_when_check_false(
     assert db_commands._run_tapdb(["db", "setup"], check=False) == 3
 
 
+def test_run_tapdb_rejects_non_absolute_config_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            config_path="relative/bloom-tapdb.yaml",
+            env="dev",
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="TapDB config path must be a full absolute path",
+    ):
+        db_commands._run_tapdb(["db", "setup"], check=True)
+
+
+def test_runtime_env_overrides_ambient_registry_and_owner_guessing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MERIDIAN_DOMAIN_CODE", "BAD")
+    monkeypatch.setenv("TAPDB_DOMAIN_CODE", "BAD")
+    monkeypatch.setenv("TAPDB_OWNER_REPO", "ambient-owner")
+    monkeypatch.setenv("TAPDB_DOMAIN_REGISTRY_PATH", "/tmp/ambient-domain.json")
+    monkeypatch.setenv(
+        "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH", "/tmp/ambient-prefix.json"
+    )
+    monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            aws_profile="lsmc",
+            aws_region="us-west-2",
+            domain_code="Z",
+            owner_repo_name="bloom",
+            domain_registry_path="/tmp/explicit-domain.json",
+            prefix_ownership_registry_path="/tmp/explicit-prefix.json",
+        ),
+    )
+    monkeypatch.setattr(db_commands, "get_settings", lambda: object())
+
+    env = db_commands._runtime_env()
+
+    assert env["MERIDIAN_DOMAIN_CODE"] == "Z"
+    assert env["TAPDB_DOMAIN_CODE"] == "Z"
+    assert env["TAPDB_OWNER_REPO"] == "bloom"
+    assert env["TAPDB_DOMAIN_REGISTRY_PATH"] == "/tmp/explicit-domain.json"
+    assert env["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] == "/tmp/explicit-prefix.json"
+
+
 def test_update_tapdb_namespace_config_uses_db_config_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -132,8 +184,8 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
         db_commands,
         "apply_runtime_environment",
         lambda _settings: SimpleNamespace(
-            client_id="bloom",
-            database_name="bloom",
+            client_id="bloomx",
+            database_name="bloomy",
             config_path="/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
             env="dev",
             aws_profile="lsmc",
@@ -169,9 +221,9 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
                 "db-config",
                 "init",
                 "--client-id",
-                "bloom",
+                "bloomx",
                 "--database-name",
-                "bloom",
+                "bloomy",
                 "--owner-repo-name",
                 "bloom",
                 "--domain-code",
@@ -243,35 +295,19 @@ def test_ensure_tapdb_namespace_config_creates_scoped_parent(
     assert config_path.parent.exists()
 
 
-def test_resolve_tapdb_schema_source_skips_dayhoff_artifacts(
+def test_ensure_schema_available_for_bloom_root_requires_repo_local_schema_file(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    sibling_schema = tmp_path / "daylily-tapdb" / "schema" / "tapdb_schema.sql"
-    sibling_schema.parent.mkdir(parents=True, exist_ok=True)
-    sibling_schema.write_text("-- sibling schema\n", encoding="utf-8")
+    bloom_root = tmp_path / "bloom"
+    (bloom_root / "schema").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(db_commands, "_bloom_root", lambda: bloom_root)
 
-    artifact_pkg = (
-        tmp_path
-        / ".dayhoff"
-        / "local"
-        / "lsmc5"
-        / "repos"
-        / "daylily-tapdb"
-        / "daylily_tapdb"
-        / "__init__.py"
-    )
-    artifact_pkg.parent.mkdir(parents=True, exist_ok=True)
-    artifact_pkg.write_text("# artifact package\n", encoding="utf-8")
-
-    monkeypatch.setattr(db_commands, "_bloom_root", lambda: tmp_path / "bloom")
-    monkeypatch.setattr(
-        db_commands.importlib,
-        "import_module",
-        lambda _name: SimpleNamespace(__file__=str(artifact_pkg)),
-    )
-
-    assert db_commands._resolve_tapdb_schema_source() == sibling_schema
+    with pytest.raises(
+        RuntimeError,
+        match="Bloom db bootstrap requires the repo-local schema file",
+    ):
+        db_commands._ensure_schema_available_for_bloom_root()
 
 
 def test_db_seed_calls_tapdb_template_loader(
