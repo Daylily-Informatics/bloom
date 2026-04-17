@@ -64,6 +64,14 @@ def test_expected_conda_env_name_uses_deployment_code(monkeypatch):
     assert expected_conda_env_name() == "BLOOM-bringup"
 
 
+def test_expected_conda_env_name_falls_back_to_active_conda_env(monkeypatch):
+    monkeypatch.delenv("BLOOM_DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("DEPLOYMENT_CODE", raising=False)
+    monkeypatch.delenv("LSMC_DEPLOYMENT_CODE", raising=False)
+    monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM-smoke")
+    assert expected_conda_env_name() == "BLOOM-smoke"
+
+
 def test_nested_env_overrides_template_defaults(monkeypatch):
     monkeypatch.setenv("BLOOM_AUTH__COGNITO_USER_POOL_ID", "pool-from-env")
     monkeypatch.setenv("BLOOM_AUTH__COGNITO_CLIENT_ID", "client-from-env")

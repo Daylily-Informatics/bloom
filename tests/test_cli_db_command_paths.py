@@ -577,7 +577,53 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
         lambda env_name, overwrite=False, **_kwargs: seeded.append((env_name, overwrite)),
     )
 
-    db_commands.db_build(force=force)
+    db_commands.db_build(force=force, target="local")
+
+    assert calls == expected_calls
+    assert seeded == [("dev", force)]
+
+
+@pytest.mark.parametrize(
+    ("force", "expected_calls"),
+    [
+        (
+            False,
+            [
+                (["db", "create", "dev"], False),
+                (["db", "setup", "dev"], True),
+            ],
+        ),
+        (
+            True,
+            [
+                (["db", "create", "dev", "--force"], False),
+                (["db", "setup", "dev", "--force"], True),
+            ],
+        ),
+    ],
+)
+def test_db_build_aurora_skips_local_pg_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+    force: bool,
+    expected_calls: list[tuple[list[str], bool]],
+) -> None:
+    calls: list[tuple[list[str], bool]] = []
+    seeded: list[tuple[str, bool]] = []
+    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(db_commands, "_ensure_tapdb_namespace_config", lambda _env: None)
+    monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+    monkeypatch.setattr(
+        db_commands,
+        "_run_tapdb",
+        lambda args, check=True: calls.append((args, check)) or 0,
+    )
+    monkeypatch.setattr(
+        db_commands,
+        "_seed_tapdb_templates",
+        lambda env_name, overwrite=False, **_kwargs: seeded.append((env_name, overwrite)),
+    )
+
+    db_commands.db_build(force=force, target="aurora")
 
     assert calls == expected_calls
     assert seeded == [("dev", force)]

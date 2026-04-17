@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from typer.testing import CliRunner
+
+from bloom_lims.cli import build_app
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -9,36 +13,33 @@ def test_root_environment_contract_uses_environment_yaml() -> None:
     assert not (PROJECT_ROOT / "requirements.txt").exists()
 
 
-def test_activate_only_references_root_environment_yaml() -> None:
+def test_activate_is_bare_and_uses_repo_root_editable_install() -> None:
     activate = (PROJECT_ROOT / "activate").read_text(encoding="utf-8")
     deactivate = (PROJECT_ROOT / "bloom_deactivate").read_text(encoding="utf-8")
     environment = (PROJECT_ROOT / "environment.yaml").read_text(encoding="utf-8")
-    root_template = (PROJECT_ROOT / "config" / "bloom-config-template.yaml").read_text(
-        encoding="utf-8"
-    )
-    packaged_template = (
-        PROJECT_ROOT / "bloom_lims" / "etc" / "bloom-config-template.yaml"
-    ).read_text(encoding="utf-8")
 
     assert "environment.yaml" in activate
-    assert "environment" + ".yml" not in activate
-    assert "requirements.txt" not in activate
-    assert 'pip install -e "${BLOOM_ROOT}[dev]" -q' in activate
+    assert '"${CONDA_PREFIX}/bin/python" -m pip install -e "$BLOOM_ROOT"' in activate
+    assert 'python -m pip install -e "$BLOOM_ROOT"' not in activate.replace(
+        '"${CONDA_PREFIX}/bin/python" -m pip install -e "$BLOOM_ROOT"', ""
+    )
+    assert "[dev]" not in activate
+    assert "TAPDB_DOMAIN_REGISTRY_PATH" not in activate
+    assert "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH" not in activate
+    assert "BLOOM_TAPDB__DOMAIN_REGISTRY_PATH" not in activate
+    assert "BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH" not in activate
+    assert "MERIDIAN_DOMAIN_CODE" not in activate
+    assert "TAPDB_OWNER_REPO" not in activate
     assert "export BLOOM_ACTIVE=1" in activate
-    assert "--no-deps" not in activate
     assert (PROJECT_ROOT / "bloom_deactivate").is_file()
     assert "unset BLOOM_ACTIVE" in deactivate
-    assert "-e ." not in environment
-    assert '_BLOOM_MERIDIAN_DOMAIN_CODE="Z"' in activate
-    assert '_BLOOM_TAPDB_OWNER_REPO="bloom"' in activate
-    assert 'export MERIDIAN_DOMAIN_CODE="${MERIDIAN_DOMAIN_CODE:-${_BLOOM_MERIDIAN_DOMAIN_CODE}}"' in activate
-    assert 'export TAPDB_OWNER_REPO="${TAPDB_OWNER_REPO:-${_BLOOM_TAPDB_OWNER_REPO}}"' in activate
-    assert 'export TAPDB_DOMAIN_CODE="${TAPDB_DOMAIN_CODE:-${MERIDIAN_DOMAIN_CODE}}"' in activate
-    assert "TAPDB_DOMAIN_REGISTRY_PATH" in activate
-    assert "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH" in activate
-    assert "owner_repo_name: \"bloom\"" in root_template
-    assert "domain_code: \"Z\"" in root_template
-    assert "domain_registry_path: \"~/.config/tapdb/domain_code_registry.json\"" in root_template
-    assert "prefix_ownership_registry_path: \"~/.config/tapdb/prefix_ownership_registry.json\"" in root_template
-    assert "owner_repo_name: \"bloom\"" in packaged_template
-    assert "domain_code: \"Z\"" in packaged_template
+    assert "ipython" not in environment.lower()
+    assert "psycopg2" not in environment.lower()
+    assert "djlint" not in environment.lower()
+
+
+def test_db_build_help_mentions_target_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(build_app(), ["db", "build", "--help"])
+    assert result.exit_code == 0
+    assert "--target" in result.output

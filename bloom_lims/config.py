@@ -87,12 +87,34 @@ def _sanitize_deployment_code(value: str) -> str:
 
 
 def _resolve_deployment_code() -> str:
-    return _sanitize_deployment_code(
+    env_candidates = (
         os.environ.get("BLOOM_DEPLOYMENT_CODE")
         or os.environ.get("DEPLOYMENT_CODE")
         or os.environ.get("LSMC_DEPLOYMENT_CODE")
-        or "local"
     )
+    if env_candidates:
+        return _sanitize_deployment_code(env_candidates)
+
+    conda_env = (os.environ.get("CONDA_DEFAULT_ENV") or "").strip()
+    if conda_env:
+        if conda_env.startswith(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-"):
+            return _sanitize_deployment_code(
+                conda_env.removeprefix(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-")
+            )
+        if conda_env != "base":
+            return _sanitize_deployment_code(conda_env)
+
+    conda_prefix = (os.environ.get("CONDA_PREFIX") or "").strip()
+    if conda_prefix:
+        env_name = Path(conda_prefix).name
+        if env_name.startswith(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-"):
+            return _sanitize_deployment_code(
+                env_name.removeprefix(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-")
+            )
+        if env_name and env_name != "base":
+            return _sanitize_deployment_code(env_name)
+
+    return "local"
 
 
 @lru_cache()

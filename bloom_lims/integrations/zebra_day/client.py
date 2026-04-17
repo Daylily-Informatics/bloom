@@ -28,7 +28,7 @@ def _load_zebra_day_client_types() -> tuple[type[Any], type[Any]]:
         client_mod = importlib.import_module("zebra_day.client")
     except ImportError as exc:
         raise ZebraDayIntegrationError(
-            "zebra-day is not installed; install bloom_lims[zebra_day] to use printer integration"
+            "zebra-day is not installed; install zebra-day in the active Bloom environment to use printer integration"
         ) from exc
 
     return client_mod.PrinterRecord, client_mod.ZebraDayApiClient

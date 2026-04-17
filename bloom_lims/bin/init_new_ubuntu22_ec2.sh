@@ -77,7 +77,7 @@ fi
 
 source ./activate "${DEPLOY_NAME}"
 export BLOOM_DEFAULT_WEB_PORT="$(python -c 'from bloom_lims.config import DEFAULT_BLOOM_WEB_PORT; print(DEFAULT_BLOOM_WEB_PORT)')"
-bloom db build --force
+bloom db build --target local --force
 
 # Test your install
 pytest  # You should get mostly successes, and some warnings (which are fine)

@@ -469,15 +469,24 @@ def _ensure_identity_prefix_config(session, *, owner_repo_name: str, domain_code
 @db_app.command("build")
 def db_build(
     force: bool = typer.Option(False, "--force", "-f", help="Force re-initialization"),
+    target: str = typer.Option(
+        "local",
+        "--target",
+        help="TapDB build target: local or aurora",
+    ),
 ) -> None:
     """Build database/runtime via tapdb orchestration."""
     env_name = _current_env()
+    target_mode = target.strip().lower()
+    if target_mode not in {"local", "aurora"}:
+        raise typer.BadParameter("--target must be either local or aurora")
+
     console.print(
-        f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]"
+        f"[cyan]Initializing BLOOM database via tapdb (env={env_name}, target={target_mode})...[/cyan]"
     )
     _ensure_tapdb_namespace_config(env_name)
 
-    if env_name in {"dev", "test"}:
+    if target_mode == "local":
         _ensure_schema_available_for_bloom_root()
         local_port = _local_pg_port(env_name)
         console.print(

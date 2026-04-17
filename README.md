@@ -151,7 +151,7 @@ For a first local bring-up:
 ```bash
 source ./activate bringup
 bloom config init
-bloom db build
+bloom db build --target local
 bloom config status
 bloom config doctor
 bloom server start --port 8912

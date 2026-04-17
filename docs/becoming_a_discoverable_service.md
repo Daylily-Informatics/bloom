@@ -55,7 +55,7 @@ This matters because Dayhoff's deploy model is built around `--deploy-name`. Ser
 Bloom's current repo-local bootstrap command is:
 
 ```bash
-bloom db build
+bloom db build --target local
 ```
 
 This is Bloom delegating runtime/bootstrap work to TapDB through its own supported CLI surface.
@@ -87,9 +87,9 @@ curl -k https://127.0.0.1:8912/readyz
 There is currently some drift between the Dayhoff service catalog and the repo-local Bloom contract:
 
 - the service catalog still shows `conda_env_name: BLOOM`
-- the catalog bootstrap command still shows `bloom db init`
+- the catalog bootstrap command still shows `bloom db init` instead of `bloom db build --target local`
 - repo-local Bloom now expects deployment-scoped env names like `BLOOM-<deploy-name>`
-- repo-local Bloom's supported bootstrap command is `bloom db build`
+- repo-local Bloom's supported bootstrap command is `bloom db build --target local`
 
 For actual Bloom operation, treat the repo-local Bloom CLI and docs as the current truth. The catalog entry should be kept aligned, but the service's own CLI is authoritative for how Bloom boots today.
 
@@ -154,7 +154,7 @@ If you are making Bloom newly deployable in a Dayhoff environment, the practical
 1. Ensure the repo activates with `source ./activate <deploy-name>`.
 2. Ensure Bloom config is present at the deployment-scoped YAML path.
 3. Ensure the TapDB namespace config exists and matches the deploy name.
-4. Bootstrap with `bloom db build`.
+4. Bootstrap with `bloom db build --target local`.
 5. Start with `bloom server start --port 8912`.
 6. Verify `https://127.0.0.1:8912/readyz`.
 7. Make sure Dayhoff's service catalog and repo-local CLI contract agree.

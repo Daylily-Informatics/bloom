@@ -8,6 +8,24 @@ Always start by activating the repo environment:
 source ./activate <deploy-name>
 ```
 
+## Activate Contract
+
+- `activate` must stay env-only: create the conda env if missing, activate it, and run exactly one `python -m pip install -e <repo-root>` on first create.
+- Do not add config copying, TapDB env exports, loader-path mutation, pre-commit installs, Playwright installs, shell tool checks, or DB/bootstrap work back into `activate`.
+- If Bloom needs runtime configuration or TapDB namespace setup, move that logic into `bloom config init`, `bloom db build`, or Dayhoff-generated bootstrap scripts instead of `activate`.
+
+## Dependency Boundary
+
+- `environment.yaml` is only for Python/bootstrap/system packages.
+- All Python libraries needed by the repo belong in `pyproject.toml` under `[project.dependencies]`.
+- Do not reintroduce `pip:` blocks or Python package installs into `environment.yaml`.
+- Do not add any secondary install set such as `.[dev]`, `.[test]`, `requirements-dev.txt`, or `[project.optional-dependencies]`.
+
+## CLI Contract
+
+- `bloom` and every declared console script must resolve from the activated conda env `bin/` directory.
+- `bloom db build` must keep an explicit `--target` argument, and repo-solo local bootstrap examples should use `bloom db build --target local`.
+
 ## Command Ownership
 
 - Use `bloom ...` as the primary interface for normal Bloom work.

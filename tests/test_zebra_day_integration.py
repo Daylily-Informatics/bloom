@@ -164,7 +164,7 @@ def test_zebra_day_service_requires_optional_dependency_when_configured(monkeypa
 
     with pytest.raises(
         ZebraDayIntegrationError,
-        match=r"install bloom_lims\[zebra_day\]",
+        match=r"install zebra-day in the active Bloom environment",
     ):
         service.submit_print_job(
             lab="BLOOM",

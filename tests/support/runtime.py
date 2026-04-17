@@ -106,23 +106,6 @@ def read_pyproject_dependency_spec(package_name: str) -> str:
         if requirement.name == package_name:
             return str(requirement.specifier)
 
-    optional_dependencies = (
-        payload.get("project", {}).get("optional-dependencies", {})
-        if isinstance(payload, dict)
-        else {}
-    )
-    if isinstance(optional_dependencies, dict):
-        for entries in optional_dependencies.values():
-            if not isinstance(entries, list):
-                continue
-            for entry in entries:
-                try:
-                    requirement = Requirement(str(entry))
-                except Exception:
-                    continue
-                if requirement.name == package_name:
-                    return str(requirement.specifier)
-
     raise RuntimeError(f"Dependency {package_name!r} is not declared in pyproject.toml")
 
 
@@ -314,18 +297,22 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
         from bloom_lims.cli import db as db_commands
 
         try:
-            db_commands.db_build(force=False)
+            db_commands.db_build(force=False, target="local")
         except SystemExit as exc:
-            raise RuntimeError(f"`bloom db build` exited with status {exc.code}") from exc
+            raise RuntimeError(
+                f"`bloom db build --target local` exited with status {exc.code}"
+            ) from exc
         except Exception as exc:
-            raise RuntimeError(f"`bloom db build` failed: {exc}") from exc
+            raise RuntimeError(
+                f"`bloom db build --target local` failed: {exc}"
+            ) from exc
 
         started_local = True
 
     if not tapdb_local_available(env_name=env_name):
         raise RuntimeError(
-            "Local TapDB is still unavailable after `bloom db build`. "
-            "Fix the runtime and retry `source ./activate <deploy-name> && bloom db build`."
+            "Local TapDB is still unavailable after `bloom db build --target local`. "
+            "Fix the runtime and retry `source ./activate <deploy-name> && bloom db build --target local`."
         )
 
     from bloom_lims.cli import db as db_commands
