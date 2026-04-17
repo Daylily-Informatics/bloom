@@ -170,6 +170,81 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare explicit Bloom/TapDB runtime config
+        shell: bash -el {0}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          repo_root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          runtime_root = Path(os.environ["RUNNER_TEMP"]).resolve() / "bloom-ci"
+          runtime_root.mkdir(parents=True, exist_ok=True)
+
+          tapdb_config_path = runtime_root / "tapdb" / "bloom" / "bloom-mmm" / "tapdb-config.yaml"
+          tapdb_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+          domain_registry_path = (
+              repo_root / "bloom_lims" / "etc" / "domain_code_registry.json"
+          ).resolve()
+          prefix_registry_path = (
+              repo_root / "bloom_lims" / "etc" / "prefix_ownership_registry.json"
+          ).resolve()
+
+          tapdb_config_path.write_text(
+              "\n".join(
+                  [
+                      "meta:",
+                      "  config_version: 3",
+                      "  client_id: bloom",
+                      "  database_name: bloom",
+                      "  owner_repo_name: bloom",
+                      f"  domain_registry_path: {domain_registry_path}",
+                      f"  prefix_ownership_registry_path: {prefix_registry_path}",
+                      "environments:",
+                      "  dev:",
+                      "    engine_type: local",
+                      "    host: localhost",
+                      '    port: "5566"',
+                      '    ui_port: "8912"',
+                      '    user: "postgres"',
+                      '    password: ""',
+                      '    database: "tapdb_bloom_dev"',
+                      '    domain_code: "Z"',
+                      '    cognito_user_pool_id: "us-west-2_test-pool"',
+                      '    audit_log_euid_prefix: "BGX"',
+                      '    support_email: "support@dyly.bio"',
+                      "  test:",
+                      "    engine_type: local",
+                      "    host: localhost",
+                      '    port: "5566"',
+                      '    ui_port: "8912"',
+                      '    user: "postgres"',
+                      '    password: ""',
+                      '    database: "tapdb_bloom_test"',
+                      '    domain_code: "Z"',
+                      '    cognito_user_pool_id: "us-west-2_test-pool"',
+                      '    audit_log_euid_prefix: "BGX"',
+                      '    support_email: "support@dyly.bio"',
+                      "",
+                  ]
+              ),
+              encoding="utf-8",
+          )
+          os.chmod(tapdb_config_path, 0o600)
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+              fh.write(f"BLOOM_TAPDB__CONFIG_PATH={tapdb_config_path}\n")
+              fh.write(f"BLOOM_TAPDB__DOMAIN_REGISTRY_PATH={domain_registry_path}\n")
+              fh.write(
+                  f"BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH={prefix_registry_path}\n"
+              )
+              fh.write(f"TAPDB_DOMAIN_REGISTRY_PATH={domain_registry_path}\n")
+              fh.write(
+                  f"TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH={prefix_registry_path}\n"
+              )
+          PY
+
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
