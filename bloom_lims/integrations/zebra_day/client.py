@@ -96,7 +96,9 @@ class ZebraDayService:
         with self._client() as client:
             return list(client.list_label_profiles())
 
-    def build_printer_preferences(self, selected_lab: str | None = None) -> dict[str, Any]:
+    def build_printer_preferences(
+        self, selected_lab: str | None = None
+    ) -> dict[str, Any]:
         if not self.is_configured:
             return {
                 "status": "not_configured",

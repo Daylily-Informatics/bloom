@@ -11,7 +11,11 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth, require_write
+from bloom_lims.api.v1.dependencies import (
+    APIUser,
+    require_external_token_auth,
+    require_write,
+)
 from bloom_lims.domain.external_specimens import ExternalSpecimenService
 from bloom_lims.schemas.external_specimens import AtlasReferences
 
@@ -93,7 +97,9 @@ def test_external_specimen_endpoints_require_external_token_auth(client):
 
 def test_external_specimen_lookup_does_not_require_atlas_client(monkeypatch):
     def _unexpected_atlas_service():
-        raise AssertionError("AtlasService should not be constructed for lookup-only queries")
+        raise AssertionError(
+            "AtlasService should not be constructed for lookup-only queries"
+        )
 
     monkeypatch.setattr(
         "bloom_lims.domain.external_specimens.AtlasService",
@@ -175,7 +181,9 @@ def test_admin_group_membership_endpoints_list_add_get_delete(client):
     members_payload = list_members_response.json()
     assert any(item["user_id"] == member_user_id for item in members_payload["items"])
 
-    remove_response = client.delete(f"/api/v1/admin/groups/{target_group}/members/{member_user_id}")
+    remove_response = client.delete(
+        f"/api/v1/admin/groups/{target_group}/members/{member_user_id}"
+    )
     assert remove_response.status_code == 200
     remove_payload = remove_response.json()
     assert remove_payload["group_code"] == target_group

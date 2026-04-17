@@ -5,7 +5,7 @@ Endpoints for subject management (patients, donors, etc.).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -15,8 +15,8 @@ from bloom_lims.template_identity import (
     instance_category_filter,
     instance_semantic_category,
 )
-from .dependencies import require_api_auth, APIUser
 
+from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
 
@@ -27,22 +27,29 @@ router = APIRouter(prefix="/subjects", tags=["Subjects"])
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
     from bloom_lims.db import BLOOMdb3
+
     return BLOOMdb3(app_username=username)
 
 
 class SubjectCreateSchema(BaseModel):
     """Schema for creating a subject."""
+
     template_euid: str = Field(..., description="Template EUID to create from")
     name: Optional[str] = Field(None, description="Subject name/identifier")
     external_id: Optional[str] = Field(None, description="External identifier")
-    json_addl: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
+    json_addl: Optional[Dict[str, Any]] = Field(
+        None, description="Additional properties"
+    )
 
 
 class SubjectUpdateSchema(BaseModel):
     """Schema for updating a subject."""
+
     name: Optional[str] = Field(None, description="Subject name/identifier")
     status: Optional[str] = Field(None, description="Subject status")
-    json_addl: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
+    json_addl: Optional[Dict[str, Any]] = Field(
+        None, description="Additional properties"
+    )
 
 
 @router.get("/", response_model=Dict[str, Any])
@@ -63,16 +70,18 @@ async def list_subjects(
         )
 
         if subtype:
-            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_instance.subtype == subtype.lower()
+            )
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
-        
-        query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+
+        query = query.filter(bdb.Base.classes.generic_instance.is_deleted.is_(False))
+
         total = query.count()
         offset = (page - 1) * page_size
         items = query.limit(page_size).offset(offset).all()
-        
+
         return {
             "items": [
                 {
@@ -98,11 +107,15 @@ async def get_subject(euid: str, user: APIUser = Depends(require_api_auth)):
     """Get a subject by EUID."""
     try:
         bdb = get_bdb(user.email)
-        
-        subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
-            bdb.Base.classes.generic_instance.euid == euid,
-            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
-        ).first()
+
+        subject = (
+            bdb.session.query(bdb.Base.classes.generic_instance)
+            .filter(
+                bdb.Base.classes.generic_instance.euid == euid,
+                instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
+            )
+            .first()
+        )
 
         if not subject:
             raise HTTPException(status_code=404, detail=f"Subject not found: {euid}")
@@ -130,30 +143,35 @@ async def create_subject(
     """Create a new subject from a template."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomObj
         from sqlalchemy.orm.attributes import flag_modified
-        
+
+        from bloom_lims.bobjs import BloomObj
+
         bo = BloomObj(bdb)
         bo.set_actor_context(user_id=user.user_id, email=user.email)
         result = bo.create_instances(data.template_euid)
-        
+
         if not result or not result[0]:
-            raise HTTPException(status_code=400, detail="Failed to create subject from template")
-        
+            raise HTTPException(
+                status_code=400, detail="Failed to create subject from template"
+            )
+
         subject = result[0][0]
-        
+
         if data.name:
             subject.name = data.name
         if data.external_id:
             subject.json_addl = subject.json_addl or {}
-            subject.json_addl.setdefault("properties", {})["external_id"] = data.external_id
+            subject.json_addl.setdefault("properties", {})["external_id"] = (
+                data.external_id
+            )
             flag_modified(subject, "json_addl")
         if data.json_addl:
             existing = subject.json_addl or {}
             existing.update(data.json_addl)
             subject.json_addl = existing
             flag_modified(subject, "json_addl")
-        
+
         bdb.session.commit()
         bo.track_user_interaction(
             subject.euid,
@@ -161,7 +179,7 @@ async def create_subject(
             user_id=user.user_id,
             email=user.email,
         )
-        
+
         return {
             "success": True,
             "euid": subject.euid,
@@ -183,15 +201,21 @@ async def update_subject(
     """Update a subject."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomObj
         from sqlalchemy.orm.attributes import flag_modified
+
+        from bloom_lims.bobjs import BloomObj
+
         bo = BloomObj(bdb)
         bo.set_actor_context(user_id=user.user_id, email=user.email)
 
-        subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
-            bdb.Base.classes.generic_instance.euid == euid,
-            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
-        ).first()
+        subject = (
+            bdb.session.query(bdb.Base.classes.generic_instance)
+            .filter(
+                bdb.Base.classes.generic_instance.euid == euid,
+                instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
+            )
+            .first()
+        )
 
         if not subject:
             raise HTTPException(status_code=404, detail=f"Subject not found: {euid}")
@@ -236,10 +260,14 @@ async def delete_subject(
     try:
         bdb = get_bdb(user.email)
 
-        subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
-            bdb.Base.classes.generic_instance.euid == euid,
-            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
-        ).first()
+        subject = (
+            bdb.session.query(bdb.Base.classes.generic_instance)
+            .filter(
+                bdb.Base.classes.generic_instance.euid == euid,
+                instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
+            )
+            .first()
+        )
 
         if not subject:
             raise HTTPException(status_code=404, detail=f"Subject not found: {euid}")
@@ -269,10 +297,14 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
     try:
         bdb = get_bdb(user.email)
 
-        subject = bdb.session.query(bdb.Base.classes.generic_instance).filter(
-            bdb.Base.classes.generic_instance.euid == euid,
-            instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
-        ).first()
+        subject = (
+            bdb.session.query(bdb.Base.classes.generic_instance)
+            .filter(
+                bdb.Base.classes.generic_instance.euid == euid,
+                instance_category_filter(bdb.Base.classes.generic_instance, "subject"),
+            )
+            .first()
+        )
 
         if not subject:
             raise HTTPException(status_code=404, detail=f"Subject not found: {euid}")
@@ -282,17 +314,19 @@ async def get_subject_specimens(euid: str, user: APIUser = Depends(require_api_a
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if (
-                instance_semantic_category(child) == "content"
-                and child.type in ["specimen", "sample"]
-            ):
-                specimens.append({
-                    "euid": child.euid,
-                    "name": child.name,
-                    "type": child.type,
-                    "subtype": child.subtype,
-                    "status": child.bstatus,
-                })
+            if instance_semantic_category(child) == "content" and child.type in [
+                "specimen",
+                "sample",
+            ]:
+                specimens.append(
+                    {
+                        "euid": child.euid,
+                        "name": child.name,
+                        "type": child.type,
+                        "subtype": child.subtype,
+                        "status": child.bstatus,
+                    }
+                )
 
         return {
             "subject_euid": euid,

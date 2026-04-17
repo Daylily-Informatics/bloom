@@ -3,7 +3,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -90,7 +89,7 @@ exit 0
 def test_activate_creates_env_and_puts_cli_on_path(tmp_path: Path) -> None:
     activate = (PROJECT_ROOT / "activate").read_text(encoding="utf-8")
     assert '"${CONDA_PREFIX}/bin/python" -m pip install -e' in activate
-    assert 'python -m pip install -e' not in activate.replace(
+    assert "python -m pip install -e" not in activate.replace(
         '"${CONDA_PREFIX}/bin/python" -m pip install -e', ""
     )
 
@@ -101,12 +100,12 @@ def test_activate_creates_env_and_puts_cli_on_path(tmp_path: Path) -> None:
         "FAKE_CONDA_ROOT": str(fake_root),
     }
     script = (
-        f'set -euo pipefail\n'
+        f"set -euo pipefail\n"
         f'source "{PROJECT_ROOT / "activate"}" smoke\n'
-        f'command -v bloom\n'
-        f'bloom --help\n'
+        f"command -v bloom\n"
+        f"bloom --help\n"
         f'source "{PROJECT_ROOT / "activate"}" smoke\n'
-        f'command -v bloom\n'
+        f"command -v bloom\n"
     )
 
     result = subprocess.run(
@@ -119,8 +118,13 @@ def test_activate_creates_env_and_puts_cli_on_path(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr + result.stdout
-    install_lines = (fake_root / "pip-install.log").read_text(encoding="utf-8").splitlines()
+    install_lines = (
+        (fake_root / "pip-install.log").read_text(encoding="utf-8").splitlines()
+    )
     assert install_lines
     assert set(install_lines) == {str(PROJECT_ROOT)}
-    assert result.stdout.count("Installing editable Bloom package into BLOOM-smoke...") == 1
+    assert (
+        result.stdout.count("Installing editable Bloom package into BLOOM-smoke...")
+        == 1
+    )
     assert "bloom cli ok" in result.stdout

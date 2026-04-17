@@ -9,12 +9,13 @@ except ModuleNotFoundError:  # pragma: no cover
 
 import yaml
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_environment_yaml_is_system_only() -> None:
-    environment = yaml.safe_load((PROJECT_ROOT / "environment.yaml").read_text(encoding="utf-8"))
+    environment = yaml.safe_load(
+        (PROJECT_ROOT / "environment.yaml").read_text(encoding="utf-8")
+    )
     dependencies = environment["dependencies"]
     rendered = (PROJECT_ROOT / "environment.yaml").read_text(encoding="utf-8").lower()
 
@@ -28,7 +29,9 @@ def test_environment_yaml_is_system_only() -> None:
 
 
 def test_pyproject_owns_python_dependencies() -> None:
-    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    pyproject = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
     project = pyproject["project"]
     dependencies = project["dependencies"]
 

@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 
 from bloom_lims.config import get_settings
 from bloom_lims.domain.beta_actions import BETA_ACTION_TEMPLATE_PREFIX
-from bloom_lims.tapdb_adapter import action_instance, action_instance_lineage, generic_template
+from bloom_lims.tapdb_adapter import (
+    action_instance,
+    action_instance_lineage,
+    generic_template,
+)
 
 EXECUTION_ACTION_GROUP = "execution_queue"
 EXECUTION_ACTION_TEMPLATE_PREFIX = BETA_ACTION_TEMPLATE_PREFIX
@@ -80,9 +84,9 @@ class ExecutionQueueActionRecorder:
 
     def __init__(self, session: Session, *, domain_code: str | None = None):
         self.session = session
-        self.domain_code = str(
-            domain_code or get_settings().tapdb.domain_code or ""
-        ).strip().upper()
+        self.domain_code = (
+            str(domain_code or get_settings().tapdb.domain_code or "").strip().upper()
+        )
         if not self.domain_code:
             raise ValueError("domain_code is required for Bloom template resolution")
 
@@ -113,9 +117,13 @@ class ExecutionQueueActionRecorder:
                 action_instance.type == EXECUTION_ACTION_GROUP,
                 action_instance.subtype == action_key,
                 action_instance.is_deleted.is_(False),
-                func.jsonb_extract_path_text(action_instance.json_addl, "subject_lookup_euid")
+                func.jsonb_extract_path_text(
+                    action_instance.json_addl, "subject_lookup_euid"
+                )
                 == clean_subject_euid,
-                func.jsonb_extract_path_text(action_instance.json_addl, "idempotency_key")
+                func.jsonb_extract_path_text(
+                    action_instance.json_addl, "idempotency_key"
+                )
                 == clean_idempotency_key,
             )
             .order_by(action_instance.created_dt.desc())

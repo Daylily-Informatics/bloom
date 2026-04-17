@@ -11,8 +11,12 @@ from daylily_tapdb.actions import ActionDispatcher
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from bloom_lims.tapdb_adapter import action_instance, action_instance_lineage, generic_instance
-from bloom_lims.tapdb_adapter import generic_template
+from bloom_lims.tapdb_adapter import (
+    action_instance,
+    action_instance_lineage,
+    generic_instance,
+    generic_template,
+)
 
 
 def _normalize_action_slug(action_key: str) -> str:
@@ -86,7 +90,11 @@ class BloomTapDBActionDispatcher(ActionDispatcher):
         if not callable(target_handler):
             raise AttributeError(name)
 
-        def _wrapped(instance: generic_instance, action_ds: dict[str, Any], captured_data: dict[str, Any]):
+        def _wrapped(
+            instance: generic_instance,
+            action_ds: dict[str, Any],
+            captured_data: dict[str, Any],
+        ):
             payload = copy.deepcopy(action_ds or {})
             merged_captured = dict(payload.get("captured_data") or {})
             merged_captured.update(captured_data or {})

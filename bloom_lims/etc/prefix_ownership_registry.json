@@ -1,6 +1,9 @@
 {
   "ownership": {
     "Z": {
+      "ADT": {
+        "issuer_app_code": "daylily-tapdb"
+      },
       "BAC": {
         "issuer_app_code": "bloom"
       },
@@ -39,6 +42,18 @@
       },
       "BWS": {
         "issuer_app_code": "bloom"
+      },
+      "EDG": {
+        "issuer_app_code": "daylily-tapdb"
+      },
+      "MSG": {
+        "issuer_app_code": "daylily-tapdb"
+      },
+      "SYS": {
+        "issuer_app_code": "daylily-tapdb"
+      },
+      "TPX": {
+        "issuer_app_code": "daylily-tapdb"
       }
     }
   },

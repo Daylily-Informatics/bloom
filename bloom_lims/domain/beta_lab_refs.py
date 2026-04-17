@@ -176,9 +176,7 @@ class _BetaLabReferenceMixin:
         fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
 
         for fulfillment_item in fulfillment_items:
-            atlas_test_euid = str(
-                fulfillment_item.get("atlas_test_euid") or ""
-            ).strip()
+            atlas_test_euid = str(fulfillment_item.get("atlas_test_euid") or "").strip()
             atlas_test_fulfillment_item_euid = str(
                 fulfillment_item.get("atlas_test_fulfillment_item_euid") or ""
             ).strip()
@@ -347,7 +345,9 @@ class _BetaLabReferenceMixin:
             relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
         )
 
-    def _replace_patient_reference(self, instance, *, atlas_context: dict[str, Any]) -> None:
+    def _replace_patient_reference(
+        self, instance, *, atlas_context: dict[str, Any]
+    ) -> None:
         self._delete_reference_type(
             instance,
             reference_type=self.PATIENT_REFERENCE_TYPE,
@@ -456,32 +456,38 @@ class _BetaLabReferenceMixin:
                 continue
             seen_test_euids.add(candidate)
             atlas_test_euids.append(candidate)
-        fallback_tenant_id = self._first_reachable_reference_value(
-            instance,
-            reference_type=self.TRF_REFERENCE_TYPE,
-            value_field="atlas_tenant_id",
-        ) or self._first_reachable_reference_value(
-            instance,
-            reference_type=self.TEST_REFERENCE_TYPE,
-            value_field="atlas_tenant_id",
-        ) or self._first_reachable_reference_value(
-            instance,
-            reference_type=self.TESTKIT_REFERENCE_TYPE,
-            value_field="atlas_tenant_id",
-        ) or self._first_reachable_reference_value(
-            instance,
-            reference_type=self.SHIPMENT_REFERENCE_TYPE,
-            value_field="atlas_tenant_id",
-        ) or self._first_reachable_reference_value(
-            instance,
-            reference_type=self.ORGANIZATION_SITE_REFERENCE_TYPE,
-            value_field="atlas_tenant_id",
-        ) or (
-            patient_ref["atlas_tenant_id"] if patient_ref is not None else ""
-        ) or (
-            collection_event_ref["atlas_tenant_id"]
-            if collection_event_ref is not None
-            else ""
+        fallback_tenant_id = (
+            self._first_reachable_reference_value(
+                instance,
+                reference_type=self.TRF_REFERENCE_TYPE,
+                value_field="atlas_tenant_id",
+            )
+            or self._first_reachable_reference_value(
+                instance,
+                reference_type=self.TEST_REFERENCE_TYPE,
+                value_field="atlas_tenant_id",
+            )
+            or self._first_reachable_reference_value(
+                instance,
+                reference_type=self.TESTKIT_REFERENCE_TYPE,
+                value_field="atlas_tenant_id",
+            )
+            or self._first_reachable_reference_value(
+                instance,
+                reference_type=self.SHIPMENT_REFERENCE_TYPE,
+                value_field="atlas_tenant_id",
+            )
+            or self._first_reachable_reference_value(
+                instance,
+                reference_type=self.ORGANIZATION_SITE_REFERENCE_TYPE,
+                value_field="atlas_tenant_id",
+            )
+            or (patient_ref["atlas_tenant_id"] if patient_ref is not None else "")
+            or (
+                collection_event_ref["atlas_tenant_id"]
+                if collection_event_ref is not None
+                else ""
+            )
         )
         if not fulfillment_items:
             return {

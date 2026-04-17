@@ -85,12 +85,16 @@ class BloomObj:
         self.is_deleted = is_deleted
         self.session = bdb.session
         self.Base = bdb.Base
-        self.domain_code = str(
-            getattr(bdb, "domain_code", "")
-            or os.environ.get("MERIDIAN_DOMAIN_CODE")
-            or os.environ.get("TAPDB_DOMAIN_CODE")
-            or ""
-        ).strip().upper()
+        self.domain_code = (
+            str(
+                getattr(bdb, "domain_code", "")
+                or os.environ.get("MERIDIAN_DOMAIN_CODE")
+                or os.environ.get("TAPDB_DOMAIN_CODE")
+                or ""
+            )
+            .strip()
+            .upper()
+        )
         if not self.domain_code:
             raise ValueError("domain_code is required for Bloom template resolution")
         app_username = str(getattr(bdb, "app_username", "") or "").strip()
@@ -616,9 +620,7 @@ class BloomObj:
 
                 for r in res:
                     action_category = template_semantic_category(r)
-                    action_key = (
-                        f"{action_category}/{r.type}/{r.subtype}/{r.version}"
-                    )
+                    action_key = f"{action_category}/{r.type}/{r.subtype}/{r.version}"
                     action_payload = None
                     if isinstance(r.json_addl, dict):
                         action_payload = r.json_addl.get("action_definition")

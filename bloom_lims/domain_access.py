@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 import re
+from collections.abc import Iterable
 from urllib.parse import urlsplit
 
 APPROVED_WEB_DOMAIN_SUFFIXES: tuple[str, ...] = (
@@ -76,7 +76,9 @@ def _origin_pattern_for_host(host: str, *, allow_http: bool) -> str:
     if not normalized:
         return ""
     scheme_expr = "https?" if allow_http else "https"
-    host_expr = re.escape(f"[{normalized}]") if ":" in normalized else re.escape(normalized)
+    host_expr = (
+        re.escape(f"[{normalized}]") if ":" in normalized else re.escape(normalized)
+    )
     return rf"{scheme_expr}://{host_expr}(?::\d+)?"
 
 

@@ -293,7 +293,9 @@ def _build_atlas_bloom_integration_app(tenant_id: uuid.UUID) -> FastAPI:
         )
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_bloom_integration_client] = override_bloom_integration_client
+    app.dependency_overrides[get_bloom_integration_client] = (
+        override_bloom_integration_client
+    )
     return app
 
 
@@ -314,9 +316,9 @@ def _build_atlas_result_app() -> FastAPI:
         )
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[
-        get_ursa_integration_write_client
-    ] = override_ursa_integration_write_client
+    app.dependency_overrides[get_ursa_integration_write_client] = (
+        override_ursa_integration_write_client
+    )
     return app
 
 

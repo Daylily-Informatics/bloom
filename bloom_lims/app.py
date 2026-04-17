@@ -17,8 +17,8 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from bloom_lims.api import RateLimitMiddleware, api_v1_router
 from bloom_lims import __version__
+from bloom_lims.api import RateLimitMiddleware, api_v1_router
 from bloom_lims.config import atlas_webhook_secret_warning, get_settings
 from bloom_lims.domain_access import (
     build_allowed_origin_regex,
@@ -44,7 +44,11 @@ def _validate_required_config(settings) -> None:
 
     Bypass with BLOOM_SKIP_STARTUP_VALIDATION=1 (tests only).
     """
-    if os.environ.get("BLOOM_SKIP_STARTUP_VALIDATION", "").strip() in ("1", "true", "yes"):
+    if os.environ.get("BLOOM_SKIP_STARTUP_VALIDATION", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
         logging.getLogger(__name__).warning(
             "Startup config validation skipped (BLOOM_SKIP_STARTUP_VALIDATION)"
         )
@@ -102,7 +106,9 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _observability_request_context(request, call_next):
         request.state.request_id = request.headers.get("x-request-id", str(uuid4()))
-        request.state.correlation_id = request.headers.get("x-correlation-id", request.state.request_id)
+        request.state.correlation_id = request.headers.get(
+            "x-correlation-id", request.state.request_id
+        )
         started = monotonic()
         try:
             response = await call_next(request)
@@ -188,7 +194,9 @@ def create_app() -> FastAPI:
     try:
         from bloom_lims.gui.router import router as gui_router
     except ModuleNotFoundError as exc:
-        logging.warning("Skipping GUI router due to missing optional dependency: %s", exc.name)
+        logging.warning(
+            "Skipping GUI router due to missing optional dependency: %s", exc.name
+        )
     else:
         app.include_router(gui_router)
 

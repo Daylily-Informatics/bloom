@@ -129,8 +129,10 @@ def test_mount_uses_explicit_tapdb_context(monkeypatch):
     monkeypatch.setattr(
         tapdb_mount,
         "_load_tapdb_admin_app",
-        lambda **kwargs: captured.update({key: str(value) for key, value in kwargs.items()})
-        or tapdb_app,
+        lambda **kwargs: (
+            captured.update({key: str(value) for key, value in kwargs.items()})
+            or tapdb_app
+        ),
     )
 
     config = tapdb_mount.mount_tapdb_admin_subapp(FastAPI())

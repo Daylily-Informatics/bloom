@@ -8,24 +8,24 @@ Configuration precedence (highest to lowest):
 """
 
 import colorsys
-import json
 import hashlib
 import importlib.metadata
+import json
 import logging
 import os
 import re
-import tomllib
 import secrets
 import string
 import tempfile
+import tomllib
 from functools import lru_cache
 from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit
 
+from packaging.requirements import InvalidRequirement, Requirement
 from packaging.version import Version
-from packaging.requirements import Requirement
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import (
@@ -144,7 +144,7 @@ def _read_pyproject_dependency_spec(package_name: str) -> str:
     for entry in dependencies:
         try:
             requirement = Requirement(str(entry))
-        except Exception:
+        except (InvalidRequirement, TypeError):
             continue
         if requirement.name == package_name:
             return str(requirement.specifier)
@@ -185,9 +185,7 @@ def _require_explicit_absolute_path(value: str, *, field_name: str) -> str:
             f"{field_name} must be a full absolute path; '~' is not allowed."
         )
     if not Path(cleaned).is_absolute():
-        raise RuntimeError(
-            f"{field_name} must be a full absolute path. Got: {cleaned}"
-        )
+        raise RuntimeError(f"{field_name} must be a full absolute path. Got: {cleaned}")
     return cleaned
 
 
@@ -242,7 +240,9 @@ def _validate_bare_host(value: str, *, field_name: str) -> str:
             f"{field_name} must be a bare host without credentials or a port"
         ) from exc
     if parsed.username or parsed.password or port is not None:
-        raise ValueError(f"{field_name} must be a bare host without credentials or a port")
+        raise ValueError(
+            f"{field_name} must be a bare host without credentials or a port"
+        )
     return normalized
 
 
@@ -287,7 +287,9 @@ def build_default_config_template() -> bytes:
         count=1,
     )
     if rendered == template_text:
-        rendered = template_text.replace('jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1)
+        rendered = template_text.replace(
+            'jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1
+        )
     return rendered.encode("utf-8")
 
 
@@ -607,9 +609,7 @@ class TapDBRuntimeContext(BaseModel):
 class StorageSettings(BaseModel):
     """File storage configuration."""
 
-    upload_dir: str = Field(
-        default="", description="Upload directory"
-    )
+    upload_dir: str = Field(default="", description="Upload directory")
     temp_dir: str = Field(
         default_factory=lambda: str(Path(tempfile.gettempdir()) / "bloom"),
         description="Temporary file directory",
@@ -745,7 +745,12 @@ class AuthSettings(BaseModel):
         description="Cognito OAuth scopes",
     )
     cognito_allowed_domains: List[str] = Field(
-        default_factory=lambda: ["lsmc.com", "lsmc.bio", "lsmc.life", "daylilyinformatics.com"],
+        default_factory=lambda: [
+            "lsmc.com",
+            "lsmc.bio",
+            "lsmc.life",
+            "daylilyinformatics.com",
+        ],
         description="Allowed email domains",
     )
     cognito_default_tenant_id: str = Field(
@@ -1076,9 +1081,8 @@ class BloomSettings(BaseSettings):
     def normalize_local_storage_paths(self) -> "BloomSettings":
         configured_upload_dir = str(self.storage.upload_dir or "").strip()
         if (
-            (not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR)
-            and str(self.tapdb.config_path or "").strip()
-        ):
+            not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR
+        ) and str(self.tapdb.config_path or "").strip():
             self.storage.upload_dir = _default_upload_dir_for_runtime(
                 client_id=self.tapdb.client_id.strip(),
                 namespace=self.tapdb.database_name.strip(),
@@ -1257,9 +1261,13 @@ def validate_settings() -> List[str]:
                 f"Upload directory does not exist: {settings.storage.upload_dir}"
             )
         elif not upload_path.is_dir():
-            warnings.append(f"Upload path is not a directory: {settings.storage.upload_dir}")
+            warnings.append(
+                f"Upload path is not a directory: {settings.storage.upload_dir}"
+            )
         elif not os.access(upload_path, os.W_OK):
-            warnings.append(f"Upload directory is not writable: {settings.storage.upload_dir}")
+            warnings.append(
+                f"Upload directory is not writable: {settings.storage.upload_dir}"
+            )
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
@@ -1356,7 +1364,9 @@ def build_effective_config_summary(
         "tapdb_prefix_ownership_registry_path": str(
             active_settings.tapdb.prefix_ownership_registry_path
         ),
-        "deployment_name": str(active_settings.deployment.name or _resolve_deployment_code()),
+        "deployment_name": str(
+            active_settings.deployment.name or _resolve_deployment_code()
+        ),
         "aws_region": str(active_settings.aws.region or "us-west-2"),
         "build_version": _get_default_api_version(),
         "show_environment_chrome": bool(active_settings.ui.show_environment_chrome),

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 
 from bloom_lims import __version__
+
 try:
     from daylily_tapdb.timezone_utils import (
         DEFAULT_DISPLAY_TIMEZONE,
@@ -127,7 +128,6 @@ def _run_git_command(*args: str) -> str:
 def _resolve_gui_metadata() -> Dict[str, str]:
     """Resolve footer/help metadata from config and local git state."""
     app_name = "BLOOM LIMS"
-    version = "dev"
     support_email = ""
     github_repo_url = "https://github.com/Daylily-Informatics/bloom"
 

@@ -15,13 +15,13 @@ Usage:
 
 import logging
 import platform
-import psutil
 from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
+import psutil
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
@@ -32,13 +32,13 @@ from bloom_lims.observability import (
     build_readyz_payload,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
 # Pydantic models for health responses
 class ComponentHealth(BaseModel):
     """Health status of a single component."""
+
     name: str
     status: str  # healthy, degraded, unhealthy
     latency_ms: Optional[float] = None
@@ -48,6 +48,7 @@ class ComponentHealth(BaseModel):
 
 class HealthResponse(BaseModel):
     """Full health check response."""
+
     status: str  # healthy, degraded, unhealthy
     timestamp: datetime
     version: str
@@ -59,12 +60,14 @@ class HealthResponse(BaseModel):
 
 class LivenessResponse(BaseModel):
     """Liveness probe response."""
+
     status: str
     timestamp: datetime
 
 
 class ReadinessResponse(BaseModel):
     """Readiness probe response."""
+
     status: str
     ready: bool
     timestamp: datetime
@@ -83,23 +86,28 @@ probe_router = APIRouter(tags=["Health"])
 async def check_database_health() -> ComponentHealth:
     """Check database connectivity and health."""
     import time
+
     start = time.time()
-    
+
     try:
         from bloom_lims.db import BLOOMdb3
+
         bdb = BLOOMdb3(echo_sql=False)
-        
+
         # Execute a simple query
         result = bdb.session.execute(text("SELECT 1")).fetchone()
         latency = (time.time() - start) * 1000
-        
+
         if result:
             return ComponentHealth(
                 name="database",
                 status="healthy",
                 latency_ms=round(latency, 2),
                 message="PostgreSQL connection successful",
-                details={"query": "SELECT 1", "observed_at": datetime.now(UTC).isoformat()},
+                details={
+                    "query": "SELECT 1",
+                    "observed_at": datetime.now(UTC).isoformat(),
+                },
             )
         else:
             return ComponentHealth(
@@ -107,7 +115,10 @@ async def check_database_health() -> ComponentHealth:
                 status="unhealthy",
                 latency_ms=round(latency, 2),
                 message="Query returned no result",
-                details={"query": "SELECT 1", "observed_at": datetime.now(UTC).isoformat()},
+                details={
+                    "query": "SELECT 1",
+                    "observed_at": datetime.now(UTC).isoformat(),
+                },
             )
     except Exception as e:
         latency = (time.time() - start) * 1000
@@ -124,8 +135,9 @@ async def check_database_health() -> ComponentHealth:
 async def check_cognito_health() -> ComponentHealth:
     """Check Cognito connectivity by resolving JWKS metadata."""
     import time
+
     start = time.time()
-    
+
     settings = get_settings()
     if not (
         settings.auth.cognito_user_pool_id
@@ -137,9 +149,10 @@ async def check_cognito_health() -> ComponentHealth:
             status="degraded",
             message="Cognito not configured",
         )
-    
+
     try:
         import httpx
+
         jwks_url = (
             f"https://cognito-idp.{settings.auth.cognito_region}.amazonaws.com/"
             f"{settings.auth.cognito_user_pool_id}/.well-known/jwks.json"
@@ -147,7 +160,7 @@ async def check_cognito_health() -> ComponentHealth:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(jwks_url)
             latency = (time.time() - start) * 1000
-            
+
             if response.status_code == 200:
                 return ComponentHealth(
                     name="cognito",
@@ -182,7 +195,9 @@ def get_system_info() -> Dict[str, Any]:
         return {
             "cpu_percent": psutil.cpu_percent(interval=0.1),
             "memory_percent": psutil.virtual_memory().percent,
-            "memory_available_mb": round(psutil.virtual_memory().available / (1024 * 1024), 2),
+            "memory_available_mb": round(
+                psutil.virtual_memory().available / (1024 * 1024), 2
+            ),
             "disk_percent": psutil.disk_usage("/").percent,
             "python_version": platform.python_version(),
             "platform": platform.platform(),
@@ -223,11 +238,11 @@ async def health_check(
     # Determine overall status
     statuses = [c.status for c in components]
     if all(s == "healthy" for s in statuses):
-        overall_status = "healthy"
+        pass
     elif "unhealthy" in statuses:
-        overall_status = "unhealthy"
+        pass
     else:
-        overall_status = "degraded"
+        pass
 
     db_payload = {
         "status": "ok" if db_health.status == "healthy" else "error",
@@ -270,8 +285,12 @@ async def health_check(
         detail=request.url.path,
         service_principal=user.auth_source == "legacy_api_key",
     )
-    projection = request.app.state.observability.projection(observed_at=db_payload.get("observed_at"))
-    return build_health_payload(request, projection=projection, health_snapshot=snapshot)
+    projection = request.app.state.observability.projection(
+        observed_at=db_payload.get("observed_at")
+    )
+    return build_health_payload(
+        request, projection=projection, health_snapshot=snapshot
+    )
 
 
 @health_router.get("/live", response_model=LivenessResponse)

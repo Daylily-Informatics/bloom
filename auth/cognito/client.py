@@ -80,7 +80,9 @@ class CognitoAuth:
     def _validate_bare_domain(domain: str) -> str:
         normalized = str(domain or "").strip()
         if not normalized:
-            raise CognitoConfigurationError("Missing Cognito configuration: cognito_domain")
+            raise CognitoConfigurationError(
+                "Missing Cognito configuration: cognito_domain"
+            )
         if "://" in normalized:
             raise CognitoConfigurationError(
                 "Cognito domain must be a bare host without a scheme"

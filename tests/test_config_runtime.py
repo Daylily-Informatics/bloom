@@ -4,31 +4,29 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import tempfile
 import tomllib
 from pathlib import Path
 
-import yaml
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from bloom_lims import __version__
 from bloom_lims.config import (
-    DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_TAPDB_DOMAIN_CODE,
     DEFAULT_TAPDB_OWNER_REPO_NAME,
     BloomSettings,
     StorageSettings,
     assert_tapdb_version,
-    build_effective_config_summary,
     build_default_config_template,
+    build_effective_config_summary,
     expected_conda_env_name,
     generate_example_webhook_secret,
-    get_user_config_path,
     get_settings,
     get_tapdb_runtime_context,
+    get_user_config_path,
     validate_settings,
 )
 from tests.support.runtime import (
@@ -68,7 +66,9 @@ def test_expected_conda_env_name_falls_back_to_active_conda_env(monkeypatch):
     assert expected_conda_env_name() == "BLOOM-smoke"
 
 
-def test_user_config_path_prefers_explicit_bloom_config_path(monkeypatch, tmp_path: Path):
+def test_user_config_path_prefers_explicit_bloom_config_path(
+    monkeypatch, tmp_path: Path
+):
     explicit = tmp_path / "custom" / "bloom-config-omfg33.yaml"
     monkeypatch.setenv("BLOOM_CONFIG_PATH", str(explicit))
 
@@ -78,11 +78,15 @@ def test_user_config_path_prefers_explicit_bloom_config_path(monkeypatch, tmp_pa
 def test_user_config_path_rejects_relative_bloom_config_path(monkeypatch):
     monkeypatch.setenv("BLOOM_CONFIG_PATH", "relative/bloom-config.yaml")
 
-    with pytest.raises(RuntimeError, match="BLOOM_CONFIG_PATH must be a full absolute path"):
+    with pytest.raises(
+        RuntimeError, match="BLOOM_CONFIG_PATH must be a full absolute path"
+    ):
         get_user_config_path()
 
 
-def test_explicit_bloom_config_path_overrides_deployment_guess(monkeypatch, tmp_path: Path):
+def test_explicit_bloom_config_path_overrides_deployment_guess(
+    monkeypatch, tmp_path: Path
+):
     explicit_config = tmp_path / "configs" / "bloom-override.yaml"
     explicit_config.parent.mkdir(parents=True)
     explicit_config.write_text(
@@ -128,8 +132,7 @@ def test_env_overrides_user_yaml_for_auth_cognito_domain(monkeypatch, tmp_path: 
     user_config_dir = xdg_config_home / "bloom-local"
     user_config_dir.mkdir(parents=True)
     (user_config_dir / "bloom-config-local.yaml").write_text(
-        "auth:\n"
-        "  cognito_domain: yaml-test.auth.us-west-2.amazoncognito.com\n",
+        "auth:\n  cognito_domain: yaml-test.auth.us-west-2.amazoncognito.com\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
@@ -145,7 +148,9 @@ def test_env_overrides_user_yaml_for_auth_cognito_domain(monkeypatch, tmp_path: 
 
 
 def test_auth_cognito_domain_rejects_schemeful_input():
-    with pytest.raises(ValidationError, match="auth.cognito_domain must be a bare host"):
+    with pytest.raises(
+        ValidationError, match="auth.cognito_domain must be a bare host"
+    ):
         BloomSettings(
             auth={
                 "cognito_domain": "https://bloom.auth.us-east-1.amazoncognito.com",
@@ -225,10 +230,26 @@ def test_runtime_context_requires_explicit_tapdb_paths(monkeypatch):
 @pytest.mark.parametrize(
     ("field_name", "field_value", "message"),
     [
-        ("config_path", "relative/tapdb-config.yaml", "tapdb.config_path must be a full absolute path"),
-        ("config_path", "~/tapdb-config.yaml", "tapdb.config_path must be a full absolute path"),
-        ("domain_registry_path", "relative/domain_code_registry.json", "tapdb registry paths must be full absolute paths"),
-        ("prefix_ownership_registry_path", "~/prefix_ownership_registry.json", "tapdb registry paths must be full absolute paths"),
+        (
+            "config_path",
+            "relative/tapdb-config.yaml",
+            "tapdb.config_path must be a full absolute path",
+        ),
+        (
+            "config_path",
+            "~/tapdb-config.yaml",
+            "tapdb.config_path must be a full absolute path",
+        ),
+        (
+            "domain_registry_path",
+            "relative/domain_code_registry.json",
+            "tapdb registry paths must be full absolute paths",
+        ),
+        (
+            "prefix_ownership_registry_path",
+            "~/prefix_ownership_registry.json",
+            "tapdb registry paths must be full absolute paths",
+        ),
     ],
 )
 def test_tapdb_path_fields_reject_non_absolute_values(
@@ -389,7 +410,9 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
             project_root / "bloom_lims" / "etc" / "prefix_ownership_registry.json"
         ).read_text(encoding="utf-8")
     )
-    pyproject = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
+    pyproject = tomllib.loads(
+        (project_root / "pyproject.toml").read_text(encoding="utf-8")
+    )
 
     assert 'owner_repo_name: "bloom"' in root_template
     assert 'domain_code: "Z"' in root_template
@@ -415,10 +438,15 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
         "BCN",
         "BCT",
         "BDT",
+        "ADT",
         "BEQ",
         "BFX",
         "BGT",
         "BHE",
+        "EDG",
+        "MSG",
+        "SYS",
+        "TPX",
         "BSJ",
         "BWF",
         "BWS",
@@ -426,18 +454,18 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert {
         claim["issuer_app_code"]
         for claim in packaged_prefix_registry["ownership"]["Z"].values()
-    } == {"bloom"}
+    } == {"bloom", "daylily-tapdb"}
 
 
 def test_settings_accept_network_allowed_hosts() -> None:
-    settings = BloomSettings(network={"allowed_hosts": ["bloom.dev2.lsmc.life", "54.218.100.68"]})
+    settings = BloomSettings(
+        network={"allowed_hosts": ["bloom.dev2.lsmc.life", "54.218.100.68"]}
+    )
 
     assert settings.network.allowed_hosts == ["bloom.dev2.lsmc.life", "54.218.100.68"]
 
 
-def test_effective_config_summary_redacts_sensitive_values(
-    monkeypatch, tmp_path: Path
-):
+def test_effective_config_summary_redacts_sensitive_values(monkeypatch, tmp_path: Path):
     ensure_test_runtime_environment()
     monkeypatch.setenv("BLOOM_UI__SHOW_ENVIRONMENT_CHROME", "false")
     monkeypatch.setenv("BLOOM_AUTH__COGNITO_CLIENT_SECRET", "super-secret")

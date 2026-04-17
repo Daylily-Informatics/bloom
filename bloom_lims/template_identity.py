@@ -74,7 +74,9 @@ def template_category_filter(model: Any, category: str | None):
             "",
         )
     )
-    return or_(func.lower(model.category) == normalized, semantic_category == normalized)
+    return or_(
+        func.lower(model.category) == normalized, semantic_category == normalized
+    )
 
 
 def instance_category_filter(model: Any, category: str | None):
@@ -92,4 +94,6 @@ def instance_category_filter(model: Any, category: str | None):
             "",
         )
     )
-    return or_(func.lower(model.category) == normalized, semantic_category == normalized)
+    return or_(
+        func.lower(model.category) == normalized, semantic_category == normalized
+    )

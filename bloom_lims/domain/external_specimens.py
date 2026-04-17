@@ -254,9 +254,7 @@ class ExternalSpecimenService:
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
                 self.bdb.Base.classes.generic_instance.domain_code == self.domain_code,
-                self.bdb.Base.classes.generic_instance.uid.in_(
-                    sorted(specimen_uids)
-                ),
+                self.bdb.Base.classes.generic_instance.uid.in_(sorted(specimen_uids)),
                 instance_category_filter(
                     self.bdb.Base.classes.generic_instance, "content"
                 ),
@@ -702,7 +700,9 @@ class ExternalSpecimenService:
         normalized = self._REFERENCE_RESPONSE_NORMALIZATION.get(reference_type)
         if normalized is not None:
             key, value_field = normalized
-            value = str(payload.get(value_field) or payload.get("reference_value") or "").strip()
+            value = str(
+                payload.get(value_field) or payload.get("reference_value") or ""
+            ).strip()
             return key, value
         return reference_type, str(payload.get("reference_value") or "").strip()
 

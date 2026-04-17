@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import datetime
 from typing import Any, Dict, Iterable, List, Tuple
 
 from sqlalchemy import and_, cast, func, or_
 from sqlalchemy.sql.sqltypes import String
 
 from bloom_lims.db import BLOOMdb3
+from bloom_lims.search.contracts import (
+    SearchJSONFilter,
+    SearchRequest,
+    SearchResultItem,
+)
 from bloom_lims.template_identity import template_semantic_category
-from bloom_lims.search.contracts import SearchJSONFilter, SearchRequest, SearchResultItem
 
 _KNOWN_LINEAGE_IDENTITIES = (
     "generic_instance_lineage",
@@ -39,7 +42,9 @@ class SearchRepository:
         self._session = bdb.session
         self._classes = bdb.Base.classes
 
-    def search(self, request: SearchRequest) -> Tuple[List[SearchResultItem], Dict[str, Dict[str, int]], bool]:
+    def search(
+        self, request: SearchRequest
+    ) -> Tuple[List[SearchResultItem], Dict[str, Dict[str, int]], bool]:
         """Run search for requested record types and return normalized items + facets."""
         handlers = {
             "instance": self._search_instances,
@@ -71,11 +76,15 @@ class SearchRepository:
         }
         return all_items, facets, truncated
 
-    def _search_instances(self, request: SearchRequest) -> Tuple[List[SearchResultItem], int, bool]:
+    def _search_instances(
+        self, request: SearchRequest
+    ) -> Tuple[List[SearchResultItem], int, bool]:
         model = self._classes.generic_instance
         query = self._session.query(model)
 
-        query = self._apply_common_filters(query, model, request, include_type_filters=True)
+        query = self._apply_common_filters(
+            query, model, request, include_type_filters=True
+        )
         query = self._apply_query_text_filter(
             query,
             request.query,
@@ -89,7 +98,9 @@ class SearchRepository:
             ],
         )
         query = self._apply_json_filters(query, model.json_addl, request)
-        query = self._apply_query_sort(query, model, request, timestamp_field="created_dt")
+        query = self._apply_query_sort(
+            query, model, request, timestamp_field="created_dt"
+        )
 
         return self._materialize_items(
             query=query,
@@ -105,16 +116,21 @@ class SearchRepository:
                 status=str(getattr(row, "bstatus", "") or ""),
                 created_dt=getattr(row, "created_dt", None),
                 modified_dt=getattr(row, "modified_dt", None),
-                timestamp=getattr(row, "created_dt", None) or getattr(row, "modified_dt", None),
+                timestamp=getattr(row, "created_dt", None)
+                or getattr(row, "modified_dt", None),
                 metadata={"json_addl": getattr(row, "json_addl", {}) or {}},
             ),
         )
 
-    def _search_templates(self, request: SearchRequest) -> Tuple[List[SearchResultItem], int, bool]:
+    def _search_templates(
+        self, request: SearchRequest
+    ) -> Tuple[List[SearchResultItem], int, bool]:
         model = self._classes.generic_template
         query = self._session.query(model)
 
-        query = self._apply_common_filters(query, model, request, include_type_filters=True)
+        query = self._apply_common_filters(
+            query, model, request, include_type_filters=True
+        )
         query = self._apply_query_text_filter(
             query,
             request.query,
@@ -128,7 +144,9 @@ class SearchRepository:
             ],
         )
         query = self._apply_json_filters(query, model.json_addl, request)
-        query = self._apply_query_sort(query, model, request, timestamp_field="created_dt")
+        query = self._apply_query_sort(
+            query, model, request, timestamp_field="created_dt"
+        )
 
         return self._materialize_items(
             query=query,
@@ -144,7 +162,8 @@ class SearchRepository:
                 status=str(getattr(row, "bstatus", "") or ""),
                 created_dt=getattr(row, "created_dt", None),
                 modified_dt=getattr(row, "modified_dt", None),
-                timestamp=getattr(row, "created_dt", None) or getattr(row, "modified_dt", None),
+                timestamp=getattr(row, "created_dt", None)
+                or getattr(row, "modified_dt", None),
                 metadata={
                     "json_addl": getattr(row, "json_addl", {}) or {},
                     "json_addl_schema": getattr(row, "json_addl_schema", None),
@@ -153,13 +172,17 @@ class SearchRepository:
             ),
         )
 
-    def _search_lineages(self, request: SearchRequest) -> Tuple[List[SearchResultItem], int, bool]:
+    def _search_lineages(
+        self, request: SearchRequest
+    ) -> Tuple[List[SearchResultItem], int, bool]:
         model = self._classes.generic_instance_lineage
         query = self._session.query(model).filter(
             model.polymorphic_discriminator.in_(_KNOWN_LINEAGE_IDENTITIES)
         )
 
-        query = self._apply_common_filters(query, model, request, include_type_filters=False)
+        query = self._apply_common_filters(
+            query, model, request, include_type_filters=False
+        )
         query = self._apply_query_text_filter(
             query,
             request.query,
@@ -174,7 +197,9 @@ class SearchRepository:
             ],
         )
         query = self._apply_json_filters(query, model.json_addl, request)
-        query = self._apply_query_sort(query, model, request, timestamp_field="created_dt")
+        query = self._apply_query_sort(
+            query, model, request, timestamp_field="created_dt"
+        )
 
         return self._materialize_items(
             query=query,
@@ -190,17 +215,24 @@ class SearchRepository:
                 status=str(getattr(row, "relationship_type", "") or ""),
                 created_dt=getattr(row, "created_dt", None),
                 modified_dt=getattr(row, "modified_dt", None),
-                timestamp=getattr(row, "created_dt", None) or getattr(row, "modified_dt", None),
+                timestamp=getattr(row, "created_dt", None)
+                or getattr(row, "modified_dt", None),
                 metadata={
-                    "parent_instance_euid": getattr(getattr(row, "parent_instance", None), "euid", None),
-                    "child_instance_euid": getattr(getattr(row, "child_instance", None), "euid", None),
+                    "parent_instance_euid": getattr(
+                        getattr(row, "parent_instance", None), "euid", None
+                    ),
+                    "child_instance_euid": getattr(
+                        getattr(row, "child_instance", None), "euid", None
+                    ),
                     "relationship_type": getattr(row, "relationship_type", ""),
                     "json_addl": getattr(row, "json_addl", {}) or {},
                 },
             ),
         )
 
-    def _search_audit(self, request: SearchRequest) -> Tuple[List[SearchResultItem], int, bool]:
+    def _search_audit(
+        self, request: SearchRequest
+    ) -> Tuple[List[SearchResultItem], int, bool]:
         model = self._classes.audit_log
         query = self._session.query(model)
 
@@ -223,10 +255,18 @@ class SearchRepository:
             )
 
         if request.statuses:
-            query = query.filter(func.lower(model.operation_type).in_([s.lower() for s in request.statuses]))
+            query = query.filter(
+                func.lower(model.operation_type).in_(
+                    [s.lower() for s in request.statuses]
+                )
+            )
 
         if request.type_names:
-            query = query.filter(func.lower(model.rel_table_name).in_([t.lower() for t in request.type_names]))
+            query = query.filter(
+                func.lower(model.rel_table_name).in_(
+                    [t.lower() for t in request.type_names]
+                )
+            )
 
         if request.created_dt_start:
             query = query.filter(model.changed_at >= request.created_dt_start)
@@ -250,7 +290,9 @@ class SearchRepository:
         )
 
         query = self._apply_json_filters(query, model.json_addl, request)
-        query = self._apply_query_sort(query, model, request, timestamp_field="changed_at")
+        query = self._apply_query_sort(
+            query, model, request, timestamp_field="changed_at"
+        )
 
         return self._materialize_items(
             query=query,
@@ -279,28 +321,42 @@ class SearchRepository:
             ),
         )
 
-    def _materialize_items(self, *, query, record_type: str, request: SearchRequest, to_item):
+    def _materialize_items(
+        self, *, query, record_type: str, request: SearchRequest, to_item
+    ):
         total_count = query.count()
         rows = query.limit(request.max_scan).all()
         truncated = total_count > len(rows)
         items = [to_item(row) for row in rows]
         return items, total_count, truncated
 
-    def _apply_common_filters(self, query, model, request: SearchRequest, include_type_filters: bool):
+    def _apply_common_filters(
+        self, query, model, request: SearchRequest, include_type_filters: bool
+    ):
         if not request.include_deleted and hasattr(model, "is_deleted"):
             query = query.filter(model.is_deleted.is_(False))
 
         if request.categories and hasattr(model, "category"):
-            query = query.filter(func.lower(model.category).in_([c.lower() for c in request.categories]))
+            query = query.filter(
+                func.lower(model.category).in_([c.lower() for c in request.categories])
+            )
 
         if include_type_filters and request.type_names and hasattr(model, "type"):
-            query = query.filter(func.lower(model.type).in_([t.lower() for t in request.type_names]))
+            query = query.filter(
+                func.lower(model.type).in_([t.lower() for t in request.type_names])
+            )
 
         if include_type_filters and request.subtype_names and hasattr(model, "subtype"):
-            query = query.filter(func.lower(model.subtype).in_([s.lower() for s in request.subtype_names]))
+            query = query.filter(
+                func.lower(model.subtype).in_(
+                    [s.lower() for s in request.subtype_names]
+                )
+            )
 
         if request.statuses and hasattr(model, "bstatus"):
-            query = query.filter(func.lower(model.bstatus).in_([s.lower() for s in request.statuses]))
+            query = query.filter(
+                func.lower(model.bstatus).in_([s.lower() for s in request.statuses])
+            )
 
         if request.created_dt_start and hasattr(model, "created_dt"):
             query = query.filter(model.created_dt >= request.created_dt_start)
@@ -363,7 +419,9 @@ class SearchRepository:
             return json_column.op("@>")(json.dumps(payload, default=str))
 
         if json_filter.op == "in":
-            values = json_filter.values or ([] if json_filter.value is None else [json_filter.value])
+            values = json_filter.values or (
+                [] if json_filter.value is None else [json_filter.value]
+            )
             if not values:
                 return None
             return or_(*[extracted == str(value) for value in values])
@@ -377,19 +435,25 @@ class SearchRepository:
             return extracted.is_(None)
         return extracted == str(json_filter.value)
 
-    def _build_nested_payload(self, path_parts: List[str], value: Any) -> Dict[str, Any]:
+    def _build_nested_payload(
+        self, path_parts: List[str], value: Any
+    ) -> Dict[str, Any]:
         payload: Any = value
         for key in reversed(path_parts):
             payload = {key: payload}
         return payload
 
-    def _apply_query_sort(self, query, model, request: SearchRequest, timestamp_field: str):
+    def _apply_query_sort(
+        self, query, model, request: SearchRequest, timestamp_field: str
+    ):
         if request.sort_by == "euid" and hasattr(model, "euid"):
             order_column = model.euid
         elif request.sort_by == "name" and hasattr(model, "name"):
             order_column = model.name
         else:
-            order_column = getattr(model, timestamp_field, None) or getattr(model, "created_dt", None)
+            order_column = getattr(model, timestamp_field, None) or getattr(
+                model, "created_dt", None
+            )
             if order_column is None and hasattr(model, "euid"):
                 order_column = model.euid
 

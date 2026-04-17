@@ -301,12 +301,15 @@ def test_modern_search_post_executes_handler(client: TestClient) -> None:
         items=[],
     )
 
-    with patch(
-        "bloom_lims.gui.routes.modern.SearchService.build_dewey_request",
-        return_value=fake_search_request,
-    ), patch(
-        "bloom_lims.gui.routes.modern.SearchService.search",
-        return_value=fake_search_response,
+    with (
+        patch(
+            "bloom_lims.gui.routes.modern.SearchService.build_dewey_request",
+            return_value=fake_search_request,
+        ),
+        patch(
+            "bloom_lims.gui.routes.modern.SearchService.search",
+            return_value=fake_search_response,
+        ),
     ):
         resp = client.post(
             "/search",
@@ -319,24 +322,34 @@ def test_modern_search_post_executes_handler(client: TestClient) -> None:
 
 
 def test_logout_alias_routes_execute_handler_body(client: TestClient) -> None:
-    with patch(
-        "bloom_lims.gui.routes.auth.build_bloom_web_session_config",
-        return_value=SimpleNamespace(
-            domain="example.auth.us-west-2.amazoncognito.com",
-            client_id="client-123",
-            logout_uri="https://testserver/auth/logout",
+    with (
+        patch(
+            "bloom_lims.gui.routes.auth.build_bloom_web_session_config",
+            return_value=SimpleNamespace(
+                domain="example.auth.us-west-2.amazoncognito.com",
+                client_id="client-123",
+                logout_uri="https://testserver/auth/logout",
+            ),
         ),
-    ), patch(
-        "bloom_lims.gui.routes.auth.build_logout_url",
-        return_value="https://example.auth.us-west-2.amazoncognito.com/logout",
-    ), patch(
-        "bloom_lims.gui.routes.auth.clear_bloom_session",
-        return_value=None,
+        patch(
+            "bloom_lims.gui.routes.auth.build_logout_url",
+            return_value="https://example.auth.us-west-2.amazoncognito.com/logout",
+        ),
+        patch(
+            "bloom_lims.gui.routes.auth.clear_bloom_session",
+            return_value=None,
+        ),
     ):
         auth_logout = client.post("/auth/logout", follow_redirects=False)
         assert auth_logout.status_code == 303
-        assert auth_logout.headers["location"] == "https://example.auth.us-west-2.amazoncognito.com/logout"
+        assert (
+            auth_logout.headers["location"]
+            == "https://example.auth.us-west-2.amazoncognito.com/logout"
+        )
 
         logout = client.get("/logout", follow_redirects=False)
         assert logout.status_code == 303
-        assert logout.headers["location"] == "https://example.auth.us-west-2.amazoncognito.com/logout"
+        assert (
+            logout.headers["location"]
+            == "https://example.auth.us-west-2.amazoncognito.com/logout"
+        )

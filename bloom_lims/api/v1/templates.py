@@ -5,7 +5,7 @@ Endpoints for template management.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -14,8 +14,8 @@ from bloom_lims.template_identity import (
     template_category_filter,
     template_semantic_category,
 )
-from .dependencies import require_api_auth, APIUser
 
+from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +30,16 @@ def _tapdb_domain_code() -> str:
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
     from bloom_lims.db import BLOOMdb3
+
     return BLOOMdb3(app_username=username)
 
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_templates(
     domain_code: str = Query(..., description="Meridian domain code"),
-    category: Optional[str] = Query(None, description="Filter by category (container, content, equipment)"),
+    category: Optional[str] = Query(
+        None, description="Filter by category (container, content, equipment)"
+    ),
     type: Optional[str] = Query(None, description="Filter by type"),
     subtype: Optional[str] = Query(None, description="Filter by subtype"),
     page: int = Query(1, ge=1),
@@ -62,9 +65,11 @@ async def list_templates(
         if type:
             query = query.filter(bdb.Base.classes.generic_template.type == type.lower())
         if subtype:
-            query = query.filter(bdb.Base.classes.generic_template.subtype == subtype.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_template.subtype == subtype.lower()
+            )
 
-        query = query.filter(bdb.Base.classes.generic_template.is_deleted == False)
+        query = query.filter(bdb.Base.classes.generic_template.is_deleted.is_(False))
 
         total = query.count()
         offset = (page - 1) * page_size
@@ -102,10 +107,14 @@ async def get_template(
         bdb = get_bdb(user.email)
         domain_code = _tapdb_domain_code()
 
-        template = bdb.session.query(bdb.Base.classes.generic_template).filter(
-            bdb.Base.classes.generic_template.euid == euid,
-            bdb.Base.classes.generic_template.domain_code == domain_code,
-        ).first()
+        template = (
+            bdb.session.query(bdb.Base.classes.generic_template)
+            .filter(
+                bdb.Base.classes.generic_template.euid == euid,
+                bdb.Base.classes.generic_template.domain_code == domain_code,
+            )
+            .first()
+        )
 
         if not template:
             raise HTTPException(status_code=404, detail=f"Template not found: {euid}")
@@ -139,7 +148,7 @@ async def list_templates_by_category(
 
         query = bdb.session.query(bdb.Base.classes.generic_template).filter(
             bdb.Base.classes.generic_template.domain_code == domain_code,
-            bdb.Base.classes.generic_template.is_deleted == False,
+            bdb.Base.classes.generic_template.is_deleted.is_(False),
         )
         category_filter = template_category_filter(
             bdb.Base.classes.generic_template, category

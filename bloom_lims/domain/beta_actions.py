@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from daylily_tapdb import require_seeded_template
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from bloom_lims.config import get_settings
@@ -95,9 +94,9 @@ class BloomBetaActionRecorder:
 
     def __init__(self, session: Session, *, domain_code: str | None = None):
         self.session = session
-        self.domain_code = str(
-            domain_code or get_settings().tapdb.domain_code or ""
-        ).strip().upper()
+        self.domain_code = (
+            str(domain_code or get_settings().tapdb.domain_code or "").strip().upper()
+        )
         if not self.domain_code:
             raise ValueError("domain_code is required for Bloom template resolution")
 
@@ -116,7 +115,9 @@ class BloomBetaActionRecorder:
         template = self._ensure_action_template(action_key)
         category = str(template.category or "").strip()
         if not category:
-            raise ValueError(f"Seeded beta action template is missing a category: {action_key}")
+            raise ValueError(
+                f"Seeded beta action template is missing a category: {action_key}"
+            )
         now = datetime.now(UTC).isoformat()
         action_definition = {
             "action_group": BETA_ACTION_GROUP,
@@ -169,7 +170,9 @@ class BloomBetaActionRecorder:
         return action_record
 
     def _ensure_action_template(self, action_key: str) -> generic_template:
-        template_code = f"{BETA_ACTION_TEMPLATE_PREFIX}/{BETA_ACTION_GROUP}/{action_key}/1.0/"
+        template_code = (
+            f"{BETA_ACTION_TEMPLATE_PREFIX}/{BETA_ACTION_GROUP}/{action_key}/1.0/"
+        )
         return require_seeded_template(
             self.session,
             template_code,

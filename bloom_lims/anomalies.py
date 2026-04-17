@@ -40,7 +40,14 @@ def redact_context(value: Any) -> Any:
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             lowered = str(key).lower()
-            if lowered in {"authorization", "cookie", "set-cookie", "token", "secret", "password"}:
+            if lowered in {
+                "authorization",
+                "cookie",
+                "set-cookie",
+                "token",
+                "secret",
+                "password",
+            }:
                 redacted[str(key)] = "[redacted]"
             else:
                 redacted[str(key)] = redact_context(item)
@@ -144,7 +151,9 @@ class TapdbAnomalyRepository:
                 return self._to_record(instance)
         return None
 
-    def record_db_probe_failure(self, *, detail: str, latency_ms: float) -> AnomalyRecord:
+    def record_db_probe_failure(
+        self, *, detail: str, latency_ms: float
+    ) -> AnomalyRecord:
         return self.record(
             category="database",
             severity="error",
@@ -188,7 +197,9 @@ class TapdbAnomalyRepository:
         return None
 
     def _instances(self) -> list[generic_instance]:
-        category, type_name, subtype, version = ANOMALY_TEMPLATE_CODE.strip("/").split("/")
+        category, type_name, subtype, version = ANOMALY_TEMPLATE_CODE.strip("/").split(
+            "/"
+        )
         stmt = (
             select(generic_instance)
             .where(
@@ -214,7 +225,9 @@ class TapdbAnomalyRepository:
             instance.json_addl = payload
         return properties
 
-    def _write_props(self, instance: generic_instance, properties: dict[str, Any]) -> None:
+    def _write_props(
+        self, instance: generic_instance, properties: dict[str, Any]
+    ) -> None:
         payload = instance.json_addl or {}
         if not isinstance(payload, dict):
             payload = {}
@@ -228,7 +241,9 @@ class TapdbAnomalyRepository:
         return AnomalyRecord(
             id=str(instance.euid),
             service=str(props.get("service") or "bloom"),
-            environment=str(props.get("environment") or (get_settings().environment or "unknown")),
+            environment=str(
+                props.get("environment") or (get_settings().environment or "unknown")
+            ),
             category=str(props.get("category") or "unknown"),
             severity=str(props.get("severity") or "unknown"),
             fingerprint=str(props.get("fingerprint") or ""),

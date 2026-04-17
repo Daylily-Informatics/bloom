@@ -806,7 +806,9 @@ class TestTemplatesAPIExtended:
         if data["items"]:
             euid = data["items"][0].get("euid")
             if euid:
-                response = client.get(f"/api/v1/templates/{euid}", params={"domain_code": "Z"})
+                response = client.get(
+                    f"/api/v1/templates/{euid}", params={"domain_code": "Z"}
+                )
                 assert response.status_code in [200, 404]
                 if response.status_code == 200:
                     assert "uuid" not in response.json()

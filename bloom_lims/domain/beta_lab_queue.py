@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from bloom_lims.db import get_child_lineages, get_parent_lineages
-from bloom_lims.template_identity import instance_semantic_category
 from bloom_lims.schemas.beta_lab import (
     BetaClaimResponse,
     BetaConsumeMaterialResponse,
@@ -20,6 +19,7 @@ from bloom_lims.schemas.execution_queue import (
     RequeueSubjectRequest,
     WorkerType,
 )
+from bloom_lims.template_identity import instance_semantic_category
 
 
 class _BetaLabQueueMixin:
@@ -39,7 +39,8 @@ class _BetaLabQueueMixin:
                 subject_euid=material.euid,
                 queue_key=queue_name,
                 next_action_key=queue_action,
-                idempotency_key=idempotency_key or f"queue:{material.euid}:{queue_name}",
+                idempotency_key=idempotency_key
+                or f"queue:{material.euid}:{queue_name}",
             ),
             executed_by=self.bdb.app_username,
         )
@@ -494,7 +495,10 @@ class _BetaLabQueueMixin:
     def _work_items_for_material(self, material) -> list[Any]:
         items: list[Any] = []
         for lineage in get_parent_lineages(material):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_WORK_ITEM_SUBJECT:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_WORK_ITEM_SUBJECT
+            ):
                 continue
             child = lineage.child_instance
             if (
@@ -593,7 +597,10 @@ class _BetaLabQueueMixin:
 
     def _active_claim_for_work_item(self, work_item):
         for lineage in get_parent_lineages(work_item):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_WORK_ITEM_CLAIM:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_WORK_ITEM_CLAIM
+            ):
                 continue
             claim = lineage.child_instance
             if (
@@ -609,7 +616,10 @@ class _BetaLabQueueMixin:
 
     def _active_reservation_for_material(self, material):
         for lineage in get_parent_lineages(material):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_MATERIAL_RESERVATION:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_MATERIAL_RESERVATION
+            ):
                 continue
             reservation = lineage.child_instance
             if (
@@ -637,7 +647,10 @@ class _BetaLabQueueMixin:
         if consumed_event:
             return True
         for lineage in get_parent_lineages(material):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_MATERIAL_CONSUMPTION:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_MATERIAL_CONSUMPTION
+            ):
                 continue
             event = lineage.child_instance
             if event is None or event.is_deleted:
@@ -870,12 +883,15 @@ class _BetaLabQueueMixin:
         if self.execution._is_execution_instance(claim, subtype="queue_lease"):
             claim_props = self.execution._props(claim)
             lease_status = str(claim_props.get("status") or "").strip().upper()
-            release_reason = str(claim_props.get("release_reason") or "").strip().lower()
+            release_reason = (
+                str(claim_props.get("release_reason") or "").strip().lower()
+            )
             display_status = lease_status.lower()
-            if (
-                lease_status == "RELEASED"
-                and release_reason in {"released", "completed", "abandoned"}
-            ):
+            if lease_status == "RELEASED" and release_reason in {
+                "released",
+                "completed",
+                "abandoned",
+            }:
                 display_status = release_reason
             return BetaClaimResponse(
                 claim_euid=claim.euid,
@@ -947,7 +963,9 @@ class _BetaLabQueueMixin:
         return BetaConsumeMaterialResponse(
             consumption_event_euid=consumption_event.euid,
             material_euid=(
-                material.euid if material is not None else str(props.get("material_euid") or "")
+                material.euid
+                if material is not None
+                else str(props.get("material_euid") or "")
             ),
             consumed=True,
             metadata=props.get("metadata")

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from bloom_lims.config import (
     DEFAULT_DEPLOYMENT_BANNER_COLOR,
@@ -9,7 +10,11 @@ from bloom_lims.config import (
     _stable_deployment_color_hex,
     _stable_region_color_hex,
 )
-from bloom_lims.gui.jinja import _resolve_deployment_metadata, refresh_template_globals, templates
+from bloom_lims.gui.jinja import (
+    _resolve_deployment_metadata,
+    refresh_template_globals,
+    templates,
+)
 
 
 def test_deployment_settings_fall_back_to_deployment_code(
@@ -78,11 +83,14 @@ def test_environment_chrome_renders_and_hides_with_config_toggle(monkeypatch) ->
     )
 
     monkeypatch.setattr("bloom_lims.config.get_settings", lambda: enabled_settings)
-    monkeypatch.setattr("bloom_lims.gui.jinja._run_git_command", lambda *args: {
-        ("rev-parse", "--abbrev-ref", "HEAD"): "codex/bloom-gui-chrome-scm",
-        ("rev-parse", "--short", "HEAD"): "abc1234",
-        ("describe", "--tags", "--exact-match"): "3.5.15",
-    }.get(args, ""))
+    monkeypatch.setattr(
+        "bloom_lims.gui.jinja._run_git_command",
+        lambda *args: {
+            ("rev-parse", "--abbrev-ref", "HEAD"): "codex/bloom-gui-chrome-scm",
+            ("rev-parse", "--short", "HEAD"): "abc1234",
+            ("describe", "--tags", "--exact-match"): "3.5.15",
+        }.get(args, ""),
+    )
     monkeypatch.setattr("bloom_lims.gui.jinja.__version__", "3.5.15")
 
     refresh_template_globals()

@@ -45,7 +45,13 @@ TEST_COGNITO_ENV_DEFAULTS = {
     "BLOOM_AUTH__COGNITO_LOGOUT_REDIRECT_URI": f"https://localhost:{DEFAULT_BLOOM_WEB_PORT}/",
 }
 
-_BLOOM_TEMPLATE_CONFIG = Path(__file__).resolve().parents[2] / "config" / "tapdb_templates" / "bloom" / "templates.json"
+_BLOOM_TEMPLATE_CONFIG = (
+    Path(__file__).resolve().parents[2]
+    / "config"
+    / "tapdb_templates"
+    / "bloom"
+    / "templates.json"
+)
 _TAPDB_CORE_PREFIX_OWNERSHIP = {
     "TPX",
     "EDG",
@@ -174,13 +180,17 @@ def create_temp_tapdb_config(
     tmp_path = (
         Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
     )
-    registry_base = Path(tempfile.gettempdir()) / f"bloom_tapdb_registry_{secrets.token_hex(8)}"
+    registry_base = (
+        Path(tempfile.gettempdir()) / f"bloom_tapdb_registry_{secrets.token_hex(8)}"
+    )
     registry_base.mkdir(parents=True, exist_ok=True)
     domain_registry_path, prefix_registry_path = _write_registry_files(registry_base)
     os.environ["TAPDB_DOMAIN_REGISTRY_PATH"] = str(domain_registry_path)
     os.environ["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] = str(prefix_registry_path)
     os.environ["BLOOM_TAPDB__DOMAIN_REGISTRY_PATH"] = str(domain_registry_path)
-    os.environ["BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH"] = str(prefix_registry_path)
+    os.environ["BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH"] = str(
+        prefix_registry_path
+    )
     tmp_path.write_text(
         "\n".join(
             [
@@ -193,8 +203,8 @@ def create_temp_tapdb_config(
                 f"  prefix_ownership_registry_path: {prefix_registry_path}",
                 "environments:",
                 "  dev:",
-                    "    engine_type: local",
-                    "    host: localhost",
+                "    engine_type: local",
+                "    host: localhost",
                 f'    port: "{resolved_port}"',
                 f'    ui_port: "{DEFAULT_BLOOM_WEB_PORT}"',
                 f'    user: "{resolved_user}"',

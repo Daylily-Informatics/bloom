@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import random
-import time
 import threading
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 from bloom_lims.config import get_settings
 from bloom_lims.integrations.atlas.client import AtlasClient, AtlasClientError
-from bloom_lims.integrations.atlas.contracts import AtlasLookupResult, AtlasStatusEventPushResult
+from bloom_lims.integrations.atlas.contracts import (
+    AtlasLookupResult,
+    AtlasStatusEventPushResult,
+)
 
 
 class AtlasDependencyError(Exception):
@@ -44,7 +47,13 @@ class AtlasService:
         self.atlas_tenant_id = str(settings.atlas.organization_id or "").strip()
         self.status_events_timeout_seconds = max(
             1,
-            int(getattr(settings.atlas, "status_events_timeout_seconds", settings.atlas.timeout_seconds)),
+            int(
+                getattr(
+                    settings.atlas,
+                    "status_events_timeout_seconds",
+                    settings.atlas.timeout_seconds,
+                )
+            ),
         )
         self.status_events_max_retries = max(
             0,
@@ -90,13 +99,17 @@ class AtlasService:
         key = f"container_trf_context:{resolved_tenant}:{container_euid}"
         return self._cached_lookup(
             key,
-            lambda: self.client.get_container_trf_context(container_euid, resolved_tenant),
+            lambda: self.client.get_container_trf_context(
+                container_euid, resolved_tenant
+            ),
         )
 
     def get_required_tenant_id(self) -> str:
         tenant_id = str(self.atlas_tenant_id or "").strip()
         if not tenant_id:
-            raise AtlasDependencyError("Atlas tenant UUID not configured (atlas.organization_id)")
+            raise AtlasDependencyError(
+                "Atlas tenant UUID not configured (atlas.organization_id)"
+            )
         return tenant_id
 
     @staticmethod
@@ -152,7 +165,10 @@ class AtlasService:
                     payload=response_payload,
                 )
             except AtlasClientError as exc:
-                if exc.status_code not in retryable_status_codes or attempt >= self.status_events_max_retries:
+                if (
+                    exc.status_code not in retryable_status_codes
+                    or attempt >= self.status_events_max_retries
+                ):
                     raise AtlasDependencyError(str(exc)) from exc
                 sleep_seconds = self._retry_sleep_seconds(attempt)
                 time.sleep(sleep_seconds)

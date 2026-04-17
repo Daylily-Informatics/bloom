@@ -292,7 +292,11 @@ class _BetaLabStoreMixin:
     def _well_name(self, well) -> str:
         if well is None:
             return ""
-        address = well.json_addl.get("cont_address") if isinstance(well.json_addl, dict) else {}
+        address = (
+            well.json_addl.get("cont_address")
+            if isinstance(well.json_addl, dict)
+            else {}
+        )
         name = str((address or {}).get("name") or "").strip()
         if name:
             return name

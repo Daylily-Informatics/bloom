@@ -88,7 +88,9 @@ def _is_admin_user(user_data: dict[str, Any]) -> bool:
 
 def _tapdb_admin_user_from_bloom_user_data(user_data: dict[str, Any]) -> dict[str, Any]:
     email = str(user_data.get("email") or "").strip().lower()
-    display_name = str(user_data.get("display_name") or user_data.get("name") or email).strip()
+    display_name = str(
+        user_data.get("display_name") or user_data.get("name") or email
+    ).strip()
     return {
         "uid": 0,
         "username": email,
@@ -100,7 +102,9 @@ def _tapdb_admin_user_from_bloom_user_data(user_data: dict[str, Any]) -> dict[st
     }
 
 
-def _configure_embedded_tapdb_auth(admin_main_module: Any, admin_auth_module: Any) -> None:
+def _configure_embedded_tapdb_auth(
+    admin_main_module: Any, admin_auth_module: Any
+) -> None:
     if getattr(admin_main_module, "_bloom_embedded_auth_configured", False):
         return
 
@@ -150,13 +154,15 @@ class BloomAdminGuardedASGI:
                     content={"detail": "Admin privileges required"},
                 )
             else:
-                response = RedirectResponse(url="/user_home?admin_required=1", status_code=303)
+                response = RedirectResponse(
+                    url="/user_home?admin_required=1", status_code=303
+                )
             await response(scope, receive, send)
             return
 
         forward_scope = dict(scope)
-        forward_scope[_BLOOM_TAPDB_SCOPE_USER_KEY] = _tapdb_admin_user_from_bloom_user_data(
-            user_data
+        forward_scope[_BLOOM_TAPDB_SCOPE_USER_KEY] = (
+            _tapdb_admin_user_from_bloom_user_data(user_data)
         )
         await self._inner_app(forward_scope, receive, send)
 
@@ -268,6 +274,8 @@ def mount_tapdb_admin_subapp(app: FastAPI) -> TapDBMountConfig | None:
             "Bloom startup aborted: TapDB mount is enabled but TapDB admin app failed to load"
         ) from exc
 
-    app.mount(config.mount_path, BloomAdminGuardedASGI(tapdb_admin_app), name="tapdb_admin")
+    app.mount(
+        config.mount_path, BloomAdminGuardedASGI(tapdb_admin_app), name="tapdb_admin"
+    )
     logger.info("Mounted TapDB admin app at %s", config.mount_path)
     return config

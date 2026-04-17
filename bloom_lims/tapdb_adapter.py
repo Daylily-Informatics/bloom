@@ -60,8 +60,11 @@ from daylily_tapdb.models.template import (
 from sqlalchemy import text
 from sqlalchemy.orm import Session, object_session
 
-from bloom_lims.config import get_tapdb_db_config
-from bloom_lims.config import apply_runtime_environment, get_settings
+from bloom_lims.config import (
+    apply_runtime_environment,
+    get_settings,
+    get_tapdb_db_config,
+)
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
 
 _KNOWN_LINEAGE_IDENTITIES = (

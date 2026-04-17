@@ -15,15 +15,15 @@ import sys
 from pathlib import Path
 
 import typer
-from daylily_tapdb.templates.loader import (
-    find_tapdb_core_config_dir,
-    seed_templates,
-    validate_template_configs,
-)
 from daylily_tapdb.euid import (
     AUDIT_LOG_PREFIX,
     GENERIC_INSTANCE_LINEAGE_PREFIX,
     GENERIC_TEMPLATE_PREFIX,
+)
+from daylily_tapdb.templates.loader import (
+    find_tapdb_core_config_dir,
+    seed_templates,
+    validate_template_configs,
 )
 from rich.console import Console
 from sqlalchemy import text
@@ -36,7 +36,6 @@ from bloom_lims.cli._registry_v2 import (
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_BLOOM_WEB_PORT,
-    DEFAULT_TAPDB_DOMAIN_CODE,
     DEFAULT_TAPDB_OWNER_REPO_NAME,
     apply_runtime_environment,
     get_settings,
@@ -231,9 +230,9 @@ def _seed_tapdb_templates(
 
     ctx = apply_runtime_environment(get_settings())
     domain_registry_path = Path(str(ctx.domain_registry_path)).expanduser().resolve()
-    prefix_registry_path = Path(
-        str(ctx.prefix_ownership_registry_path)
-    ).expanduser().resolve()
+    prefix_registry_path = (
+        Path(str(ctx.prefix_ownership_registry_path)).expanduser().resolve()
+    )
     bdb = BLOOMdb3(app_username="bloom-cli")
     try:
         if core_templates:
@@ -300,7 +299,9 @@ def _load_prefix_ownership_registry(path: Path) -> dict[str, object]:
     if ownership is None:
         payload["ownership"] = {}
     elif not isinstance(ownership, dict):
-        raise ValueError(f"Prefix ownership registry must define object ownership: {path}")
+        raise ValueError(
+            f"Prefix ownership registry must define object ownership: {path}"
+        )
     payload.setdefault("version", "0.4.0")
     return payload
 
@@ -329,7 +330,9 @@ def _claim_client_template_prefixes(
     if not normalized_domain_code:
         raise ValueError("domain_code is required to claim client template prefixes")
     if not normalized_owner_repo_name:
-        raise ValueError("owner_repo_name is required to claim client template prefixes")
+        raise ValueError(
+            "owner_repo_name is required to claim client template prefixes"
+        )
 
     prefixes = sorted(
         {
@@ -371,7 +374,10 @@ def _claim_client_template_prefixes(
                     f"Prefix {prefix!r} for domain {normalized_domain_code!r} is claimed by "
                     f"{claimed_owner!r}, not {normalized_owner_repo_name!r}"
                 )
-            if claimed_owner != normalized_owner_repo_name or existing.get("issuer_app_code") != normalized_owner_repo_name:
+            if (
+                claimed_owner != normalized_owner_repo_name
+                or existing.get("issuer_app_code") != normalized_owner_repo_name
+            ):
                 domain_claims[prefix] = {"issuer_app_code": normalized_owner_repo_name}
                 changed = True
             continue
@@ -387,7 +393,9 @@ def _claim_client_template_prefixes(
         _write_prefix_ownership_registry(prefix_registry_path, registry)
 
 
-def _ensure_identity_prefix_config(session, *, owner_repo_name: str, domain_code: str) -> None:
+def _ensure_identity_prefix_config(
+    session, *, owner_repo_name: str, domain_code: str
+) -> None:
     values_sql = ",\n        ".join(
         f"('{entity}', '{domain_code}', '{owner_repo_name}', '{prefix}')"
         for entity, prefix in _IDENTITY_PREFIXES.items()

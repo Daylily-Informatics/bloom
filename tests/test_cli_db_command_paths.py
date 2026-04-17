@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import importlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -391,7 +391,9 @@ def test_seed_templates_split_core_and_client_ownership(
                 "seed",
                 {
                     "owner_repo_name": kwargs["owner_repo_name"],
-                    "templates": [template["instance_prefix"] for template in templates],
+                    "templates": [
+                        template["instance_prefix"] for template in templates
+                    ],
                 },
             )
         )
@@ -403,7 +405,9 @@ def test_seed_templates_split_core_and_client_ownership(
                 {
                     "owner_repo_name": kwargs["owner_repo_name"],
                     "domain_code": kwargs["domain_code"],
-                    "templates": [template["instance_prefix"] for template in kwargs["templates"]],
+                    "templates": [
+                        template["instance_prefix"] for template in kwargs["templates"]
+                    ],
                 },
             )
         )
@@ -436,7 +440,9 @@ def test_seed_templates_split_core_and_client_ownership(
     fake_engine = FakeEngine()
     monkeypatch.setattr(db_commands, "seed_templates", fake_seed_templates)
     monkeypatch.setattr(
-        db_commands, "_claim_client_template_prefixes", fake_claim_client_template_prefixes
+        db_commands,
+        "_claim_client_template_prefixes",
+        fake_claim_client_template_prefixes,
     )
     monkeypatch.setattr(
         db_commands,
@@ -568,7 +574,16 @@ def test_claim_client_template_prefixes_repairs_ownerless_claim(
             False,
             [
                 (["pg", "init", "dev"], False),
-                (["pg", "start-local", "dev", "--port", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)], True),
+                (
+                    [
+                        "pg",
+                        "start-local",
+                        "dev",
+                        "--port",
+                        str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
+                    ],
+                    True,
+                ),
                 (["db", "create", "dev"], False),
                 (["db", "schema", "apply", "dev"], True),
                 (["db", "schema", "migrate", "dev"], True),
@@ -578,7 +593,16 @@ def test_claim_client_template_prefixes_repairs_ownerless_claim(
             True,
             [
                 (["pg", "init", "dev"], False),
-                (["pg", "start-local", "dev", "--port", str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT)], True),
+                (
+                    [
+                        "pg",
+                        "start-local",
+                        "dev",
+                        "--port",
+                        str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
+                    ],
+                    True,
+                ),
                 (["db", "delete", "dev", "--force"], False),
                 (["db", "create", "dev"], False),
                 (["db", "schema", "apply", "dev", "--reinitialize"], True),
@@ -595,8 +619,12 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
     calls: list[tuple[list[str], bool]] = []
     seeded: list[tuple[str, bool]] = []
     monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
-    monkeypatch.setattr(db_commands, "_ensure_tapdb_namespace_config", lambda _env: None)
-    monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+    monkeypatch.setattr(
+        db_commands, "_ensure_tapdb_namespace_config", lambda _env: None
+    )
+    monkeypatch.setattr(
+        db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
+    )
     monkeypatch.setattr(
         db_commands,
         "_local_pg_port",
@@ -610,7 +638,9 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
     monkeypatch.setattr(
         db_commands,
         "_seed_tapdb_templates",
-        lambda env_name, overwrite=False, **_kwargs: seeded.append((env_name, overwrite)),
+        lambda env_name, overwrite=False, **_kwargs: seeded.append(
+            (env_name, overwrite)
+        ),
     )
 
     db_commands.db_build(force=force, target="local")
@@ -646,8 +676,12 @@ def test_db_build_aurora_skips_local_pg_bootstrap(
     calls: list[tuple[list[str], bool]] = []
     seeded: list[tuple[str, bool]] = []
     monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
-    monkeypatch.setattr(db_commands, "_ensure_tapdb_namespace_config", lambda _env: None)
-    monkeypatch.setattr(db_commands, "_ensure_schema_available_for_bloom_root", lambda: None)
+    monkeypatch.setattr(
+        db_commands, "_ensure_tapdb_namespace_config", lambda _env: None
+    )
+    monkeypatch.setattr(
+        db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
+    )
     monkeypatch.setattr(
         db_commands,
         "_run_tapdb",
@@ -656,7 +690,9 @@ def test_db_build_aurora_skips_local_pg_bootstrap(
     monkeypatch.setattr(
         db_commands,
         "_seed_tapdb_templates",
-        lambda env_name, overwrite=False, **_kwargs: seeded.append((env_name, overwrite)),
+        lambda env_name, overwrite=False, **_kwargs: seeded.append(
+            (env_name, overwrite)
+        ),
     )
 
     db_commands.db_build(force=force, target="aurora")

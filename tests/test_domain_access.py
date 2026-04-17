@@ -5,7 +5,11 @@ import re
 from fastapi.testclient import TestClient
 
 from bloom_lims.app import create_app
-from bloom_lims.domain_access import build_allowed_origin_regex, build_trusted_hosts, is_allowed_origin
+from bloom_lims.domain_access import (
+    build_allowed_origin_regex,
+    build_trusted_hosts,
+    is_allowed_origin,
+)
 
 
 def test_bloom_allows_approved_origin_preflight() -> None:
@@ -44,7 +48,9 @@ def test_bloom_rejects_disallowed_host() -> None:
     app = create_app()
 
     with TestClient(app, raise_server_exceptions=False) as client:
-        response = client.get("/", headers={"host": "evil.example.com"}, follow_redirects=False)
+        response = client.get(
+            "/", headers={"host": "evil.example.com"}, follow_redirects=False
+        )
 
     assert response.status_code == 400
 

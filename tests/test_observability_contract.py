@@ -14,7 +14,6 @@ os.environ["BLOOM_OAUTH"] = "no"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from bloom_lims import __version__
-from main import app
 from bloom_lims.config import get_settings
 from bloom_lims.observability import (
     EndpointRollup,
@@ -22,6 +21,7 @@ from bloom_lims.observability import (
     _percentile,
     base_frame,
 )
+from main import app
 
 
 def _schema_root() -> Path:
@@ -55,7 +55,9 @@ def test_observability_contract_endpoints_match_shared_frame() -> None:
 
         for path, schema_name in schema_map.items():
             response = client.get(path)
-            assert response.status_code in {200, 503}, f"{path} returned {response.status_code}"
+            assert response.status_code in {200, 503}, (
+                f"{path} returned {response.status_code}"
+            )
             payload = response.json()
             _validate(schema_name, payload)
             assert payload["service"] == "bloom"
@@ -77,10 +79,16 @@ def test_obs_services_uses_canonical_capability_vocabulary() -> None:
         "/health": {"auth": "operator_or_service_token", "kind": "summary"},
         "/obs_services": {"auth": "operator_or_service_token", "kind": "discovery"},
         "/api_health": {"auth": "operator_or_service_token", "kind": "api_rollup"},
-        "/endpoint_health": {"auth": "operator_or_service_token", "kind": "endpoint_rollup"},
+        "/endpoint_health": {
+            "auth": "operator_or_service_token",
+            "kind": "endpoint_rollup",
+        },
         "/db_health": {"auth": "operator_or_service_token", "kind": "database"},
         "/api/anomalies": {"auth": "operator_or_service_token", "kind": "anomaly_list"},
-        "/api/anomalies/{anomaly_id}": {"auth": "operator_or_service_token", "kind": "anomaly_detail"},
+        "/api/anomalies/{anomaly_id}": {
+            "auth": "operator_or_service_token",
+            "kind": "anomaly_detail",
+        },
         "/my_health": {"auth": "authenticated_self", "kind": "self"},
         "/auth_health": {"auth": "operator_or_service_token", "kind": "auth"},
     }
@@ -230,6 +238,7 @@ def test_observability_helpers_cover_empty_rollups_and_db_fallback(monkeypatch) 
     assert payload["request_count"] == 1
 
     with TestClient(app, raise_server_exceptions=False) as client:
+
         async def _fake_check_database_health():
             return SimpleNamespace(
                 status="healthy",

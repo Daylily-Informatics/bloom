@@ -16,7 +16,6 @@ from bloom_lims.api.v1.dependencies import APIUser
 from bloom_lims.config import get_settings
 from bloom_lims.schema_drift import read_schema_drift_report
 
-
 CONTRACT_VERSION = "v3"
 SERVICE_NAME = "bloom"
 
@@ -164,19 +163,47 @@ class BloomObservabilityStore:
             "endpoints": [
                 {"path": "/healthz", "auth": "none", "kind": "liveness"},
                 {"path": "/readyz", "auth": "none", "kind": "readiness"},
-                {"path": "/health", "auth": "operator_or_service_token", "kind": "summary"},
-                {"path": "/obs_services", "auth": "operator_or_service_token", "kind": "discovery"},
-                {"path": "/api_health", "auth": "operator_or_service_token", "kind": "api_rollup"},
-                {"path": "/endpoint_health", "auth": "operator_or_service_token", "kind": "endpoint_rollup"},
-                {"path": "/db_health", "auth": "operator_or_service_token", "kind": "database"},
-                {"path": "/api/anomalies", "auth": "operator_or_service_token", "kind": "anomaly_list"},
+                {
+                    "path": "/health",
+                    "auth": "operator_or_service_token",
+                    "kind": "summary",
+                },
+                {
+                    "path": "/obs_services",
+                    "auth": "operator_or_service_token",
+                    "kind": "discovery",
+                },
+                {
+                    "path": "/api_health",
+                    "auth": "operator_or_service_token",
+                    "kind": "api_rollup",
+                },
+                {
+                    "path": "/endpoint_health",
+                    "auth": "operator_or_service_token",
+                    "kind": "endpoint_rollup",
+                },
+                {
+                    "path": "/db_health",
+                    "auth": "operator_or_service_token",
+                    "kind": "database",
+                },
+                {
+                    "path": "/api/anomalies",
+                    "auth": "operator_or_service_token",
+                    "kind": "anomaly_list",
+                },
                 {
                     "path": "/api/anomalies/{anomaly_id}",
                     "auth": "operator_or_service_token",
                     "kind": "anomaly_detail",
                 },
                 {"path": "/my_health", "auth": "authenticated_self", "kind": "self"},
-                {"path": "/auth_health", "auth": "operator_or_service_token", "kind": "auth"},
+                {
+                    "path": "/auth_health",
+                    "auth": "operator_or_service_token",
+                    "kind": "auth",
+                },
             ],
             "extensions": [
                 "bloom.admin_metrics_ui",
@@ -191,7 +218,9 @@ class BloomObservabilityStore:
             "observed_at": self._started_at,
         }
 
-    def projection(self, *, observed_at: str | None = None, detail: str | None = None) -> ProjectionMetadata:
+    def projection(
+        self, *, observed_at: str | None = None, detail: str | None = None
+    ) -> ProjectionMetadata:
         seen_at = observed_at or self._started_at
         return ProjectionMetadata(
             state="ready",
@@ -222,7 +251,9 @@ class BloomObservabilityStore:
                 duration_ms=duration_ms,
                 fingerprint=fingerprint,
             )
-            family_rollup = self._family_rollups.setdefault(family, FamilyRollup(family=family))
+            family_rollup = self._family_rollups.setdefault(
+                family, FamilyRollup(family=family)
+            )
             family_rollup.record(status_code=status_code, duration_ms=duration_ms)
 
     def record_db_probe(self, *, status: str, latency_ms: float, detail: str) -> None:
@@ -262,10 +293,14 @@ class BloomObservabilityStore:
         dependencies = snapshot.get("dependencies")
         if isinstance(dependencies, dict):
             snapshot["dependencies"] = {
-                "configured_services": list(dependencies.get("configured_services") or []),
+                "configured_services": list(
+                    dependencies.get("configured_services") or []
+                ),
                 "observed_services": list(dependencies.get("observed_services") or []),
             }
-        snapshot["managed_services"] = [dict(item) for item in snapshot.get("managed_services") or []]
+        snapshot["managed_services"] = [
+            dict(item) for item in snapshot.get("managed_services") or []
+        ]
         observed_at = str(snapshot.get("observed_at") or self._started_at)
         return self.projection(observed_at=observed_at), snapshot
 
@@ -276,13 +311,25 @@ class BloomObservabilityStore:
         observed_at = families[0]["observed_at"] if families else self._started_at
         return self.projection(observed_at=observed_at), families
 
-    def endpoint_health(self, *, offset: int, limit: int) -> tuple[ProjectionMetadata, dict[str, Any]]:
+    def endpoint_health(
+        self, *, offset: int, limit: int
+    ) -> tuple[ProjectionMetadata, dict[str, Any]]:
         with self._lock:
             items = [rollup.to_dict() for rollup in self._endpoint_rollups.values()]
-        items.sort(key=lambda item: (-int(item["request_count"]), item["route_template"], item["method"]))
+        items.sort(
+            key=lambda item: (
+                -int(item["request_count"]),
+                item["route_template"],
+                item["method"],
+            )
+        )
         total = len(items)
         sliced = items[offset : offset + limit]
-        observed_at = sliced[0]["observed_at"] if sliced else (items[0]["observed_at"] if items else self._started_at)
+        observed_at = (
+            sliced[0]["observed_at"]
+            if sliced
+            else (items[0]["observed_at"] if items else self._started_at)
+        )
         return self.projection(observed_at=observed_at), {
             "total": total,
             "offset": offset,
@@ -335,7 +382,8 @@ class BloomObservabilityStore:
             {
                 str(item.get("principal_email") or "").strip().lower()
                 for item in recent
-                if str(item.get("principal_email") or "").strip() and not bool(item.get("service_principal"))
+                if str(item.get("principal_email") or "").strip()
+                and not bool(item.get("service_principal"))
             }
         )
         return self.projection(observed_at=observed_at), {
@@ -369,7 +417,17 @@ class BloomObservabilityStore:
             return "auth"
         if path.startswith("/admin"):
             return "admin"
-        if path in {"/health", "/healthz", "/readyz", "/obs_services", "/api_health", "/endpoint_health", "/db_health", "/my_health", "/auth_health"}:
+        if path in {
+            "/health",
+            "/healthz",
+            "/readyz",
+            "/obs_services",
+            "/api_health",
+            "/endpoint_health",
+            "/db_health",
+            "/my_health",
+            "/auth_health",
+        }:
             return "observability"
         return "web"
 
@@ -396,7 +454,9 @@ def _status_for_projection(projection: ProjectionMetadata, ready_status: str) ->
     return ready_status if projection.state == "ready" else "unknown"
 
 
-def _with_projection(payload: dict[str, Any], projection: ProjectionMetadata) -> dict[str, Any]:
+def _with_projection(
+    payload: dict[str, Any], projection: ProjectionMetadata
+) -> dict[str, Any]:
     payload["projection"] = projection.model_dump()
     return payload
 
@@ -455,16 +515,22 @@ def build_readyz_payload(
     return _with_projection(payload, _probe_projection(observed_at))
 
 
-def build_health_payload(request: Request, *, projection: ProjectionMetadata, health_snapshot: dict[str, Any]) -> dict[str, Any]:
+def build_health_payload(
+    request: Request, *, projection: ProjectionMetadata, health_snapshot: dict[str, Any]
+) -> dict[str, Any]:
     payload = base_frame(
         request,
-        status=_status_for_projection(projection, str(health_snapshot.get("status") or "unknown")),
+        status=_status_for_projection(
+            projection, str(health_snapshot.get("status") or "unknown")
+        ),
     )
     payload["checks"] = dict(health_snapshot.get("checks") or {})
     return _with_projection(payload, projection)
 
 
-def build_obs_services_payload(request: Request, *, projection: ProjectionMetadata, snapshot: dict[str, Any]) -> dict[str, Any]:
+def build_obs_services_payload(
+    request: Request, *, projection: ProjectionMetadata, snapshot: dict[str, Any]
+) -> dict[str, Any]:
     payload = base_frame(
         request,
         status=_status_for_projection(projection, str(snapshot.get("status") or "ok")),
@@ -472,14 +538,20 @@ def build_obs_services_payload(request: Request, *, projection: ProjectionMetada
     payload["endpoints"] = list(snapshot.get("endpoints") or [])
     payload["extensions"] = list(snapshot.get("extensions") or [])
     payload["dependencies"] = {
-        "configured_services": list((snapshot.get("dependencies") or {}).get("configured_services") or []),
-        "observed_services": list((snapshot.get("dependencies") or {}).get("observed_services") or []),
+        "configured_services": list(
+            (snapshot.get("dependencies") or {}).get("configured_services") or []
+        ),
+        "observed_services": list(
+            (snapshot.get("dependencies") or {}).get("observed_services") or []
+        ),
     }
     payload["managed_services"] = list(snapshot.get("managed_services") or [])
     return _with_projection(payload, projection)
 
 
-def build_api_health_payload(request: Request, *, projection: ProjectionMetadata, families: list[dict[str, Any]]) -> dict[str, Any]:
+def build_api_health_payload(
+    request: Request, *, projection: ProjectionMetadata, families: list[dict[str, Any]]
+) -> dict[str, Any]:
     payload = base_frame(request, status=_status_for_projection(projection, "ok"))
     payload["families"] = families
     return _with_projection(payload, projection)
@@ -500,19 +572,27 @@ def build_endpoint_health_payload(
     return _with_projection(payload, projection)
 
 
-def build_db_health_payload(request: Request, *, projection: ProjectionMetadata, db_health: dict[str, Any]) -> dict[str, Any]:
+def build_db_health_payload(
+    request: Request, *, projection: ProjectionMetadata, db_health: dict[str, Any]
+) -> dict[str, Any]:
     payload = base_frame(
         request,
-        status=_status_for_projection(projection, str(db_health.get("status") or "unknown")),
+        status=_status_for_projection(
+            projection, str(db_health.get("status") or "unknown")
+        ),
     )
     payload["database"] = db_health
     return _with_projection(payload, projection)
 
 
-def build_auth_health_payload(request: Request, *, projection: ProjectionMetadata, auth_rollup: dict[str, Any]) -> dict[str, Any]:
+def build_auth_health_payload(
+    request: Request, *, projection: ProjectionMetadata, auth_rollup: dict[str, Any]
+) -> dict[str, Any]:
     payload = base_frame(
         request,
-        status=_status_for_projection(projection, str(auth_rollup.get("status") or "unknown")),
+        status=_status_for_projection(
+            projection, str(auth_rollup.get("status") or "unknown")
+        ),
     )
     payload["auth"] = {
         "mode": str(auth_rollup.get("mode") or ""),

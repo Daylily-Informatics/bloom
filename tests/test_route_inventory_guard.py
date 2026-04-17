@@ -60,7 +60,9 @@ def _iter_direct_request_samples() -> set[tuple[str, str]]:
     for path in Path("tests").rglob("test_*.py"):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            if not isinstance(node, ast.Call) or not isinstance(
+                node.func, ast.Attribute
+            ):
                 continue
             method = node.func.attr.upper()
             if method not in HTTP_METHODS or not node.args:

@@ -111,7 +111,9 @@ def test_zebra_day_service_submits_server_side_print_jobs(monkeypatch):
             token="internal-token",
         )
     )
-    fake_client = _FakeZebraClient(print_response={"success": True, "message": "queued"})
+    fake_client = _FakeZebraClient(
+        print_response={"success": True, "message": "queued"}
+    )
     service = ZebraDayService(settings)
     monkeypatch.setattr(service, "_client", lambda: fake_client)
 
@@ -174,10 +176,15 @@ def test_zebra_day_service_requires_optional_dependency_when_configured(monkeypa
         )
 
 
-def test_observability_store_treats_zebra_day_as_dependency_not_managed_service(monkeypatch):
+def test_observability_store_treats_zebra_day_as_dependency_not_managed_service(
+    monkeypatch,
+):
     settings = BloomSettings(
         atlas={"base_url": "https://atlas.example.org", "token": "atlas-token"},
-        zebra_day={"base_url": "https://zebra-day.example.org", "token": "internal-token"},
+        zebra_day={
+            "base_url": "https://zebra-day.example.org",
+            "token": "internal-token",
+        },
     )
     monkeypatch.setattr("bloom_lims.observability.get_settings", lambda: settings)
 

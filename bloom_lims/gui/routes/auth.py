@@ -15,8 +15,8 @@ from fastapi import APIRouter, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
-from bloom_lims.auth.rbac import Role
 from bloom_lims import __version__
+from bloom_lims.auth.rbac import Role
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService, map_legacy_role
 from bloom_lims.config import get_settings

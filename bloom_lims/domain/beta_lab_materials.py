@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from bloom_lims.template_identity import template_semantic_category
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaMaterialResponse,
 )
+from bloom_lims.template_identity import template_semantic_category
 
 
 class _BetaLabMaterialsMixin:
@@ -217,9 +217,7 @@ class _BetaLabMaterialsMixin:
                     reference_type=self.PATIENT_REFERENCE_TYPE,
                 )
             else:
-                self._replace_patient_reference(
-                    specimen, atlas_context=atlas_context
-                )
+                self._replace_patient_reference(specimen, atlas_context=atlas_context)
 
         self._record_action(
             target_instance=specimen,

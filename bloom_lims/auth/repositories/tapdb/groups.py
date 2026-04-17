@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from daylily_tapdb import require_seeded_templates
 from daylily_tapdb.factory import InstanceFactory
 from daylily_tapdb.models.instance import generic_instance
-from daylily_tapdb import require_seeded_templates
 from daylily_tapdb.templates import TemplateManager
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -22,7 +21,6 @@ from bloom_lims.auth.repositories.tapdb.identity import (
     resolve_public_id,
 )
 from bloom_lims.config import get_settings
-
 
 GROUP_TEMPLATE_CODE = "BBX/auth/user-group/1.0/"
 GROUP_REVISION_TEMPLATE_CODE = "BBX/auth/user-group-revision/1.0/"
@@ -143,7 +141,10 @@ class TapdbGroupRepository:
         return None
 
     def get_user_group_codes(self, user_id: str) -> list[str]:
-        group_lookup = {group.id: group.group_code for group in self.list_groups(include_inactive=False)}
+        group_lookup = {
+            group.id: group.group_code
+            for group in self.list_groups(include_inactive=False)
+        }
         memberships = self._list_memberships(user_id=user_id, include_inactive=False)
         codes: list[str] = []
         for membership in memberships:
@@ -158,7 +159,7 @@ class TapdbGroupRepository:
             return []
         members = self._list_memberships(group_id=group.id, include_inactive=True)
         members.sort(
-            key=lambda row: (row.joined_at or datetime.min.replace(tzinfo=UTC)),
+            key=lambda row: row.joined_at or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         return members
@@ -253,7 +254,9 @@ class TapdbGroupRepository:
         include_inactive: bool,
     ) -> list[GroupMembershipRecord]:
         memberships: list[GroupMembershipRecord] = []
-        for membership_instance in self._instances_for_template(GROUP_MEMBERSHIP_TEMPLATE_CODE):
+        for membership_instance in self._instances_for_template(
+            GROUP_MEMBERSHIP_TEMPLATE_CODE
+        ):
             record = self._to_membership(membership_instance)
             if record is None:
                 continue
@@ -272,7 +275,9 @@ class TapdbGroupRepository:
         group_id: str,
         user_id: str,
     ) -> generic_instance | None:
-        for membership_instance in self._instances_for_template(GROUP_MEMBERSHIP_TEMPLATE_CODE):
+        for membership_instance in self._instances_for_template(
+            GROUP_MEMBERSHIP_TEMPLATE_CODE
+        ):
             props = self._props(membership_instance)
             if normalize_public_id(props.get("group_id")) != group_id:
                 continue
@@ -303,7 +308,9 @@ class TapdbGroupRepository:
             "is_active": True,
             "created_by": str(created_by) if created_by else None,
         }
-        group_public_id = ensure_public_id_property(group_properties, "id", prefix="grp")
+        group_public_id = ensure_public_id_property(
+            group_properties, "id", prefix="grp"
+        )
 
         group_instance = self.factory.create_instance(
             session=self.db,
@@ -354,10 +361,17 @@ class TapdbGroupRepository:
             group_code=group_code,
             name=str(revision_props.get("name") or group_instance.name or group_code),
             description=revision_props.get("description"),
-            is_system_group=bool(revision_props.get("is_system_group", props.get("is_system_group", False))),
-            is_active=bool(revision_props.get("is_active", props.get("is_active", True))),
+            is_system_group=bool(
+                revision_props.get(
+                    "is_system_group", props.get("is_system_group", False)
+                )
+            ),
+            is_active=bool(
+                revision_props.get("is_active", props.get("is_active", True))
+            ),
             revision_no=int(revision_props.get("revision_no", 1)),
-            created_at=_to_dt(revision_props.get("created_at")) or group_instance.created_dt,
+            created_at=_to_dt(revision_props.get("created_at"))
+            or group_instance.created_dt,
             euid=group_instance.euid,
         )
 
@@ -373,11 +387,17 @@ class TapdbGroupRepository:
         user_id = normalize_public_id(props.get("user_id"))
         if group_id is None or user_id is None:
             return None
-        normalized_group_code = str(props.get("group_code") or group_code or "").strip().upper()
+        normalized_group_code = (
+            str(props.get("group_code") or group_code or "").strip().upper()
+        )
         if not normalized_group_code:
             group_instance = self._find_group_instance(group_id)
             if group_instance is not None:
-                normalized_group_code = str(self._props(group_instance).get("group_code", "")).strip().upper()
+                normalized_group_code = (
+                    str(self._props(group_instance).get("group_code", ""))
+                    .strip()
+                    .upper()
+                )
         return GroupMembershipRecord(
             id=membership_id,
             group_id=group_id,
@@ -393,14 +413,18 @@ class TapdbGroupRepository:
 
     def _latest_revision_for_group(self, group_id: str) -> generic_instance | None:
         revisions: list[generic_instance] = []
-        for revision_instance in self._instances_for_template(GROUP_REVISION_TEMPLATE_CODE):
+        for revision_instance in self._instances_for_template(
+            GROUP_REVISION_TEMPLATE_CODE
+        ):
             props = self._props(revision_instance)
             if normalize_public_id(props.get("group_id")) != group_id:
                 continue
             revisions.append(revision_instance)
         if not revisions:
             return None
-        revisions.sort(key=lambda row: int(self._props(row).get("revision_no", 0)), reverse=True)
+        revisions.sort(
+            key=lambda row: int(self._props(row).get("revision_no", 0)), reverse=True
+        )
         return revisions[0]
 
     def _instances_for_template(self, template_code: str) -> list[generic_instance]:
@@ -451,7 +475,9 @@ class TapdbGroupRepository:
             instance.json_addl = payload
         return properties
 
-    def _write_props(self, instance: generic_instance, properties: dict[str, Any]) -> None:
+    def _write_props(
+        self, instance: generic_instance, properties: dict[str, Any]
+    ) -> None:
         payload = instance.json_addl or {}
         if isinstance(payload, str):
             try:

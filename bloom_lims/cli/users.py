@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from enum import Enum
 import json
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import typer
@@ -18,7 +18,7 @@ from bloom_lims.auth.repositories.tapdb.users import (
     normalize_persisted_role,
     set_user_role,
 )
-from bloom_lims.auth.services.groups import GroupService, SYSTEM_GROUP_CODES
+from bloom_lims.auth.services.groups import SYSTEM_GROUP_CODES, GroupService
 from bloom_lims.auth.services.user_api_tokens import (
     TokenCreateInput,
     UserAPITokenService,
@@ -41,7 +41,9 @@ def provision_local(
     email: str = typer.Option("", "--email", help="Optional email override"),
     name: str = typer.Option(..., "--name", help="Display name"),
     role: str = typer.Option("admin", "--role", help="Role: admin or user"),
-    group: list[str] = typer.Option([], "--group", help="Repeatable local Bloom group code"),
+    group: list[str] = typer.Option(
+        [], "--group", help="Repeatable local Bloom group code"
+    ),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ) -> None:
     """Provision or update a local Bloom user and Bloom-local group membership."""
