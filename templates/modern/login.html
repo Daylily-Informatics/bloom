@@ -118,13 +118,23 @@
     }
   </style>
 </head>
-<body>
-  {% if deployment_chrome.name and not deployment_chrome.is_production %}
-  <div style="height: 18px; background: {{ deployment_chrome.color }}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;">
-    {{ deployment_chrome.name|upper }}
+<body class="{% if environment_chrome.enabled %}environment-chrome-enabled{% endif %}">
+  {% if environment_chrome.enabled %}
+  <div class="bloom-environment-chrome">
+    <div
+      class="bloom-deployment-bar"
+      style="background: {{ environment_chrome.deployment.color }};"
+      title="Deployment: {{ environment_chrome.deployment.name }}"
+    >
+      {{ environment_chrome.deployment.name|upper }}
+    </div>
+    <div
+      class="bloom-region-bar"
+      style="background: {{ environment_chrome.region.color }};"
+      title="Region: {{ environment_chrome.region.name }}"
+    ></div>
   </div>
   {% endif %}
-  <div class="bloom-stripe-bar"></div>
   
   <div class="login-page">
     <div class="login-container" style="max-width: 980px;">
@@ -165,7 +175,12 @@
         </div>
       </div>
       <div class="login-footer">
-        <p>BLOOM LIMS v{{ version | default('1.0.0') }}</p>
+        <p>BLOOM LIMS v{{ version | default('dev') }}</p>
+        <p class="login-footer-meta">
+          <span>Branch: {{ gui_meta.branch }}</span>
+          <span>Tag: {{ gui_meta.tag }}</span>
+          <span>Commit: {{ gui_meta.commit }}</span>
+        </p>
       </div>
     </div>
   </div>

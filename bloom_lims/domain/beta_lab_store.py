@@ -10,6 +10,10 @@ from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.db import get_child_lineages, get_parent_lineages
+from bloom_lims.template_identity import (
+    instance_category_filter,
+    instance_semantic_category,
+)
 
 
 class _BetaLabStoreMixin:
@@ -22,7 +26,7 @@ class _BetaLabStoreMixin:
     ):
         if plate_euid:
             plate = self._require_instance(plate_euid)
-            if plate.category != "container":
+            if instance_semantic_category(plate) != "container":
                 raise ValueError(f"EUID is not a container plate: {plate_euid}")
             return plate
 
@@ -46,7 +50,7 @@ class _BetaLabStoreMixin:
     ):
         if container_euid:
             container = self._require_instance(container_euid)
-            if container.category != "container":
+            if instance_semantic_category(container) != "container":
                 raise ValueError(f"EUID is not a container: {container_euid}")
             return container
 
@@ -81,7 +85,11 @@ class _BetaLabStoreMixin:
             if lineage.is_deleted:
                 continue
             child = lineage.child_instance
-            if child is None or child.is_deleted or child.category != "container":
+            if (
+                child is None
+                or child.is_deleted
+                or instance_semantic_category(child) != "container"
+            ):
                 continue
             address = (
                 child.json_addl.get("cont_address")
@@ -130,7 +138,9 @@ class _BetaLabStoreMixin:
         return (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == category,
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, category
+                ),
                 self.bdb.Base.classes.generic_instance.type == type_name,
                 self.bdb.Base.classes.generic_instance.subtype == subtype,
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -147,7 +157,9 @@ class _BetaLabStoreMixin:
         return (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "content",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "content"
+                ),
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
                 func.jsonb_extract_path_text(
                     self.bdb.Base.classes.generic_instance.json_addl["properties"],
@@ -167,7 +179,9 @@ class _BetaLabStoreMixin:
         return (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "container",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "container"
+                ),
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
                 func.jsonb_extract_path_text(
                     self.bdb.Base.classes.generic_instance.json_addl["properties"],
@@ -193,7 +207,9 @@ class _BetaLabStoreMixin:
         return (
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "generic",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "data"
+                ),
                 self.bdb.Base.classes.generic_instance.type == "generic",
                 self.bdb.Base.classes.generic_instance.subtype == "generic",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -234,7 +250,11 @@ class _BetaLabStoreMixin:
             if lineage.is_deleted:
                 continue
             parent = lineage.parent_instance
-            if parent is None or parent.is_deleted or parent.category != "container":
+            if (
+                parent is None
+                or parent.is_deleted
+                or instance_semantic_category(parent) != "container"
+            ):
                 continue
             return parent.euid
         return None
@@ -272,7 +292,11 @@ class _BetaLabStoreMixin:
     def _well_name(self, well) -> str:
         if well is None:
             return ""
-        address = well.json_addl.get("cont_address") if isinstance(well.json_addl, dict) else {}
+        address = (
+            well.json_addl.get("cont_address")
+            if isinstance(well.json_addl, dict)
+            else {}
+        )
         name = str((address or {}).get("name") or "").strip()
         if name:
             return name

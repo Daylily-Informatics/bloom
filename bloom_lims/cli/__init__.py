@@ -40,16 +40,36 @@ def _validate_bloom_config(content: str) -> list[str]:
 def _bloom_info_hook() -> list[tuple[str, str]]:
     """Extra rows for the built-in ``info`` command."""
     settings = get_settings()
-    ctx = apply_runtime_environment(settings)
+    ctx = None
+    runtime_error = ""
+    try:
+        ctx = apply_runtime_environment(settings)
+    except Exception as exc:
+        runtime_error = str(exc)
 
     rows: list[tuple[str, str]] = [
         ("Project Root", str(PROJECT_ROOT)),
         ("Environment", settings.environment),
-        ("TapDB Env", ctx.env),
-        ("TapDB Namespace", ctx.database_name),
-        ("TapDB Config", ctx.config_path or "(derived)"),
-        ("AWS Profile", os.environ.get("AWS_PROFILE", ctx.aws_profile)),
-        ("AWS Region", os.environ.get("AWS_REGION", ctx.aws_region)),
+        ("TapDB Env", ctx.env if ctx is not None else "(unresolved)"),
+        ("TapDB Namespace", ctx.database_name if ctx is not None else "(unresolved)"),
+        (
+            "TapDB Config",
+            ctx.config_path if ctx is not None else f"(unresolved: {runtime_error})",
+        ),
+        (
+            "AWS Profile",
+            os.environ.get(
+                "AWS_PROFILE",
+                ctx.aws_profile if ctx is not None else settings.aws.profile,
+            ),
+        ),
+        (
+            "AWS Region",
+            os.environ.get(
+                "AWS_REGION",
+                ctx.aws_region if ctx is not None else settings.aws.region,
+            ),
+        ),
         ("Conda Env", os.environ.get("CONDA_DEFAULT_ENV", "(not set)")),
     ]
 

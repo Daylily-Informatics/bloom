@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -85,6 +86,93 @@ def test_issue_token_emits_plaintext_token(
     assert result.exit_code == 0
     assert "token_id=tok-1" in result.output
     assert "plaintext_token=blm_plaintext_demo" in result.output
+    assert committed == ["commit"]
+    assert closed == ["close"]
+
+
+def test_provision_local_emits_user_payload(
+    runner: CliRunner,
+    cli_app,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    committed: list[str] = []
+    closed: list[str] = []
+    added_groups: list[tuple[str, str, str]] = []
+
+    class FakeDB:
+        def __init__(self, *args, **kwargs):
+            self.session = SimpleNamespace(
+                commit=lambda: committed.append("commit"),
+                rollback=lambda: committed.append("rollback"),
+            )
+
+        def close(self):
+            closed.append("close")
+
+    class FakeGroupService:
+        def __init__(self, _db):
+            return None
+
+        def ensure_system_groups(self):
+            return None
+
+        def get_group_codes_for_user(self, _user_id):
+            return ["API_ACCESS"]
+
+        def add_user_to_group(self, *, group_code: str, user_id: str, added_by: str):
+            added_groups.append((group_code, user_id, added_by))
+
+    monkeypatch.setattr(users_cli, "BLOOMdb3", FakeDB)
+    monkeypatch.setattr(
+        users_cli,
+        "create_or_get",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(
+                uid=42,
+                euid="BMUSR00042",
+                username="dayhoff@lsmc.bio",
+                email="dayhoff@lsmc.bio",
+            ),
+            True,
+        ),
+    )
+    set_role_calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        users_cli,
+        "set_user_role",
+        lambda _session, identifier, role: (
+            set_role_calls.append((identifier, role)),
+            True,
+        )[1],
+    )
+    monkeypatch.setattr(users_cli, "GroupService", FakeGroupService)
+
+    result = runner.invoke(
+        cli_app,
+        [
+            "users",
+            "provision-local",
+            "--username",
+            "dayhoff@lsmc.bio",
+            "--name",
+            "dayhoff@lsmc.bio",
+            "--role",
+            "admin",
+            "--group",
+            "API_ACCESS",
+            "--group",
+            "ENABLE_ATLAS_API",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["username"] == "dayhoff@lsmc.bio"
+    assert payload["role"] == "ADMIN"
+    assert payload["groups"] == ["API_ACCESS", "ENABLE_ATLAS_API"]
+    assert set_role_calls == [(42, "ADMIN")]
+    assert added_groups == [("ENABLE_ATLAS_API", "42", "42")]
     assert committed == ["commit"]
     assert closed == ["close"]
 

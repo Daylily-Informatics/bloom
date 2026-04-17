@@ -4,7 +4,7 @@
     {
       "name": "Claim Material In Queue",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "claim_material_in_queue",
       "version": "1.0",
@@ -20,13 +20,14 @@
           "action_key": "claim_material_in_queue",
           "name": "Claim Material In Queue",
           "description": "Creates a work claim for queued beta material."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Consume Material",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "consume_material",
       "version": "1.0",
@@ -42,13 +43,14 @@
           "action_key": "consume_material",
           "name": "Consume Material",
           "description": "Records beta material consumption to prevent stage reuse."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Create Empty Tube",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "create_empty_tube",
       "version": "1.0",
@@ -64,13 +66,14 @@
           "action_key": "create_empty_tube",
           "name": "Create Empty Tube",
           "description": "Creates a Bloom beta tube/container with Atlas linkage references."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Create Extraction",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "create_extraction",
       "version": "1.0",
@@ -86,13 +89,14 @@
           "action_key": "create_extraction",
           "name": "Create Extraction",
           "description": "Creates a Bloom beta extraction output from queued material."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Create Library Prep",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "create_library_prep",
       "version": "1.0",
@@ -108,13 +112,14 @@
           "action_key": "create_library_prep",
           "name": "Create Library Prep",
           "description": "Creates a Bloom beta library-prep output from an extraction output."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Create Pool",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "create_pool",
       "version": "1.0",
@@ -130,13 +135,14 @@
           "action_key": "create_pool",
           "name": "Create Pool",
           "description": "Creates a Bloom beta sequencing pool from library-prep outputs."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Create Run",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "create_run",
       "version": "1.0",
@@ -152,13 +158,14 @@
           "action_key": "create_run",
           "name": "Create Run",
           "description": "Creates a Bloom beta sequencing run and sequenced assignments."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Move Material To Queue",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "move_material_to_queue",
       "version": "1.0",
@@ -174,13 +181,14 @@
           "action_key": "move_material_to_queue",
           "name": "Move Material To Queue",
           "description": "Moves Bloom beta material into a canonical beta queue."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Record Post Extract QC",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "record_post_extract_qc",
       "version": "1.0",
@@ -196,13 +204,14 @@
           "action_key": "record_post_extract_qc",
           "name": "Record Post Extract QC",
           "description": "Records post-extraction QC and optional queue progression."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Register Accepted Material",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "register_accepted_material",
       "version": "1.0",
@@ -218,13 +227,14 @@
           "action_key": "register_accepted_material",
           "name": "Register Accepted Material",
           "description": "Creates accepted Bloom beta material and links Atlas fulfillment-item references."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Release Claim",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "release_claim",
       "version": "1.0",
@@ -240,13 +250,14 @@
           "action_key": "release_claim",
           "name": "Release Claim",
           "description": "Releases a work claim for queued beta material."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Release Reservation",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "release_reservation",
       "version": "1.0",
@@ -262,13 +273,14 @@
           "action_key": "release_reservation",
           "name": "Release Reservation",
           "description": "Releases a reservation lock on beta material."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Reserve Material",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "reserve_material",
       "version": "1.0",
@@ -284,13 +296,14 @@
           "action_key": "reserve_material",
           "name": "Reserve Material",
           "description": "Creates a reservation lock on beta material."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Update Specimen",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "update_specimen",
       "version": "1.0",
@@ -306,13 +319,14 @@
           "action_key": "update_specimen",
           "name": "Update Specimen",
           "description": "Updates Bloom beta specimen Atlas collection-event reference metadata."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Update Tube",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "beta_lab",
       "subtype": "update_tube",
       "version": "1.0",
@@ -328,13 +342,14 @@
           "action_key": "update_tube",
           "name": "Update Tube",
           "description": "Updates a Bloom beta tube/container status and Atlas linkage references."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/core/add-relationships/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "core",
       "subtype": "add-relationships",
       "version": "1.0",
@@ -363,13 +378,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/core/create-subject-and-anchor/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "core",
       "subtype": "create-subject-and-anchor",
       "version": "1.0",
@@ -398,13 +414,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/core/print_barcode_label/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "core",
       "subtype": "print_barcode_label",
       "version": "1.0",
@@ -441,13 +458,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/core/set_object_status/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "core",
       "subtype": "set_object_status",
       "version": "1.0",
@@ -480,13 +498,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/data/log-temperature/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "data",
       "subtype": "log-temperature",
       "version": "1.0",
@@ -522,13 +541,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/data/record_cfdna_quant_outcome/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "data",
       "subtype": "record_cfdna_quant_outcome",
       "version": "1.0",
@@ -564,13 +584,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/equipment/add-container-to/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "equipment",
       "subtype": "add-container-to",
       "version": "1.0",
@@ -610,13 +631,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/equipment/download-inventory-tsv/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "equipment",
       "subtype": "download-inventory-tsv",
       "version": "1.0",
@@ -655,13 +677,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/equipment/log-temperature/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "equipment",
       "subtype": "log-temperature",
       "version": "1.0",
@@ -707,13 +730,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/equipment/remove-container-from/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "equipment",
       "subtype": "remove-container-from",
       "version": "1.0",
@@ -752,13 +776,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "Cancel Subject Execution",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "cancel_subject_execution",
       "version": "1.0",
@@ -774,13 +799,14 @@
           "action_key": "cancel_subject_execution",
           "name": "Cancel Subject Execution",
           "description": "Cancels execution for a subject."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Claim Queue Item",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "claim_queue_item",
       "version": "1.0",
@@ -796,13 +822,14 @@
           "action_key": "claim_queue_item",
           "name": "Claim Queue Item",
           "description": "Creates a lease and STARTED execution record for a queued subject."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Complete Queue Execution",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "complete_queue_execution",
       "version": "1.0",
@@ -818,13 +845,14 @@
           "action_key": "complete_queue_execution",
           "name": "Complete Queue Execution",
           "description": "Completes queued execution and advances subject state."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Expire Queue Lease",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "expire_queue_lease",
       "version": "1.0",
@@ -840,13 +868,14 @@
           "action_key": "expire_queue_lease",
           "name": "Expire Queue Lease",
           "description": "Expires a stale queue lease for observability cleanup."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Fail Queue Execution",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "fail_queue_execution",
       "version": "1.0",
@@ -862,13 +891,14 @@
           "action_key": "fail_queue_execution",
           "name": "Fail Queue Execution",
           "description": "Marks a queued execution attempt as retryable or terminal failure."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Heartbeat Worker",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "heartbeat_worker",
       "version": "1.0",
@@ -884,13 +914,14 @@
           "action_key": "heartbeat_worker",
           "name": "Heartbeat Worker",
           "description": "Updates worker heartbeat and liveness metadata."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Place Execution Hold",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "place_execution_hold",
       "version": "1.0",
@@ -906,13 +937,14 @@
           "action_key": "place_execution_hold",
           "name": "Place Execution Hold",
           "description": "Places an explicit execution hold on a subject."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Register Worker",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "register_worker",
       "version": "1.0",
@@ -928,13 +960,14 @@
           "action_key": "register_worker",
           "name": "Register Worker",
           "description": "Registers or updates a persistent execution worker."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Release Execution Hold",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "release_execution_hold",
       "version": "1.0",
@@ -950,13 +983,14 @@
           "action_key": "release_execution_hold",
           "name": "Release Execution Hold",
           "description": "Releases an explicit execution hold."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Release Queue Lease",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "release_queue_lease",
       "version": "1.0",
@@ -972,13 +1006,14 @@
           "action_key": "release_queue_lease",
           "name": "Release Queue Lease",
           "description": "Releases an active queue lease without completion."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Renew Queue Lease",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "renew_queue_lease",
       "version": "1.0",
@@ -994,13 +1029,14 @@
           "action_key": "renew_queue_lease",
           "name": "Renew Queue Lease",
           "description": "Renews an active queue lease."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "Requeue Subject",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "execution_queue",
       "subtype": "requeue_subject",
       "version": "1.0",
@@ -1016,13 +1052,14 @@
           "action_key": "requeue_subject",
           "name": "Requeue Subject",
           "description": "Moves a subject into READY state for a queue/action pair."
-        }
+        },
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/file/download_file/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "file",
       "subtype": "download_file",
       "version": "1.0",
@@ -1051,13 +1088,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/move-queues/move-among-ay-top-queues/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "move-queues",
       "subtype": "move-among-ay-top-queues",
       "version": "1.0",
@@ -1094,13 +1132,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/object/set-child-object/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "object",
       "subtype": "set-child-object",
       "version": "1.0",
@@ -1141,13 +1180,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/plate/download_plate_map/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "plate",
       "subtype": "download_plate_map",
       "version": "1.0",
@@ -1185,13 +1225,14 @@
           "comments": "",
           "name": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/plate/stamp_plates_into_plate/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "plate",
       "subtype": "stamp_plates_into_plate",
       "version": "1.0",
@@ -1242,13 +1283,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/plate/stamp_plates_into_plate__extraction_plate_filled/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "plate",
       "subtype": "stamp_plates_into_plate__extraction_plate_filled",
       "version": "1.0",
@@ -1299,13 +1341,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/pool/create-pool-from-containers/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "pool",
       "subtype": "create-pool-from-containers",
       "version": "1.0",
@@ -1365,13 +1408,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/pool/create_pool_from_containers__extraction_plate_filled/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "pool",
       "subtype": "create_pool_from_containers__extraction_plate_filled",
       "version": "1.0",
@@ -1431,13 +1475,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow/destroy_specimen_containers/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow",
       "subtype": "destroy_specimen_containers",
       "version": "1.0",
@@ -1484,13 +1529,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_analysis/download_quant_data/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_analysis",
       "subtype": "download_quant_data",
       "version": "1.0",
@@ -1529,13 +1575,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_destroy/complete_specimen_destroy/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_destroy",
       "subtype": "complete_specimen_destroy",
       "version": "1.0",
@@ -1572,13 +1619,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_extraction/cfdna_post_extraction_quant/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_extraction",
       "subtype": "cfdna_post_extraction_quant",
       "version": "1.0",
@@ -1633,13 +1681,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_plate_operations/cfdna_quant/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_plate_operations",
       "subtype": "cfdna_quant",
       "version": "1.0",
@@ -1694,13 +1743,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_plate_operations/stamp_copy_plate/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_plate_operations",
       "subtype": "stamp_copy_plate",
       "version": "1.0",
@@ -1746,13 +1796,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "add-gdna-to-gdna-normalization-queue",
       "version": "1.0",
@@ -1788,13 +1839,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/add-to-blood-gdna-extraction-queue/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "add-to-blood-gdna-extraction-queue",
       "version": "1.0",
@@ -1830,13 +1882,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/add-to-buccal-gdna-extraction-queue/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "add-to-buccal-gdna-extraction-queue",
       "version": "1.0",
@@ -1872,13 +1925,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/create_test_req_and_link_child_workflow_step/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "create_test_req_and_link_child_workflow_step",
       "version": "1.0",
@@ -1935,13 +1989,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/existing-plate-fill-auto/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "existing-plate-fill-auto",
       "version": "1.0",
@@ -1976,13 +2031,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/existing-plate-fill-directed/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "existing-plate-fill-directed",
       "version": "1.0",
@@ -2017,13 +2073,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/fill_plate_directed/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "fill_plate_directed",
       "version": "1.0",
@@ -2065,13 +2122,14 @@
             "fields": []
           }
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/fill_plate_undirected/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "fill_plate_undirected",
       "version": "1.0",
@@ -2117,13 +2175,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/link_tubes_auto/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "link_tubes_auto",
       "version": "1.0",
@@ -2187,13 +2246,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/plate-create-fill-auto/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "plate-create-fill-auto",
       "version": "1.0",
@@ -2228,13 +2288,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/plate-create-fill-directed/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "plate-create-fill-directed",
       "version": "1.0",
@@ -2269,13 +2330,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/save-quant-data/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "save-quant-data",
       "version": "1.0",
@@ -2310,13 +2372,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "action/workflow_step_queue/ycreate_test_req_and_link_child_workflow_step/1.0",
       "polymorphic_discriminator": "action_template",
-      "category": "action",
+      "category": "BAC",
       "type": "workflow_step_queue",
       "subtype": "ycreate_test_req_and_link_child_workflow_step",
       "version": "1.0",
@@ -2371,13 +2434,14 @@
           "name": "",
           "comments": ""
         },
-        "instantiation_layouts": null
+        "instantiation_layouts": null,
+        "semantic_category": "action"
       }
     },
     {
       "name": "Bloom Authenticated User",
       "polymorphic_discriminator": "actor_template",
-      "category": "actor",
+      "category": "BAR",
       "type": "generic",
       "subtype": "bloom-user",
       "version": "1.0",
@@ -2388,10 +2452,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Bloom Authenticated User",
         "expected_inputs": [],
@@ -2403,13 +2467,14 @@
           "email": "",
           "name": "Bloom User"
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "actor"
       }
     },
     {
       "name": "Patient",
       "polymorphic_discriminator": "actor_template",
-      "category": "actor",
+      "category": "BAR",
       "type": "generic",
       "subtype": "patient",
       "version": "1.0",
@@ -2420,10 +2485,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Patient",
         "expected_inputs": [],
@@ -2439,13 +2504,14 @@
           "patient_id": "",
           "phone": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "actor"
       }
     },
     {
       "name": "Clinician",
       "polymorphic_discriminator": "actor_template",
-      "category": "actor",
+      "category": "BAR",
       "type": "generic",
       "subtype": "physician",
       "version": "1.0",
@@ -2456,10 +2522,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -2485,13 +2551,14 @@
           "other_uids": [],
           "phone": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "actor"
       }
     },
     {
       "name": "Execution System Worker",
       "polymorphic_discriminator": "actor_template",
-      "category": "actor",
+      "category": "BAR",
       "type": "system",
       "subtype": "worker",
       "version": "1.0",
@@ -2502,9 +2569,9 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Execution System Worker",
         "expected_inputs": [],
@@ -2531,13 +2598,14 @@
           "last_error_class": null,
           "revision": 1
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "actor"
       }
     },
     {
       "name": "Bloom User",
       "polymorphic_discriminator": "generic_template",
-      "category": "actor",
+      "category": "BAR",
       "type": "user",
       "subtype": "bloom-user",
       "version": "1.0",
@@ -2562,17 +2630,21 @@
             "group_order": "1",
             "group_name": "Core Actions",
             "actions": {
-              "action/core/*/1.0/": {}
+              "BAC/core/add-relationships/1.0": {},
+              "BAC/core/create-subject-and-anchor/1.0": {},
+              "BAC/core/print_barcode_label/1.0": {},
+              "BAC/core/set_object_status/1.0": {}
             }
           }
         },
-        "instantiation_layouts": []
+        "instantiation_layouts": [],
+        "semantic_category": "actor"
       }
     },
     {
       "name": "Bloom User API Token Revision",
       "polymorphic_discriminator": "generic_template",
-      "category": "bloom",
+      "category": "BBX",
       "type": "auth",
       "subtype": "user-api-token-revision",
       "version": "1.0",
@@ -2582,13 +2654,14 @@
       "is_singleton": false,
       "json_addl": {
         "managed_by": "bloom",
-        "domain": "auth"
+        "domain": "auth",
+        "semantic_category": "bloom"
       }
     },
     {
       "name": "Bloom User API Token Usage Log",
       "polymorphic_discriminator": "generic_template",
-      "category": "bloom",
+      "category": "BBX",
       "type": "auth",
       "subtype": "user-api-token-usage-log",
       "version": "1.0",
@@ -2598,13 +2671,14 @@
       "is_singleton": false,
       "json_addl": {
         "managed_by": "bloom",
-        "domain": "auth"
+        "domain": "auth",
+        "semantic_category": "bloom"
       }
     },
     {
       "name": "Bloom User API Token",
       "polymorphic_discriminator": "generic_template",
-      "category": "bloom",
+      "category": "BBX",
       "type": "auth",
       "subtype": "user-api-token",
       "version": "1.0",
@@ -2614,13 +2688,38 @@
       "is_singleton": false,
       "json_addl": {
         "managed_by": "bloom",
-        "domain": "auth"
+        "domain": "auth",
+        "semantic_category": "bloom"
+      }
+    },
+    {
+      "name": "Generic External Object Link",
+      "polymorphic_discriminator": "generic_template",
+      "category": "BGT",
+      "type": "generic",
+      "subtype": "external_object_link",
+      "version": "1.0",
+      "instance_prefix": "BGT",
+      "instance_polymorphic_identity": "generic_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "managed_by": "bloom",
+        "domain": "generic",
+        "properties": {
+          "provider": "",
+          "reference_type": "",
+          "reference_value": "",
+          "foreign_reference": "",
+          "validation": {}
+        },
+        "semantic_category": "generic"
       }
     },
     {
       "name": "Bloom User Group Membership",
       "polymorphic_discriminator": "generic_template",
-      "category": "bloom",
+      "category": "BBX",
       "type": "auth",
       "subtype": "user-group-membership",
       "version": "1.0",
@@ -2630,13 +2729,14 @@
       "is_singleton": false,
       "json_addl": {
         "managed_by": "bloom",
-        "domain": "auth"
+        "domain": "auth",
+        "semantic_category": "bloom"
       }
     },
     {
       "name": "Bloom User Group Revision",
       "polymorphic_discriminator": "generic_template",
-      "category": "bloom",
+      "category": "BBX",
       "type": "auth",
       "subtype": "user-group-revision",
       "version": "1.0",
@@ -2646,13 +2746,14 @@
       "is_singleton": false,
       "json_addl": {
         "managed_by": "bloom",
-        "domain": "auth"
+        "domain": "auth",
+        "semantic_category": "bloom"
       }
     },
     {
       "name": "Bloom User Group",
       "polymorphic_discriminator": "generic_template",
-      "category": "bloom",
+      "category": "BBX",
       "type": "auth",
       "subtype": "user-group",
       "version": "1.0",
@@ -2662,13 +2763,14 @@
       "is_singleton": false,
       "json_addl": {
         "managed_by": "bloom",
-        "domain": "auth"
+        "domain": "auth",
+        "semantic_category": "bloom"
       }
     },
     {
       "name": "24 fixed well plate",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "plate",
       "subtype": "fixed-plate-24",
       "version": "1.0",
@@ -2679,12 +2781,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "download_plate_map": "action/plate/download_plate_map/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0",
-          "stamp_plates_into_plate": "action/plate/stamp_plates_into_plate/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "download_plate_map": "BAC/plate/download_plate_map/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0",
+          "stamp_plates_into_plate": "BAC/plate/stamp_plates_into_plate/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -3202,13 +3304,14 @@
         "valid_content": [
           "none"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "96 well fixed plate",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "plate",
       "subtype": "fixed-plate-96",
       "version": "1.0",
@@ -3219,12 +3322,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "download_plate_map": "action/plate/download_plate_map/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0",
-          "stamp_plates_into_plate": "action/plate/stamp_plates_into_plate/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "download_plate_map": "BAC/plate/download_plate_map/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0",
+          "stamp_plates_into_plate": "BAC/plate/stamp_plates_into_plate/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -4835,13 +4938,14 @@
         "valid_content": [
           "none"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "4 position Rack",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "rack",
       "subtype": "tube-rack-4-empty",
       "version": "1.0",
@@ -4852,10 +4956,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -4887,13 +4991,14 @@
         "valid_content": [
           "none"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "4 position Rack",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "rack",
       "subtype": "tube-rack-generic",
       "version": "1.0",
@@ -4904,10 +5009,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -4993,13 +5098,14 @@
         "valid_content": [
           "none"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "Shelf",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "shelf",
       "subtype": "generic",
       "version": "1.0",
@@ -5010,11 +5116,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_container_to": "action/equipment/add-container-to/1.0",
-          "download_inventory_tsv": "action/equipment/download-inventory-tsv/1.0",
-          "log_temperature": "action/equipment/log-temperature/1.0",
-          "remove_container_from": "action/equipment/remove-container-from/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_container_to": "BAC/equipment/add-container-to/1.0",
+          "download_inventory_tsv": "BAC/equipment/download-inventory-tsv/1.0",
+          "log_temperature": "BAC/equipment/log-temperature/1.0",
+          "remove_container_from": "BAC/equipment/remove-container-from/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5048,13 +5154,14 @@
         ],
         "valid_parents": [
           ""
-        ]
+        ],
+        "semantic_category": "container"
       }
     },
     {
       "name": "10ml glass tube",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "tube",
       "subtype": "tube-10ml-glass",
       "version": "1.0",
@@ -5065,10 +5172,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5103,13 +5210,14 @@
         "valid_content": [
           "content/.*"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "1.5ml eppi tube",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "tube",
       "subtype": "tube-eppi-1.5ml",
       "version": "1.0",
@@ -5120,10 +5228,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5158,13 +5266,14 @@
         "valid_content": [
           "content/.*"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "Generic 10ml tube",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "tube",
       "subtype": "tube-generic-10ml",
       "version": "1.0",
@@ -5175,10 +5284,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5213,13 +5322,14 @@
         "valid_content": [
           "content/.*"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "strek 10ml",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "tube",
       "subtype": "tube-strek-10ml",
       "version": "1.0",
@@ -5230,10 +5340,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5269,13 +5379,14 @@
         "valid_content": [
           "content/.*"
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "container"
       }
     },
     {
       "name": "plate well - fixed",
       "polymorphic_discriminator": "container_template",
-      "category": "container",
+      "category": "BCN",
       "type": "well",
       "subtype": "fixed-plate-well",
       "version": "1.0",
@@ -5286,7 +5397,7 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "set_object_status": "action/core/set_object_status/1.0"
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5323,13 +5434,14 @@
         ],
         "valid_parents": [
           "container/plate/fixed-plate.*?/.*?"
-        ]
+        ],
+        "semantic_category": "container"
       }
     },
     {
       "name": "giab NA12878",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "control",
       "subtype": "giab-HG001",
       "version": "1.0",
@@ -5340,10 +5452,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5366,13 +5478,14 @@
           "volume": "",
           "volume_units": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "content"
       }
     },
     {
       "name": "giab NA24385",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "control",
       "subtype": "giab-HG002",
       "version": "1.0",
@@ -5383,10 +5496,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5409,13 +5522,14 @@
           "volume": "",
           "volume_units": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "content"
       }
     },
     {
       "name": "synthetic-cfdna",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "control",
       "subtype": "synthetic-cfdna",
       "version": "1.0",
@@ -5426,10 +5540,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5452,13 +5566,14 @@
           "volume": "",
           "volume_units": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "content"
       }
     },
     {
       "name": "NTC - water",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "control",
       "subtype": "water-ntc",
       "version": "1.0",
@@ -5469,10 +5584,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -5495,13 +5610,14 @@
           "volume": "",
           "volume_units": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "content"
       }
     },
     {
       "name": "Pool of Contents",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "pool",
       "subtype": "generic",
       "version": "1.0",
@@ -5530,13 +5646,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "Novaseq sequencing kit",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "reagent",
       "subtype": "ILMN-nova-seq-kit",
       "version": "1.0",
@@ -5572,13 +5689,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "idt probes for rare mendelian disease, v1.0",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "reagent",
       "subtype": "idt-probes-rare-mendelian",
       "version": "1.0",
@@ -5614,13 +5732,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "NaOH",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "reagent",
       "subtype": "naoh",
       "version": "1.0",
@@ -5657,13 +5776,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "plasma (whole blood)",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "sample",
       "subtype": "blood-plasma",
       "version": "1.0",
@@ -5694,13 +5814,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "cell free DNA ",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "sample",
       "subtype": "cfdna",
       "version": "1.0",
@@ -5731,13 +5852,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "genomic DNA",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "sample",
       "subtype": "gdna",
       "version": "1.0",
@@ -5768,13 +5890,14 @@
             }
           ],
           "allocation_type": ""
-        }
+        },
+        "semantic_category": "content"
       }
     },
     {
       "name": "Whole Blood",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "specimen",
       "subtype": "blood-whole",
       "version": "1.0",
@@ -5805,13 +5928,14 @@
         "expected_inputs": [],
         "singleton": "0",
         "expected_outputs": [],
-        "actions": {}
+        "actions": {},
+        "semantic_category": "content"
       }
     },
     {
       "name": "Buccal Swab",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "specimen",
       "subtype": "buccal-swab",
       "version": "1.0",
@@ -5842,13 +5966,14 @@
         "expected_inputs": [],
         "singleton": "0",
         "expected_outputs": [],
-        "actions": {}
+        "actions": {},
+        "semantic_category": "content"
       }
     },
     {
       "name": "FFPE Block",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "specimen",
       "subtype": "ffpe-block",
       "version": "1.0",
@@ -5879,13 +6004,14 @@
           ],
           "allocation_type": ""
         },
-        "actions": {}
+        "actions": {},
+        "semantic_category": "content"
       }
     },
     {
       "name": "FFPE Slides",
       "polymorphic_discriminator": "content_template",
-      "category": "content",
+      "category": "BCT",
       "type": "specimen",
       "subtype": "ffpe-slice",
       "version": "1.0",
@@ -5916,13 +6042,14 @@
           ],
           "allocation_type": ""
         },
-        "actions": {}
+        "actions": {},
+        "semantic_category": "content"
       }
     },
     {
       "name": "Execution Dead Letter Record",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "execution",
       "subtype": "dead_letter",
       "version": "1.0",
@@ -5933,9 +6060,9 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Execution Dead Letter Record",
         "expected_inputs": [],
@@ -5954,13 +6081,14 @@
           "resolved_by_lookup_euid": null,
           "resolved_at": null
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "Execution Attempt Record",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "execution",
       "subtype": "execution_record",
       "version": "1.0",
@@ -5971,9 +6099,9 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Execution Attempt Record",
         "expected_inputs": [],
@@ -6006,13 +6134,14 @@
           "result_snapshot": {},
           "policy_refs": []
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "Execution Hold",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "execution",
       "subtype": "hold",
       "version": "1.0",
@@ -6023,9 +6152,9 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Execution Hold",
         "expected_inputs": [],
@@ -6042,13 +6171,14 @@
           "released_at": null,
           "released_by_lookup_euid": null
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "Execution Queue Definition",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "execution",
       "subtype": "queue",
       "version": "1.0",
@@ -6059,10 +6189,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Execution Queue Definition",
         "expected_inputs": [],
@@ -6105,13 +6235,14 @@
           "revision": 1,
           "disabled_reason": null
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "Execution Queue Lease",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "execution",
       "subtype": "queue_lease",
       "version": "1.0",
@@ -6122,9 +6253,9 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Execution Queue Lease",
         "expected_inputs": [],
@@ -6148,13 +6279,44 @@
           "subject_revision_at_claim": 0,
           "payload_hash": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
+      }
+    },
+    {
+      "name": "Generic Data Record",
+      "polymorphic_discriminator": "data_template",
+      "category": "BDT",
+      "type": "generic",
+      "subtype": "generic",
+      "version": "1.0",
+      "instance_prefix": "BDT",
+      "instance_polymorphic_identity": "data_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
+        },
+        "description": "Generic data record",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "name": "Generic Data Record"
+        },
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "DNA Quant Data",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "generic",
       "subtype": "gdna-quantification",
       "version": "1.0",
@@ -6165,11 +6327,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "record_cfdna_quant_outcome": "action/data/record_cfdna_quant_outcome/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "record_cfdna_quant_outcome": "BAC/data/record_cfdna_quant_outcome/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6190,13 +6352,14 @@
           "lab_code": "",
           "name": "DNA Quant Data"
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "Temperature Log Data",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "generic",
       "subtype": "temperature-log",
       "version": "1.0",
@@ -6226,13 +6389,14 @@
           "lab_code": "",
           "name": "Temperate Log Data"
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "Wet-Lab Library Prep Output",
       "polymorphic_discriminator": "data_template",
-      "category": "data",
+      "category": "BDT",
       "type": "wetlab",
       "subtype": "library_prep_output",
       "version": "1.0",
@@ -6243,10 +6407,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "description": "Wet-Lab Library Prep Output",
         "expected_inputs": [],
@@ -6258,13 +6422,14 @@
           "name": "Library Prep Output",
           "idempotency_key": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "data"
       }
     },
     {
       "name": "-20C Freezer",
       "polymorphic_discriminator": "equipment_template",
-      "category": "equipment",
+      "category": "BEQ",
       "type": "freezer",
       "subtype": "freezer-m20c",
       "version": "1.0",
@@ -6275,14 +6440,14 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_container_to": "action/equipment/add-container-to/1.0",
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "download_inventory_tsv": "action/equipment/download-inventory-tsv/1.0",
-          "log_temperature": "action/equipment/log-temperature/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "remove_container_from": "action/equipment/remove-container-from/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_container_to": "BAC/equipment/add-container-to/1.0",
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "download_inventory_tsv": "BAC/equipment/download-inventory-tsv/1.0",
+          "log_temperature": "BAC/equipment/log-temperature/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "remove_container_from": "BAC/equipment/remove-container-from/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6302,7 +6467,7 @@
             "relationship_type": "contains",
             "child_templates": [
               {
-                "template_code": "container/shelf/generic/1.0",
+                "template_code": "BCN/shelf/generic/1.0",
                 "json_addl": {
                   "cont_address": {
                     "capacity": "10",
@@ -6315,7 +6480,7 @@
                 }
               },
               {
-                "template_code": "container/shelf/generic/1.0",
+                "template_code": "BCN/shelf/generic/1.0",
                 "json_addl": {
                   "cont_address": {
                     "capacity": "10",
@@ -6339,13 +6504,14 @@
           "operataional_status": "",
           "serial": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "equipment"
       }
     },
     {
       "name": "-80C Freezer.",
       "polymorphic_discriminator": "equipment_template",
-      "category": "equipment",
+      "category": "BEQ",
       "type": "freezer",
       "subtype": "freezer-m80c",
       "version": "1.0",
@@ -6356,14 +6522,14 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_container_to": "action/equipment/add-container-to/1.0",
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "download_inventory_tsv": "action/equipment/download-inventory-tsv/1.0",
-          "log_temperature": "action/equipment/log-temperature/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "remove_container_from": "action/equipment/remove-container-from/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_container_to": "BAC/equipment/add-container-to/1.0",
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "download_inventory_tsv": "BAC/equipment/download-inventory-tsv/1.0",
+          "log_temperature": "BAC/equipment/log-temperature/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "remove_container_from": "BAC/equipment/remove-container-from/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6383,7 +6549,7 @@
             "relationship_type": "contains",
             "child_templates": [
               {
-                "template_code": "container/shelf/generic/1.0",
+                "template_code": "BCN/shelf/generic/1.0",
                 "json_addl": {
                   "cont_address": {
                     "capacity": "10",
@@ -6396,7 +6562,7 @@
                 }
               },
               {
-                "template_code": "container/shelf/generic/1.0",
+                "template_code": "BCN/shelf/generic/1.0",
                 "json_addl": {
                   "cont_address": {
                     "capacity": "10",
@@ -6409,7 +6575,7 @@
                 }
               },
               {
-                "template_code": "container/shelf/generic/1.0",
+                "template_code": "BCN/shelf/generic/1.0",
                 "json_addl": {
                   "cont_address": {
                     "capacity": "10",
@@ -6422,7 +6588,7 @@
                 }
               },
               {
-                "template_code": "container/shelf/generic/1.0",
+                "template_code": "BCN/shelf/generic/1.0",
                 "json_addl": {
                   "cont_address": {
                     "capacity": "10",
@@ -6446,13 +6612,14 @@
           "operataional_status": "",
           "serial": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "equipment"
       }
     },
     {
       "name": "Bravo Liquid Handler",
       "polymorphic_discriminator": "equipment_template",
-      "category": "equipment",
+      "category": "BEQ",
       "type": "liquid_handler",
       "subtype": "bravo",
       "version": "1.0",
@@ -6463,10 +6630,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6491,13 +6658,14 @@
           "operataional_status": "",
           "serial": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "equipment"
       }
     },
     {
       "name": "Illumnina MiSeq y",
       "polymorphic_discriminator": "equipment_template",
-      "category": "equipment",
+      "category": "BEQ",
       "type": "sequencers",
       "subtype": "miseq-y",
       "version": "1.0",
@@ -6508,10 +6676,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6536,13 +6704,14 @@
           "operataional_status": "",
           "serial": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "equipment"
       }
     },
     {
       "name": "Illumnina Novaseq 6000",
       "polymorphic_discriminator": "equipment_template",
-      "category": "equipment",
+      "category": "BEQ",
       "type": "sequencers",
       "subtype": "novaseq-6000",
       "version": "1.0",
@@ -6553,10 +6722,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6581,13 +6750,14 @@
           "operataional_status": "",
           "serial": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "equipment"
       }
     },
     {
       "name": "ONT MinION",
       "polymorphic_discriminator": "equipment_template",
-      "category": "equipment",
+      "category": "BEQ",
       "type": "sequencers",
       "subtype": "ont-minion",
       "version": "1.0",
@@ -6598,10 +6768,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -6626,13 +6796,14 @@
           "operataional_status": "",
           "serial": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "equipment"
       }
     },
     {
       "name": "Generic File",
       "polymorphic_discriminator": "file_template",
-      "category": "file",
+      "category": "BFX",
       "type": "file",
       "subtype": "generic",
       "version": "1.0",
@@ -6643,11 +6814,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "download_file": "action/file/download_file/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "download_file": "BAC/file/download_file/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "arbitrary_association_strings": [],
         "cogs": {
@@ -6958,13 +7129,14 @@
             "value_type": "controlled"
           }
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "file"
       }
     },
     {
       "name": "Generic File Set",
       "polymorphic_discriminator": "file_template",
-      "category": "file",
+      "category": "BFX",
       "type": "file_set",
       "subtype": "generic",
       "version": "1.0",
@@ -6975,10 +7147,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7051,13 +7223,14 @@
             "required": false,
             "value_type": "hidden"
           }
-        ]
+        ],
+        "semantic_category": "file"
       }
     },
     {
       "name": "Generic File Reference",
       "polymorphic_discriminator": "file_template",
-      "category": "file",
+      "category": "BFX",
       "type": "shared_ref",
       "subtype": "generic",
       "version": "1.0",
@@ -7068,10 +7241,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "arbitrary_association_strings": [],
         "cogs": {
@@ -7136,13 +7309,14 @@
             "property_key": "who_pays"
           }
         ],
-        "valid_parents": []
+        "valid_parents": [],
+        "semantic_category": "file"
       }
     },
     {
       "name": "Generic Health Event",
       "polymorphic_discriminator": "health_event_template",
-      "category": "health_event",
+      "category": "BHE",
       "type": "generic",
       "subtype": "health-event",
       "version": "1.0",
@@ -7153,10 +7327,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7177,13 +7351,14 @@
           "lab_code": "",
           "name": "Generic Object Name (displayed in UI, can be easily overidded in child template references)"
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "health_event"
       }
     },
     {
       "name": "Decision scope for an accession (ACC / TRX / intake bundle).",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "generic",
       "subtype": "accession-subject",
       "version": "1.0",
@@ -7194,10 +7369,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7275,13 +7450,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Decision scope for analysis result bundles.",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "generic",
       "subtype": "analysis-bundle-subject",
       "version": "1.0",
@@ -7292,10 +7468,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7373,13 +7549,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Fallback decision scope for custom use cases.",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "generic",
       "subtype": "generic-subject",
       "version": "1.0",
@@ -7390,10 +7567,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7474,13 +7651,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Decision scope for clinical reportable units.",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "generic",
       "subtype": "report-subject",
       "version": "1.0",
@@ -7491,10 +7669,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7572,13 +7750,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Workset grouping workflow steps and objects created during an accessioning transaction.",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "workset",
       "subtype": "accession",
       "version": "1.0",
@@ -7589,10 +7768,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7700,13 +7879,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Workset grouping workflow steps and objects created during an extraction batch.",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "workset",
       "subtype": "extraction",
       "version": "1.0",
@@ -7717,10 +7897,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7828,13 +8008,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Workset grouping workflow steps and objects created during a sequencing run.",
       "polymorphic_discriminator": "subject_template",
-      "category": "subject",
+      "category": "BSJ",
       "type": "workset",
       "subtype": "sequencing",
       "version": "1.0",
@@ -7845,10 +8026,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7956,13 +8137,14 @@
             "required": false,
             "value_type": "text"
           }
-        ]
+        ],
+        "semantic_category": "subject"
       }
     },
     {
       "name": "Workset for carrier-screen 3.9",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "assay-workset",
       "subtype": "carrier-screen",
       "version": "3.9",
@@ -7973,11 +8155,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "move_among_ay_top_queues": "action/move-queues/move-among-ay-top-queues/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "move_among_ay_top_queues": "BAC/move-queues/move-among-ay-top-queues/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -7997,7 +8179,7 @@
             "relationship_type": "contains",
             "child_templates": [
               {
-                "template_code": "workflow_step/queue/plasma-isolation-queue-available/1.0/",
+                "template_code": "BWS/queue/plasma-isolation-queue-available/1.0",
                 "json_addl": {
                   "properties": {
                     "comments": "",
@@ -8006,7 +8188,7 @@
                 }
               },
               {
-                "template_code": "workflow_step/queue/plasma-isolation-queue-removed/1.0/",
+                "template_code": "BWS/queue/plasma-isolation-queue-removed/1.0",
                 "json_addl": {
                   "properties": {
                     "comments": "",
@@ -8015,7 +8197,7 @@
                 }
               },
               {
-                "template_code": "workflow_step/queue/plasma-isolation-queue-exception/1.0/",
+                "template_code": "BWS/queue/plasma-isolation-queue-exception/1.0",
                 "json_addl": {
                   "properties": {
                     "comments": "",
@@ -8036,13 +8218,14 @@
           {
             "workflow/assay/carrier-screen/3.9/": {}
           }
-        ]
+        ],
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "Workset for hla-typing 1.2",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "assay-workset",
       "subtype": "hla-typing",
       "version": "1.2",
@@ -8053,11 +8236,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "move_among_ay_top_queues": "action/move-queues/move-among-ay-top-queues/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "move_among_ay_top_queues": "BAC/move-queues/move-among-ay-top-queues/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8088,13 +8271,14 @@
           {
             "workflow/assay/hla-typing/1.2/": {}
           }
-        ]
+        ],
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "Carrier Screen 3.9",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "assay",
       "subtype": "carrier-screen",
       "version": "3.9",
@@ -8105,10 +8289,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "assay_type": "assay",
         "cogs": {
@@ -8129,7 +8313,7 @@
             "relationship_type": "contains",
             "child_templates": [
               {
-                "template_code": "workflow_step/queue/extraction-batch-eligible/1.0/",
+                "template_code": "BWS/queue/extraction-batch-eligible/1.0",
                 "json_addl": {
                   "description": "Extraction Batch Eligible",
                   "properties": {
@@ -8142,7 +8326,7 @@
                 "name_pattern": "Extraction Batch Eligible"
               },
               {
-                "template_code": "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/",
+                "template_code": "BWS/queue/blood-to-gdna-extraction-eligible/1.0",
                 "json_addl": {
                   "description": "Blood To gDNA Extraction Eligible",
                   "properties": {
@@ -8155,7 +8339,7 @@
                 "name_pattern": "Blood To gDNA Extraction Eligible"
               },
               {
-                "template_code": "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/",
+                "template_code": "BWS/queue/buccal-to-gdna-extraction-eligible/1.0",
                 "json_addl": {
                   "description": "Buccal To gDNA Extraction Eligible",
                   "properties": {
@@ -8168,7 +8352,7 @@
                 "name_pattern": "Buccal To gDNA Extraction Eligible"
               },
               {
-                "template_code": "workflow_step/queue/input-gdna-normalization-eligible/1.0/",
+                "template_code": "BWS/queue/input-gdna-normalization-eligible/1.0",
                 "json_addl": {
                   "description": "Input gDNA Normalization Eligible",
                   "properties": {
@@ -8181,7 +8365,7 @@
                 "name_pattern": "Input gDNA Normalization Eligible"
               },
               {
-                "template_code": "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/",
+                "template_code": "BWS/queue/illumina-novaseq-libprep-eligible/1.0",
                 "json_addl": {
                   "description": "Illumina Novaseq LibPrep Eligible",
                   "properties": {
@@ -8194,7 +8378,7 @@
                 "name_pattern": "Illumina Novaseq LibPrep Eligible"
               },
               {
-                "template_code": "workflow_step/queue/ont-libprep-eligible/1.0/",
+                "template_code": "BWS/queue/ont-libprep-eligible/1.0",
                 "json_addl": {
                   "description": "ONT LibPrep Eligible",
                   "properties": {
@@ -8218,13 +8402,14 @@
           ],
           "name": "Carrier Screen 3.9"
         },
-        "singleton": "1"
+        "singleton": "1",
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "HLA Typing v1.2",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "assay",
       "subtype": "hla-typing",
       "version": "1.2",
@@ -8235,10 +8420,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "assay_type": "assay",
         "cogs": {
@@ -8259,7 +8444,7 @@
             "relationship_type": "contains",
             "child_templates": [
               {
-                "template_code": "workflow_step/queue/extraction-batch-eligible/1.0/",
+                "template_code": "BWS/queue/extraction-batch-eligible/1.0",
                 "json_addl": {
                   "description": "Extraction Batch Eligible",
                   "properties": {
@@ -8272,7 +8457,7 @@
                 "name_pattern": "Extraction Batch Eligible"
               },
               {
-                "template_code": "workflow_step/queue/blood-to-gdna-extraction-eligible/1.0/",
+                "template_code": "BWS/queue/blood-to-gdna-extraction-eligible/1.0",
                 "json_addl": {
                   "description": "Blood To gDNA Extraction Eligible",
                   "properties": {
@@ -8285,7 +8470,7 @@
                 "name_pattern": "Blood To gDNA Extraction Eligible"
               },
               {
-                "template_code": "workflow_step/queue/buccal-to-gdna-extraction-eligible/1.0/",
+                "template_code": "BWS/queue/buccal-to-gdna-extraction-eligible/1.0",
                 "json_addl": {
                   "description": "Buccal To gDNA Extraction Eligible",
                   "properties": {
@@ -8298,7 +8483,7 @@
                 "name_pattern": "Buccal To gDNA Extraction Eligible"
               },
               {
-                "template_code": "workflow_step/queue/input-gdna-normalization-eligible/1.0/",
+                "template_code": "BWS/queue/input-gdna-normalization-eligible/1.0",
                 "json_addl": {
                   "description": "Input gDNA Normalization Eligible",
                   "properties": {
@@ -8311,7 +8496,7 @@
                 "name_pattern": "Input gDNA Normalization Eligible"
               },
               {
-                "template_code": "workflow_step/queue/illumina-novaseq-libprep-eligible/1.0/",
+                "template_code": "BWS/queue/illumina-novaseq-libprep-eligible/1.0",
                 "json_addl": {
                   "description": "Illumina Novaseq LibPrep Eligible",
                   "properties": {
@@ -8324,7 +8509,7 @@
                 "name_pattern": "Illumina Novaseq LibPrep Eligible"
               },
               {
-                "template_code": "workflow_step/queue/ont-libprep-eligible/1.0/",
+                "template_code": "BWS/queue/ont-libprep-eligible/1.0",
                 "json_addl": {
                   "description": "ONT LibPrep Eligible",
                   "properties": {
@@ -8348,13 +8533,14 @@
           ],
           "name": "HLA Typing v1.2"
         },
-        "singleton": "1"
+        "singleton": "1",
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "Destroy Specimen Containers",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "destroy",
       "subtype": "specimen-containers",
       "version": "1.0",
@@ -8365,11 +8551,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "destroy_specimen_containers": "action/workflow/destroy_specimen_containers/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "destroy_specimen_containers": "BAC/workflow/destroy_specimen_containers/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8389,13 +8575,14 @@
           "comments": "",
           "lab_code": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "DNA extraction from blood-whole in tube-strek-10ml tubes to a fixed-plate-96 with gdna in each well.",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "extraction",
       "subtype": "blood-whole-to-gdna",
       "version": "1.0",
@@ -8406,10 +8593,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8434,13 +8621,14 @@
           "comments": "",
           "lab_code": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "DNA extraction from blood-whole in tube-strek-10ml tubes to a fixed-plate-96 with gdna in each well.",
       "polymorphic_discriminator": "workflow_template",
-      "category": "workflow",
+      "category": "BWF",
       "type": "extraction",
       "subtype": "blood-whole-to-plasma-to-cfdna",
       "version": "1.0",
@@ -8451,10 +8639,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8479,13 +8667,14 @@
           "comments": "",
           "lab_code": ""
         },
-        "singleton": "0"
+        "singleton": "0",
+        "semantic_category": "workflow"
       }
     },
     {
       "name": "DNA QUANTIFIED",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "analysis",
       "subtype": "gdna-quantified",
       "version": "1.0",
@@ -8496,10 +8685,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8571,13 +8760,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Plasma QUANT",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "analysis",
       "subtype": "plasma-quantification",
       "version": "1.0",
@@ -8588,11 +8778,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "download_quant_data": "action/workflow_step_analysis/download_quant_data/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "download_quant_data": "BAC/workflow_step_analysis/download_quant_data/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8622,13 +8812,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Specimens Destroyed",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "destroy-steps",
       "subtype": "specimen-containers-destroyed",
       "version": "1.0",
@@ -8639,11 +8830,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "complete_specimen_destroy": "action/workflow_step_destroy/complete_specimen_destroy/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "complete_specimen_destroy": "BAC/workflow_step_destroy/complete_specimen_destroy/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8673,13 +8864,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Destroyed Containers Exceptions",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "exception",
       "subtype": "specimen-containers-destroyed",
       "version": "1.0",
@@ -8690,10 +8882,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8723,13 +8915,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "cfDNA Extraction Plate ",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "extraction-steps",
       "subtype": "cfdna-extracted",
       "version": "1.0",
@@ -8740,11 +8933,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "cfdna_post_extraction_quant": "action/workflow_step_extraction/cfdna_post_extraction_quant/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "cfdna_post_extraction_quant": "BAC/workflow_step_extraction/cfdna_post_extraction_quant/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8844,13 +9037,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Extracting gdna from blood-whole in tubes to wells in a fixed-plate-96.",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "extraction-steps",
       "subtype": "gdna-extraction",
       "version": "1.0",
@@ -8861,10 +9055,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -8962,13 +9156,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Loading blood-whole in tube-strek-10ml tubes.",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "extraction-steps",
       "subtype": "loading",
       "version": "1.0",
@@ -8979,10 +9174,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9033,13 +9228,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "plasma isolation",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "extraction-steps",
       "subtype": "plasma-isolated",
       "version": "1.0",
@@ -9050,10 +9246,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9125,13 +9321,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Filled Extraction Plate",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "plate-operations",
       "subtype": "extraction-plate-filled",
       "version": "1.0",
@@ -9142,15 +9339,15 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "cfdna_quant": "action/workflow_step_plate_operations/cfdna_quant/1.0",
-          "create_pool_from_containers": "action/pool/create_pool_from_containers__extraction_plate_filled/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_child_object": "action/object/set-child-object/1.0",
-          "set_object_status": "action/core/set_object_status/1.0",
-          "stamp_copy_plate": "action/workflow_step_plate_operations/stamp_copy_plate/1.0",
-          "stamp_plates_into_plate": "action/plate/stamp_plates_into_plate__extraction_plate_filled/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "cfdna_quant": "BAC/workflow_step_plate_operations/cfdna_quant/1.0",
+          "create_pool_from_containers": "BAC/pool/create_pool_from_containers__extraction_plate_filled/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_child_object": "BAC/object/set-child-object/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0",
+          "stamp_copy_plate": "BAC/workflow_step_plate_operations/stamp_copy_plate/1.0",
+          "stamp_plates_into_plate": "BAC/plate/stamp_plates_into_plate__extraction_plate_filled/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9187,13 +9384,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Heatseal Plate",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "plate-operations",
       "subtype": "heat-seal",
       "version": "1.0",
@@ -9204,10 +9402,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9245,13 +9443,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Existing plate, had 1+ plates merged into it.",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "plate-operations",
       "subtype": "plate-added-to",
       "version": "1.0",
@@ -9262,12 +9461,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "cfdna_quant": "action/workflow_step_plate_operations/cfdna_quant/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0",
-          "stamp_copy_plate": "action/workflow_step_plate_operations/stamp_copy_plate/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "cfdna_quant": "BAC/workflow_step_plate_operations/cfdna_quant/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0",
+          "stamp_copy_plate": "BAC/workflow_step_plate_operations/stamp_copy_plate/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9297,13 +9496,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Stamp Copy Plate",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "plate-operations",
       "subtype": "stamp-copy-plate",
       "version": "1.0",
@@ -9314,12 +9514,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "cfdna_quant": "action/workflow_step_plate_operations/cfdna_quant/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0",
-          "stamp_copy_plate": "action/workflow_step_plate_operations/stamp_copy_plate/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "cfdna_quant": "BAC/workflow_step_plate_operations/cfdna_quant/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0",
+          "stamp_copy_plate": "BAC/workflow_step_plate_operations/stamp_copy_plate/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9349,13 +9549,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "pool",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "pool",
       "subtype": "generic",
       "version": "1.0",
@@ -9366,10 +9567,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9399,13 +9600,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "OVERRIDEME",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "all-purpose",
       "version": "1.0",
@@ -9416,10 +9618,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9449,13 +9651,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Blood To gDNA Extraction Eligible",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "blood-to-gdna-extraction-eligible",
       "version": "1.0",
@@ -9466,15 +9669,15 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_gdna_to_gdna_normalization_queue": "action/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0",
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "existing_plate_fill_auto": "action/workflow_step_queue/existing-plate-fill-auto/1.0",
-          "existing_plate_fill_directed": "action/workflow_step_queue/existing-plate-fill-directed/1.0",
-          "plate_create_fill_auto": "action/workflow_step_queue/plate-create-fill-auto/1.0",
-          "plate_create_fill_directed": "action/workflow_step_queue/plate-create-fill-directed/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_gdna_to_gdna_normalization_queue": "BAC/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0",
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "existing_plate_fill_auto": "BAC/workflow_step_queue/existing-plate-fill-auto/1.0",
+          "existing_plate_fill_directed": "BAC/workflow_step_queue/existing-plate-fill-directed/1.0",
+          "plate_create_fill_auto": "BAC/workflow_step_queue/plate-create-fill-auto/1.0",
+          "plate_create_fill_directed": "BAC/workflow_step_queue/plate-create-fill-directed/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9504,13 +9707,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Buccal To gDNA Extraction Eligible",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "buccal-to-gdna-extraction-eligible",
       "version": "1.0",
@@ -9521,15 +9725,15 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_gdna_to_gdna_normalization_queue": "action/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0",
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "existing_plate_fill_auto": "action/workflow_step_queue/existing-plate-fill-auto/1.0",
-          "existing_plate_fill_directed": "action/workflow_step_queue/existing-plate-fill-directed/1.0",
-          "plate_create_fill_auto": "action/workflow_step_queue/plate-create-fill-auto/1.0",
-          "plate_create_fill_directed": "action/workflow_step_queue/plate-create-fill-directed/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_gdna_to_gdna_normalization_queue": "BAC/workflow_step_queue/add-gdna-to-gdna-normalization-queue/1.0",
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "existing_plate_fill_auto": "BAC/workflow_step_queue/existing-plate-fill-auto/1.0",
+          "existing_plate_fill_directed": "BAC/workflow_step_queue/existing-plate-fill-directed/1.0",
+          "plate_create_fill_auto": "BAC/workflow_step_queue/plate-create-fill-auto/1.0",
+          "plate_create_fill_directed": "BAC/workflow_step_queue/plate-create-fill-directed/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9559,13 +9763,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Extraction Batch Eligible",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "extraction-batch-eligible",
       "version": "1.0",
@@ -9576,12 +9781,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "add_to_blood_gdna_extraction_queue": "action/workflow_step_queue/add-to-blood-gdna-extraction-queue/1.0",
-          "add_to_buccal_gdna_extraction_queue": "action/workflow_step_queue/add-to-buccal-gdna-extraction-queue/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "add_to_blood_gdna_extraction_queue": "BAC/workflow_step_queue/add-to-blood-gdna-extraction-queue/1.0",
+          "add_to_buccal_gdna_extraction_queue": "BAC/workflow_step_queue/add-to-buccal-gdna-extraction-queue/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9611,13 +9816,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Plasma To Plates For Extraction",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "extraction-queue-available",
       "version": "1.0",
@@ -9628,12 +9834,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "fill_plate_directed": "action/workflow_step_queue/fill_plate_directed/1.0",
-          "fill_plate_undirected": "action/workflow_step_queue/fill_plate_undirected/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "fill_plate_directed": "BAC/workflow_step_queue/fill_plate_directed/1.0",
+          "fill_plate_undirected": "BAC/workflow_step_queue/fill_plate_undirected/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9663,13 +9869,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Illumina Novaseq LibPrep Eligible",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "illumina-novaseq-libprep-eligible",
       "version": "1.0",
@@ -9680,14 +9887,14 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "existing_plate_fill_auto": "action/workflow_step_queue/existing-plate-fill-auto/1.0",
-          "existing_plate_fill_directed": "action/workflow_step_queue/existing-plate-fill-directed/1.0",
-          "plate_create_fill_auto": "action/workflow_step_queue/plate-create-fill-auto/1.0",
-          "plate_create_fill_directed": "action/workflow_step_queue/plate-create-fill-directed/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "existing_plate_fill_auto": "BAC/workflow_step_queue/existing-plate-fill-auto/1.0",
+          "existing_plate_fill_directed": "BAC/workflow_step_queue/existing-plate-fill-directed/1.0",
+          "plate_create_fill_auto": "BAC/workflow_step_queue/plate-create-fill-auto/1.0",
+          "plate_create_fill_directed": "BAC/workflow_step_queue/plate-create-fill-directed/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9717,13 +9924,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Input gDNA Normalization Eligible",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "input-gdna-normalization-eligible",
       "version": "1.0",
@@ -9734,15 +9942,15 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "existing_plate_fill_auto": "action/workflow_step_queue/existing-plate-fill-auto/1.0",
-          "existing_plate_fill_directed": "action/workflow_step_queue/existing-plate-fill-directed/1.0",
-          "plate_create_fill_auto": "action/workflow_step_queue/plate-create-fill-auto/1.0",
-          "plate_create_fill_directed": "action/workflow_step_queue/plate-create-fill-directed/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "save_quant_data": "action/workflow_step_queue/save-quant-data/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "existing_plate_fill_auto": "BAC/workflow_step_queue/existing-plate-fill-auto/1.0",
+          "existing_plate_fill_directed": "BAC/workflow_step_queue/existing-plate-fill-directed/1.0",
+          "plate_create_fill_auto": "BAC/workflow_step_queue/plate-create-fill-auto/1.0",
+          "plate_create_fill_directed": "BAC/workflow_step_queue/plate-create-fill-directed/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "save_quant_data": "BAC/workflow_step_queue/save-quant-data/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9772,13 +9980,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "ONT LibPrep Eligible",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "ont-libprep-eligible",
       "version": "1.0",
@@ -9789,14 +9998,14 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "existing_plate_fill_auto": "action/workflow_step_queue/existing-plate-fill-auto/1.0",
-          "existing_plate_fill_directed": "action/workflow_step_queue/existing-plate-fill-directed/1.0",
-          "plate_create_fill_auto": "action/workflow_step_queue/plate-create-fill-auto/1.0",
-          "plate_create_fill_directed": "action/workflow_step_queue/plate-create-fill-directed/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "existing_plate_fill_auto": "BAC/workflow_step_queue/existing-plate-fill-auto/1.0",
+          "existing_plate_fill_directed": "BAC/workflow_step_queue/existing-plate-fill-directed/1.0",
+          "plate_create_fill_auto": "BAC/workflow_step_queue/plate-create-fill-auto/1.0",
+          "plate_create_fill_directed": "BAC/workflow_step_queue/plate-create-fill-directed/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9826,13 +10035,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Containers available for plasma isolation in this queue.",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "plasma-isolation-queue-available",
       "version": "1.0",
@@ -9843,11 +10053,11 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "link_tubes_auto": "action/workflow_step_queue/link_tubes_auto/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "link_tubes_auto": "BAC/workflow_step_queue/link_tubes_auto/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9877,13 +10087,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Plasma Isolation Exception Queue",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "plasma-isolation-queue-exception",
       "version": "1.0",
@@ -9894,12 +10105,12 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "link_tubes_auto": "action/workflow_step_queue/link_tubes_auto/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0",
-          "ycreate_test_req_and_link_child_workflow_step": "action/workflow_step_queue/ycreate_test_req_and_link_child_workflow_step/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "link_tubes_auto": "BAC/workflow_step_queue/link_tubes_auto/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0",
+          "ycreate_test_req_and_link_child_workflow_step": "BAC/workflow_step_queue/ycreate_test_req_and_link_child_workflow_step/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -9943,13 +10154,14 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     },
     {
       "name": "Containers Removed From Queue",
       "polymorphic_discriminator": "workflow_step_template",
-      "category": "workflow_step",
+      "category": "BWS",
       "type": "queue",
       "subtype": "plasma-isolation-queue-removed",
       "version": "1.0",
@@ -9960,10 +10172,10 @@
       "json_addl": {
         "action_groups": {},
         "action_imports": {
-          "add_relationships": "action/core/add-relationships/1.0",
-          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
-          "print_barcode_label": "action/core/print_barcode_label/1.0",
-          "set_object_status": "action/core/set_object_status/1.0"
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
         },
         "cogs": {
           "allocation_type": "",
@@ -10004,7 +10216,8 @@
           "start_operator": "",
           "start_timestamp": "",
           "step_number": ""
-        }
+        },
+        "semantic_category": "workflow_step"
       }
     }
   ]

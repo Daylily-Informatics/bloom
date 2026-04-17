@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -20,6 +21,8 @@ os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 from fastapi.responses import RedirectResponse
 from fastapi.testclient import TestClient
+
+from bloom_lims.search.contracts import SearchRequest, SearchResponse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main
@@ -273,3 +276,80 @@ def test_query_by_euids_and_removed_file_flows(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert resp.status_code == 404
+
+
+def test_modern_search_post_executes_handler(client: TestClient) -> None:
+    _warm_session(client)
+
+    fake_search_request = SearchRequest(
+        query="BCN-SEARCH-1",
+        record_types=["instance"],
+        categories=["file"],
+        page=1,
+        page_size=50,
+    )
+    fake_search_response = SearchResponse(
+        query="BCN-SEARCH-1",
+        page=1,
+        page_size=50,
+        total=1,
+        total_pages=1,
+        sort_by="timestamp",
+        sort_order="desc",
+        truncated=False,
+        facets={"record_type": {"instance": 1}, "category": {"file": 1}},
+        items=[],
+    )
+
+    with (
+        patch(
+            "bloom_lims.gui.routes.modern.SearchService.build_dewey_request",
+            return_value=fake_search_request,
+        ),
+        patch(
+            "bloom_lims.gui.routes.modern.SearchService.search",
+            return_value=fake_search_response,
+        ),
+    ):
+        resp = client.post(
+            "/search",
+            data={"search_target": "file", "euid": "BCN-SEARCH-1"},
+        )
+
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers.get("content-type", "")
+    assert "BCN-SEARCH-1" in resp.text
+
+
+def test_logout_alias_routes_execute_handler_body(client: TestClient) -> None:
+    with (
+        patch(
+            "bloom_lims.gui.routes.auth.build_bloom_web_session_config",
+            return_value=SimpleNamespace(
+                domain="example.auth.us-west-2.amazoncognito.com",
+                client_id="client-123",
+                logout_uri="https://testserver/auth/logout",
+            ),
+        ),
+        patch(
+            "bloom_lims.gui.routes.auth.build_logout_url",
+            return_value="https://example.auth.us-west-2.amazoncognito.com/logout",
+        ),
+        patch(
+            "bloom_lims.gui.routes.auth.clear_bloom_session",
+            return_value=None,
+        ),
+    ):
+        auth_logout = client.post("/auth/logout", follow_redirects=False)
+        assert auth_logout.status_code == 303
+        assert (
+            auth_logout.headers["location"]
+            == "https://example.auth.us-west-2.amazoncognito.com/logout"
+        )
+
+        logout = client.get("/logout", follow_redirects=False)
+        assert logout.status_code == 303
+        assert (
+            logout.headers["location"]
+            == "https://example.auth.us-west-2.amazoncognito.com/logout"
+        )

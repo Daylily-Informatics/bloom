@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 import bloom_lims.tapdb_adapter as tapdb_adapter
 from bloom_lims.tapdb_adapter import generic_instance_lineage, generic_template
+from bloom_lims.template_identity import instance_semantic_category
 
 
 def test_template_exposes_only_canonical_uid_attribute():
@@ -18,6 +21,13 @@ def test_lineage_exposes_only_canonical_uid_fk_attributes():
     )
     assert not hasattr(generic_instance_lineage, "parent_instance_uuid")
     assert not hasattr(generic_instance_lineage, "child_instance_uuid")
+
+
+def test_instance_semantic_category_falls_back_to_parent_template():
+    template = SimpleNamespace(json_addl={"semantic_category": "container"})
+    instance = SimpleNamespace(json_addl={}, parent_template=template, category="BCN")
+
+    assert instance_semantic_category(instance) == "container"
 
 
 class _FakeSession:

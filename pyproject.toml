@@ -6,10 +6,13 @@
 # Activation creates a deployment-scoped conda environment named
 # `BLOOM-<deploy-name>` from repo-root `environment.yaml`.
 #
+# `environment.yaml` is system/bootstrap tooling only; all Python libraries
+# belong in [project.dependencies].
+#
 # To set up the environment:
 #   source ./activate <deploy-name>
 #
-# See environment.yaml for the full list of dependencies.
+# See environment.yaml for the non-Python/system dependencies.
 # =============================================================================
 
 [build-system]
@@ -24,28 +27,42 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
-    "cli-core-yo==2.0.0",
-    "daylily-tapdb==5.0.4",
-    "daylily-auth-cognito==2.0.2",
+    "cli-core-yo==2.1.0",
+    "daylily-tapdb==6.0.4",
+    "daylily-auth-cognito==2.1.1",
+    "IPython>=8.18.1",
+    "bandit[toml]>=1.8.0",
+    "black>=24.0.0",
+    "psycopg2==2.9.9",
     "boto3>=1.34.0",
+    "djlint",
     "fastapi>=0.110.0",
     "httpx>=0.27.2",
     "itsdangerous>=2.1.2",
     "Jinja2>=3.0.3",
     "matplotlib>=3.8.0",
+    "moto>=5.0.0",
+    "mypy>=1.0",
     "pandas>=2.2.0",
+    "playwright>=1.42.0",
+    "pre-commit>=3.8.0",
     "pydantic>=2.6.0",
     "pydantic-settings>=2.0.0",
+    "psutil>=5.9.0",
     "PyJWT>=2.8.0",
     "python-multipart>=0.0.9",
-    "psutil>=5.9.0",
     "PyYAML>=6.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-playwright>=0.4.4",
     "requests>=2.28.2",
+    "requests-mock>=1.11.0",
     "rich>=13.0",
+    "ruff>=0.1.0",
     "sqlalchemy>=2.0.23",
     "starlette>=0.35.1",
     "uvicorn>=0.28.0",
-    "zebra-day==5.1.3",
     "daylily-carrier-tracking==0.5.1",
 ]
 classifiers = [
@@ -66,22 +83,6 @@ Homepage = "https://github.com/Daylily-Informatics/bloom"
 Repository = "https://github.com/Daylily-Informatics/bloom.git"
 Issues = "https://github.com/Daylily-Informatics/bloom/issues"
 
-[project.optional-dependencies]
-dev = [
-    "bandit[toml]>=1.8.0",
-    "black>=24.0.0",
-    "moto>=5.0.0",
-    "pre-commit>=3.8.0",
-    "pytest>=8.0",
-    "pytest-cov>=4.1.0",
-    "pytest-asyncio>=0.23.0",
-    "playwright>=1.42.0",
-    "pytest-playwright>=0.4.4",
-    "requests-mock>=1.11.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0",
-]
-
 [project.scripts]
 bloom = "bloom_lims.cli:main"
 
@@ -94,7 +95,7 @@ where = ["."]
 include = ["bloom_lims*"]
 
 [tool.setuptools.package-data]
-bloom_lims = ["etc/*.yaml"]
+bloom_lims = ["etc/*.yaml", "etc/*.json"]
 
 # =============================================================================
 # BLOOM Environment Configuration

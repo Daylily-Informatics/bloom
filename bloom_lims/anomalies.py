@@ -40,7 +40,14 @@ def redact_context(value: Any) -> Any:
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             lowered = str(key).lower()
-            if lowered in {"authorization", "cookie", "set-cookie", "token", "secret", "password"}:
+            if lowered in {
+                "authorization",
+                "cookie",
+                "set-cookie",
+                "token",
+                "secret",
+                "password",
+            }:
                 redacted[str(key)] = "[redacted]"
             else:
                 redacted[str(key)] = redact_context(item)
@@ -65,8 +72,12 @@ def redact_context(value: Any) -> Any:
 class TapdbAnomalyRepository:
     def __init__(self, db: Session):
         self.db = db
+        self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
-        self.factory = InstanceFactory(self.templates)
+        self.factory = InstanceFactory(
+            self.templates,
+            domain_code=self.domain_code,
+        )
         self._templates_ready = False
 
     def projection(self, *, observed_at: str | None = None) -> ProjectionMetadata:
@@ -140,7 +151,9 @@ class TapdbAnomalyRepository:
                 return self._to_record(instance)
         return None
 
-    def record_db_probe_failure(self, *, detail: str, latency_ms: float) -> AnomalyRecord:
+    def record_db_probe_failure(
+        self, *, detail: str, latency_ms: float
+    ) -> AnomalyRecord:
         return self.record(
             category="database",
             severity="error",
@@ -159,6 +172,7 @@ class TapdbAnomalyRepository:
             self.db,
             [(ANOMALY_TEMPLATE_CODE, ANOMALY_PREFIX)],
             app_name="Bloom",
+            domain_code=self.domain_code,
             template_manager=self.templates,
         )
         self._templates_ready = True
@@ -183,10 +197,13 @@ class TapdbAnomalyRepository:
         return None
 
     def _instances(self) -> list[generic_instance]:
-        category, type_name, subtype, version = ANOMALY_TEMPLATE_CODE.strip("/").split("/")
+        category, type_name, subtype, version = ANOMALY_TEMPLATE_CODE.strip("/").split(
+            "/"
+        )
         stmt = (
             select(generic_instance)
             .where(
+                generic_instance.domain_code == self.domain_code,
                 generic_instance.category == category,
                 generic_instance.type == type_name,
                 generic_instance.subtype == subtype,
@@ -208,7 +225,9 @@ class TapdbAnomalyRepository:
             instance.json_addl = payload
         return properties
 
-    def _write_props(self, instance: generic_instance, properties: dict[str, Any]) -> None:
+    def _write_props(
+        self, instance: generic_instance, properties: dict[str, Any]
+    ) -> None:
         payload = instance.json_addl or {}
         if not isinstance(payload, dict):
             payload = {}
@@ -222,7 +241,9 @@ class TapdbAnomalyRepository:
         return AnomalyRecord(
             id=str(instance.euid),
             service=str(props.get("service") or "bloom"),
-            environment=str(props.get("environment") or (get_settings().environment or "unknown")),
+            environment=str(
+                props.get("environment") or (get_settings().environment or "unknown")
+            ),
             category=str(props.get("category") or "unknown"),
             severity=str(props.get("severity") or "unknown"),
             fingerprint=str(props.get("fingerprint") or ""),

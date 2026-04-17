@@ -17,6 +17,7 @@ from bloom_lims.cli import (
     build_app,
     config_extra,
 )
+from bloom_lims.config import get_user_config_path
 
 try:
     from cli_core_yo.certs import ResolvedHttpsCerts
@@ -40,8 +41,15 @@ def runner() -> CliRunner:
 
 @pytest.fixture
 def cli_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from bloom_lims.config import get_settings
+
     monkeypatch.setenv("HOME", str(tmp_path))
-    return build_app()
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / ".local" / "state"))
+    get_settings.cache_clear()
+    app = build_app()
+    yield app
+    get_settings.cache_clear()
 
 
 class TestMainCommands:
@@ -119,7 +127,7 @@ class TestMainCommands:
     def test_db_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["db", "--help"])
         assert result.exit_code == 0
-        assert "init" in result.output
+        assert "build" in result.output
         assert "seed" in result.output
         assert "reset" in result.output
         assert "nuke" in result.output
@@ -183,7 +191,9 @@ class TestMainCommands:
         monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
         _enforce_conda_env_contract(["env", "status"])
 
-    def test_env_commands_render(self, runner: CliRunner, cli_app, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_env_commands_render(
+        self, runner: CliRunner, cli_app, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("BLOOM_ACTIVE", "1")
         monkeypatch.setenv("BLOOM_ROOT", "/tmp/bloom")
 
@@ -194,7 +204,10 @@ class TestMainCommands:
 
         activate_result = runner.invoke(cli_app, ["env", "activate"])
         assert activate_result.exit_code == 0
-        assert f"source {cli_module.ACTIVATE_SCRIPT} <deploy-name>" in activate_result.output
+        assert (
+            f"source {cli_module.ACTIVATE_SCRIPT} <deploy-name>"
+            in activate_result.output
+        )
 
         deactivate_result = runner.invoke(cli_app, ["env", "deactivate"])
         assert deactivate_result.exit_code == 0
@@ -203,7 +216,9 @@ class TestMainCommands:
         reset_result = runner.invoke(cli_app, ["env", "reset"])
         assert reset_result.exit_code == 0
         assert f"source {cli_module.DEACTIVATE_SCRIPT}" in reset_result.output
-        assert f"source {cli_module.ACTIVATE_SCRIPT} <deploy-name>" in reset_result.output
+        assert (
+            f"source {cli_module.ACTIVATE_SCRIPT} <deploy-name>" in reset_result.output
+        )
 
     def test_config_doctor_help(self, runner: CliRunner, cli_app) -> None:
         result = runner.invoke(cli_app, ["config", "doctor", "--help"])
@@ -230,6 +245,10 @@ class TestMainCommands:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
+        import bloom_lims.schema_drift as schema_drift_module
+
+        state_dir = tmp_path / ".local" / "state" / "bloom"
+        monkeypatch.setattr(schema_drift_module, "_state_dir", lambda: state_dir)
         monkeypatch.setattr(
             config_extra,
             "run_schema_drift_check",
@@ -250,7 +269,7 @@ class TestMainCommands:
         assert result.exit_code == 0
         assert "schema drift detected" in result.output.lower()
         assert "report only" in result.output.lower()
-        drift_report = tmp_path / ".local" / "state" / "bloom" / "schema_drift.json"
+        drift_report = schema_drift_module.schema_drift_state_file()
         assert drift_report.exists()
         assert "expected=12 live=13" in drift_report.read_text(encoding="utf-8")
 
@@ -296,7 +315,7 @@ class TestConfigValidation:
         result = runner.invoke(cli_app, ["config", "init"])
         assert result.exit_code == 0
 
-        config_path = tmp_path / ".config" / "bloom-local" / "bloom-config-local.yaml"
+        config_path = get_user_config_path()
         assert config_path.exists()
 
         result = runner.invoke(cli_app, ["config", "validate"])
@@ -309,7 +328,7 @@ class TestConfigValidation:
         cli_app,
         tmp_path: Path,
     ) -> None:
-        config_path = tmp_path / ".config" / "bloom-local" / "bloom-config-local.yaml"
+        config_path = get_user_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text("auth:\n  cognito_user_pool_id: [\n", encoding="utf-8")
 
@@ -323,7 +342,7 @@ class TestConfigValidation:
         cli_app,
         tmp_path: Path,
     ) -> None:
-        config_path = tmp_path / ".config" / "bloom-local" / "bloom-config-local.yaml"
+        config_path = get_user_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text("environment: invalid\n", encoding="utf-8")
 
@@ -368,10 +387,11 @@ class TestServerState:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        state_dir = tmp_path / ".local" / "state" / "bloom"
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "server.pid").write_text("321", encoding="utf-8")
-        monkeypatch.setattr(server_commands.os, "kill", lambda pid, sig: None)
+        monkeypatch.setattr(
+            server_commands,
+            "server_status_label",
+            lambda: "Running (HTTPS, PID 321)",
+        )
 
         result = runner.invoke(cli_app, ["info"])
         assert result.exit_code == 0
@@ -515,14 +535,19 @@ class TestServerTlsBehavior:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        state_dir = tmp_path / ".local" / "state" / "bloom"
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "server.pid").write_text("321", encoding="utf-8")
-        (state_dir / "server-meta.json").write_text(
+        pid_file = tmp_path / "server.pid"
+        pid_file.write_text("321", encoding="utf-8")
+        meta_file = tmp_path / "server-meta.json"
+        meta_file.write_text(
             json.dumps({"ssl_enabled": False}),
             encoding="utf-8",
         )
-        monkeypatch.setattr(server_commands.os, "kill", lambda pid, sig: None)
+        monkeypatch.setattr(
+            server_commands,
+            "active_server_pid",
+            lambda: (321, pid_file),
+        )
+        monkeypatch.setattr(server_commands, "_runtime_meta_file", lambda: meta_file)
 
         result = runner.invoke(cli_app, ["server", "status"])
 

@@ -2,21 +2,31 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cli_core_yo.registry import CommandRegistry
     from cli_core_yo.spec import CliSpec
 
-import importlib
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import typer
+from daylily_tapdb.euid import (
+    AUDIT_LOG_PREFIX,
+    GENERIC_INSTANCE_LINEAGE_PREFIX,
+    GENERIC_TEMPLATE_PREFIX,
+)
+from daylily_tapdb.templates.loader import (
+    find_tapdb_core_config_dir,
+    seed_templates,
+    validate_template_configs,
+)
 from rich.console import Console
+from sqlalchemy import text
 
 from bloom_lims.cli._registry_v2 import (
     EXEMPT_MUTATING,
@@ -26,79 +36,37 @@ from bloom_lims.cli._registry_v2 import (
 from bloom_lims.config import (
     DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
     DEFAULT_BLOOM_WEB_PORT,
+    DEFAULT_TAPDB_OWNER_REPO_NAME,
     apply_runtime_environment,
     get_settings,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_DEFAULT_AUDIT_LOG_EUID_PREFIX = "BGX"
-_DEFAULT_TAPDB_CLIENT_ID = "bloom"
-_DEFAULT_TAPDB_DATABASE_NAME = "bloom"
-_DEFAULT_TAPDB_EUID_CLIENT_CODE = "B"
-_DEFAULT_MERIDIAN_DOMAIN_CODE = "B"
-_DEFAULT_TAPDB_APP_CODE = "B"
+_TAPDB_CORE_TEMPLATE_PREFIXES = {"SYS", "MSG"}
+_IDENTITY_PREFIXES: dict[str, str] = {
+    "generic_template": GENERIC_TEMPLATE_PREFIX,
+    "generic_instance_lineage": GENERIC_INSTANCE_LINEAGE_PREFIX,
+    "audit_log": AUDIT_LOG_PREFIX,
+}
 
 
 def _bloom_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _is_dayhoff_artifact_path(path: Path) -> bool:
-    return ".dayhoff/local" in str(path)
-
-
-def _resolve_tapdb_schema_source() -> Path | None:
-    """Locate tapdb_schema.sql from installed package or local dev checkouts."""
-    candidates: list[Path] = []
-
-    root = _bloom_root()
-    candidates.extend(
-        [
-            root.parent / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-            root.parent / "daylily" / "daylily-tapdb" / "schema" / "tapdb_schema.sql",
-        ]
-    )
-
-    try:
-        tapdb_pkg = importlib.import_module("daylily_tapdb")
-        pkg_file = Path(tapdb_pkg.__file__).resolve()
-        candidates.extend(
-            [
-                pkg_file.parents[1] / "schema" / "tapdb_schema.sql",
-                pkg_file.parents[2] / "schema" / "tapdb_schema.sql",
-            ]
-        )
-    except Exception:
-        pass
-
-    for candidate in candidates:
-        if candidate.exists() and not _is_dayhoff_artifact_path(candidate):
-            return candidate
-    return None
-
-
 def _ensure_schema_available_for_bloom_root() -> None:
-    """Ensure tapdb schema is visible when running tapdb from bloom repo root."""
-    target = _bloom_root() / "schema" / "tapdb_schema.sql"
-    if target.exists():
+    """Require the repo-local TapDB schema file instead of discovering fallback copies."""
+    schema_path = (_bloom_root() / "schema" / "tapdb_schema.sql").resolve()
+    if schema_path.is_file():
         return
-
-    source = _resolve_tapdb_schema_source()
-    if source is None:
-        return
-
-    if target.is_symlink():
-        target.unlink()
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        target.symlink_to(source)
-    except Exception:
-        if target.exists() or target.is_symlink():
-            target.unlink()
-        shutil.copy2(source, target)
+    raise RuntimeError(
+        "Bloom db bootstrap requires the repo-local schema file "
+        f"{schema_path}. Bloom will not guess schema sources from sibling repos, "
+        "site-packages, or Dayhoff artifacts."
+    )
 
 
 def _tapdb_base_cmd() -> list[str]:
@@ -110,15 +78,18 @@ def _runtime_env() -> dict[str, str]:
     """Build normalized runtime env for tapdb commands."""
     settings = get_settings()
     ctx = apply_runtime_environment(settings)
+    domain_registry_path = str(ctx.domain_registry_path).strip()
+    prefix_registry_path = str(ctx.prefix_ownership_registry_path).strip()
 
     env = os.environ.copy()
     env["AWS_PROFILE"] = ctx.aws_profile
     env["AWS_REGION"] = ctx.aws_region
     env["AWS_DEFAULT_REGION"] = ctx.aws_region
-    env["MERIDIAN_DOMAIN_CODE"] = os.environ.get(
-        "MERIDIAN_DOMAIN_CODE", _DEFAULT_MERIDIAN_DOMAIN_CODE
-    )
-    env["TAPDB_APP_CODE"] = os.environ.get("TAPDB_APP_CODE", _DEFAULT_TAPDB_APP_CODE)
+    env["MERIDIAN_DOMAIN_CODE"] = ctx.domain_code
+    env["TAPDB_DOMAIN_CODE"] = ctx.domain_code
+    env["TAPDB_OWNER_REPO"] = ctx.owner_repo_name or DEFAULT_TAPDB_OWNER_REPO_NAME
+    env["TAPDB_DOMAIN_REGISTRY_PATH"] = domain_registry_path
+    env["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] = prefix_registry_path
     return env
 
 
@@ -145,11 +116,6 @@ def _local_ui_port(env_name: str) -> str:
     return str(DEFAULT_BLOOM_WEB_PORT).strip()
 
 
-def _tapdb_audit_log_euid_prefix(env_name: str) -> str:
-    _ = env_name
-    return _DEFAULT_AUDIT_LOG_EUID_PREFIX
-
-
 def _tapdb_support_email(env_name: str) -> str:
     _ = env_name
     return get_settings().ui.support_email.strip()
@@ -162,8 +128,6 @@ def _update_tapdb_namespace_config(env_name: str) -> None:
             "update",
             "--env",
             env_name,
-            "--audit-log-euid-prefix",
-            _tapdb_audit_log_euid_prefix(env_name),
             "--support-email",
             _tapdb_support_email(env_name),
         ]
@@ -177,6 +141,10 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
         raise RuntimeError(
             "TapDB config path is required. Resolve it via Bloom settings and pass it explicitly "
             "to TapDB with --config."
+        )
+    if config_path.startswith("~") or not Path(config_path).is_absolute():
+        raise RuntimeError(
+            f"TapDB config path must be a full absolute path. Got: {config_path}"
         )
     cmd = _tapdb_base_cmd() + [
         "--config",
@@ -195,19 +163,23 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
 def _ensure_tapdb_namespace_config(env_name: str) -> None:
     """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
     ctx = apply_runtime_environment(get_settings())
-    if not str(ctx.config_path or "").strip():
-        return
     _ensure_runtime_config_parent()
 
     args = [
         "db-config",
         "init",
         "--client-id",
-        _DEFAULT_TAPDB_CLIENT_ID,
+        ctx.client_id,
         "--database-name",
-        _DEFAULT_TAPDB_DATABASE_NAME,
-        "--euid-client-code",
-        _DEFAULT_TAPDB_EUID_CLIENT_CODE,
+        ctx.database_name,
+        "--owner-repo-name",
+        ctx.owner_repo_name,
+        "--domain-code",
+        f"{env_name}={ctx.domain_code}",
+        "--domain-registry-path",
+        str(ctx.domain_registry_path),
+        "--prefix-ownership-registry-path",
+        str(ctx.prefix_ownership_registry_path),
         "--env",
         env_name,
     ]
@@ -230,36 +202,240 @@ def _seed_tapdb_templates(
     include_workflow: bool = False,
     overwrite: bool = False,
 ) -> None:
-    """Seed TAPDB templates (TapDB core config is always included by TapDB)."""
-    tapdb_config_dir = str(_bloom_root() / "config" / "tapdb_templates")
-    args = ["db", "data", "seed", env_name]
-    if tapdb_config_dir:
-        args.extend(["--config", tapdb_config_dir])
-        console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
-    else:
-        console.print(
-            "[cyan]TapDB template seed:[/cyan] using built-in TapDB core config"
-        )
+    """Seed TapDB templates with strict per-owner prefix validation."""
+    tapdb_config_dir = (_bloom_root() / "config" / "tapdb_templates").resolve()
+    console.print(f"[cyan]TapDB template seed config:[/cyan] {tapdb_config_dir}")
     if include_workflow:
-        console.print(
-            "[yellow]Workflow overlay seeding is not supported in Bloom.[/yellow]"
+        raise RuntimeError("Workflow overlay seeding is not supported in Bloom.")
+    core_config_dir = find_tapdb_core_config_dir().resolve()
+    templates, issues = validate_template_configs(
+        [core_config_dir, tapdb_config_dir],
+        strict=True,
+    )
+    errors = [issue for issue in issues if issue.level == "error"]
+    if errors:
+        joined = "; ".join(issue.message for issue in errors)
+        raise RuntimeError(f"Bloom template pack validation failed: {joined}")
+
+    core_templates: list[dict[str, object]] = []
+    client_templates: list[dict[str, object]] = []
+    for template in templates:
+        instance_prefix = str(template.get("instance_prefix") or "").strip().upper()
+        target_batch = (
+            core_templates
+            if instance_prefix in _TAPDB_CORE_TEMPLATE_PREFIXES
+            else client_templates
         )
-    args.append("--overwrite" if overwrite else "--skip-existing")
-    _run_tapdb(args)
+        target_batch.append(template)
+
+    ctx = apply_runtime_environment(get_settings())
+    domain_registry_path = Path(str(ctx.domain_registry_path)).expanduser().resolve()
+    prefix_registry_path = (
+        Path(str(ctx.prefix_ownership_registry_path)).expanduser().resolve()
+    )
+    bdb = BLOOMdb3(app_username="bloom-cli")
+    try:
+        if core_templates:
+            _ensure_identity_prefix_config(
+                bdb.session,
+                owner_repo_name="daylily-tapdb",
+                domain_code=ctx.domain_code,
+            )
+            seed_templates(
+                bdb.session,
+                core_templates,
+                overwrite=overwrite,
+                core_config_dir=core_config_dir,
+                domain_code=ctx.domain_code,
+                owner_repo_name="daylily-tapdb",
+                domain_registry_path=domain_registry_path,
+                prefix_registry_path=prefix_registry_path,
+            )
+        if client_templates:
+            client_templates = [
+                template
+                for template in client_templates
+                if str(template.get("instance_prefix") or "").strip().upper()
+                not in _TAPDB_CORE_TEMPLATE_PREFIXES
+            ]
+            _claim_client_template_prefixes(
+                prefix_registry_path=prefix_registry_path,
+                domain_code=ctx.domain_code,
+                owner_repo_name=ctx.owner_repo_name,
+                templates=client_templates,
+            )
+            _ensure_identity_prefix_config(
+                bdb.session,
+                owner_repo_name=ctx.owner_repo_name,
+                domain_code=ctx.domain_code,
+            )
+            seed_templates(
+                bdb.session,
+                client_templates,
+                overwrite=overwrite,
+                core_config_dir=core_config_dir,
+                domain_code=ctx.domain_code,
+                owner_repo_name=ctx.owner_repo_name,
+                domain_registry_path=domain_registry_path,
+                prefix_registry_path=prefix_registry_path,
+            )
+        bdb.session.commit()
+    except Exception:
+        bdb.session.rollback()
+        raise
+    finally:
+        bdb.session.close()
+        bdb.engine.dispose()
+
+
+def _load_prefix_ownership_registry(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {"version": "0.4.0", "ownership": {}}
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Prefix ownership registry must be a JSON object: {path}")
+    ownership = payload.get("ownership")
+    if ownership is None:
+        payload["ownership"] = {}
+    elif not isinstance(ownership, dict):
+        raise ValueError(
+            f"Prefix ownership registry must define object ownership: {path}"
+        )
+    payload.setdefault("version", "0.4.0")
+    return payload
+
+
+def _write_prefix_ownership_registry(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        path.chmod(0o600)
+    except Exception:
+        pass
+
+
+def _claim_client_template_prefixes(
+    *,
+    prefix_registry_path: Path,
+    domain_code: str,
+    owner_repo_name: str,
+    templates: list[dict[str, object]],
+) -> None:
+    normalized_domain_code = str(domain_code or "").strip().upper()
+    normalized_owner_repo_name = str(owner_repo_name or "").strip()
+    if not normalized_domain_code:
+        raise ValueError("domain_code is required to claim client template prefixes")
+    if not normalized_owner_repo_name:
+        raise ValueError(
+            "owner_repo_name is required to claim client template prefixes"
+        )
+
+    prefixes = sorted(
+        {
+            str(template.get("instance_prefix") or "").strip().upper()
+            for template in templates
+            if str(template.get("instance_prefix") or "").strip()
+            and str(template.get("instance_prefix") or "").strip().upper()
+            not in _TAPDB_CORE_TEMPLATE_PREFIXES
+        }
+    )
+    if not prefixes:
+        return
+
+    registry = _load_prefix_ownership_registry(prefix_registry_path)
+    ownership = registry.setdefault("ownership", {})
+    if not isinstance(ownership, dict):
+        raise ValueError(
+            f"Prefix ownership registry must define object ownership: {prefix_registry_path}"
+        )
+    domain_claims = ownership.setdefault(normalized_domain_code, {})
+    if not isinstance(domain_claims, dict):
+        raise ValueError(
+            f"Prefix ownership registry must define object ownership for domain "
+            f"{normalized_domain_code!r}: {prefix_registry_path}"
+        )
+
+    changed = False
+    for prefix in prefixes:
+        existing = domain_claims.get(prefix)
+        if isinstance(existing, dict):
+            claimed_owner = str(
+                existing.get("issuer_app_code")
+                or existing.get("owner_repo_name")
+                or existing.get("repo_name")
+                or ""
+            ).strip()
+            if claimed_owner and claimed_owner != normalized_owner_repo_name:
+                raise ValueError(
+                    f"Prefix {prefix!r} for domain {normalized_domain_code!r} is claimed by "
+                    f"{claimed_owner!r}, not {normalized_owner_repo_name!r}"
+                )
+            if (
+                claimed_owner != normalized_owner_repo_name
+                or existing.get("issuer_app_code") != normalized_owner_repo_name
+            ):
+                domain_claims[prefix] = {"issuer_app_code": normalized_owner_repo_name}
+                changed = True
+            continue
+        if existing is not None:
+            raise ValueError(
+                f"Prefix {prefix!r} for domain {normalized_domain_code!r} has an invalid "
+                f"claim entry in {prefix_registry_path}"
+            )
+        domain_claims[prefix] = {"issuer_app_code": normalized_owner_repo_name}
+        changed = True
+
+    if changed:
+        _write_prefix_ownership_registry(prefix_registry_path, registry)
+
+
+def _ensure_identity_prefix_config(
+    session, *, owner_repo_name: str, domain_code: str
+) -> None:
+    values_sql = ",\n        ".join(
+        f"('{entity}', '{domain_code}', '{owner_repo_name}', '{prefix}')"
+        for entity, prefix in _IDENTITY_PREFIXES.items()
+    )
+    sequence_sql = "\n    ".join(
+        f'CREATE SEQUENCE IF NOT EXISTS "{prefix.lower()}_instance_seq";'
+        for prefix in sorted(set(_IDENTITY_PREFIXES.values()))
+    )
+    sql = f"""
+    INSERT INTO tapdb_identity_prefix_config(entity, domain_code, issuer_app_code, prefix)
+    VALUES {values_sql}
+    ON CONFLICT (entity, domain_code, issuer_app_code) DO UPDATE
+      SET prefix = EXCLUDED.prefix, updated_dt = NOW();
+
+    {sequence_sql}
+    """
+    session.execute(text(sql))
 
 
 @db_app.command("build")
 def db_build(
     force: bool = typer.Option(False, "--force", "-f", help="Force re-initialization"),
+    target: str = typer.Option(
+        "local",
+        "--target",
+        help="TapDB build target: local or aurora",
+    ),
 ) -> None:
     """Build database/runtime via tapdb orchestration."""
     env_name = _current_env()
+    target_mode = target.strip().lower()
+    if target_mode not in {"local", "aurora"}:
+        raise typer.BadParameter("--target must be either local or aurora")
+
     console.print(
-        f"[cyan]Initializing BLOOM database via tapdb (env={env_name})...[/cyan]"
+        f"[cyan]Initializing BLOOM database via tapdb (env={env_name}, target={target_mode})...[/cyan]"
     )
     _ensure_tapdb_namespace_config(env_name)
 
-    if env_name in {"dev", "test"}:
+    if target_mode == "local":
         _ensure_schema_available_for_bloom_root()
         local_port = _local_pg_port(env_name)
         console.print(
@@ -267,10 +443,14 @@ def db_build(
         )
         _run_tapdb(["pg", "init", env_name], check=False)
         _run_tapdb(["pg", "start-local", env_name, "--port", local_port])
-        setup_args = ["db", "setup", env_name]
         if force:
-            setup_args.append("--force")
-        _run_tapdb(setup_args)
+            _run_tapdb(["db", "delete", env_name, "--force"], check=False)
+        _run_tapdb(["db", "create", env_name], check=False)
+        schema_args = ["db", "schema", "apply", env_name]
+        if force:
+            schema_args.append("--reinitialize")
+        _run_tapdb(schema_args)
+        _run_tapdb(["db", "schema", "migrate", env_name])
         _seed_tapdb_templates(env_name, overwrite=force)
         return
 

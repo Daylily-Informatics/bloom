@@ -110,7 +110,7 @@ Bloom reads Atlas references via configured service credentials:
 Lookups:
 - preferred TRF: `/api/integrations/bloom/v1/lookups/trfs/{trf_euid}`
 - preferred patient: `/api/integrations/bloom/v1/lookups/patients/{patient_id}`
-- preferred shipment/package: `/api/integrations/bloom/v1/lookups/shipments/{shipment_number}`
+- preferred shipment/package: `/api/integrations/bloom/v1/lookups/shipments/{shipment_euid}`
 - preferred testkit barcode: `/api/integrations/bloom/v1/lookups/testkits/{barcode}`
 
 Cache behavior:

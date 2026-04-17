@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from daylily_tapdb import require_seeded_templates
 from daylily_tapdb.factory import InstanceFactory
 from daylily_tapdb.models.instance import generic_instance
-from daylily_tapdb import require_seeded_templates
 from daylily_tapdb.templates import TemplateManager
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -21,10 +20,11 @@ from bloom_lims.auth.repositories.tapdb.identity import (
     normalize_public_id,
     resolve_public_id,
 )
+from bloom_lims.config import get_settings
 
-TOKEN_TEMPLATE_CODE = "bloom/auth/user-api-token/1.0/"
-TOKEN_REVISION_TEMPLATE_CODE = "bloom/auth/user-api-token-revision/1.0/"
-TOKEN_USAGE_LOG_TEMPLATE_CODE = "bloom/auth/user-api-token-usage-log/1.0/"
+TOKEN_TEMPLATE_CODE = "BBX/auth/user-api-token/1.0/"
+TOKEN_REVISION_TEMPLATE_CODE = "BBX/auth/user-api-token-revision/1.0/"
+TOKEN_USAGE_LOG_TEMPLATE_CODE = "BBX/auth/user-api-token-usage-log/1.0/"
 
 TOKEN_PREFIX = "BBX"
 TOKEN_REVISION_PREFIX = "BBX"
@@ -105,8 +105,12 @@ class TapdbUserAPITokenRepository:
 
     def __init__(self, db: Session):
         self.db = db
+        self.domain_code = str(get_settings().tapdb.domain_code).strip().upper()
         self.templates = TemplateManager()
-        self.factory = InstanceFactory(self.templates)
+        self.factory = InstanceFactory(
+            self.templates,
+            domain_code=self.domain_code,
+        )
         self._templates_bootstrapped = False
 
     def create_token(
@@ -193,7 +197,9 @@ class TapdbUserAPITokenRepository:
         )
         return tokens
 
-    def get_token(self, token_id: str) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
+    def get_token(
+        self, token_id: str
+    ) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
         self._ensure_templates_bootstrapped()
         token_instance = self._find_token_instance(token_id)
         if token_instance is None:
@@ -208,7 +214,9 @@ class TapdbUserAPITokenRepository:
 
     def get_latest_revision(self, token_id: str) -> UserTokenRevisionRecord | None:
         revisions: list[UserTokenRevisionRecord] = []
-        for revision_instance in self._instances_for_template(TOKEN_REVISION_TEMPLATE_CODE):
+        for revision_instance in self._instances_for_template(
+            TOKEN_REVISION_TEMPLATE_CODE
+        ):
             revision = self._to_revision(revision_instance)
             if revision is None:
                 continue
@@ -271,9 +279,13 @@ class TapdbUserAPITokenRepository:
             raise ValueError("Failed to persist token revision")
         return record
 
-    def find_latest_revision_by_hash(self, token_hash: str) -> UserTokenRevisionRecord | None:
+    def find_latest_revision_by_hash(
+        self, token_hash: str
+    ) -> UserTokenRevisionRecord | None:
         revisions: list[UserTokenRevisionRecord] = []
-        for revision_instance in self._instances_for_template(TOKEN_REVISION_TEMPLATE_CODE):
+        for revision_instance in self._instances_for_template(
+            TOKEN_REVISION_TEMPLATE_CODE
+        ):
             revision = self._to_revision(revision_instance)
             if revision is None:
                 continue
@@ -333,7 +345,9 @@ class TapdbUserAPITokenRepository:
         limit: int = 100,
     ) -> list[UserTokenUsageRecord]:
         usage: list[UserTokenUsageRecord] = []
-        for usage_instance in self._instances_for_template(TOKEN_USAGE_LOG_TEMPLATE_CODE):
+        for usage_instance in self._instances_for_template(
+            TOKEN_USAGE_LOG_TEMPLATE_CODE
+        ):
             usage_record = self._to_usage(usage_instance)
             if usage_record is None:
                 continue
@@ -365,14 +379,18 @@ class TapdbUserAPITokenRepository:
         return UserTokenRecord(
             id=token_id,
             user_id=user_id,
-            token_name=str(props.get("token_name") or token_instance.name or token_instance.euid),
+            token_name=str(
+                props.get("token_name") or token_instance.name or token_instance.euid
+            ),
             token_prefix=str(props.get("token_prefix") or ""),
             scope=str(props.get("scope") or ""),
             created_at=_to_dt(props.get("created_at")) or token_instance.created_dt,
             euid=token_instance.euid,
         )
 
-    def _to_revision(self, revision_instance: generic_instance) -> UserTokenRevisionRecord | None:
+    def _to_revision(
+        self, revision_instance: generic_instance
+    ) -> UserTokenRevisionRecord | None:
         props = self._props(revision_instance)
         token_id = normalize_public_id(props.get("token_id"))
         revision_id = resolve_public_id(revision_instance, props, prefix="tokrev")
@@ -396,7 +414,9 @@ class TapdbUserAPITokenRepository:
             euid=revision_instance.euid,
         )
 
-    def _to_usage(self, usage_instance: generic_instance) -> UserTokenUsageRecord | None:
+    def _to_usage(
+        self, usage_instance: generic_instance
+    ) -> UserTokenUsageRecord | None:
         props = self._props(usage_instance)
         usage_id = resolve_public_id(usage_instance, props, prefix="tokuse")
         token_id = normalize_public_id(props.get("token_id"))
@@ -416,7 +436,8 @@ class TapdbUserAPITokenRepository:
             ip_address=props.get("ip_address"),
             user_agent=props.get("user_agent"),
             request_metadata=metadata,
-            request_timestamp=_to_dt(props.get("request_timestamp")) or usage_instance.created_dt,
+            request_timestamp=_to_dt(props.get("request_timestamp"))
+            or usage_instance.created_dt,
             euid=usage_instance.euid,
         )
 
@@ -425,6 +446,7 @@ class TapdbUserAPITokenRepository:
         stmt = (
             select(generic_instance)
             .where(
+                generic_instance.domain_code == self.domain_code,
                 generic_instance.category == category,
                 generic_instance.type == type_name,
                 generic_instance.subtype == subtype,
@@ -446,6 +468,7 @@ class TapdbUserAPITokenRepository:
                 (TOKEN_USAGE_LOG_TEMPLATE_CODE, TOKEN_USAGE_PREFIX),
             ],
             app_name="Bloom",
+            domain_code=self.domain_code,
             template_manager=self.templates,
         )
         self._templates_bootstrapped = True
@@ -466,7 +489,9 @@ class TapdbUserAPITokenRepository:
             instance.json_addl = payload
         return properties
 
-    def _write_props(self, instance: generic_instance, properties: dict[str, Any]) -> None:
+    def _write_props(
+        self, instance: generic_instance, properties: dict[str, Any]
+    ) -> None:
         payload = instance.json_addl or {}
         if isinstance(payload, str):
             try:

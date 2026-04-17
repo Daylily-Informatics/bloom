@@ -52,7 +52,7 @@ def _ensure_db_backed_integration_runtime(pytestconfig):
         pytest.exit(
             "BLOOM integration test bootstrap failed. "
             f"{exc} "
-            "Retry after `source ./activate <deploy-name> && bloom db build`.",
+            "Retry after `source ./activate <deploy-name> && bloom db build --target local`.",
             returncode=2,
         )
 

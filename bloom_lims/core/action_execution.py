@@ -12,6 +12,7 @@ from bloom_lims.core.exceptions import BloomValidationError
 from bloom_lims.core.tapdb_action_dispatcher import BloomTapDBActionDispatcher
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
+from bloom_lims.template_identity import template_category_filter
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +67,20 @@ def _normalize_action_slug(action_key: str) -> str:
 def normalize_action_execute_payload(payload: dict[str, Any]) -> ActionExecuteRequest:
     """Normalize strict action execute payload into a shared execute contract."""
     if not isinstance(payload, dict):
-        raise ActionExecutionError(status_code=400, detail="Request body must be a JSON object")
+        raise ActionExecutionError(
+            status_code=400, detail="Request body must be a JSON object"
+        )
 
     euid = str(payload.get("euid") or "").strip()
     action_group = str(payload.get("action_group") or "").strip()
     action_key = str(payload.get("action_key") or "").strip()
 
     if not euid:
-        raise ActionExecutionError(status_code=400, detail="Missing required field: euid", error_fields=["euid"])
+        raise ActionExecutionError(
+            status_code=400,
+            detail="Missing required field: euid",
+            error_fields=["euid"],
+        )
     if not action_group:
         raise ActionExecutionError(
             status_code=400,
@@ -132,7 +139,9 @@ def _extract_required_fields_from_ui_schema(action_ds: dict[str, Any]) -> list[s
     return required_fields
 
 
-def _missing_required_fields(captured_data: dict[str, Any], required_fields: list[str]) -> list[str]:
+def _missing_required_fields(
+    captured_data: dict[str, Any], required_fields: list[str]
+) -> list[str]:
     missing: list[str] = []
 
     def is_missing(value: Any) -> bool:
@@ -236,17 +245,16 @@ def _upgrade_active_action_definition(
         )
 
     template = query_obj.Base.classes.generic_template
-    action_template = (
-        query_obj.session.query(template)
-        .filter(
-            template.is_deleted == False,  # noqa: E712
-            template.category == "action",
-            template.type == parts[1],
-            template.subtype == parts[2],
-            template.version == parts[3],
-        )
-        .one_or_none()
+    category_filter = template_category_filter(template, "action")
+    action_query = query_obj.session.query(template).filter(
+        template.is_deleted == False,  # noqa: E712
+        template.type == parts[1],
+        template.subtype == parts[2],
+        template.version == parts[3],
     )
+    if category_filter is not None:
+        action_query = action_query.filter(category_filter)
+    action_template = action_query.one_or_none()
     if action_template is None:
         raise ActionExecutionError(
             status_code=409,
@@ -343,7 +351,9 @@ def _map_exception(exc: Exception) -> ActionExecutionError:
     if isinstance(exc, BloomValidationError):
         field = exc.details.get("field") if isinstance(exc.details, dict) else None
         fields = [field] if field else []
-        return ActionExecutionError(status_code=400, detail=exc.message, error_fields=fields)
+        return ActionExecutionError(
+            status_code=400, detail=exc.message, error_fields=fields
+        )
 
     if isinstance(exc, KeyError):
         field = str(exc).strip("'\"")
@@ -355,7 +365,9 @@ def _map_exception(exc: Exception) -> ActionExecutionError:
 
     msg = str(exc).strip() or "Action execution failed"
     if "No instance refs were provided" in msg:
-        return ActionExecutionError(status_code=400, detail=msg, error_fields=["instance_refs"])
+        return ActionExecutionError(
+            status_code=400, detail=msg, error_fields=["instance_refs"]
+        )
     if msg.startswith("Missing required field"):
         suffix = msg.split(":", 1)[1].strip() if ":" in msg else ""
         return ActionExecutionError(
@@ -410,9 +422,13 @@ def execute_action_for_instance(
 
         required_fields = _extract_required_fields_from_ui_schema(action_definition)
         if not required_fields:
-            required_fields = _infer_required_fields(action_definition, request_data.action_key)
+            required_fields = _infer_required_fields(
+                action_definition, request_data.action_key
+            )
 
-        missing_fields = _missing_required_fields(request_data.captured_data, required_fields)
+        missing_fields = _missing_required_fields(
+            request_data.captured_data, required_fields
+        )
         if missing_fields:
             field_list = ", ".join(missing_fields)
             raise ActionExecutionError(

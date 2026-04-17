@@ -38,7 +38,7 @@ _USER_SELECT_SQL = """
         END AS is_active
     FROM generic_instance gi
     WHERE gi.polymorphic_discriminator = 'actor_instance'
-      AND gi.category = 'generic'
+      AND gi.category = 'SYS'
       AND gi.type = 'actor'
       AND gi.subtype = 'system_user'
       AND COALESCE(gi.is_deleted, FALSE) = FALSE
@@ -190,7 +190,7 @@ def set_user_role(session: Session, identifier: str | int, role: str) -> bool:
                     ),
                     modified_dt = NOW()
                 WHERE gi.polymorphic_discriminator = 'actor_instance'
-                  AND gi.category = 'generic'
+                  AND gi.category = 'SYS'
                   AND gi.type = 'actor'
                   AND gi.subtype = 'system_user'
                   AND COALESCE(gi.is_deleted, FALSE) = FALSE
@@ -215,7 +215,7 @@ def set_user_role(session: Session, identifier: str | int, role: str) -> bool:
                 ),
                 modified_dt = NOW()
             WHERE gi.polymorphic_discriminator = 'actor_instance'
-              AND gi.category = 'generic'
+              AND gi.category = 'SYS'
               AND gi.type = 'actor'
               AND gi.subtype = 'system_user'
               AND COALESCE(gi.is_deleted, FALSE) = FALSE

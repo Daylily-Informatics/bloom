@@ -60,8 +60,28 @@ from daylily_tapdb.models.template import (
 from sqlalchemy import text
 from sqlalchemy.orm import Session, object_session
 
-from bloom_lims.config import get_tapdb_db_config
+from bloom_lims.config import (
+    apply_runtime_environment,
+    get_settings,
+    get_tapdb_db_config,
+)
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
+
+_KNOWN_LINEAGE_IDENTITIES = (
+    "generic_instance_lineage",
+    "workflow_instance_lineage",
+    "workflow_step_instance_lineage",
+    "container_instance_lineage",
+    "content_instance_lineage",
+    "equipment_instance_lineage",
+    "data_instance_lineage",
+    "test_requisition_instance_lineage",
+    "actor_instance_lineage",
+    "action_instance_lineage",
+    "health_event_instance_lineage",
+    "file_instance_lineage",
+    "subject_instance_lineage",
+)
 
 
 class _LineageQueryProxy:
@@ -112,7 +132,15 @@ def _query_lineages_for_instance(instance, *, fk_attr_name: str):
         return _LineageQueryProxy([])
 
     lineage_attr = getattr(generic_instance_lineage, fk_attr_name)
-    query = session.query(generic_instance_lineage).filter(lineage_attr == instance.uid)
+    query = (
+        session.query(generic_instance_lineage)
+        .filter(lineage_attr == instance.uid)
+        .filter(
+            generic_instance_lineage.polymorphic_discriminator.in_(
+                _KNOWN_LINEAGE_IDENTITIES
+            )
+        )
+    )
     return _LineageQueryProxy(query)
 
 
@@ -237,6 +265,9 @@ class BLOOMdb3:
     ):
         self.logger = logging.getLogger(__name__ + ".BLOOMdb3")
         self.app_username = app_username
+        runtime_ctx = apply_runtime_environment(get_settings())
+        self.domain_code = runtime_ctx.domain_code
+        self.owner_repo_name = runtime_ctx.owner_repo_name
 
         # Best-effort attribution for TapDB-style DB metrics.
         # (The request middleware sets path/method; the DB adapter tags username.)
@@ -266,6 +297,8 @@ class BLOOMdb3:
             engine_type="aurora" if engine_type == "aurora" else None,
             region=region,
             iam_auth=iam_auth,
+            domain_code=self.domain_code,
+            owner_repo_name=self.owner_repo_name,
         )
 
         self.engine = self._conn.engine
@@ -273,8 +306,6 @@ class BLOOMdb3:
         self.Base = Base
         # Install TapDB-style per-query metrics once per engine.
         try:
-            from bloom_lims.config import get_settings
-
             maybe_install_engine_metrics(self.engine, env_name=get_settings().tapdb.env)
         except Exception:
             # Metrics are best-effort; never block DB init.

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import bloom_lims.integrations.tapdb_mount as tapdb_mount
@@ -103,3 +105,42 @@ def test_app_shutdown_cleanup_runs(monkeypatch):
         pass
 
     assert calls == ["stop"]
+
+
+def test_mount_uses_explicit_tapdb_context(monkeypatch):
+    captured: dict[str, str] = {}
+
+    tapdb_app = FastAPI()
+
+    @tapdb_app.get("/")
+    async def _index():
+        return {"tapdb": "ok"}
+
+    monkeypatch.setattr(
+        tapdb_mount,
+        "apply_runtime_environment",
+        lambda: SimpleNamespace(
+            env="dev",
+            config_path="/tmp/bloom-tapdb-config.yaml",
+            client_id="bloom",
+            database_name="bloom",
+        ),
+    )
+    monkeypatch.setattr(
+        tapdb_mount,
+        "_load_tapdb_admin_app",
+        lambda **kwargs: (
+            captured.update({key: str(value) for key, value in kwargs.items()})
+            or tapdb_app
+        ),
+    )
+
+    config = tapdb_mount.mount_tapdb_admin_subapp(FastAPI())
+
+    assert config is not None
+    assert captured == {
+        "tapdb_env": "dev",
+        "config_path": "/tmp/bloom-tapdb-config.yaml",
+        "client_id": "bloom",
+        "database_name": "bloom",
+    }

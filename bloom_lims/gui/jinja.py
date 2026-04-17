@@ -9,6 +9,8 @@ from zoneinfo import ZoneInfo
 
 from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 
+from bloom_lims import __version__
+
 try:
     from daylily_tapdb.timezone_utils import (
         DEFAULT_DISPLAY_TIMEZONE,
@@ -126,7 +128,6 @@ def _run_git_command(*args: str) -> str:
 def _resolve_gui_metadata() -> Dict[str, str]:
     """Resolve footer/help metadata from config and local git state."""
     app_name = "BLOOM LIMS"
-    version = "dev"
     support_email = ""
     github_repo_url = "https://github.com/Daylily-Informatics/bloom"
 
@@ -135,26 +136,24 @@ def _resolve_gui_metadata() -> Dict[str, str]:
 
         settings = get_settings()
         app_name = settings.app_name
-        version = settings.api.version
         support_email = settings.ui.support_email
         github_repo_url = settings.ui.github_repo_url
     except Exception:
         pass
 
-    branch = _run_git_command("rev-parse", "--abbrev-ref", "HEAD") or "unknown"
-    commit_hash = _run_git_command("rev-parse", "--short", "HEAD") or "unknown"
+    branch = _run_git_command("rev-parse", "--abbrev-ref", "HEAD") or "unavailable"
+    commit_hash = _run_git_command("rev-parse", "--short", "HEAD") or "unavailable"
     tag = _run_git_command("describe", "--tags", "--exact-match")
     if not tag:
-        tag = _run_git_command("describe", "--tags", "--abbrev=0")
-    if not tag:
-        tag = "none"
+        tag = "unreleased"
 
     return {
         "app_name": app_name,
-        "version": version,
+        "version": __version__,
         "branch": branch,
         "tag": tag,
         "hash": commit_hash,
+        "commit": commit_hash,
         "support_email": support_email,
         "github_repo_url": github_repo_url,
     }
@@ -170,19 +169,63 @@ def _resolve_deployment_metadata() -> Dict[str, str | bool]:
         from bloom_lims.config import get_settings
 
         settings = get_settings()
+        from bloom_lims.config import _resolve_deployment_chrome
+
+        resolved = _resolve_deployment_chrome(
+            name=settings.deployment.name,
+            color=settings.deployment.color,
+            fallback_name=settings.deployment.name,
+        )
         deployment = {
-            "name": settings.deployment.name,
-            "color": settings.deployment.color,
-            "is_production": settings.deployment.is_production,
+            "name": str(resolved["name"]),
+            "color": str(resolved["color"]),
+            "is_production": bool(resolved["is_production"]),
         }
     except Exception:
         pass
     return deployment
 
 
+def _resolve_region_metadata() -> Dict[str, str]:
+    region = "unknown"
+    try:
+        from bloom_lims.config import get_settings
+
+        settings = get_settings()
+        region = str(settings.aws.region or "").strip() or "unknown"
+    except Exception:
+        pass
+
+    from bloom_lims.config import _stable_region_color_hex
+
+    return {
+        "name": region,
+        "color": _stable_region_color_hex(region),
+    }
+
+
+def _resolve_environment_chrome() -> Dict[str, Any]:
+    deployment = _resolve_deployment_metadata()
+    region = _resolve_region_metadata()
+    show_environment_chrome = True
+    try:
+        from bloom_lims.config import get_settings
+
+        show_environment_chrome = bool(get_settings().ui.show_environment_chrome)
+    except Exception:
+        show_environment_chrome = True
+    return {
+        "enabled": show_environment_chrome,
+        "deployment": deployment,
+        "region": region,
+    }
+
+
 def refresh_template_globals() -> None:
     templates.globals["gui_meta"] = _resolve_gui_metadata()
     templates.globals["deployment_chrome"] = _resolve_deployment_metadata()
+    templates.globals["region_chrome"] = _resolve_region_metadata()
+    templates.globals["environment_chrome"] = _resolve_environment_chrome()
 
 
 templates.filters["format_dt"] = format_dt

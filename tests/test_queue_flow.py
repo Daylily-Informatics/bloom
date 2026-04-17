@@ -13,6 +13,10 @@ from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3, get_parent_lineages
+from bloom_lims.template_identity import (
+    instance_category_filter,
+    template_category_filter,
+)
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 os.environ["MERIDIAN_ENVIRONMENT"] = "production"
@@ -48,8 +52,8 @@ def _opaque(prefix: str) -> str:
 
 
 def _assert_domain_scoped_euid(euid: str, legacy_prefix: str) -> None:
-    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "B").strip() or "B"
-    assert euid.startswith(f"{domain_code}:{legacy_prefix}")
+    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "Z").strip() or "Z"
+    assert euid.startswith(f"{domain_code}-{legacy_prefix}")
 
 
 def _assert_no_uuid_keys(payload):
@@ -107,10 +111,10 @@ def _ensure_reference_instance(*, category: str, type_name: str | None = None) -
     bdb = BLOOMdb3(app_username="pytest-beta-queue")
     try:
         GI = bdb.Base.classes.generic_instance
-        query = bdb.session.query(GI).filter(
-            GI.is_deleted.is_(False),
-            GI.category == category,
-        )
+        query = bdb.session.query(GI).filter(GI.is_deleted.is_(False))
+        category_filter = instance_category_filter(GI, category)
+        if category_filter is not None:
+            query = query.filter(category_filter)
         if type_name is not None:
             query = query.filter(GI.type == type_name)
         existing = query.first()
@@ -118,10 +122,10 @@ def _ensure_reference_instance(*, category: str, type_name: str | None = None) -
             return existing.euid
 
         GT = bdb.Base.classes.generic_template
-        template_query = bdb.session.query(GT).filter(
-            GT.is_deleted.is_(False),
-            GT.category == category,
-        )
+        template_query = bdb.session.query(GT).filter(GT.is_deleted.is_(False))
+        category_filter = template_category_filter(GT, category)
+        if category_filter is not None:
+            template_query = template_query.filter(category_filter)
         if type_name is not None:
             template_query = template_query.filter(GT.type == type_name)
         template = template_query.first()

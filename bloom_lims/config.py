@@ -10,17 +10,21 @@ Configuration precedence (highest to lowest):
 import colorsys
 import hashlib
 import importlib.metadata
+import json
 import logging
 import os
 import re
 import secrets
 import string
 import tempfile
+import tomllib
 from functools import lru_cache
 from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
+from packaging.requirements import InvalidRequirement, Requirement
 from packaging.version import Version
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,12 +41,36 @@ DEFAULT_BLOOM_WEB_PORT = 8912
 DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT = 5566
 DEFAULT_BLOOM_CONDA_ENV_BASE = "BLOOM"
 LEGACY_UPLOAD_DIR = "/var/lib/bloom/uploads"
+DEFAULT_TAPDB_OWNER_REPO_NAME = "bloom"
+DEFAULT_TAPDB_DOMAIN_CODE = "Z"
+_CONFIG_FILE_OVERRIDE_ENV = "BLOOM_CONFIG_PATH"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
 
 TEMPLATE_CONFIG_FILE = (
     Path(__file__).resolve().parent / "etc" / "bloom-config-template.yaml"
 )
 DEFAULT_DEPLOYMENT_BANNER_COLOR = "#AFEEEE"
 PRODUCTION_DEPLOYMENT_NAMES = {"prod", "production"}
+SENSITIVE_CONFIG_KEYWORDS = (
+    "secret",
+    "token",
+    "password",
+    "passwd",
+    "key",
+    "credential",
+    "private",
+    "signing",
+    "session",
+    "cookie",
+    "authorization",
+    "client_secret",
+    "api_key",
+    "access_key",
+    "secret_key",
+)
+CONFIG_UNSET = "<unset>"
+CONFIG_REDACTED = "<redacted>"
 
 
 def _sanitize_deployment_code(value: str) -> str:
@@ -53,12 +81,75 @@ def _sanitize_deployment_code(value: str) -> str:
 
 
 def _resolve_deployment_code() -> str:
-    return _sanitize_deployment_code(
+    env_candidates = (
         os.environ.get("BLOOM_DEPLOYMENT_CODE")
         or os.environ.get("DEPLOYMENT_CODE")
         or os.environ.get("LSMC_DEPLOYMENT_CODE")
-        or "local"
     )
+    if env_candidates:
+        return _sanitize_deployment_code(env_candidates)
+
+    conda_env = (os.environ.get("CONDA_DEFAULT_ENV") or "").strip()
+    if conda_env:
+        if conda_env.startswith(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-"):
+            return _sanitize_deployment_code(
+                conda_env.removeprefix(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-")
+            )
+        if conda_env != "base":
+            return _sanitize_deployment_code(conda_env)
+
+    conda_prefix = (os.environ.get("CONDA_PREFIX") or "").strip()
+    if conda_prefix:
+        env_name = Path(conda_prefix).name
+        if env_name.startswith(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-"):
+            return _sanitize_deployment_code(
+                env_name.removeprefix(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-")
+            )
+        if env_name and env_name != "base":
+            return _sanitize_deployment_code(env_name)
+
+    return "local"
+
+
+def _explicit_config_file_override() -> Path | None:
+    raw = str(os.environ.get(_CONFIG_FILE_OVERRIDE_ENV) or "").strip()
+    if not raw:
+        return None
+    if raw.startswith("~"):
+        raise RuntimeError(
+            f"{_CONFIG_FILE_OVERRIDE_ENV} must be a full absolute path; '~' is not allowed."
+        )
+    path = Path(raw)
+    if not path.is_absolute():
+        raise RuntimeError(
+            f"{_CONFIG_FILE_OVERRIDE_ENV} must be a full absolute path: {raw}"
+        )
+    return path.resolve()
+
+
+@lru_cache()
+def _read_pyproject_dependency_spec(package_name: str) -> str:
+    if not PYPROJECT_TOML.exists():
+        raise RuntimeError(f"pyproject.toml not found at {PYPROJECT_TOML}")
+
+    payload = tomllib.loads(PYPROJECT_TOML.read_text(encoding="utf-8"))
+    dependencies = (
+        payload.get("project", {}).get("dependencies", [])
+        if isinstance(payload, dict)
+        else []
+    )
+    if not isinstance(dependencies, list):
+        raise RuntimeError("pyproject.toml project.dependencies must be a list")
+
+    for entry in dependencies:
+        try:
+            requirement = Requirement(str(entry))
+        except (InvalidRequirement, TypeError):
+            continue
+        if requirement.name == package_name:
+            return str(requirement.specifier)
+
+    raise RuntimeError(f"Dependency {package_name!r} is not declared in pyproject.toml")
 
 
 def expected_conda_env_name() -> str:
@@ -66,6 +157,9 @@ def expected_conda_env_name() -> str:
 
 
 def _user_config_dir() -> Path:
+    override = _explicit_config_file_override()
+    if override is not None:
+        return override.parent
     xdg_config_home = Path(
         os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
     )
@@ -73,18 +167,26 @@ def _user_config_dir() -> Path:
 
 
 def _user_config_file() -> Path:
+    override = _explicit_config_file_override()
+    if override is not None:
+        return override
     deployment = _resolve_deployment_code()
     return _user_config_dir() / f"bloom-config-{deployment}.yaml"
 
 
-def _deployment_scoped_tapdb_config_path(client_id: str, namespace: str) -> str:
-    xdg_config_home = Path(
-        os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
-    )
-    scoped_namespace = f"{namespace}-{_resolve_deployment_code()}"
-    return str(
-        xdg_config_home / "tapdb" / client_id / scoped_namespace / "tapdb-config.yaml"
-    )
+def _require_explicit_absolute_path(value: str, *, field_name: str) -> str:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        raise RuntimeError(
+            f"{field_name} is required and must be passed as a full absolute path."
+        )
+    if cleaned.startswith("~"):
+        raise RuntimeError(
+            f"{field_name} must be a full absolute path; '~' is not allowed."
+        )
+    if not Path(cleaned).is_absolute():
+        raise RuntimeError(f"{field_name} must be a full absolute path. Got: {cleaned}")
+    return cleaned
 
 
 def _default_upload_dir_for_runtime(
@@ -94,9 +196,11 @@ def _default_upload_dir_for_runtime(
     env_name: str,
     config_path: str = "",
 ) -> str:
-    resolved_config_path = (
-        str(config_path or "").strip()
-        or _deployment_scoped_tapdb_config_path(client_id, namespace)
+    _ = client_id
+    _ = namespace
+    resolved_config_path = _require_explicit_absolute_path(
+        config_path,
+        field_name="tapdb.config_path",
     )
     scoped_root = Path(resolved_config_path).expanduser().resolve().parent
     return str(scoped_root / env_name.strip().lower() / "uploads")
@@ -117,6 +221,29 @@ def _validate_optional_https_url(value: str, *, field_name: str) -> str:
     if not normalized.startswith("https://"):
         raise ValueError(f"{field_name} must use an absolute https:// URL")
     return normalized.rstrip("/")
+
+
+def _validate_bare_host(value: str, *, field_name: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if "://" in normalized:
+        raise ValueError(f"{field_name} must be a bare host without a scheme")
+
+    parsed = urlsplit(f"//{normalized}")
+    if not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
+        raise ValueError(f"{field_name} must be a bare host without a path")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(
+            f"{field_name} must be a bare host without credentials or a port"
+        ) from exc
+    if parsed.username or parsed.password or port is not None:
+        raise ValueError(
+            f"{field_name} must be a bare host without credentials or a port"
+        )
+    return normalized
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -160,7 +287,9 @@ def build_default_config_template() -> bytes:
         count=1,
     )
     if rendered == template_text:
-        rendered = template_text.replace('jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1)
+        rendered = template_text.replace(
+            'jwt_secret: ""', f'jwt_secret: "{jwt_secret}"', 1
+        )
     return rendered.encode("utf-8")
 
 
@@ -211,6 +340,70 @@ def _stable_deployment_color_hex(name: str) -> str:
         round(green * 255),
         round(blue * 255),
     )
+
+
+def _stable_region_color_hex(name: str) -> str:
+    digest = hashlib.sha256(name.encode("utf-8")).digest()
+    hue = (int.from_bytes(digest[:8], "big") % 360 + 180) % 360
+    red, green, blue = colorsys.hls_to_rgb(hue / 360.0, 0.62, 0.45)
+    return "#{:02x}{:02x}{:02x}".format(
+        round(red * 255),
+        round(green * 255),
+        round(blue * 255),
+    )
+
+
+def _is_sensitive_config_path(path: str) -> bool:
+    normalized = str(path or "").strip().lower()
+    return any(token in normalized for token in SENSITIVE_CONFIG_KEYWORDS)
+
+
+def _sanitize_config_structure(path: str, value: Any) -> Any:
+    if _is_sensitive_config_path(path):
+        if value in (None, "", [], {}, ()):
+            return CONFIG_UNSET
+        return CONFIG_REDACTED
+
+    if isinstance(value, dict):
+        return {
+            str(key): _sanitize_config_structure(
+                f"{path}.{key}" if path else str(key),
+                item,
+            )
+            for key, item in value.items()
+        }
+
+    if isinstance(value, list):
+        return [
+            _sanitize_config_structure(f"{path}[{index}]", item)
+            for index, item in enumerate(value)
+        ]
+
+    if value in (None, ""):
+        return CONFIG_UNSET
+
+    return value
+
+
+def _flatten_config_rows(value: Any, *, prefix: str = "") -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key in sorted(value):
+            child_prefix = f"{prefix}.{key}" if prefix else str(key)
+            rows.extend(_flatten_config_rows(value[key], prefix=child_prefix))
+        return rows
+
+    if isinstance(value, list):
+        rendered = json.dumps(value, sort_keys=True)
+    elif isinstance(value, bool):
+        rendered = "true" if value else "false"
+    elif value == CONFIG_UNSET:
+        rendered = CONFIG_UNSET
+    else:
+        rendered = str(value)
+
+    rows.append({"key": prefix, "value": rendered})
+    return rows
 
 
 def _resolve_deployment_chrome(
@@ -300,24 +493,33 @@ class TapDBSettings(BaseModel):
         default="bloom",
         description="TapDB database namespace key for Bloom runtime config",
     )
+    owner_repo_name: str = Field(
+        default=DEFAULT_TAPDB_OWNER_REPO_NAME,
+        description="TapDB owner repo name for Meridian governance",
+    )
+    domain_code: str = Field(
+        default=DEFAULT_TAPDB_DOMAIN_CODE,
+        description="Meridian domain code for TapDB runtime config",
+    )
+    domain_registry_path: str = Field(
+        default="",
+        description="Shared Meridian domain registry path",
+    )
+    prefix_ownership_registry_path: str = Field(
+        default="",
+        description="Shared Meridian prefix ownership registry path",
+    )
     strict_namespace: bool = Field(
         default=True,
         description="Enable strict namespace mode for namespaced TapDB config",
     )
     config_path: str = Field(
         default="",
-        description="Optional explicit TapDB config path override",
+        description="Required explicit absolute TapDB config path",
     )
     local_pg_port: int = Field(
         default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
-    )
-    min_version: str = Field(
-        default="5.0.4", description="Minimum supported daylily-tapdb"
-    )
-    max_version_exclusive: str = Field(
-        default="5.0.5",
-        description="Exclusive upper bound for daylily-tapdb",
     )
 
     @field_validator("env")
@@ -344,6 +546,42 @@ class TapDBSettings(BaseModel):
             raise ValueError("tapdb.database_name cannot be empty")
         return cleaned
 
+    @field_validator("owner_repo_name")
+    @classmethod
+    def validate_owner_repo_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("tapdb.owner_repo_name cannot be empty")
+        return cleaned
+
+    @field_validator("domain_code")
+    @classmethod
+    def validate_domain_code(cls, value: str) -> str:
+        cleaned = value.strip().upper()
+        if not cleaned:
+            raise ValueError("tapdb.domain_code cannot be empty")
+        return cleaned
+
+    @field_validator("domain_registry_path", "prefix_ownership_registry_path")
+    @classmethod
+    def validate_registry_path(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            return ""
+        if cleaned.startswith("~") or not Path(cleaned).is_absolute():
+            raise ValueError("tapdb registry paths must be full absolute paths")
+        return cleaned
+
+    @field_validator("config_path")
+    @classmethod
+    def validate_config_path(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            return ""
+        if cleaned.startswith("~") or not Path(cleaned).is_absolute():
+            raise ValueError("tapdb.config_path must be a full absolute path")
+        return cleaned
+
     @field_validator("local_pg_port")
     @classmethod
     def validate_local_pg_port(cls, value: int) -> int:
@@ -358,6 +596,10 @@ class TapDBRuntimeContext(BaseModel):
     env: str
     client_id: str
     database_name: str
+    owner_repo_name: str = DEFAULT_TAPDB_OWNER_REPO_NAME
+    domain_code: str = DEFAULT_TAPDB_DOMAIN_CODE
+    domain_registry_path: str = ""
+    prefix_ownership_registry_path: str = ""
     strict_namespace: bool = True
     config_path: str = ""
     aws_profile: str = "lsmc"
@@ -367,9 +609,7 @@ class TapDBRuntimeContext(BaseModel):
 class StorageSettings(BaseModel):
     """File storage configuration."""
 
-    upload_dir: str = Field(
-        default="", description="Upload directory"
-    )
+    upload_dir: str = Field(default="", description="Upload directory")
     temp_dir: str = Field(
         default_factory=lambda: str(Path(tempfile.gettempdir()) / "bloom"),
         description="Temporary file directory",
@@ -436,6 +676,15 @@ class AWSSettings(BaseModel):
     region: str = Field(default="us-west-2", description="Default AWS region")
 
 
+class NetworkSettings(BaseModel):
+    """Inbound host allowlist extensions."""
+
+    allowed_hosts: List[str] = Field(
+        default_factory=list,
+        description="Additional hostnames or IPs trusted by middleware",
+    )
+
+
 class UISettings(BaseModel):
     """UI metadata configuration."""
 
@@ -446,6 +695,10 @@ class UISettings(BaseModel):
     github_repo_url: str = Field(
         default="https://github.com/Daylily-Informatics/bloom",
         description="Repository URL shown in the GUI footer/help page",
+    )
+    show_environment_chrome: bool = Field(
+        default=True,
+        description="Show deployment and region chrome in GUI shells",
     )
 
 
@@ -480,7 +733,9 @@ class AuthSettings(BaseModel):
         default="", description="Cognito app client secret"
     )
     cognito_region: str = Field(default="", description="AWS region for Cognito")
-    cognito_domain: str = Field(default="", description="Cognito hosted UI domain")
+    cognito_domain: str = Field(
+        default="", description="Cognito hosted UI domain (bare host only)"
+    )
     cognito_redirect_uri: str = Field(default="", description="Cognito redirect URI")
     cognito_logout_redirect_uri: str = Field(
         default="", description="Cognito logout redirect URI"
@@ -490,7 +745,12 @@ class AuthSettings(BaseModel):
         description="Cognito OAuth scopes",
     )
     cognito_allowed_domains: List[str] = Field(
-        default_factory=lambda: ["lsmc.com", "lsmc.bio", "lsmc.life", "daylilyinformatics.com"],
+        default_factory=lambda: [
+            "lsmc.com",
+            "lsmc.bio",
+            "lsmc.life",
+            "daylilyinformatics.com",
+        ],
         description="Allowed email domains",
     )
     cognito_default_tenant_id: str = Field(
@@ -508,6 +768,11 @@ class AuthSettings(BaseModel):
 
     session_timeout_minutes: int = Field(default=30, description="Session timeout")
     max_sessions_per_user: int = Field(default=5, description="Max concurrent sessions")
+
+    @field_validator("cognito_domain")
+    @classmethod
+    def validate_cognito_domain(cls, value: str) -> str:
+        return _validate_bare_host(value, field_name="auth.cognito_domain")
 
 
 class AtlasSettings(BaseModel):
@@ -774,6 +1039,7 @@ class BloomSettings(BaseSettings):
     dewey: DeweySettings = Field(default_factory=DeweySettings)
     zebra_day: ZebraDaySettings = Field(default_factory=ZebraDaySettings)
     aws: AWSSettings = Field(default_factory=AWSSettings)
+    network: NetworkSettings = Field(default_factory=NetworkSettings)
     ui: UISettings = Field(default_factory=UISettings)
     deployment: DeploymentSettings = Field(default_factory=DeploymentSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
@@ -814,7 +1080,9 @@ class BloomSettings(BaseSettings):
     @model_validator(mode="after")
     def normalize_local_storage_paths(self) -> "BloomSettings":
         configured_upload_dir = str(self.storage.upload_dir or "").strip()
-        if not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR:
+        if (
+            not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR
+        ) and str(self.tapdb.config_path or "").strip():
             self.storage.upload_dir = _default_upload_dir_for_runtime(
                 client_id=self.tapdb.client_id.strip(),
                 namespace=self.tapdb.database_name.strip(),
@@ -822,7 +1090,8 @@ class BloomSettings(BaseSettings):
                 config_path=self.tapdb.config_path,
             )
 
-        _ensure_directory(self.storage.upload_dir)
+        if str(self.storage.upload_dir or "").strip():
+            _ensure_directory(self.storage.upload_dir)
         return self
 
     @field_validator("environment")
@@ -866,18 +1135,28 @@ def get_tapdb_runtime_context(
 ) -> TapDBRuntimeContext:
     """Resolve active TapDB runtime context from Bloom config."""
     settings = settings or get_settings()
+    config_path = _require_explicit_absolute_path(
+        settings.tapdb.config_path,
+        field_name="tapdb.config_path",
+    )
+    domain_registry_path = _require_explicit_absolute_path(
+        settings.tapdb.domain_registry_path,
+        field_name="tapdb.domain_registry_path",
+    )
+    prefix_ownership_registry_path = _require_explicit_absolute_path(
+        settings.tapdb.prefix_ownership_registry_path,
+        field_name="tapdb.prefix_ownership_registry_path",
+    )
     return TapDBRuntimeContext(
         env=settings.tapdb.env.strip().lower(),
         client_id=settings.tapdb.client_id.strip(),
         database_name=settings.tapdb.database_name.strip(),
+        owner_repo_name=settings.tapdb.owner_repo_name.strip(),
+        domain_code=settings.tapdb.domain_code.strip().upper(),
+        domain_registry_path=domain_registry_path,
+        prefix_ownership_registry_path=prefix_ownership_registry_path,
         strict_namespace=settings.tapdb.strict_namespace,
-        config_path=(
-            settings.tapdb.config_path
-            or _deployment_scoped_tapdb_config_path(
-                settings.tapdb.client_id.strip(),
-                settings.tapdb.database_name.strip(),
-            )
-        ).strip(),
+        config_path=config_path,
         aws_profile=(settings.aws.profile or "lsmc").strip(),
         aws_region=(settings.aws.region or "us-west-2").strip(),
     )
@@ -913,24 +1192,22 @@ def get_tapdb_db_config(
     )
 
 
-def assert_tapdb_version(
-    min_version: Optional[str] = None,
-    max_version_exclusive: Optional[str] = None,
-) -> str:
-    """Assert installed daylily-tapdb version is within the supported range."""
-    settings = get_settings()
-    min_v = Version(min_version or settings.tapdb.min_version)
-    max_v = Version(max_version_exclusive or settings.tapdb.max_version_exclusive)
+def assert_tapdb_version() -> str:
+    """Assert installed daylily-tapdb version matches the Bloom pin."""
+    pinned_spec = _read_pyproject_dependency_spec("daylily-tapdb")
 
     try:
         installed = Version(importlib.metadata.version("daylily-tapdb"))
     except importlib.metadata.PackageNotFoundError as exc:
         raise RuntimeError("daylily-tapdb is not installed") from exc
 
-    if installed < min_v or installed >= max_v:
-        raise RuntimeError(
-            f"Unsupported daylily-tapdb version {installed}; expected >= {min_v} and < {max_v}"
-        )
+    if pinned_spec:
+        from packaging.specifiers import SpecifierSet
+
+        if installed not in SpecifierSet(pinned_spec):
+            raise RuntimeError(
+                f"Unsupported daylily-tapdb version {installed}; expected {pinned_spec}"
+            )
 
     return str(installed)
 
@@ -976,15 +1253,21 @@ def validate_settings() -> List[str]:
     if not settings.auth.jwt_secret and settings.is_production:
         warnings.append("JWT secret is not set in production")
 
-    upload_path = Path(settings.storage.upload_dir).expanduser()
-    if not upload_path.exists():
-        warnings.append(
-            f"Upload directory does not exist: {settings.storage.upload_dir}"
-        )
-    elif not upload_path.is_dir():
-        warnings.append(f"Upload path is not a directory: {settings.storage.upload_dir}")
-    elif not os.access(upload_path, os.W_OK):
-        warnings.append(f"Upload directory is not writable: {settings.storage.upload_dir}")
+    upload_dir = str(settings.storage.upload_dir or "").strip()
+    if upload_dir:
+        upload_path = Path(upload_dir).expanduser()
+        if not upload_path.exists():
+            warnings.append(
+                f"Upload directory does not exist: {settings.storage.upload_dir}"
+            )
+        elif not upload_path.is_dir():
+            warnings.append(
+                f"Upload path is not a directory: {settings.storage.upload_dir}"
+            )
+        elif not os.access(upload_path, os.W_OK):
+            warnings.append(
+                f"Upload directory is not writable: {settings.storage.upload_dir}"
+            )
 
     if settings.storage.s3_bucket and not os.environ.get("AWS_ACCESS_KEY_ID"):
         warnings.append("S3 bucket configured but AWS_ACCESS_KEY_ID not set")
@@ -1062,6 +1345,33 @@ def get_user_config_path() -> Path:
 
 def get_template_config_path() -> Path:
     return TEMPLATE_CONFIG_FILE
+
+
+def build_effective_config_summary(
+    settings: Optional["BloomSettings"] = None,
+) -> dict[str, Any]:
+    active_settings = settings or get_settings()
+    dumped = active_settings.model_dump(mode="python")
+    sanitized = _sanitize_config_structure("", dumped)
+    rows = _flatten_config_rows(sanitized)
+    return {
+        "user_config_path": str(get_user_config_path()),
+        "template_config_path": str(get_template_config_path()),
+        "tapdb_config_path": str(active_settings.tapdb.config_path),
+        "tapdb_owner_repo_name": str(active_settings.tapdb.owner_repo_name),
+        "tapdb_domain_code": str(active_settings.tapdb.domain_code),
+        "tapdb_domain_registry_path": str(active_settings.tapdb.domain_registry_path),
+        "tapdb_prefix_ownership_registry_path": str(
+            active_settings.tapdb.prefix_ownership_registry_path
+        ),
+        "deployment_name": str(
+            active_settings.deployment.name or _resolve_deployment_code()
+        ),
+        "aws_region": str(active_settings.aws.region or "us-west-2"),
+        "build_version": _get_default_api_version(),
+        "show_environment_chrome": bool(active_settings.ui.show_environment_chrome),
+        "effective_rows": rows,
+    }
 
 
 def ensure_user_config_exists() -> Path:

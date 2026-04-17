@@ -19,7 +19,7 @@ For a typical local bring-up:
 ```bash
 source ./activate bringup
 bloom config init
-bloom db build
+bloom db build --target local
 bloom config status
 bloom config doctor
 ```
@@ -28,7 +28,7 @@ What those steps do:
 
 - `source ./activate <deploy-name>` creates or activates the deployment-scoped repo environment
 - `bloom config init` seeds the deployment-scoped YAML from the packaged template
-- `bloom db build` delegates runtime/bootstrap work to TapDB
+- `bloom db build --target local` delegates runtime/bootstrap work to TapDB
 - `bloom config status` shows the effective current config
 - `bloom config doctor` validates environment, dependencies, config, and writable paths
 
@@ -75,7 +75,7 @@ The current supported bootstrap command is:
 
 ```bash
 source ./activate bringup
-bloom db build
+bloom db build --target local
 ```
 
 Seed template data when needed:
@@ -85,7 +85,7 @@ source ./activate bringup
 bloom db seed
 ```
 
-If you see older references to `bloom db init` in historical notes, activation banners, or external service-catalog metadata, use `bloom db build`. The current Bloom CLI help is authoritative.
+If you see older references to `bloom db init` in historical notes, activation banners, or external service-catalog metadata, use `bloom db build --target local`. The current Bloom CLI help is authoritative.
 
 ## Run The Server
 
@@ -346,7 +346,7 @@ Fix:
 
 ```bash
 source ./activate bringup
-bloom db build
+bloom db build --target local
 bloom config doctor
 ```
 
@@ -395,7 +395,7 @@ Symptoms:
 
 Fix:
 
-- use `bloom db build`
+- use `bloom db build --target local`
 - treat repo-local Bloom CLI help and these docs as authoritative
 
 ## Where To Go Next

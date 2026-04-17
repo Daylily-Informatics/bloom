@@ -58,6 +58,7 @@
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;
   --transition-slow: 0.3s ease;
+  --environment-chrome-height: 0px;
 }
 
 /* ==================== Light Theme Override ==================== */
@@ -120,15 +121,36 @@ body {
   min-height: 100vh;
 }
 
-/* Accent stripe bar at top */
-.bloom-stripe-bar {
+body.environment-chrome-enabled {
+  --environment-chrome-height: 22px;
+}
+
+/* Environment bars at top */
+.bloom-environment-chrome {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
+  z-index: 9999;
+}
+
+.bloom-deployment-bar {
+  height: 18px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.32);
+}
+
+.bloom-region-bar,
+.bloom-stripe-bar {
   height: 4px;
   background: linear-gradient(90deg, var(--color-highlight), var(--color-info), var(--color-highlight));
-  z-index: 9999;
 }
 
 /* ==================== Typography ==================== */
@@ -190,7 +212,7 @@ pre {
 }
 
 .main-content {
-  padding-top: calc(4px + 60px + var(--spacing-lg));
+  padding-top: calc(var(--environment-chrome-height) + 60px + var(--spacing-lg));
   padding-bottom: var(--spacing-2xl);
   min-height: 100vh;
 }
@@ -198,7 +220,7 @@ pre {
 /* ==================== Header ==================== */
 .header {
   position: fixed;
-  top: 4px;
+  top: var(--environment-chrome-height);
   left: 0;
   right: 0;
   height: 60px;
@@ -435,7 +457,7 @@ pre {
     display: flex;
     flex-direction: column;
     position: absolute;
-    top: 60px;
+    top: calc(var(--environment-chrome-height) + 60px);
     left: 0;
     right: 0;
     background: var(--color-primary);
@@ -933,6 +955,23 @@ pre {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--color-gray-500);
+}
+
+.login-footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  margin-top: var(--spacing-sm);
+}
+
+.login-footer-meta span {
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--color-gray-700);
+  color: var(--color-gray-300);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
 }
 
 .footer-right {

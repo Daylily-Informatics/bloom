@@ -30,6 +30,11 @@ from bloom_lims.domain.utils import (
 from bloom_lims.domain.utils import (
     update_recursive as _update_recursive,
 )
+from bloom_lims.template_identity import (
+    instance_semantic_category,
+    template_category_filter,
+    template_semantic_category,
+)
 
 # Try to import carrier tracking module (replaced fedex_tracking_day with daylily_carrier_tracking)
 try:
@@ -80,6 +85,18 @@ class BloomObj:
         self.is_deleted = is_deleted
         self.session = bdb.session
         self.Base = bdb.Base
+        self.domain_code = (
+            str(
+                getattr(bdb, "domain_code", "")
+                or os.environ.get("MERIDIAN_DOMAIN_CODE")
+                or os.environ.get("TAPDB_DOMAIN_CODE")
+                or ""
+            )
+            .strip()
+            .upper()
+        )
+        if not self.domain_code:
+            raise ValueError("domain_code is required for Bloom template resolution")
         app_username = str(getattr(bdb, "app_username", "") or "").strip()
         self._actor_user_id = None
         self._actor_email = app_username if "@" in app_username else None
@@ -457,7 +474,7 @@ class BloomObj:
             json_addl=template.json_addl,
             template_uid=template.uid,
             bstatus=template.bstatus,
-            category=template.category,
+            category=str(template.category or "").strip(),
             is_singleton=is_singleton,
             polymorphic_discriminator=template.polymorphic_discriminator.replace(
                 "_template", "_instance"
@@ -602,7 +619,8 @@ class BloomObj:
                     raise Exception(f"Action import {ai} not found in database")
 
                 for r in res:
-                    action_key = f"{r.category}/{r.type}/{r.subtype}/{r.version}"
+                    action_category = template_semantic_category(r)
+                    action_key = f"{action_category}/{r.type}/{r.subtype}/{r.version}"
                     action_payload = None
                     if isinstance(r.json_addl, dict):
                         action_payload = r.json_addl.get("action_definition")
@@ -651,6 +669,10 @@ class BloomObj:
                         continue
                     layout_ds = {"json_addl": child_cfg.get("json_addl") or {}}
                     child_instance = self._create_child_instance(layout_str, layout_ds)
+                    parent_category = (
+                        instance_semantic_category(parent_instance)
+                        or str(parent_instance.category or "").strip()
+                    )
                     lineage_record = self.Base.classes.generic_instance_lineage(
                         parent_instance_uid=parent_instance.uid,
                         child_instance_uid=child_instance.uid,
@@ -660,10 +682,10 @@ class BloomObj:
                         version=parent_instance.version,
                         json_addl=parent_instance.json_addl,
                         bstatus=parent_instance.bstatus,
-                        category=parent_instance.category,
+                        category=parent_category,
                         parent_type=parent_instance.polymorphic_discriminator,
                         child_type=child_instance.polymorphic_discriminator,
-                        polymorphic_discriminator=f"{parent_instance.category}_instance_lineage",
+                        polymorphic_discriminator=f"{parent_category}_instance_lineage",
                         relationship_type=relationship_type,
                     )
                     self.session.add(lineage_record)
@@ -678,6 +700,10 @@ class BloomObj:
                     layout_str = i
                     layout_ds = ds[i]
                     child_instance = self._create_child_instance(layout_str, layout_ds)
+                    parent_category = (
+                        instance_semantic_category(parent_instance)
+                        or str(parent_instance.category or "").strip()
+                    )
                     lineage_record = self.Base.classes.generic_instance_lineage(
                         parent_instance_uid=parent_instance.uid,
                         child_instance_uid=child_instance.uid,
@@ -687,10 +713,10 @@ class BloomObj:
                         version=parent_instance.version,
                         json_addl=parent_instance.json_addl,
                         bstatus=parent_instance.bstatus,
-                        category=parent_instance.category,
+                        category=parent_category,
                         parent_type=parent_instance.polymorphic_discriminator,
                         child_type=child_instance.polymorphic_discriminator,
-                        polymorphic_discriminator=f"{parent_instance.category}_instance_lineage",
+                        polymorphic_discriminator=f"{parent_category}_instance_lineage",
                     )
                     self.session.add(lineage_record)
                     ##self.session.flush()
@@ -891,6 +917,9 @@ class BloomObj:
         query = self.session.query(self.Base.classes.generic_instance)
 
         # Apply filters conditionally
+        query = query.filter(
+            self.Base.classes.generic_instance.domain_code == self.domain_code
+        )
         if category is not None:
             query = query.filter(
                 self.Base.classes.generic_instance.category == category
@@ -919,6 +948,9 @@ class BloomObj:
         query = self.session.query(self.Base.classes.generic_instance)
 
         # Add filters based on the provided arguments
+        query = query.filter(
+            self.Base.classes.generic_instance.domain_code == self.domain_code
+        )
         if category:
             query = query.filter(
                 self.Base.classes.generic_instance.category == category
@@ -958,10 +990,15 @@ class BloomObj:
         query = self.session.query(self.Base.classes.generic_template)
 
         # Apply filters conditionally
+        query = query.filter(
+            self.Base.classes.generic_template.domain_code == self.domain_code
+        )
         if category is not None:
-            query = query.filter(
-                self.Base.classes.generic_template.category == category
+            category_filter = template_category_filter(
+                self.Base.classes.generic_template, category
             )
+            if category_filter is not None:
+                query = query.filter(category_filter)
         if type is not None:
             query = query.filter(self.Base.classes.generic_template.type == type)
 

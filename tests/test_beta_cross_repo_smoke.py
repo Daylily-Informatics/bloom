@@ -85,10 +85,10 @@ except ModuleNotFoundError:  # pragma: no cover - compatibility fallback
 
 import app.api.routes.bloom_integration as atlas_bloom_routes  # noqa: E402
 import app.api.routes.ursa_integration as atlas_ursa_routes  # noqa: E402
-from app.api.routes.internal import verify_internal_api_key  # noqa: E402
 from app.auth.dependencies import (  # noqa: E402
     IntegrationClientPrincipal,
     get_bloom_integration_client,
+    get_ursa_integration_write_client,
 )
 from app.db.engine import get_db  # noqa: E402
 
@@ -293,7 +293,9 @@ def _build_atlas_bloom_integration_app(tenant_id: uuid.UUID) -> FastAPI:
         )
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_bloom_integration_client] = override_bloom_integration_client
+    app.dependency_overrides[get_bloom_integration_client] = (
+        override_bloom_integration_client
+    )
     return app
 
 
@@ -304,11 +306,19 @@ def _build_atlas_result_app() -> FastAPI:
     def override_get_db():
         yield None
 
-    async def override_verify_internal_api_key():
-        return None
+    def override_ursa_integration_write_client():
+        return IntegrationClientPrincipal(
+            client_id=str(uuid.uuid4()),
+            tenant_id=uuid.UUID(int=0),
+            client_name="ursa-smoke-client",
+            permissions=["ursa:atlas:write"],
+            allowed_endpoints=["/api/integrations/ursa/v1"],
+        )
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[verify_internal_api_key] = override_verify_internal_api_key
+    app.dependency_overrides[get_ursa_integration_write_client] = (
+        override_ursa_integration_write_client
+    )
     return app
 
 
@@ -541,7 +551,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
             ),
             atlas_client=AtlasResultClient(
                 base_url="https://testserver",
-                api_key="atlas-smoke-key",
+                token="atlas-smoke-key",
                 client=atlas_result_client,  # type: ignore[arg-type]
             ),
             dewey_client=dewey_client,

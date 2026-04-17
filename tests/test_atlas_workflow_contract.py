@@ -11,8 +11,8 @@ import sys
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-import requests
 import pytest
+import requests
 from fastapi.testclient import TestClient
 
 import bloom_lims.domain.external_specimens as external_domain
@@ -41,24 +41,28 @@ def _opaque(prefix: str, nbytes: int = 8) -> str:
 
 class _FakeAtlasLookupService:
     def _result(self):
-        return SimpleNamespace(from_cache=False, stale=False, fetched_at=datetime.now(UTC))
+        return SimpleNamespace(
+            from_cache=False, stale=False, fetched_at=datetime.now(UTC)
+        )
 
     def get_required_tenant_id(self):
         return "00000000-0000-0000-0000-000000000001"
 
-    def get_order(self, order_number: str):
+    def get_order(self, order_euid: str):
         return self._result()
 
     def get_patient(self, patient_id: str):
         return self._result()
 
-    def get_shipment(self, shipment_number: str):
+    def get_shipment(self, shipment_euid: str):
         return self._result()
 
     def get_testkit(self, kit_barcode: str):
         return self._result()
 
-    def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+    def get_container_trf_context(
+        self, container_euid: str, *, tenant_id: str | None = None
+    ):
         _ = container_euid
         _ = tenant_id
         return SimpleNamespace(
@@ -133,7 +137,7 @@ def _create_container(client: TestClient, *, name: str) -> dict:
 
 def _create_specimen_payload(
     *,
-    order_number: str,
+    order_euid: str,
     patient_id: str,
     container_euid: str | None = None,
 ) -> dict:
@@ -143,7 +147,7 @@ def _create_specimen_payload(
         "status": "active",
         "properties": {"source": "atlas-contract-test"},
         "atlas_refs": {
-            "order_number": order_number,
+            "order_euid": order_euid,
             "patient_id": patient_id,
             "kit_barcode": f"KIT-{_suffix(3)}",
         },
@@ -155,7 +159,9 @@ def _create_specimen_payload(
     return payload
 
 
-def _create_specimen(client: TestClient, *, payload: dict, idempotency_key: str) -> dict:
+def _create_specimen(
+    client: TestClient, *, payload: dict, idempotency_key: str
+) -> dict:
     response = client.post(
         "/api/v1/external/specimens",
         json=payload,
@@ -166,7 +172,9 @@ def _create_specimen(client: TestClient, *, payload: dict, idempotency_key: str)
 
 
 def _build_client(monkeypatch) -> TestClient:
-    monkeypatch.setattr(external_domain, "AtlasService", lambda: _FakeAtlasLookupService())
+    monkeypatch.setattr(
+        external_domain, "AtlasService", lambda: _FakeAtlasLookupService()
+    )
     app.dependency_overrides[require_external_token_auth] = _token_user
     return TestClient(app)
 
@@ -200,11 +208,13 @@ def test_put_container_accepts_metadata(monkeypatch):
 
 def test_create_specimen_with_existing_container_contract(monkeypatch):
     with _build_client(monkeypatch) as client:
-        container = _create_container(client, name=f"atlas-existing-container-{_suffix()}")
+        container = _create_container(
+            client, name=f"atlas-existing-container-{_suffix()}"
+        )
         specimen = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{_suffix()}",
+                order_euid=f"ORD-{_suffix()}",
                 patient_id=f"PAT-{_suffix()}",
                 container_euid=container["euid"],
             ),
@@ -212,20 +222,22 @@ def test_create_specimen_with_existing_container_contract(monkeypatch):
         )
         assert specimen["specimen_euid"]
         assert specimen["container_euid"] == container["euid"]
-        assert specimen["atlas_refs"]["order_number"].startswith("ORD-")
+        assert specimen["atlas_refs"]["order_euid"].startswith("ORD-")
         assert "atlas_refs" not in specimen["properties"]
         assert "atlas_validation" not in specimen["properties"]
 
 
 def test_container_context_validation_mismatch_returns_400(monkeypatch):
     class _ContextMismatchAtlasService(_FakeAtlasLookupService):
-        def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+        def get_container_trf_context(
+            self, container_euid: str, *, tenant_id: str | None = None
+        ):
             _ = container_euid
             _ = tenant_id
             return SimpleNamespace(
                 payload={
                     "tenant_id": "00000000-0000-0000-0000-000000000001",
-                    "order": {"order_number": "ORD-CONTEXT"},
+                    "order": {"order_euid": "ORD-CONTEXT"},
                     "patient": {"patient_id": "PAT-CONTEXT"},
                     "test_orders": [],
                     "links": {"testkit_barcode": "KIT-CONTEXT"},
@@ -235,11 +247,15 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
                 fetched_at=datetime.now(UTC),
             )
 
-    monkeypatch.setattr(external_domain, "AtlasService", lambda: _ContextMismatchAtlasService())
+    monkeypatch.setattr(
+        external_domain, "AtlasService", lambda: _ContextMismatchAtlasService()
+    )
     app.dependency_overrides[require_external_token_auth] = _token_user
 
     with TestClient(app) as client:
-        container = _create_container(client, name=f"atlas-context-mismatch-{_suffix()}")
+        container = _create_container(
+            client, name=f"atlas-context-mismatch-{_suffix()}"
+        )
         response = client.post(
             "/api/v1/external/specimens",
             headers={"Idempotency-Key": _opaque("idem", 16)},
@@ -250,7 +266,7 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
                 "status": "active",
                 "properties": {"source": "atlas-contract-test"},
                 "atlas_refs": {
-                    "order_number": "ORD-DIFFERENT",
+                    "order_euid": "ORD-DIFFERENT",
                     "patient_id": "PAT-DIFFERENT",
                     "kit_barcode": "KIT-DIFFERENT",
                 },
@@ -261,25 +277,37 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
     assert "mismatch" in response.json()["detail"].lower()
 
 
-def test_container_context_summary_is_projected_through_explicit_reference_objects(monkeypatch):
+def test_container_context_summary_is_projected_through_explicit_reference_objects(
+    monkeypatch,
+):
     class _ContextMatchingAtlasService(_FakeAtlasLookupService):
-        def get_container_trf_context(self, container_euid: str, *, tenant_id: str | None = None):
+        def get_container_trf_context(
+            self, container_euid: str, *, tenant_id: str | None = None
+        ):
             _ = container_euid
             _ = tenant_id
             return SimpleNamespace(
                 payload={
                     "tenant_id": "00000000-0000-0000-0000-000000000001",
-                    "order": {"order_number": "ORD-MATCH"},
+                    "order": {"order_euid": "ORD-MATCH"},
                     "patient": {"patient_id": "PAT-MATCH"},
-                    "test_orders": [{"test_order_id": "TO-1"}, {"test_order_id": "TO-2"}],
-                    "links": {"testkit_barcode": "KIT-MATCH", "shipment_number": "SHIP-MATCH"},
+                    "test_orders": [
+                        {"test_order_id": "TO-1"},
+                        {"test_order_id": "TO-2"},
+                    ],
+                    "links": {
+                        "testkit_barcode": "KIT-MATCH",
+                        "shipment_euid": "SHIP-MATCH",
+                    },
                 },
                 from_cache=False,
                 stale=False,
                 fetched_at=datetime.now(UTC),
             )
 
-    monkeypatch.setattr(external_domain, "AtlasService", lambda: _ContextMatchingAtlasService())
+    monkeypatch.setattr(
+        external_domain, "AtlasService", lambda: _ContextMatchingAtlasService()
+    )
     app.dependency_overrides[require_external_token_auth] = _token_user
 
     with TestClient(app) as client:
@@ -293,19 +321,19 @@ def test_container_context_summary_is_projected_through_explicit_reference_objec
                 "status": "active",
                 "properties": {"source": "atlas-contract-test"},
                 "atlas_refs": {
-                    "order_number": "ORD-MATCH",
+                    "order_euid": "ORD-MATCH",
                     "patient_id": "PAT-MATCH",
                     "kit_barcode": "KIT-MATCH",
-                    "shipment_number": "SHIP-MATCH",
+                    "shipment_euid": "SHIP-MATCH",
                 },
             },
             idempotency_key=_opaque("idem", 16),
         )
 
-    assert created["atlas_refs"]["order_number"] == "ORD-MATCH"
+    assert created["atlas_refs"]["order_euid"] == "ORD-MATCH"
     assert created["atlas_refs"]["patient_id"] == "PAT-MATCH"
     assert created["atlas_refs"]["kit_barcode"] == "KIT-MATCH"
-    assert created["atlas_refs"]["shipment_number"] == "SHIP-MATCH"
+    assert created["atlas_refs"]["shipment_euid"] == "SHIP-MATCH"
     assert "atlas_refs" not in created["properties"]
     assert "atlas_validation" not in created["properties"]
 
@@ -315,7 +343,7 @@ def test_create_specimen_auto_container_contract(monkeypatch):
         specimen = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{_suffix()}",
+                order_euid=f"ORD-{_suffix()}",
                 patient_id=f"PAT-{_suffix()}",
             ),
             idempotency_key=_opaque("idem", 16),
@@ -329,7 +357,7 @@ def test_get_patch_delete_specimen_contract_sequence(monkeypatch):
         created = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=f"ORD-{_suffix()}",
+                order_euid=f"ORD-{_suffix()}",
                 patient_id=f"PAT-{_suffix()}",
             ),
             idempotency_key=_opaque("idem", 16),
@@ -355,20 +383,20 @@ def test_get_patch_delete_specimen_contract_sequence(monkeypatch):
         assert missing.status_code == 404
 
 
-def test_lookup_specimens_by_reference_order_number(monkeypatch):
+def test_lookup_specimens_by_reference_order_euid(monkeypatch):
     with _build_client(monkeypatch) as client:
-        order_number = f"ORD-{_suffix()}"
+        order_euid = f"ORD-{_suffix()}"
         created = _create_specimen(
             client,
             payload=_create_specimen_payload(
-                order_number=order_number,
+                order_euid=order_euid,
                 patient_id=f"PAT-{_suffix()}",
             ),
             idempotency_key=_opaque("idem", 16),
         )
         lookup = client.get(
             "/api/v1/external/specimens/by-reference",
-            params={"order_number": order_number},
+            params={"order_euid": order_euid},
         )
         assert lookup.status_code == 200
         items = lookup.json()["items"]
@@ -389,7 +417,10 @@ def test_unsupported_template_returns_validation_error(monkeypatch):
         )
         assert response.status_code == 400
         detail = response.json()["detail"]
-        assert "template" in detail.lower() or "failed to create specimen instance" in detail.lower()
+        assert (
+            "template" in detail.lower()
+            or "failed to create specimen instance" in detail.lower()
+        )
 
 
 def test_event_emitter_signs_and_posts_expected_payload(monkeypatch):
@@ -421,7 +452,9 @@ def test_event_emitter_signs_and_posts_expected_payload(monkeypatch):
         payload={"euid": "SP-1", "status": "active"},
     )
     assert event_id
-    assert captured["url"] == "https://atlas.example.org/api/integrations/bloom/v1/events"
+    assert (
+        captured["url"] == "https://atlas.example.org/api/integrations/bloom/v1/events"
+    )
     assert captured["timeout"] == 9
 
     raw = captured["data"]
@@ -437,7 +470,9 @@ def test_event_emitter_signs_and_posts_expected_payload(monkeypatch):
 
 
 def test_event_delivery_failure_is_fail_open(monkeypatch):
-    monkeypatch.setattr(external_domain, "AtlasService", lambda: _FakeAtlasLookupService())
+    monkeypatch.setattr(
+        external_domain, "AtlasService", lambda: _FakeAtlasLookupService()
+    )
     app.dependency_overrides[require_external_token_auth] = _token_user
 
     failing_settings = SimpleNamespace(

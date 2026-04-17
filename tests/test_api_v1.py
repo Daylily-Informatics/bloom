@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 # Add root to path for main import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from bloom_lims import __version__
 from main import app
 
 
@@ -42,6 +43,7 @@ class TestAPIRoot:
         assert response.status_code == 200
         data = response.json()
         assert "version" in data
+        assert data["version"] == __version__
         assert "endpoints" in data
         assert "search_v2" in data["endpoints"]
         assert "workflows" not in data["endpoints"]
@@ -356,7 +358,7 @@ class TestTemplatesAPI:
 
     def test_list_templates(self, client):
         """Test listing templates."""
-        response = client.get("/api/v1/templates/")
+        response = client.get("/api/v1/templates/", params={"domain_code": "Z"})
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
@@ -365,7 +367,10 @@ class TestTemplatesAPI:
 
     def test_list_templates_by_category(self, client):
         """Test listing templates by category."""
-        response = client.get("/api/v1/templates/by-category/container")
+        response = client.get(
+            "/api/v1/templates/by-category/container",
+            params={"domain_code": "Z"},
+        )
         assert response.status_code == 200
         data = response.json()
         assert "templates" in data
@@ -779,7 +784,10 @@ class TestTemplatesAPIExtended:
 
     def test_list_templates_with_pagination(self, client):
         """Test listing templates with pagination."""
-        response = client.get("/api/v1/templates/?page=1&page_size=5")
+        response = client.get(
+            "/api/v1/templates/",
+            params={"domain_code": "Z", "page": 1, "page_size": 5},
+        )
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
@@ -788,14 +796,19 @@ class TestTemplatesAPIExtended:
     def test_get_template_by_euid(self, client):
         """Test getting template by EUID."""
         # First get a list of templates to find a valid EUID
-        response = client.get("/api/v1/templates/?page_size=1")
+        response = client.get(
+            "/api/v1/templates/",
+            params={"domain_code": "Z", "page_size": 1},
+        )
         assert response.status_code == 200
         data = response.json()
         _assert_items_do_not_expose_uuid(data)
         if data["items"]:
             euid = data["items"][0].get("euid")
             if euid:
-                response = client.get(f"/api/v1/templates/{euid}")
+                response = client.get(
+                    f"/api/v1/templates/{euid}", params={"domain_code": "Z"}
+                )
                 assert response.status_code in [200, 404]
                 if response.status_code == 200:
                     assert "uuid" not in response.json()
@@ -993,12 +1006,16 @@ class TestHealthEndpoints:
         response = client.get("/healthz")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "alive"
+        assert data["status"] == "ok"
+        assert data["checks"]["process"]["status"] == "ok"
 
     def test_readyz_endpoint(self, client):
         """Test /readyz endpoint."""
         response = client.get("/readyz")
         assert response.status_code in [200, 503]
+        data = response.json()
+        assert "ready" in data
+        assert "database" in data["checks"]
 
 
 class TestAPIVersionInfo:

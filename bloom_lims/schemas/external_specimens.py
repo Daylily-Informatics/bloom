@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field, model_validator
 class AtlasReferences(BaseModel):
     trf_euid: str | None = None
     patient_id: str | None = None
-    shipment_number: str | None = None
+    order_euid: str | None = None
+    shipment_euid: str | None = None
     kit_barcode: str | None = None
     atlas_tenant_id: str | None = None
     atlas_trf_euid: str | None = None
@@ -31,9 +32,9 @@ class ExternalSpecimenCreateRequest(BaseModel):
         refs = self.atlas_refs
         if not any(
             [
-                refs.order_number,
+                refs.order_euid,
                 refs.patient_id,
-                refs.shipment_number,
+                refs.shipment_euid,
                 refs.kit_barcode,
                 refs.atlas_tenant_id,
                 refs.trf_euid,

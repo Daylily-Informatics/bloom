@@ -9,8 +9,13 @@ from daylily_tapdb import require_seeded_template
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from bloom_lims.config import get_settings
 from bloom_lims.domain.beta_actions import BETA_ACTION_TEMPLATE_PREFIX
-from bloom_lims.tapdb_adapter import action_instance, action_instance_lineage, generic_template
+from bloom_lims.tapdb_adapter import (
+    action_instance,
+    action_instance_lineage,
+    generic_template,
+)
 
 EXECUTION_ACTION_GROUP = "execution_queue"
 EXECUTION_ACTION_TEMPLATE_PREFIX = BETA_ACTION_TEMPLATE_PREFIX
@@ -77,8 +82,13 @@ def _parse_template_code(template_code: str) -> tuple[str, str, str, str]:
 class ExecutionQueueActionRecorder:
     """Persists first-class action records for execution queue mutations."""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, *, domain_code: str | None = None):
         self.session = session
+        self.domain_code = (
+            str(domain_code or get_settings().tapdb.domain_code or "").strip().upper()
+        )
+        if not self.domain_code:
+            raise ValueError("domain_code is required for Bloom template resolution")
 
     def find_replay(
         self,
@@ -89,6 +99,12 @@ class ExecutionQueueActionRecorder:
     ) -> action_instance | None:
         if action_key not in _ACTION_TEMPLATE_DEFINITIONS:
             raise ValueError(f"Unsupported execution action key: {action_key}")
+        template = self._ensure_action_template(action_key)
+        category = str(template.category or "").strip()
+        if not category:
+            raise ValueError(
+                f"Seeded execution action template is missing a category: {action_key}"
+            )
         clean_subject_euid = str(subject_euid or "").strip()
         clean_idempotency_key = str(idempotency_key or "").strip()
         if not clean_subject_euid or not clean_idempotency_key:
@@ -97,13 +113,17 @@ class ExecutionQueueActionRecorder:
         stmt = (
             select(action_instance)
             .where(
-                action_instance.category == "action",
+                action_instance.category == category,
                 action_instance.type == EXECUTION_ACTION_GROUP,
                 action_instance.subtype == action_key,
                 action_instance.is_deleted.is_(False),
-                func.jsonb_extract_path_text(action_instance.json_addl, "subject_lookup_euid")
+                func.jsonb_extract_path_text(
+                    action_instance.json_addl, "subject_lookup_euid"
+                )
                 == clean_subject_euid,
-                func.jsonb_extract_path_text(action_instance.json_addl, "idempotency_key")
+                func.jsonb_extract_path_text(
+                    action_instance.json_addl, "idempotency_key"
+                )
                 == clean_idempotency_key,
             )
             .order_by(action_instance.created_dt.desc())
@@ -129,6 +149,11 @@ class ExecutionQueueActionRecorder:
             raise ValueError(f"Unsupported execution action key: {action_key}")
 
         template = self._ensure_action_template(action_key)
+        category = str(template.category or "").strip()
+        if not category:
+            raise ValueError(
+                f"Seeded execution action template is missing a category: {action_key}"
+            )
         now = datetime.now(UTC).isoformat()
         action_definition = {
             "action_group": EXECUTION_ACTION_GROUP,
@@ -139,7 +164,7 @@ class ExecutionQueueActionRecorder:
         action_record = action_instance(
             name=f"{action_key}@{target_instance.euid}",
             polymorphic_discriminator="action_instance",
-            category="action",
+            category=category,
             type=EXECUTION_ACTION_GROUP,
             subtype=action_key,
             version="1.0",
@@ -187,10 +212,11 @@ class ExecutionQueueActionRecorder:
         return action_record
 
     def _ensure_action_template(self, action_key: str) -> generic_template:
-        template_code = f"action/{EXECUTION_ACTION_GROUP}/{action_key}/1.0/"
+        template_code = f"{EXECUTION_ACTION_TEMPLATE_PREFIX}/{EXECUTION_ACTION_GROUP}/{action_key}/1.0/"
         return require_seeded_template(
             self.session,
             template_code,
+            domain_code=self.domain_code,
             expected_prefix=EXECUTION_ACTION_TEMPLATE_PREFIX,
             app_name="Bloom",
         )

@@ -474,6 +474,67 @@
     </div>
   </div>
 </div>
+
+<div class="card" style="margin-top: var(--spacing-lg);">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-sliders"></i> Runtime Configuration</h3>
+  </div>
+  <div class="card-body">
+    <div class="grid grid-2" style="margin-bottom: var(--spacing-md);">
+      <div class="info-item">
+        <div class="info-label">User Config Path</div>
+        <div class="info-value font-mono text-sm">{{ config_summary.user_config_path }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Template Config Path</div>
+        <div class="info-value font-mono text-sm">{{ config_summary.template_config_path }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">TapDB Config Path</div>
+        <div class="info-value font-mono text-sm">{{ config_summary.tapdb_config_path }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Environment Chrome</div>
+        <div class="info-value">{{ "enabled" if config_summary.show_environment_chrome else "disabled" }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Deployment</div>
+        <div class="info-value">{{ config_summary.deployment_name }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">AWS Region</div>
+        <div class="info-value">{{ config_summary.aws_region }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Build Version</div>
+        <div class="info-value">{{ config_summary.build_version }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Config Rows</div>
+        <div class="info-value">{{ config_summary.effective_rows | length }}</div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in config_summary.effective_rows %}
+          <tr>
+            <td class="font-mono text-sm">{{ row.key }}</td>
+            <td class="font-mono text-sm">{{ row.value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_css %}

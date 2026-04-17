@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from bloom_lims.config import BloomSettings, ZebraDaySettings
-from bloom_lims.integrations.zebra_day.client import ZebraDayService
+from bloom_lims.integrations.zebra_day.client import (
+    ZebraDayIntegrationError,
+    ZebraDayService,
+)
 from bloom_lims.observability import BloomObservabilityStore
 
 
@@ -106,7 +111,9 @@ def test_zebra_day_service_submits_server_side_print_jobs(monkeypatch):
             token="internal-token",
         )
     )
-    fake_client = _FakeZebraClient(print_response={"success": True, "message": "queued"})
+    fake_client = _FakeZebraClient(
+        print_response={"success": True, "message": "queued"}
+    )
     service = ZebraDayService(settings)
     monkeypatch.setattr(service, "_client", lambda: fake_client)
 
@@ -140,10 +147,44 @@ def test_zebra_day_service_submits_server_side_print_jobs(monkeypatch):
     }
 
 
-def test_observability_store_treats_zebra_day_as_dependency_not_managed_service(monkeypatch):
+def test_zebra_day_service_requires_optional_dependency_when_configured(monkeypatch):
+    settings = BloomSettings(
+        zebra_day=ZebraDaySettings(
+            base_url="https://zebra-day.example.org",
+            token="internal-token",
+        )
+    )
+    service = ZebraDayService(settings)
+
+    def _missing_client(_name: str):
+        raise ImportError("No module named 'zebra_day'")
+
+    monkeypatch.setattr(
+        "bloom_lims.integrations.zebra_day.client.importlib.import_module",
+        _missing_client,
+    )
+
+    with pytest.raises(
+        ZebraDayIntegrationError,
+        match=r"install zebra-day in the active Bloom environment",
+    ):
+        service.submit_print_job(
+            lab="BLOOM",
+            printer_id="printer-7",
+            label_zpl_style="tube_2inX1in",
+            euid="E123",
+        )
+
+
+def test_observability_store_treats_zebra_day_as_dependency_not_managed_service(
+    monkeypatch,
+):
     settings = BloomSettings(
         atlas={"base_url": "https://atlas.example.org", "token": "atlas-token"},
-        zebra_day={"base_url": "https://zebra-day.example.org", "token": "internal-token"},
+        zebra_day={
+            "base_url": "https://zebra-day.example.org",
+            "token": "internal-token",
+        },
     )
     monkeypatch.setattr("bloom_lims.observability.get_settings", lambda: settings)
 

@@ -5,27 +5,16 @@ CRUD endpoints for BloomObj (generic instances).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from bloom_lims.schemas import (
     ObjectCreateSchema,
     ObjectUpdateSchema,
-    ObjectResponseSchema,
-    ObjectQueryParams,
-    PaginationParams,
-    PaginatedResponse,
-    SuccessResponse,
 )
-from bloom_lims.exceptions import (
-    NotFoundError,
-    ValidationError,
-    DatabaseError,
-    create_error_response,
-)
-from .dependencies import APIUser, require_read, require_write
 
+from .dependencies import APIUser, require_read, require_write
 
 logger = logging.getLogger(__name__)
 
@@ -45,38 +34,42 @@ async def list_objects(
 ):
     """
     List objects with optional filters.
-    
+
     Returns paginated list of BloomObj instances.
     """
     try:
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.bobjs import BloomObj
-        
+        from bloom_lims.db import BLOOMdb3
+
         bdb = BLOOMdb3()
-        bo = BloomObj(bdb)
-        
+        BloomObj(bdb)
+
         # Build query
         query = bdb.session.query(bdb.Base.classes.generic_instance)
 
         if type:
             query = query.filter(bdb.Base.classes.generic_instance.type == type.lower())
         if subtype:
-            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_instance.subtype == subtype.lower()
+            )
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
         if name_contains:
-            query = query.filter(bdb.Base.classes.generic_instance.name.ilike(f"%{name_contains}%"))
-        
+            query = query.filter(
+                bdb.Base.classes.generic_instance.name.ilike(f"%{name_contains}%")
+            )
+
         # Filter out deleted
-        query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+        query = query.filter(bdb.Base.classes.generic_instance.is_deleted.is_(False))
+
         # Get total count
         total = query.count()
-        
+
         # Paginate
         offset = (page - 1) * page_size
         items = query.limit(page_size).offset(offset).all()
-        
+
         return {
             "items": [
                 {
@@ -93,7 +86,7 @@ async def list_objects(
             "page_size": page_size,
             "pages": (total + page_size - 1) // page_size,
         }
-        
+
     except Exception as e:
         logger.error(f"Error listing objects: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -105,16 +98,16 @@ async def get_object(euid: str, user: APIUser = Depends(require_read)):
     Get a single object by EUID.
     """
     try:
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.bobjs import BloomObj
-        
+        from bloom_lims.db import BLOOMdb3
+
         bdb = BLOOMdb3()
         bo = BloomObj(bdb)
-        
+
         obj = bo.get_by_euid(euid)
         if not obj:
             raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
-        
+
         return {
             "euid": obj.euid,
             "name": obj.name,
@@ -124,7 +117,7 @@ async def get_object(euid: str, user: APIUser = Depends(require_read)):
             "json_addl": obj.json_addl,
             "created_at": obj.created_dt.isoformat() if obj.created_dt else None,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -137,13 +130,15 @@ async def get_object(euid: str, user: APIUser = Depends(require_read)):
 
 
 @router.post("/", response_model=Dict[str, Any])
-async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(require_write)):
+async def create_object(
+    data: ObjectCreateSchema, user: APIUser = Depends(require_write)
+):
     """
     Create a new object.
     """
     try:
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.bobjs import BloomObj
+        from bloom_lims.db import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)
@@ -161,15 +156,6 @@ async def create_object(data: ObjectCreateSchema, user: APIUser = Depends(requir
             subtype=data.subtype,
             version=version,
         )
-        if not templates and data.subtype:
-            # Fallback: if subtype doesn't exist, allow creating from the first
-            # matching category/type template.
-            templates = bo.query_template_by_component_v2(
-                category=category,
-                type=data.type,
-                subtype=None,
-                version=version,
-            )
         if not templates:
             raise HTTPException(
                 status_code=400,
@@ -224,9 +210,10 @@ async def update_object(
     - json_addl: Additional JSON data (merged with existing)
     """
     try:
-        from bloom_lims.db import BLOOMdb3
-        from bloom_lims.bobjs import BloomObj
         from sqlalchemy.orm.attributes import flag_modified
+
+        from bloom_lims.bobjs import BloomObj
+        from bloom_lims.db import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)
@@ -302,10 +289,12 @@ async def delete_object(
     """
     try:
         if hard_delete and not user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin privileges required for hard delete")
+            raise HTTPException(
+                status_code=403, detail="Admin privileges required for hard delete"
+            )
 
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.bobjs import BloomObj
+        from bloom_lims.db import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)

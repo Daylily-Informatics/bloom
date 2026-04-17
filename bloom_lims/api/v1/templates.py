@@ -5,12 +5,17 @@ Endpoints for template management.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from .dependencies import require_api_auth, APIUser
+from bloom_lims.config import get_settings
+from bloom_lims.template_identity import (
+    template_category_filter,
+    template_semantic_category,
+)
 
+from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
 
@@ -18,15 +23,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/templates", tags=["Templates"])
 
 
+def _tapdb_domain_code() -> str:
+    return str(get_settings().tapdb.domain_code).strip().upper()
+
+
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
     from bloom_lims.db import BLOOMdb3
+
     return BLOOMdb3(app_username=username)
 
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_templates(
-    category: Optional[str] = Query(None, description="Filter by category (container, content, equipment)"),
+    domain_code: str = Query(..., description="Meridian domain code"),
+    category: Optional[str] = Query(
+        None, description="Filter by category (container, content, equipment)"
+    ),
     type: Optional[str] = Query(None, description="Filter by type"),
     subtype: Optional[str] = Query(None, description="Filter by subtype"),
     page: int = Query(1, ge=1),
@@ -36,17 +49,27 @@ async def list_templates(
     """List available templates."""
     try:
         bdb = get_bdb(user.email)
+        domain_code = _tapdb_domain_code()
 
         query = bdb.session.query(bdb.Base.classes.generic_template)
+        query = query.filter(
+            bdb.Base.classes.generic_template.domain_code == domain_code
+        )
 
         if category:
-            query = query.filter(bdb.Base.classes.generic_template.category == category.lower())
+            category_filter = template_category_filter(
+                bdb.Base.classes.generic_template, category
+            )
+            if category_filter is not None:
+                query = query.filter(category_filter)
         if type:
             query = query.filter(bdb.Base.classes.generic_template.type == type.lower())
         if subtype:
-            query = query.filter(bdb.Base.classes.generic_template.subtype == subtype.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_template.subtype == subtype.lower()
+            )
 
-        query = query.filter(bdb.Base.classes.generic_template.is_deleted == False)
+        query = query.filter(bdb.Base.classes.generic_template.is_deleted.is_(False))
 
         total = query.count()
         offset = (page - 1) * page_size
@@ -57,7 +80,7 @@ async def list_templates(
                 {
                     "euid": t.euid,
                     "name": t.name,
-                    "category": t.category,
+                    "category": template_semantic_category(t),
                     "type": t.type,
                     "subtype": t.subtype,
                     "polymorphic_discriminator": t.polymorphic_discriminator,
@@ -74,14 +97,24 @@ async def list_templates(
 
 
 @router.get("/{euid}")
-async def get_template(euid: str, user: APIUser = Depends(require_api_auth)):
+async def get_template(
+    euid: str,
+    domain_code: str = Query(..., description="Meridian domain code"),
+    user: APIUser = Depends(require_api_auth),
+):
     """Get a template by EUID."""
     try:
         bdb = get_bdb(user.email)
+        domain_code = _tapdb_domain_code()
 
-        template = bdb.session.query(bdb.Base.classes.generic_template).filter(
-            bdb.Base.classes.generic_template.euid == euid
-        ).first()
+        template = (
+            bdb.session.query(bdb.Base.classes.generic_template)
+            .filter(
+                bdb.Base.classes.generic_template.euid == euid,
+                bdb.Base.classes.generic_template.domain_code == domain_code,
+            )
+            .first()
+        )
 
         if not template:
             raise HTTPException(status_code=404, detail=f"Template not found: {euid}")
@@ -89,7 +122,7 @@ async def get_template(euid: str, user: APIUser = Depends(require_api_auth)):
         return {
             "euid": template.euid,
             "name": template.name,
-            "category": template.category,
+            "category": template_semantic_category(template),
             "type": template.type,
             "subtype": template.subtype,
             "polymorphic_discriminator": template.polymorphic_discriminator,
@@ -105,21 +138,29 @@ async def get_template(euid: str, user: APIUser = Depends(require_api_auth)):
 @router.get("/by-category/{category}", response_model=Dict[str, Any])
 async def list_templates_by_category(
     category: str,
+    domain_code: str = Query(..., description="Meridian domain code"),
     user: APIUser = Depends(require_api_auth),
 ):
     """List templates by category (container, content, equipment, workflow)."""
     try:
         bdb = get_bdb(user.email)
+        domain_code = _tapdb_domain_code()
 
         query = bdb.session.query(bdb.Base.classes.generic_template).filter(
-            bdb.Base.classes.generic_template.category == category.lower(),
-            bdb.Base.classes.generic_template.is_deleted == False,
+            bdb.Base.classes.generic_template.domain_code == domain_code,
+            bdb.Base.classes.generic_template.is_deleted.is_(False),
         )
+        category_filter = template_category_filter(
+            bdb.Base.classes.generic_template, category
+        )
+        if category_filter is not None:
+            query = query.filter(category_filter)
 
         items = query.all()
+        resolved_category = template_semantic_category(items[0]) if items else category
 
         return {
-            "category": category,
+            "category": resolved_category,
             "templates": [
                 {
                     "euid": t.euid,
@@ -134,4 +175,3 @@ async def list_templates_by_category(
     except Exception as e:
         logger.error(f"Error listing templates by category {category}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

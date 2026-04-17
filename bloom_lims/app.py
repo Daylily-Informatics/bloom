@@ -17,6 +17,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from bloom_lims import __version__
 from bloom_lims.api import RateLimitMiddleware, api_v1_router
 from bloom_lims.config import atlas_webhook_secret_warning, get_settings
 from bloom_lims.domain_access import (
@@ -25,6 +26,7 @@ from bloom_lims.domain_access import (
     is_allowed_origin,
 )
 from bloom_lims.gui.errors import register_exception_handlers
+from bloom_lims.gui.jinja import refresh_template_globals
 from bloom_lims.gui.web_session import setup_bloom_session_middleware
 from bloom_lims.health import health_router, probe_router
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
@@ -42,7 +44,11 @@ def _validate_required_config(settings) -> None:
 
     Bypass with BLOOM_SKIP_STARTUP_VALIDATION=1 (tests only).
     """
-    if os.environ.get("BLOOM_SKIP_STARTUP_VALIDATION", "").strip() in ("1", "true", "yes"):
+    if os.environ.get("BLOOM_SKIP_STARTUP_VALIDATION", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
         logging.getLogger(__name__).warning(
             "Startup config validation skipped (BLOOM_SKIP_STARTUP_VALIDATION)"
         )
@@ -83,6 +89,7 @@ def create_app() -> FastAPI:
     if atlas_secret_warning:
         logging.getLogger(__name__).warning(atlas_secret_warning)
     allow_local_domain_access = not settings.is_production
+    configured_allowed_hosts = settings.network.allowed_hosts
 
     @asynccontextmanager
     async def _lifespan(_app: FastAPI):
@@ -92,13 +99,16 @@ def create_app() -> FastAPI:
             # Best-effort shutdown to flush/stop metrics writer.
             stop_all_writers()
 
-    app = FastAPI(lifespan=_lifespan)
+    app = FastAPI(lifespan=_lifespan, version=__version__)
     app.state.observability = BloomObservabilityStore()
+    refresh_template_globals()
 
     @app.middleware("http")
     async def _observability_request_context(request, call_next):
         request.state.request_id = request.headers.get("x-request-id", str(uuid4()))
-        request.state.correlation_id = request.headers.get("x-correlation-id", request.state.request_id)
+        request.state.correlation_id = request.headers.get(
+            "x-correlation-id", request.state.request_id
+        )
         started = monotonic()
         try:
             response = await call_next(request)
@@ -140,13 +150,17 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=build_trusted_hosts(allow_local=allow_local_domain_access),
+        allowed_hosts=build_trusted_hosts(
+            allow_local=allow_local_domain_access,
+            additional_hosts=configured_allowed_hosts,
+        ),
     )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[],
         allow_origin_regex=build_allowed_origin_regex(
-            allow_local=allow_local_domain_access
+            allow_local=allow_local_domain_access,
+            additional_hosts=configured_allowed_hosts,
         ),
         allow_credentials=settings.api.cors_allow_credentials,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -156,7 +170,11 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _enforce_origin_allowlist(request, call_next):
         origin = request.headers.get("origin")
-        if origin and not is_allowed_origin(origin, allow_local=allow_local_domain_access):
+        if origin and not is_allowed_origin(
+            origin,
+            allow_local=allow_local_domain_access,
+            additional_hosts=configured_allowed_hosts,
+        ):
             return PlainTextResponse("Origin not allowed", status_code=403)
         return await call_next(request)
 
@@ -176,7 +194,9 @@ def create_app() -> FastAPI:
     try:
         from bloom_lims.gui.router import router as gui_router
     except ModuleNotFoundError as exc:
-        logging.warning("Skipping GUI router due to missing optional dependency: %s", exc.name)
+        logging.warning(
+            "Skipping GUI router due to missing optional dependency: %s", exc.name
+        )
     else:
         app.include_router(gui_router)
 

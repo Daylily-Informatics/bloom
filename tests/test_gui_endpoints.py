@@ -50,6 +50,9 @@ class TestPublicEndpoints:
         response = client.get("/login")
         assert response.status_code == 200
         assert 'href="/auth/login' in response.text
+        assert "Branch:" in response.text
+        assert "Tag:" in response.text
+        assert "Commit:" in response.text
 
     def test_help_page(self, client):
         """Test help page returns HTML."""
@@ -78,6 +81,9 @@ class TestMainGUIEndpoints:
         response = client.get("/admin")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
+        assert "Runtime Configuration" in response.text
+        assert "User Config Path" in response.text
+        assert "ui.show_environment_chrome" in response.text
 
     def test_admin_includes_tapdb_metrics_link(self, client):
         """Admin page includes link to TapDB metrics."""

@@ -6,31 +6,40 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import jsonschema
 from fastapi.testclient import TestClient
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 os.environ["BLOOM_OAUTH"] = "no"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import app
+from bloom_lims import __version__
 from bloom_lims.config import get_settings
-from bloom_lims.observability import EndpointRollup, ProjectionMetadata, _percentile
+from bloom_lims.observability import (
+    EndpointRollup,
+    ProjectionMetadata,
+    _percentile,
+    base_frame,
+)
+from main import app
 
 
-DAYHOFF_SCHEMA_ROOT = Path("/Users/jmajor/.codex/worktrees/cbc5/dayhoff/contracts/observability")
+def _schema_root() -> Path:
+    return (
+        Path(__file__).resolve().parents[2]
+        / "_tmp"
+        / "dayhoff-contracts"
+        / "contracts"
+        / "observability"
+    )
 
 
 def _load_schema(name: str) -> dict:
-    return json.loads((DAYHOFF_SCHEMA_ROOT / name).read_text())
+    return json.loads((_schema_root() / name).read_text(encoding="utf-8"))
 
 
-def _assert_required_shape(payload: dict, schema: dict) -> None:
-    for key in schema.get("required", []):
-        assert key in payload, f"missing required key {key}"
-    projection_schema = schema.get("properties", {}).get("projection")
-    if projection_schema and "projection" in payload:
-        for key in projection_schema.get("required", []):
-            assert key in payload["projection"], f"missing projection key {key}"
+def _validate(name: str, payload: dict) -> None:
+    jsonschema.validate(payload, _load_schema(name))
 
 
 def test_observability_contract_endpoints_match_shared_frame() -> None:
@@ -40,20 +49,17 @@ def test_observability_contract_endpoints_match_shared_frame() -> None:
         client.get("/obs_services")
 
         schema_map = {
-            "/health": "health.schema.json",
-            "/obs_services": "obs_services.schema.json",
-            "/api_health": "api_health.schema.json",
-            "/endpoint_health": "endpoint_health.schema.json",
-            "/db_health": "db_health.schema.json",
-            "/auth_health": "auth_health.schema.json",
-            "/my_health": "my_health.schema.json",
+            "/healthz": "healthz.schema.json",
+            "/readyz": "readyz.schema.json",
         }
 
         for path, schema_name in schema_map.items():
             response = client.get(path)
-            assert response.status_code == 200, f"{path} returned {response.status_code}"
+            assert response.status_code in {200, 503}, (
+                f"{path} returned {response.status_code}"
+            )
             payload = response.json()
-            _assert_required_shape(payload, _load_schema(schema_name))
+            _validate(schema_name, payload)
             assert payload["service"] == "bloom"
             assert payload["contract_version"] == "v3"
 
@@ -73,10 +79,16 @@ def test_obs_services_uses_canonical_capability_vocabulary() -> None:
         "/health": {"auth": "operator_or_service_token", "kind": "summary"},
         "/obs_services": {"auth": "operator_or_service_token", "kind": "discovery"},
         "/api_health": {"auth": "operator_or_service_token", "kind": "api_rollup"},
-        "/endpoint_health": {"auth": "operator_or_service_token", "kind": "endpoint_rollup"},
+        "/endpoint_health": {
+            "auth": "operator_or_service_token",
+            "kind": "endpoint_rollup",
+        },
         "/db_health": {"auth": "operator_or_service_token", "kind": "database"},
         "/api/anomalies": {"auth": "operator_or_service_token", "kind": "anomaly_list"},
-        "/api/anomalies/{anomaly_id}": {"auth": "operator_or_service_token", "kind": "anomaly_detail"},
+        "/api/anomalies/{anomaly_id}": {
+            "auth": "operator_or_service_token",
+            "kind": "anomaly_detail",
+        },
         "/my_health": {"auth": "authenticated_self", "kind": "self"},
         "/auth_health": {"auth": "operator_or_service_token", "kind": "auth"},
     }
@@ -116,6 +128,16 @@ def test_endpoint_health_uses_route_templates_not_raw_instances() -> None:
     route_templates = {item["route_template"] for item in response.json()["items"]}
     assert "/api/v1/objects/{euid}" in route_templates
     assert all("NONEXISTENT_EUID" not in item for item in route_templates)
+
+
+def test_base_frame_reports_scm_version() -> None:
+    request = SimpleNamespace(
+        state=SimpleNamespace(request_id="req-1", correlation_id="corr-1")
+    )
+
+    payload = base_frame(request, status="ok")
+
+    assert payload["build"]["version"] == __version__
 
 
 def test_admin_observability_page_renders() -> None:
@@ -216,6 +238,7 @@ def test_observability_helpers_cover_empty_rollups_and_db_fallback(monkeypatch) 
     assert payload["request_count"] == 1
 
     with TestClient(app, raise_server_exceptions=False) as client:
+
         async def _fake_check_database_health():
             return SimpleNamespace(
                 status="healthy",

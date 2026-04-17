@@ -8,6 +8,31 @@ Always start by activating the repo environment:
 source ./activate <deploy-name>
 ```
 
+## Activate Contract
+
+- `activate` must stay env-only: create the conda env if missing, activate it, and run exactly one `python -m pip install -e <repo-root>` on first create.
+- Do not add config copying, TapDB env exports, loader-path mutation, pre-commit installs, Playwright installs, shell tool checks, or DB/bootstrap work back into `activate`.
+- If Bloom needs runtime configuration or TapDB namespace setup, move that logic into `bloom config init`, `bloom db build`, or Dayhoff-generated bootstrap scripts instead of `activate`.
+- Every service config, TapDB config, and TapDB registry path must be passed explicitly as a full absolute file path.
+- Do not guess TapDB config or registry paths from deployment code, `~/.config`, or repo-local defaults during runtime startup.
+- If Bloom is missing an explicit path, fail hard and fix the caller or config source instead of synthesizing a fallback path.
+
+## Dependency Boundary
+
+- `environment.yaml` is only for Python/bootstrap/system packages.
+- All Python libraries needed by the repo belong in `pyproject.toml` under `[project.dependencies]`.
+- Do not reintroduce `pip:` blocks or Python package installs into `environment.yaml`.
+- Do not add any secondary install set such as `.[dev]`, `.[test]`, `requirements-dev.txt`, or `[project.optional-dependencies]`.
+
+## CLI Contract
+
+- `bloom` and every declared console script must resolve from the activated conda env `bin/` directory.
+- `bloom db build` must keep an explicit `--target` argument, and repo-solo local bootstrap examples should use `bloom db build --target local`.
+- Bloom runtime and bootstrap commands must consume explicit absolute config file paths.
+- Do not reintroduce service-config, TapDB config, or registry-path guessing from deployment names, `HOME`, `~/.config`, or silent fallback helpers.
+- If Bloom is invoked by Dayhoff or another orchestrator, that caller must pass the full absolute `--config` path plus the full absolute TapDB config and registry paths Bloom needs.
+- `bloom config init` may materialize the deployment-scoped YAML, but every later runtime/bootstrap path must fail hard when required explicit file paths are missing or non-absolute.
+
 ## Command Ownership
 
 - Use `bloom ...` as the primary interface for normal Bloom work.

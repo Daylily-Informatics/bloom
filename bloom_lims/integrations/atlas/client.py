@@ -7,7 +7,6 @@ from typing import Any
 
 import requests
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -58,20 +57,34 @@ class AtlasClient:
     def get_trf(self, trf_euid: str) -> dict[str, Any]:
         return self._get_json(f"/api/integrations/bloom/v1/lookups/trfs/{trf_euid}")
 
-    def get_patient(self, patient_id: str) -> dict[str, Any]:
-        return self._get_json(f"/api/integrations/bloom/v1/lookups/patients/{patient_id}")
+    def get_order(self, order_euid: str) -> dict[str, Any]:
+        return self._get_json(f"/api/integrations/bloom/v1/lookups/orders/{order_euid}")
 
-    def get_shipment(self, shipment_number: str) -> dict[str, Any]:
-        return self._get_json(f"/api/integrations/bloom/v1/lookups/shipments/{shipment_number}")
+    def get_patient(self, patient_id: str) -> dict[str, Any]:
+        return self._get_json(
+            f"/api/integrations/bloom/v1/lookups/patients/{patient_id}"
+        )
+
+    def get_shipment(self, shipment_euid: str) -> dict[str, Any]:
+        return self._get_json(
+            f"/api/integrations/bloom/v1/lookups/shipments/{shipment_euid}"
+        )
 
     def get_testkit(self, kit_barcode: str) -> dict[str, Any]:
-        return self._get_json(f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}")
+        return self._get_json(
+            f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}"
+        )
 
-    def get_container_trf_context(self, container_euid: str, tenant_id: str) -> dict[str, Any]:
+    def get_container_trf_context(
+        self, container_euid: str, tenant_id: str
+    ) -> dict[str, Any]:
         path = f"/api/integrations/bloom/v1/lookups/containers/{container_euid}/trf-context"
         clean_tenant = str(tenant_id or "").strip()
         if not clean_tenant:
-            raise AtlasClientError("Atlas tenant ID is required for container TRF context lookup", path=path)
+            raise AtlasClientError(
+                "Atlas tenant ID is required for container TRF context lookup",
+                path=path,
+            )
         return self._get_json(
             path,
             extra_headers={"X-Atlas-Tenant-Id": clean_tenant},
@@ -115,9 +128,13 @@ class AtlasClient:
         clean_tenant = str(tenant_id or "").strip()
         clean_idempotency = str(idempotency_key or "").strip()
         if not clean_tenant:
-            raise AtlasClientError("Atlas tenant ID is required for status events", path=path)
+            raise AtlasClientError(
+                "Atlas tenant ID is required for status events", path=path
+            )
         if not clean_idempotency:
-            raise AtlasClientError("Idempotency key is required for status events", path=path)
+            raise AtlasClientError(
+                "Idempotency key is required for status events", path=path
+            )
         return self._post_json(
             path,
             payload,
@@ -153,6 +170,7 @@ class AtlasClient:
         url = f"{self.base_url}{path}"
         try:
             response = requests.get(
+                # nosec B113 - timeout is always passed explicitly below.
                 url,
                 headers=self._headers(extra_headers),
                 timeout=timeout_seconds or self.timeout_seconds,
@@ -165,7 +183,9 @@ class AtlasClient:
         try:
             payload = response.json()
         except ValueError as exc:
-            raise AtlasClientError("Atlas response was not valid JSON", path=path) from exc
+            raise AtlasClientError(
+                "Atlas response was not valid JSON", path=path
+            ) from exc
         if not isinstance(payload, dict):
             raise AtlasClientError("Atlas response must be a JSON object", path=path)
         return payload
@@ -183,6 +203,7 @@ class AtlasClient:
         url = f"{self.base_url}{path}"
         try:
             response = requests.post(
+                # nosec B113 - timeout is always passed explicitly below.
                 url,
                 headers=self._headers(extra_headers),
                 json=data,
@@ -196,12 +217,16 @@ class AtlasClient:
         try:
             payload = response.json()
         except ValueError as exc:
-            raise AtlasClientError("Atlas response was not valid JSON", path=path) from exc
+            raise AtlasClientError(
+                "Atlas response was not valid JSON", path=path
+            ) from exc
         if not isinstance(payload, dict):
             raise AtlasClientError("Atlas response must be a JSON object", path=path)
         return payload
 
-    def _raise_http_error(self, method: str, path: str, response: requests.Response) -> None:
+    def _raise_http_error(
+        self, method: str, path: str, response: requests.Response
+    ) -> None:
         status_code = int(response.status_code)
         detail = ""
         try:
@@ -209,7 +234,12 @@ class AtlasClient:
         except ValueError:
             payload = None
         if isinstance(payload, dict):
-            detail = str(payload.get("detail") or payload.get("message") or payload.get("error") or "").strip()
+            detail = str(
+                payload.get("detail")
+                or payload.get("message")
+                or payload.get("error")
+                or ""
+            ).strip()
         if not detail:
             detail = str(response.text or "").strip()
         if len(detail) > 200:

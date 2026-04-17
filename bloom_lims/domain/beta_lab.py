@@ -34,7 +34,7 @@ class BetaLabService(
     SHIPMENT_REFERENCE_TYPE = "atlas_shipment"
     ORGANIZATION_SITE_REFERENCE_TYPE = "atlas_organization_site"
     COLLECTION_EVENT_REFERENCE_TYPE = "atlas_collection_event"
-    GENERIC_DATA_TEMPLATE_CODE = "generic/generic/generic/1.0"
+    GENERIC_DATA_TEMPLATE_CODE = "data/generic/generic/1.0"
     BETA_KIND_QUEUE_DEFINITION = "queue_definition"
     BETA_KIND_QUEUE_EVENT = "queue_event"
     BETA_KIND_WORK_ITEM = "beta_work_item"
@@ -113,7 +113,10 @@ class BetaLabService(
     ):
         self.bdb = BLOOMdb3(app_username=app_username)
         self.bobj = BloomObj(self.bdb)
-        self.action_recorder = BloomBetaActionRecorder(self.bdb.session)
+        self.action_recorder = BloomBetaActionRecorder(
+            self.bdb.session,
+            domain_code=self.bdb.domain_code,
+        )
         self.execution = ExecutionQueueService(
             app_username=app_username,
             bdb=self.bdb,

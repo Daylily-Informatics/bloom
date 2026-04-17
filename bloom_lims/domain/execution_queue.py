@@ -9,7 +9,7 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
@@ -51,6 +51,11 @@ from bloom_lims.schemas.execution_queue import (
     WorkerStatus,
     WorkerSummary,
     WorkerType,
+)
+from bloom_lims.template_identity import (
+    instance_category_filter,
+    instance_semantic_category,
+    template_semantic_category,
 )
 
 
@@ -189,7 +194,10 @@ class ExecutionQueueService:
         self.bdb = bdb if bdb is not None else BLOOMdb3(app_username=app_username)
         self._owns_bdb = bdb is None
         self.bobj = BloomObj(self.bdb)
-        self.action_recorder = ExecutionQueueActionRecorder(self.bdb.session)
+        self.action_recorder = ExecutionQueueActionRecorder(
+            self.bdb.session,
+            domain_code=self.bdb.domain_code,
+        )
         self.clock = clock or (lambda: datetime.now(UTC))
 
     def close(self) -> None:
@@ -210,7 +218,13 @@ class ExecutionQueueService:
                 continue
             queue = self.bobj.create_instance_by_code(
                 self.EXECUTION_QUEUE_TEMPLATE_CODE,
-                {"json_addl": {"properties": self._queue_definition_defaults(queue_key, defaults)}},
+                {
+                    "json_addl": {
+                        "properties": self._queue_definition_defaults(
+                            queue_key, defaults
+                        )
+                    }
+                },
             )
             queue.name = defaults["display_name"]
             props = self._props(queue)
@@ -279,7 +293,10 @@ class ExecutionQueueService:
         worker = self._require_worker(payload.worker_euid)
         props = self._props(worker)
         props["heartbeat_at"] = self._timestamp()
-        if payload.status is not None and str(props.get("status") or "") != WorkerStatus.DISABLED.value:
+        if (
+            payload.status is not None
+            and str(props.get("status") or "") != WorkerStatus.DISABLED.value
+        ):
             props["status"] = payload.status.value
         if payload.last_error_at is not None:
             props["last_error_at"] = payload.last_error_at
@@ -309,7 +326,10 @@ class ExecutionQueueService:
     def list_queues(self) -> list[ExecutionQueueSummary]:
         self.ensure_default_queue_definitions()
         now = self.clock()
-        return [self._queue_summary(queue, now=now) for queue in self._all_execution_queues()]
+        return [
+            self._queue_summary(queue, now=now)
+            for queue in self._all_execution_queues()
+        ]
 
     def get_queue(self, queue_key: str) -> ExecutionQueueDetail:
         self.ensure_default_queue_definitions()
@@ -323,14 +343,18 @@ class ExecutionQueueService:
                 ExecutionState(str(value))
                 for value in list(props.get("eligible_states") or [])
             ],
-            required_worker_capabilities=list(props.get("required_worker_capabilities") or []),
+            required_worker_capabilities=list(
+                props.get("required_worker_capabilities") or []
+            ),
             site_scope=list(props.get("site_scope") or []),
             platform_scope=list(props.get("platform_scope") or []),
             assay_scope=list(props.get("assay_scope") or []),
             lease_ttl_seconds=int(props.get("lease_ttl_seconds") or 900),
             max_attempts_default=int(props.get("max_attempts_default") or 5),
             retry_policy=QueueRetryPolicy(**dict(props.get("retry_policy") or {})),
-            selection_policy=QueueSelectionPolicy(**dict(props.get("selection_policy") or {})),
+            selection_policy=QueueSelectionPolicy(
+                **dict(props.get("selection_policy") or {})
+            ),
             diagnostics_enabled=bool(props.get("diagnostics_enabled", True)),
             revision=int(props.get("revision") or 1),
             disabled_reason=str(props.get("disabled_reason") or "") or None,
@@ -339,7 +363,10 @@ class ExecutionQueueService:
     def list_queue_items(self, queue_key: str) -> list[ExecutionQueueItem]:
         self.ensure_default_queue_definitions()
         queue = self._require_queue(queue_key)
-        return [self._queue_item(instance) for instance in self._visible_queue_items(queue, self.clock())]
+        return [
+            self._queue_item(instance)
+            for instance in self._visible_queue_items(queue, self.clock())
+        ]
 
     def list_workers(self) -> list[WorkerSummary]:
         now = self.clock()
@@ -367,11 +394,14 @@ class ExecutionQueueService:
 
     def get_subject_detail(self, subject_euid: str) -> SubjectExecutionDetail:
         subject = self._require_instance(subject_euid)
-        execution = ExecutionEnvelope(**self._ensure_execution_envelope(subject, write=False))
-        diagnostics = self._subject_diagnostics(subject, queue_key=execution.next_queue_key)
+        execution = ExecutionEnvelope(
+            **self._ensure_execution_envelope(subject, write=False)
+        )
+        diagnostics = self._subject_diagnostics(
+            subject, queue_key=execution.next_queue_key
+        )
         active_holds = [
-            self._hold_summary(hold)
-            for hold in self._active_holds_for_subject(subject)
+            self._hold_summary(hold) for hold in self._active_holds_for_subject(subject)
         ]
         dead_letter = self._latest_dead_letter_for_subject(subject)
         return SubjectExecutionDetail(
@@ -381,11 +411,15 @@ class ExecutionQueueService:
             template_code=self._template_code(subject),
             execution=execution,
             diagnostics=diagnostics,
-            active_lease=self._lease_summary(self._active_lease_for_subject(subject, self.clock()))
+            active_lease=self._lease_summary(
+                self._active_lease_for_subject(subject, self.clock())
+            )
             if self._active_lease_for_subject(subject, self.clock()) is not None
             else None,
             active_holds=active_holds,
-            dead_letter=self._dead_letter_summary(dead_letter) if dead_letter is not None else None,
+            dead_letter=self._dead_letter_summary(dead_letter)
+            if dead_letter is not None
+            else None,
         )
 
     def get_subject_history(self, subject_euid: str) -> SubjectExecutionHistory:
@@ -395,8 +429,7 @@ class ExecutionQueueService:
             for record in self._records_for_subject(subject)
         ]
         leases = [
-            self._lease_summary(lease)
-            for lease in self._leases_for_subject(subject)
+            self._lease_summary(lease) for lease in self._leases_for_subject(subject)
         ]
         holds = [self._hold_summary(hold) for hold in self._holds_for_subject(subject)]
         dead_letters = [
@@ -459,7 +492,9 @@ class ExecutionQueueService:
                 "status": LeaseStatus.ACTIVE.value,
                 "claimed_at": self._timestamp(now),
                 "heartbeat_at": self._timestamp(now),
-                "expires_at": self._timestamp(now + timedelta(seconds=lease_ttl_seconds)),
+                "expires_at": self._timestamp(
+                    now + timedelta(seconds=lease_ttl_seconds)
+                ),
                 "released_at": None,
                 "release_reason": None,
                 "attempt_number": attempt_number,
@@ -651,11 +686,21 @@ class ExecutionQueueService:
         self._assert_lease_active_for_subject(subject, lease, now=self.clock())
 
         execution = self._ensure_execution_envelope(subject, write=True)
-        self._assert_expected_state(subject, execution, payload.expected_state, payload.expected_revision)
+        self._assert_expected_state(
+            subject, execution, payload.expected_state, payload.expected_revision
+        )
 
-        next_state = ExecutionState.COMPLETED if payload.terminal or not payload.next_queue_key else ExecutionState.READY
+        next_state = (
+            ExecutionState.COMPLETED
+            if payload.terminal or not payload.next_queue_key
+            else ExecutionState.READY
+        )
         if str(execution.get("state") or "") == ExecutionState.WAITING_EXTERNAL.value:
-            next_state = ExecutionState.READY if payload.next_queue_key else ExecutionState.COMPLETED
+            next_state = (
+                ExecutionState.READY
+                if payload.next_queue_key
+                else ExecutionState.COMPLETED
+            )
         execution["state"] = next_state.value
         execution["revision"] = int(execution.get("revision") or 1) + 1
         execution["next_queue_key"] = payload.next_queue_key
@@ -667,7 +712,9 @@ class ExecutionQueueService:
 
         record = self._active_record_for_lease(lease)
         if record is None:
-            raise ExecutionQueueConflictError(f"Active execution record not found for lease {lease.euid}")
+            raise ExecutionQueueConflictError(
+                f"Active execution record not found for lease {lease.euid}"
+            )
         self._finalize_record(
             record,
             status=RecordStatus.SUCCEEDED,
@@ -680,7 +727,9 @@ class ExecutionQueueService:
         execution["queue_cache"]["current_queue_key"] = payload.next_queue_key
         execution["queue_cache"]["computed_at"] = self._timestamp()
         self._set_execution_envelope(subject, execution)
-        self._transition_lease_to_terminal(lease, status=LeaseStatus.COMPLETED, reason="completed")
+        self._transition_lease_to_terminal(
+            lease, status=LeaseStatus.COMPLETED, reason="completed"
+        )
 
         self.action_recorder.record(
             target_instance=subject,
@@ -733,9 +782,15 @@ class ExecutionQueueService:
         self._assert_lease_active_for_subject(subject, lease, now=self.clock())
 
         execution = self._ensure_execution_envelope(subject, write=True)
-        self._assert_expected_state(subject, execution, payload.expected_state, payload.expected_revision)
+        self._assert_expected_state(
+            subject, execution, payload.expected_state, payload.expected_revision
+        )
 
-        queue_key = str(self._props(lease).get("queue_lookup_key") or execution.get("next_queue_key") or "")
+        queue_key = str(
+            self._props(lease).get("queue_lookup_key")
+            or execution.get("next_queue_key")
+            or ""
+        )
         queue = self._require_queue(queue_key)
         queue_props = self._props(queue)
         execution["attempt_count"] = int(execution.get("attempt_count") or 0) + 1
@@ -747,7 +802,9 @@ class ExecutionQueueService:
 
         record = self._active_record_for_lease(lease)
         if record is None:
-            raise ExecutionQueueConflictError(f"Active execution record not found for lease {lease.euid}")
+            raise ExecutionQueueConflictError(
+                f"Active execution record not found for lease {lease.euid}"
+            )
 
         dead_letter_euid: str | None = None
         if payload.retryable and int(execution["attempt_count"]) < max_attempts:
@@ -770,7 +827,9 @@ class ExecutionQueueService:
                 error_code=payload.error_code,
                 error_message=payload.error_message,
             )
-            self._transition_lease_to_terminal(lease, status=LeaseStatus.RELEASED, reason="retryable_failure")
+            self._transition_lease_to_terminal(
+                lease, status=LeaseStatus.RELEASED, reason="retryable_failure"
+            )
         else:
             execution["state"] = ExecutionState.FAILED_TERMINAL.value
             execution["retry_at"] = None
@@ -786,8 +845,12 @@ class ExecutionQueueService:
                 error_code=payload.error_code,
                 error_message=payload.error_message,
             )
-            self._transition_lease_to_terminal(lease, status=LeaseStatus.RELEASED, reason="terminal_failure")
-            dead_letter = self._create_dead_letter(subject, queue, record, lease, payload)
+            self._transition_lease_to_terminal(
+                lease, status=LeaseStatus.RELEASED, reason="terminal_failure"
+            )
+            dead_letter = self._create_dead_letter(
+                subject, queue, record, lease, payload
+            )
             dead_letter_euid = dead_letter.euid
         execution["revision"] = int(execution.get("revision") or 1) + 1
         execution["last_execution_record_euid"] = record.euid
@@ -842,7 +905,9 @@ class ExecutionQueueService:
 
         subject = self._lock_subject(payload.subject_euid)
         placed_by = self._require_worker(payload.placed_by_worker_euid)
-        queue = self._find_queue_by_key(payload.queue_key) if payload.queue_key else None
+        queue = (
+            self._find_queue_by_key(payload.queue_key) if payload.queue_key else None
+        )
         execution = self._ensure_execution_envelope(subject, write=True)
         execution["state"] = ExecutionState.HELD.value
         execution["hold_state"] = "ACTIVE"
@@ -963,7 +1028,9 @@ class ExecutionQueueService:
         self._require_queue(payload.queue_key)
         execution = self._ensure_execution_envelope(subject, write=True)
         if payload.expected_state is not None:
-            self._assert_expected_state(subject, execution, payload.expected_state, payload.expected_revision)
+            self._assert_expected_state(
+                subject, execution, payload.expected_state, payload.expected_revision
+            )
         execution["state"] = ExecutionState.READY.value
         execution["next_queue_key"] = payload.queue_key
         execution["next_action_key"] = payload.next_action_key
@@ -986,7 +1053,11 @@ class ExecutionQueueService:
             target_instance=subject,
             action_key="requeue_subject",
             captured_data=payload.model_dump(),
-            result={"status": "success", "subject_euid": subject.euid, "queue_key": payload.queue_key},
+            result={
+                "status": "success",
+                "subject_euid": subject.euid,
+                "queue_key": payload.queue_key,
+            },
             executed_by=executed_by,
             subject_euid=subject.euid,
             worker_euid=None,
@@ -1020,7 +1091,9 @@ class ExecutionQueueService:
         subject = self._lock_subject(payload.subject_euid)
         execution = self._ensure_execution_envelope(subject, write=True)
         if payload.expected_state is not None:
-            self._assert_expected_state(subject, execution, payload.expected_state, payload.expected_revision)
+            self._assert_expected_state(
+                subject, execution, payload.expected_state, payload.expected_revision
+            )
         execution["state"] = ExecutionState.CANCELED.value
         execution["cancel_requested"] = True
         execution["terminal"] = True
@@ -1143,7 +1216,11 @@ class ExecutionQueueService:
             if lineage.is_deleted or lineage.relationship_type != "contains":
                 continue
             parent = lineage.parent_instance
-            if parent is None or parent.is_deleted or parent.category != "container":
+            if (
+                parent is None
+                or parent.is_deleted
+                or instance_semantic_category(parent) != "container"
+            ):
                 continue
             container_queue = self.current_queue_for_instance(parent)
             if container_queue:
@@ -1163,7 +1240,9 @@ class ExecutionQueueService:
             return f"worker://bloom/{kind}/{user_id}/{normalized_scope}"
         return f"worker://bloom/{kind}/{user_id}"
 
-    def _queue_definition_defaults(self, queue_key: str, defaults: dict[str, Any]) -> dict[str, Any]:
+    def _queue_definition_defaults(
+        self, queue_key: str, defaults: dict[str, Any]
+    ) -> dict[str, Any]:
         return {
             "queue_key": queue_key,
             "display_name": defaults["display_name"],
@@ -1171,12 +1250,16 @@ class ExecutionQueueService:
             "manual_only": False,
             "operator_visible": True,
             "dispatch_priority": int(defaults.get("dispatch_priority") or 100),
-            "subject_template_codes": list(defaults.get("subject_template_codes") or []),
+            "subject_template_codes": list(
+                defaults.get("subject_template_codes") or []
+            ),
             "eligible_states": [
                 ExecutionState.READY.value,
                 ExecutionState.FAILED_RETRYABLE.value,
             ],
-            "required_worker_capabilities": list(defaults.get("required_worker_capabilities") or []),
+            "required_worker_capabilities": list(
+                defaults.get("required_worker_capabilities") or []
+            ),
             "site_scope": [],
             "platform_scope": [],
             "assay_scope": [],
@@ -1189,7 +1272,9 @@ class ExecutionQueueService:
             "disabled_reason": None,
         }
 
-    def _create_dead_letter(self, subject, queue, record, lease, payload: FailQueueExecutionRequest):
+    def _create_dead_letter(
+        self, subject, queue, record, lease, payload: FailQueueExecutionRequest
+    ):
         dead_letter = self._create_execution_instance(
             self.EXECUTION_DEAD_LETTER_TEMPLATE_CODE,
             name=f"dead-letter:{queue.euid}:{subject.euid}",
@@ -1199,7 +1284,12 @@ class ExecutionQueueService:
                 "last_execution_record_lookup_euid": record.euid,
                 "last_lease_lookup_euid": lease.euid,
                 "dead_lettered_at": self._timestamp(),
-                "failure_count": int(self._ensure_execution_envelope(subject, write=False).get("attempt_count") or 0),
+                "failure_count": int(
+                    self._ensure_execution_envelope(subject, write=False).get(
+                        "attempt_count"
+                    )
+                    or 0
+                ),
                 "error_class": payload.error_class,
                 "error_message": payload.error_message,
                 "resolution_state": DeadLetterResolutionState.OPEN.value,
@@ -1215,27 +1305,39 @@ class ExecutionQueueService:
     def _records_for_subject(self, subject) -> list[Any]:
         records: list[Any] = []
         for lineage in get_parent_lineages(subject):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_SUBJECT_RECORD:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_SUBJECT_RECORD
+            ):
                 continue
             child = lineage.child_instance
             if child is None or child.is_deleted:
                 continue
             if self._is_execution_instance(child, subtype="execution_record"):
                 records.append(child)
-        records.sort(key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC), reverse=True)
+        records.sort(
+            key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
         return records
 
     def _leases_for_subject(self, subject) -> list[Any]:
         leases: list[Any] = []
         for lineage in get_parent_lineages(subject):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_SUBJECT_LEASE:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_SUBJECT_LEASE
+            ):
                 continue
             child = lineage.child_instance
             if child is None or child.is_deleted:
                 continue
             if self._is_execution_instance(child, subtype="queue_lease"):
                 leases.append(child)
-        leases.sort(key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC), reverse=True)
+        leases.sort(
+            key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
         return leases
 
     def _holds_for_subject(self, subject) -> list[Any]:
@@ -1248,7 +1350,10 @@ class ExecutionQueueService:
                 continue
             if self._is_execution_instance(child, subtype="hold"):
                 holds.append(child)
-        holds.sort(key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC), reverse=True)
+        holds.sort(
+            key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
         return holds
 
     def _active_holds_for_subject(self, subject) -> list[Any]:
@@ -1261,14 +1366,20 @@ class ExecutionQueueService:
     def _dead_letters_for_subject(self, subject) -> list[Any]:
         dead_letters: list[Any] = []
         for lineage in get_parent_lineages(subject):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_SUBJECT_DEAD_LETTER:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_SUBJECT_DEAD_LETTER
+            ):
                 continue
             child = lineage.child_instance
             if child is None or child.is_deleted:
                 continue
             if self._is_execution_instance(child, subtype="dead_letter"):
                 dead_letters.append(child)
-        dead_letters.sort(key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC), reverse=True)
+        dead_letters.sort(
+            key=lambda row: row.created_dt or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
         return dead_letters
 
     def _latest_dead_letter_for_subject(self, subject):
@@ -1283,7 +1394,9 @@ class ExecutionQueueService:
             worker
             for worker in self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "actor",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "actor"
+                ),
                 self.bdb.Base.classes.generic_instance.type == "system",
                 self.bdb.Base.classes.generic_instance.subtype == "worker",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -1295,7 +1408,9 @@ class ExecutionQueueService:
         return list(
             self.bdb.session.query(self.bdb.Base.classes.generic_instance)
             .filter(
-                self.bdb.Base.classes.generic_instance.category == "data",
+                instance_category_filter(
+                    self.bdb.Base.classes.generic_instance, "data"
+                ),
                 self.bdb.Base.classes.generic_instance.type == "execution",
                 self.bdb.Base.classes.generic_instance.subtype == subtype,
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
@@ -1307,19 +1422,27 @@ class ExecutionQueueService:
         props = self._props(queue)
         if not bool(props.get("enabled", True)):
             return []
-        subject_template_codes = set(str(code) for code in list(props.get("subject_template_codes") or []))
-        eligible_states = set(str(code) for code in list(props.get("eligible_states") or []))
+        subject_template_codes = set(
+            str(code) for code in list(props.get("subject_template_codes") or [])
+        )
+        eligible_states = set(
+            str(code) for code in list(props.get("eligible_states") or [])
+        )
         items = []
         for instance in self._candidate_subjects():
             template_code = self._template_code(instance)
             if template_code not in subject_template_codes:
                 continue
             execution = self._ensure_execution_envelope(instance, write=False)
-            if str(execution.get("next_queue_key") or "") != str(props.get("queue_key") or ""):
+            if str(execution.get("next_queue_key") or "") != str(
+                props.get("queue_key") or ""
+            ):
                 continue
             if str(execution.get("state") or "") not in eligible_states:
                 continue
-            if bool(execution.get("terminal")) or bool(execution.get("cancel_requested")):
+            if bool(execution.get("terminal")) or bool(
+                execution.get("cancel_requested")
+            ):
                 continue
             if str(execution.get("hold_state") or "") == "ACTIVE":
                 continue
@@ -1337,13 +1460,19 @@ class ExecutionQueueService:
         return items
 
     def _candidate_subjects(self) -> list[Any]:
-        return [
-            instance
-            for instance in self.bdb.session.query(self.bdb.Base.classes.generic_instance)
-            .filter(self.bdb.Base.classes.generic_instance.is_deleted.is_(False))
+        model = self.bdb.Base.classes.generic_instance
+        return list(
+            self.bdb.session.query(model)
+            .filter(
+                model.is_deleted.is_(False),
+                or_(
+                    instance_category_filter(model, "content"),
+                    instance_category_filter(model, "container"),
+                    instance_category_filter(model, "data"),
+                ),
+            )
             .all()
-            if str(instance.category or "") not in {"action"}
-        ]
+        )
 
     def _next_visible_subject_euid(self, queue, now: datetime) -> str | None:
         items = self._visible_queue_items(queue, now)
@@ -1353,8 +1482,12 @@ class ExecutionQueueService:
         execution = self._ensure_execution_envelope(instance, write=False)
         priority = -int(execution.get("priority") or 0)
         due_at = self._parse_datetime(execution.get("due_at"))
-        due_at_key = (0, due_at) if due_at is not None else (1, datetime.max.replace(tzinfo=UTC))
-        ready_ts = self._queue_ready_at(instance, execution) or datetime.max.replace(tzinfo=UTC)
+        due_at_key = (
+            (0, due_at) if due_at is not None else (1, datetime.max.replace(tzinfo=UTC))
+        )
+        ready_ts = self._queue_ready_at(instance, execution) or datetime.max.replace(
+            tzinfo=UTC
+        )
         created_dt = instance.created_dt or datetime.max.replace(tzinfo=UTC)
         return (priority, due_at_key, ready_ts, created_dt, str(instance.euid))
 
@@ -1372,7 +1505,15 @@ class ExecutionQueueService:
         newest_age = None
         if visible_items:
             ages = [
-                (now - (self._queue_ready_at(item, self._ensure_execution_envelope(item, write=False)) or now)).total_seconds()
+                (
+                    now
+                    - (
+                        self._queue_ready_at(
+                            item, self._ensure_execution_envelope(item, write=False)
+                        )
+                        or now
+                    )
+                ).total_seconds()
                 for item in visible_items
             ]
             oldest_age = max(ages)
@@ -1410,7 +1551,10 @@ class ExecutionQueueService:
             status = str(self._props(record).get("status") or "")
             if status == RecordStatus.SUCCEEDED.value:
                 successes += 1
-            elif status in {RecordStatus.FAILED_RETRYABLE.value, RecordStatus.FAILED_TERMINAL.value}:
+            elif status in {
+                RecordStatus.FAILED_RETRYABLE.value,
+                RecordStatus.FAILED_TERMINAL.value,
+            }:
                 failures += 1
         total = successes + failures
         if total == 0:
@@ -1432,7 +1576,10 @@ class ExecutionQueueService:
     def _dead_letters_for_queue(self, queue) -> list[Any]:
         dead_letters: list[Any] = []
         for lineage in get_parent_lineages(queue):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_QUEUE_DEAD_LETTER:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_QUEUE_DEAD_LETTER
+            ):
                 continue
             child = lineage.child_instance
             if child is None or child.is_deleted:
@@ -1449,7 +1596,9 @@ class ExecutionQueueService:
             child = lineage.child_instance
             if child is None or child.is_deleted:
                 continue
-            if self._is_execution_instance(child, subtype="queue_lease") and self._lease_active(child, now):
+            if self._is_execution_instance(
+                child, subtype="queue_lease"
+            ) and self._lease_active(child, now):
                 leases.append(child)
         return leases
 
@@ -1475,24 +1624,32 @@ class ExecutionQueueService:
 
     def _lease_active(self, lease, now: datetime) -> bool:
         props = self._props(lease)
-        return str(props.get("status") or "") == LeaseStatus.ACTIVE.value and not self._lease_expired(lease, now)
+        return str(
+            props.get("status") or ""
+        ) == LeaseStatus.ACTIVE.value and not self._lease_expired(lease, now)
 
     def _lease_expired(self, lease, now: datetime) -> bool:
         expires_at = self._parse_datetime(self._props(lease).get("expires_at"))
         return expires_at is not None and expires_at <= now
 
-    def _subject_diagnostics(self, subject, *, queue_key: str | None) -> SubjectExecutionDiagnostics:
+    def _subject_diagnostics(
+        self, subject, *, queue_key: str | None
+    ) -> SubjectExecutionDiagnostics:
         execution = self._ensure_execution_envelope(subject, write=False)
         reasons: list[str] = []
         queue = self._find_queue_by_key(queue_key) if queue_key else None
         now = self.clock()
         if not queue_key:
             reasons.append("next_queue_key_missing")
-        if str(execution.get("terminal") or False).lower() == "true" or bool(execution.get("terminal")):
+        if str(execution.get("terminal") or False).lower() == "true" or bool(
+            execution.get("terminal")
+        ):
             reasons.append("terminal_state")
         if bool(execution.get("cancel_requested")):
             reasons.append("cancel_requested")
-        if str(execution.get("hold_state") or "") == "ACTIVE" or self._active_holds_for_subject(subject):
+        if str(
+            execution.get("hold_state") or ""
+        ) == "ACTIVE" or self._active_holds_for_subject(subject):
             reasons.append("active_hold")
         if self._active_lease_for_subject(subject, now) is not None:
             reasons.append("active_lease")
@@ -1503,19 +1660,40 @@ class ExecutionQueueService:
             queue_props = self._props(queue)
             if not bool(queue_props.get("enabled", True)):
                 reasons.append("queue_disabled")
-            if str(execution.get("state") or "") not in set(queue_props.get("eligible_states") or []):
+            if str(execution.get("state") or "") not in set(
+                queue_props.get("eligible_states") or []
+            ):
                 reasons.append("state_not_eligible")
             if not self._scopes_match(subject, queue):
                 reasons.append("capability_mismatch")
-        visible = not reasons and (queue is not None) and bool(self._visible_queue_items(queue, now))
+        not reasons and (queue is not None) and bool(
+            self._visible_queue_items(queue, now)
+        )
         return SubjectExecutionDiagnostics(
-            visible_in_queue=self._is_visible_in_queue(subject, queue, now) if queue is not None else False,
+            visible_in_queue=self._is_visible_in_queue(subject, queue, now)
+            if queue is not None
+            else False,
             current_queue_key=self.current_queue_for_instance(subject),
             reasons=reasons,
         )
 
     def _is_visible_in_queue(self, subject, queue, now: datetime) -> bool:
-        return any(item.uid == subject.uid for item in self._visible_queue_items(queue, now))
+        visible_uids = {item.uid for item in self._visible_queue_items(queue, now)}
+        if subject.uid in visible_uids:
+            return True
+        for lineage in get_child_lineages(subject):
+            if lineage.is_deleted or lineage.relationship_type != "contains":
+                continue
+            parent = lineage.parent_instance
+            if (
+                parent is None
+                or parent.is_deleted
+                or instance_semantic_category(parent) != "container"
+            ):
+                continue
+            if parent.uid in visible_uids:
+                return True
+        return False
 
     def _scopes_match(self, instance, queue) -> bool:
         props = self._props(instance)
@@ -1526,10 +1704,16 @@ class ExecutionQueueService:
             ("assay_scope", [props.get("assay"), props.get("assay_key")]),
         ]
         for queue_field, candidates in checks:
-            queue_scope = [str(item).strip() for item in list(queue_props.get(queue_field) or []) if str(item).strip()]
+            queue_scope = [
+                str(item).strip()
+                for item in list(queue_props.get(queue_field) or [])
+                if str(item).strip()
+            ]
             if not queue_scope:
                 continue
-            subject_values = {str(item).strip() for item in candidates if str(item or "").strip()}
+            subject_values = {
+                str(item).strip() for item in candidates if str(item or "").strip()
+            }
             if not subject_values.intersection(queue_scope):
                 return False
         return True
@@ -1539,21 +1723,42 @@ class ExecutionQueueService:
         queue_props = self._props(queue)
         worker_status = str(worker_props.get("status") or WorkerStatus.OFFLINE.value)
         if worker_status in {WorkerStatus.DISABLED.value, WorkerStatus.RETIRED.value}:
-            raise ExecutionQueuePermissionError(f"Worker cannot claim in status {worker_status}")
-        if bool(worker_props.get("drain_requested")) or worker_status == WorkerStatus.DRAINING.value:
+            raise ExecutionQueuePermissionError(
+                f"Worker cannot claim in status {worker_status}"
+            )
+        if (
+            bool(worker_props.get("drain_requested"))
+            or worker_status == WorkerStatus.DRAINING.value
+        ):
             raise ExecutionQueuePermissionError(f"Worker is draining: {worker.euid}")
         if not bool(queue_props.get("enabled", True)):
             raise ExecutionQueuePermissionError(f"Queue is disabled: {queue.euid}")
-        if bool(queue_props.get("manual_only")) and str(worker_props.get("worker_type") or "") != WorkerType.HUMAN_SESSION.value:
+        if (
+            bool(queue_props.get("manual_only"))
+            and str(worker_props.get("worker_type") or "")
+            != WorkerType.HUMAN_SESSION.value
+        ):
             raise ExecutionQueuePermissionError(f"Queue is manual-only: {queue.euid}")
-        required = {str(item) for item in list(queue_props.get("required_worker_capabilities") or []) if str(item).strip()}
-        capabilities = {str(item) for item in list(worker_props.get("capabilities") or []) if str(item).strip()}
+        required = {
+            str(item)
+            for item in list(queue_props.get("required_worker_capabilities") or [])
+            if str(item).strip()
+        }
+        capabilities = {
+            str(item)
+            for item in list(worker_props.get("capabilities") or [])
+            if str(item).strip()
+        }
         if not required.issubset(capabilities):
-            raise ExecutionQueuePermissionError(f"Worker capability mismatch for queue {queue.euid}")
+            raise ExecutionQueuePermissionError(
+                f"Worker capability mismatch for queue {queue.euid}"
+            )
         active_lease_count = len(self._active_leases_for_worker(worker, self.clock()))
         max_concurrent = int(worker_props.get("max_concurrent_leases") or 1)
         if active_lease_count >= max_concurrent:
-            raise ExecutionQueuePermissionError(f"Worker already at max active leases: {worker.euid}")
+            raise ExecutionQueuePermissionError(
+                f"Worker already at max active leases: {worker.euid}"
+            )
 
     def _active_leases_for_worker(self, worker, now: datetime) -> list[Any]:
         leases: list[Any] = []
@@ -1563,11 +1768,15 @@ class ExecutionQueueService:
             child = lineage.child_instance
             if child is None or child.is_deleted:
                 continue
-            if self._is_execution_instance(child, subtype="queue_lease") and self._lease_active(child, now):
+            if self._is_execution_instance(
+                child, subtype="queue_lease"
+            ) and self._lease_active(child, now):
                 leases.append(child)
         return leases
 
-    def _assert_subject_visible_in_queue(self, subject, queue, *, now: datetime) -> None:
+    def _assert_subject_visible_in_queue(
+        self, subject, queue, *, now: datetime
+    ) -> None:
         if not self._is_visible_in_queue(subject, queue, now):
             raise ExecutionQueueConflictError(
                 f"Subject is not currently visible in queue {self._props(queue).get('queue_key')}: {subject.euid}"
@@ -1584,17 +1793,25 @@ class ExecutionQueueService:
             raise ExecutionQueueConflictError(
                 f"Expected state {expected_state.value} but found {execution.get('state')} for {subject.euid}"
             )
-        if expected_revision is not None and int(execution.get("revision") or 0) != expected_revision:
+        if (
+            expected_revision is not None
+            and int(execution.get("revision") or 0) != expected_revision
+        ):
             raise ExecutionQueueConflictError(
                 f"Expected revision {expected_revision} but found {execution.get('revision')} for {subject.euid}"
             )
 
-    def _assert_lease_active_for_subject(self, subject, lease, *, now: datetime) -> None:
+    def _assert_lease_active_for_subject(
+        self, subject, lease, *, now: datetime
+    ) -> None:
         if str(self._props(lease).get("status") or "") != LeaseStatus.ACTIVE.value:
             raise ExecutionQueueConflictError(f"Lease is not active: {lease.euid}")
         if self._lease_expired(lease, now):
             raise ExecutionQueueConflictError(f"LEASE_EXPIRED: {lease.euid}")
-        if self._subject_for_lease(lease) is None or self._subject_for_lease(lease).uid != subject.uid:
+        if (
+            self._subject_for_lease(lease) is None
+            or self._subject_for_lease(lease).uid != subject.uid
+        ):
             raise ExecutionQueueConflictError(
                 f"Lease {lease.euid} does not belong to subject {subject.euid}"
             )
@@ -1606,7 +1823,9 @@ class ExecutionQueueService:
                 f"Worker {worker.euid} does not own lease {lease.euid}"
             )
 
-    def _transition_lease_to_terminal(self, lease, *, status: LeaseStatus, reason: str) -> None:
+    def _transition_lease_to_terminal(
+        self, lease, *, status: LeaseStatus, reason: str
+    ) -> None:
         props = self._props(lease)
         if str(props.get("status") or "") in {
             LeaseStatus.RELEASED.value,
@@ -1654,18 +1873,26 @@ class ExecutionQueueService:
         heartbeat_at = self._parse_datetime(props.get("heartbeat_at"))
         lag = (now - heartbeat_at).total_seconds() if heartbeat_at is not None else None
         status_value = str(props.get("status") or WorkerStatus.OFFLINE.value)
-        if heartbeat_at is not None and lag is not None and lag > int(props.get("heartbeat_ttl_seconds") or 60):
+        if (
+            heartbeat_at is not None
+            and lag is not None
+            and lag > int(props.get("heartbeat_ttl_seconds") or 60)
+        ):
             status_value = WorkerStatus.OFFLINE.value
         return WorkerSummary(
             worker_euid=worker.euid,
             worker_key=str(props.get("worker_key") or ""),
             display_name=str(props.get("display_name") or worker.name or worker.euid),
-            worker_type=WorkerType(str(props.get("worker_type") or WorkerType.SERVICE.value)),
+            worker_type=WorkerType(
+                str(props.get("worker_type") or WorkerType.SERVICE.value)
+            ),
             status=WorkerStatus(status_value),
             capabilities=list(props.get("capabilities") or []),
             active_lease_count=len(self._active_leases_for_worker(worker, now)),
             max_concurrent_leases=int(props.get("max_concurrent_leases") or 1),
-            heartbeat_at=self._timestamp(heartbeat_at) if heartbeat_at is not None else None,
+            heartbeat_at=self._timestamp(heartbeat_at)
+            if heartbeat_at is not None
+            else None,
             heartbeat_lag_seconds=lag,
             drain_requested=bool(props.get("drain_requested")),
         )
@@ -1695,7 +1922,9 @@ class ExecutionQueueService:
             subject_name=instance.name,
             subject_category=str(instance.category or ""),
             template_code=self._template_code(instance),
-            state=ExecutionState(str(execution.get("state") or ExecutionState.PENDING.value)),
+            state=ExecutionState(
+                str(execution.get("state") or ExecutionState.PENDING.value)
+            ),
             next_queue_key=str(execution.get("next_queue_key") or "") or None,
             next_action_key=str(execution.get("next_action_key") or "") or None,
             priority=int(execution.get("priority") or 0),
@@ -1704,7 +1933,9 @@ class ExecutionQueueService:
             retry_at=str(execution.get("retry_at") or "") or None,
             attempt_count=int(execution.get("attempt_count") or 0),
             created_at=getattr(instance, "created_dt", None),
-            queue_ready_timestamp=self._timestamp(self._queue_ready_at(instance, execution))
+            queue_ready_timestamp=self._timestamp(
+                self._queue_ready_at(instance, execution)
+            )
             if self._queue_ready_at(instance, execution) is not None
             else None,
         )
@@ -1745,7 +1976,9 @@ class ExecutionQueueService:
             end_state=str(props.get("end_state") or "") or None,
             started_at=str(props.get("started_at") or "") or None,
             finished_at=str(props.get("finished_at") or "") or None,
-            duration_ms=int(props.get("duration_ms")) if props.get("duration_ms") is not None else None,
+            duration_ms=int(props.get("duration_ms"))
+            if props.get("duration_ms") is not None
+            else None,
             retryable=bool(props.get("retryable")),
             error_class=str(props.get("error_class") or "") or None,
             error_code=str(props.get("error_code") or "") or None,
@@ -1766,7 +1999,8 @@ class ExecutionQueueService:
             reason=str(props.get("reason") or ""),
             placed_at=str(props.get("placed_at") or "") or None,
             released_at=str(props.get("released_at") or "") or None,
-            released_by_lookup_euid=str(props.get("released_by_lookup_euid") or "") or None,
+            released_by_lookup_euid=str(props.get("released_by_lookup_euid") or "")
+            or None,
         )
 
     def _dead_letter_summary(self, dead_letter) -> DeadLetterSummary:
@@ -1775,16 +2009,24 @@ class ExecutionQueueService:
             dead_letter_euid=dead_letter.euid,
             subject_lookup_euid=str(props.get("subject_lookup_euid") or ""),
             queue_lookup_key=str(props.get("queue_lookup_key") or ""),
-            last_execution_record_lookup_euid=str(props.get("last_execution_record_lookup_euid") or "") or None,
-            last_lease_lookup_euid=str(props.get("last_lease_lookup_euid") or "") or None,
+            last_execution_record_lookup_euid=str(
+                props.get("last_execution_record_lookup_euid") or ""
+            )
+            or None,
+            last_lease_lookup_euid=str(props.get("last_lease_lookup_euid") or "")
+            or None,
             dead_lettered_at=str(props.get("dead_lettered_at") or "") or None,
             failure_count=int(props.get("failure_count") or 0),
             error_class=str(props.get("error_class") or "") or None,
             error_message=str(props.get("error_message") or "") or None,
             resolution_state=DeadLetterResolutionState(
-                str(props.get("resolution_state") or DeadLetterResolutionState.OPEN.value)
+                str(
+                    props.get("resolution_state")
+                    or DeadLetterResolutionState.OPEN.value
+                )
             ),
-            resolved_by_lookup_euid=str(props.get("resolved_by_lookup_euid") or "") or None,
+            resolved_by_lookup_euid=str(props.get("resolved_by_lookup_euid") or "")
+            or None,
             resolved_at=str(props.get("resolved_at") or "") or None,
         )
 
@@ -1815,7 +2057,11 @@ class ExecutionQueueService:
     def _authoritative_queue_key_for_instance(self, instance) -> str | None:
         execution = self._ensure_execution_envelope(instance, write=False)
         queue_key = str(execution.get("next_queue_key") or "").strip()
-        if queue_key and not execution.get("terminal") and not execution.get("cancel_requested"):
+        if (
+            queue_key
+            and not execution.get("terminal")
+            and not execution.get("cancel_requested")
+        ):
             return queue_key
 
         props = self._props(instance)
@@ -1824,7 +2070,10 @@ class ExecutionQueueService:
             return current_queue
 
         for lineage in get_child_lineages(instance):
-            if lineage.is_deleted or lineage.relationship_type != self.LEGACY_REL_QUEUE_MEMBERSHIP:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.LEGACY_REL_QUEUE_MEMBERSHIP
+            ):
                 continue
             parent = lineage.parent_instance
             if parent is None or parent.is_deleted:
@@ -1849,7 +2098,7 @@ class ExecutionQueueService:
         return (
             self.bdb.session.query(GI)
             .filter(
-                GI.category == category,
+                instance_category_filter(GI, category),
                 GI.type == type_name,
                 GI.subtype == subtype,
                 GI.is_deleted.is_(False),
@@ -1859,7 +2108,9 @@ class ExecutionQueueService:
             .first()
         )
 
-    def _create_execution_instance(self, template_code: str, *, name: str, properties: dict[str, Any]):
+    def _create_execution_instance(
+        self, template_code: str, *, name: str, properties: dict[str, Any]
+    ):
         instance = self.bobj.create_instance_by_code(
             template_code,
             {"json_addl": {"properties": properties}},
@@ -1879,7 +2130,10 @@ class ExecutionQueueService:
 
     def _subject_for_lease(self, lease):
         for lineage in get_child_lineages(lease):
-            if lineage.is_deleted or lineage.relationship_type != self.REL_SUBJECT_LEASE:
+            if (
+                lineage.is_deleted
+                or lineage.relationship_type != self.REL_SUBJECT_LEASE
+            ):
                 continue
             return lineage.parent_instance
         return None
@@ -1918,7 +2172,7 @@ class ExecutionQueueService:
             self.bdb.session.query(GI)
             .filter(
                 GI.euid == worker_euid,
-                GI.category == "actor",
+                instance_category_filter(GI, "actor"),
                 GI.type == "system",
                 GI.subtype == "worker",
                 GI.is_deleted.is_(False),
@@ -1956,17 +2210,35 @@ class ExecutionQueueService:
         return bool(
             instance is not None
             and not instance.is_deleted
-            and str(instance.category or "") == "data"
+            and instance_semantic_category(instance) == "data"
             and str(instance.type or "") == "execution"
             and str(instance.subtype or "") == subtype
         )
 
     def _template_code(self, instance) -> str:
-        category = str(getattr(instance, "category", "") or "")
+        template = getattr(instance, "parent_template", None)
+        if template is None:
+            template = self._require_template(
+                f"{getattr(instance, 'category', '')}/{getattr(instance, 'type', '')}/"
+                f"{getattr(instance, 'subtype', '')}/{getattr(instance, 'version', '')}"
+            )
+        category = template_semantic_category(template)
         type_name = str(getattr(instance, "type", "") or "")
         subtype = str(getattr(instance, "subtype", "") or "")
         version = str(getattr(instance, "version", "") or "")
         return f"{category}/{type_name}/{subtype}/{version}"
+
+    def _require_template(self, template_code: str):
+        clean = str(template_code or "").strip().strip("/")
+        parts = clean.split("/")
+        if len(parts) != 4:
+            raise ValueError(
+                f"Template code must be category/type/subtype/version: {template_code}"
+            )
+        templates = self.bobj.query_template_by_component_v2(*parts)
+        if not templates:
+            raise ValueError(f"Template not found: {template_code}")
+        return templates[0]
 
     def _props(self, instance) -> dict[str, Any]:
         payload = instance.json_addl if isinstance(instance.json_addl, dict) else {}
@@ -1974,7 +2246,9 @@ class ExecutionQueueService:
         return dict(props) if isinstance(props, dict) else {}
 
     def _write_props(self, instance, props: dict[str, Any]) -> None:
-        payload = deepcopy(instance.json_addl) if isinstance(instance.json_addl, dict) else {}
+        payload = (
+            deepcopy(instance.json_addl) if isinstance(instance.json_addl, dict) else {}
+        )
         payload["properties"] = props
         instance.json_addl = payload
         flag_modified(instance, "json_addl")
@@ -1985,15 +2259,21 @@ class ExecutionQueueService:
 
     def _ensure_execution_envelope(self, instance, *, write: bool) -> dict[str, Any]:
         props = self._props(instance)
-        current = props.get("execution") if isinstance(props.get("execution"), dict) else {}
-        queue_cache = current.get("queue_cache") if isinstance(current.get("queue_cache"), dict) else {}
+        current = (
+            props.get("execution") if isinstance(props.get("execution"), dict) else {}
+        )
+        queue_cache = (
+            current.get("queue_cache")
+            if isinstance(current.get("queue_cache"), dict)
+            else {}
+        )
         envelope = self._default_execution_envelope()
         envelope.update({k: v for k, v in current.items() if k != "queue_cache"})
         envelope["queue_cache"] = {
             **dict(envelope.get("queue_cache") or {}),
             **dict(queue_cache or {}),
         }
-        if write or not current:
+        if write:
             self._set_execution_envelope(instance, envelope)
         return envelope
 
@@ -2007,14 +2287,20 @@ class ExecutionQueueService:
         props = self._props(instance)
         props["execution"] = normalized
         queue_key = str(normalized.get("next_queue_key") or "").strip()
-        if queue_key and not bool(normalized.get("terminal")) and not bool(normalized.get("cancel_requested")):
+        if (
+            queue_key
+            and not bool(normalized.get("terminal"))
+            and not bool(normalized.get("cancel_requested"))
+        ):
             props["current_queue"] = queue_key
         else:
             props.pop("current_queue", None)
         self._write_props(instance, props)
 
     def _payload_hash(self, payload: dict[str, Any]) -> str:
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        encoded = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), default=str
+        ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
     def _maybe_replay_action(
@@ -2075,7 +2361,9 @@ class ExecutionQueueService:
     def _random_token(self) -> str:
         return secrets.token_hex(16)
 
-    def _compute_retry_at(self, *, queue_props: dict[str, Any], attempt_count: int) -> datetime:
+    def _compute_retry_at(
+        self, *, queue_props: dict[str, Any], attempt_count: int
+    ) -> datetime:
         retry_policy = dict(queue_props.get("retry_policy") or {})
         initial_delay_seconds = int(retry_policy.get("initial_delay_seconds") or 60)
         backoff_factor = float(retry_policy.get("backoff_factor") or 2.0)
