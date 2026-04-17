@@ -167,6 +167,7 @@ jobs:
       MERIDIAN_SANDBOX_PREFIX: ""
       MERIDIAN_DOMAIN_CODE: B
       TAPDB_APP_CODE: B
+      USER: postgres
     steps:
       - uses: actions/checkout@v4
 
