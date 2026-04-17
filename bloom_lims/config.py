@@ -43,6 +43,7 @@ DEFAULT_BLOOM_CONDA_ENV_BASE = "BLOOM"
 LEGACY_UPLOAD_DIR = "/var/lib/bloom/uploads"
 DEFAULT_TAPDB_OWNER_REPO_NAME = "bloom"
 DEFAULT_TAPDB_DOMAIN_CODE = "Z"
+_CONFIG_FILE_OVERRIDE_ENV = "BLOOM_CONFIG_PATH"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
 
@@ -110,6 +111,22 @@ def _resolve_deployment_code() -> str:
     return "local"
 
 
+def _explicit_config_file_override() -> Path | None:
+    raw = str(os.environ.get(_CONFIG_FILE_OVERRIDE_ENV) or "").strip()
+    if not raw:
+        return None
+    if raw.startswith("~"):
+        raise RuntimeError(
+            f"{_CONFIG_FILE_OVERRIDE_ENV} must be a full absolute path; '~' is not allowed."
+        )
+    path = Path(raw)
+    if not path.is_absolute():
+        raise RuntimeError(
+            f"{_CONFIG_FILE_OVERRIDE_ENV} must be a full absolute path: {raw}"
+        )
+    return path.resolve()
+
+
 @lru_cache()
 def _read_pyproject_dependency_spec(package_name: str) -> str:
     if not PYPROJECT_TOML.exists():
@@ -140,6 +157,9 @@ def expected_conda_env_name() -> str:
 
 
 def _user_config_dir() -> Path:
+    override = _explicit_config_file_override()
+    if override is not None:
+        return override.parent
     xdg_config_home = Path(
         os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
     )
@@ -147,6 +167,9 @@ def _user_config_dir() -> Path:
 
 
 def _user_config_file() -> Path:
+    override = _explicit_config_file_override()
+    if override is not None:
+        return override
     deployment = _resolve_deployment_code()
     return _user_config_dir() / f"bloom-config-{deployment}.yaml"
 

@@ -26,6 +26,7 @@ from bloom_lims.config import (
     build_default_config_template,
     expected_conda_env_name,
     generate_example_webhook_secret,
+    get_user_config_path,
     get_settings,
     get_tapdb_runtime_context,
     validate_settings,
@@ -65,6 +66,42 @@ def test_expected_conda_env_name_falls_back_to_active_conda_env(monkeypatch):
     monkeypatch.delenv("LSMC_DEPLOYMENT_CODE", raising=False)
     monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM-smoke")
     assert expected_conda_env_name() == "BLOOM-smoke"
+
+
+def test_user_config_path_prefers_explicit_bloom_config_path(monkeypatch, tmp_path: Path):
+    explicit = tmp_path / "custom" / "bloom-config-omfg33.yaml"
+    monkeypatch.setenv("BLOOM_CONFIG_PATH", str(explicit))
+
+    assert get_user_config_path() == explicit.resolve()
+
+
+def test_user_config_path_rejects_relative_bloom_config_path(monkeypatch):
+    monkeypatch.setenv("BLOOM_CONFIG_PATH", "relative/bloom-config.yaml")
+
+    with pytest.raises(RuntimeError, match="BLOOM_CONFIG_PATH must be a full absolute path"):
+        get_user_config_path()
+
+
+def test_explicit_bloom_config_path_overrides_deployment_guess(monkeypatch, tmp_path: Path):
+    explicit_config = tmp_path / "configs" / "bloom-override.yaml"
+    explicit_config.parent.mkdir(parents=True)
+    explicit_config.write_text(
+        "deployment:\n"
+        "  name: explicit-deploy\n"
+        "auth:\n"
+        "  cognito_domain: explicit.auth.us-west-2.amazoncognito.com\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("BLOOM_CONFIG_PATH", str(explicit_config))
+    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "wrong-deploy")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv("BLOOM_AUTH__COGNITO_DOMAIN", raising=False)
+    get_settings.cache_clear()
+
+    settings = BloomSettings()
+
+    assert settings.deployment.name == "explicit-deploy"
+    assert settings.auth.cognito_domain == "explicit.auth.us-west-2.amazoncognito.com"
 
 
 def test_nested_env_overrides_template_defaults(monkeypatch):

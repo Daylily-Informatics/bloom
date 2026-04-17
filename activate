@@ -88,6 +88,8 @@ if [[ "${CONDA_DEFAULT_ENV:-}" != "${_BLOOM_CONDA_ENV_NAME}" ]] || [[ -z "${COND
     return 1
 fi
 
+export PATH="${CONDA_PREFIX}/bin:${PATH}"
+
 if [[ "${_BLOOM_CONDA_ENV_CREATED}" == "1" ]]; then
     echo -e "  ${_CYAN}→${_NC} Installing editable Bloom package into ${_BLOOM_CONDA_ENV_NAME}..."
     if ! "${CONDA_PREFIX}/bin/python" -m pip install -e "$BLOOM_ROOT"; then
