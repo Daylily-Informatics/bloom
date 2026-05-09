@@ -5,10 +5,11 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 import bloom_lims.integrations.tapdb_mount as tapdb_mount
+import bloom_lims.tapdb_dag as tapdb_dag
 from bloom_lims.app import create_app
 
 
@@ -94,6 +95,51 @@ def test_bloom_single_app_serves_api_and_tapdb_mount(monkeypatch):
         tapdb_response = client.get("/admin/tapdb/login", follow_redirects=False)
         assert api_response.status_code == 200
         assert tapdb_response.status_code != 404
+
+
+def test_canonical_tapdb_dag_search_route_is_mounted(monkeypatch):
+    monkeypatch.delenv("BLOOM_DEV_AUTH_BYPASS", raising=False)
+    with _client() as client:
+        response = client.get("/api/dag/search", follow_redirects=False)
+
+    assert response.status_code == 401
+    assert response.json()["detail"].startswith("Authentication required")
+
+
+def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
+    captured: dict[str, str] = {}
+    router = APIRouter()
+
+    @router.get("/api/dag/search")
+    async def _search():
+        return {"status": "ok"}
+
+    monkeypatch.setattr(
+        tapdb_dag,
+        "apply_runtime_environment",
+        lambda: SimpleNamespace(
+            env="dev",
+            config_path="/tmp/bloom-tapdb-config.yaml",
+        ),
+    )
+    monkeypatch.setattr(
+        tapdb_dag,
+        "create_tapdb_dag_router",
+        lambda **kwargs: (
+            captured.update({key: str(value) for key, value in kwargs.items()})
+            or router
+        ),
+    )
+
+    app = FastAPI()
+    tapdb_dag.mount_tapdb_dag_api(app)
+
+    assert captured == {
+        "config_path": "/tmp/bloom-tapdb-config.yaml",
+        "env_name": "dev",
+        "service_name": "bloom",
+    }
+    assert "/api/dag/search" in {route.path for route in app.routes}
 
 
 def test_app_shutdown_cleanup_runs(monkeypatch):

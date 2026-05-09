@@ -39,7 +39,7 @@ def test_pyproject_owns_python_dependencies() -> None:
     assert "psycopg2==2.9.9" in dependencies
     assert "djlint" in dependencies
     assert "pytest>=8.0" in dependencies
-    assert "zebra-day==5.2.0" not in dependencies
+    assert not any(str(dep).startswith("zebra-day") for dep in dependencies)
     assert "optional-dependencies" not in project
     assert project["scripts"]["bloom"] == "bloom_lims.cli:main"
 

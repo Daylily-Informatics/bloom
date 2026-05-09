@@ -15,6 +15,7 @@ from bloom_lims import __version__
 from bloom_lims.api.v1.dependencies import APIUser
 from bloom_lims.config import get_settings
 from bloom_lims.schema_drift import read_schema_drift_report
+from bloom_lims.tapdb_dag import bloom_tapdb_dag_obs_services_fragment
 
 CONTRACT_VERSION = "v3"
 SERVICE_NAME = "bloom"
@@ -158,7 +159,7 @@ class BloomObservabilityStore:
         return []
 
     def _build_obs_services_snapshot(self) -> dict[str, Any]:
-        return {
+        snapshot = {
             "status": "ok",
             "endpoints": [
                 {"path": "/healthz", "auth": "none", "kind": "liveness"},
@@ -210,6 +211,8 @@ class BloomObservabilityStore:
                 "bloom.admin_observability_ui",
                 "bloom.anomalies_v1",
             ],
+            "capabilities": [],
+            "external_ref_models": [],
             "dependencies": {
                 "configured_services": self._configured_service_dependencies(),
                 "observed_services": [],
@@ -217,6 +220,44 @@ class BloomObservabilityStore:
             "managed_services": self._managed_services(),
             "observed_at": self._started_at,
         }
+        fragment = bloom_tapdb_dag_obs_services_fragment()
+        known_endpoints = {
+            (str(item.get("path") or ""), str(item.get("kind") or ""))
+            for item in snapshot["endpoints"]
+        }
+        known_extensions = {str(item) for item in snapshot["extensions"]}
+        known_capabilities: set[str] = set()
+        known_external_ref_models: set[str] = set()
+        for item in list(fragment.get("endpoints") or []):
+            if not isinstance(item, dict):
+                continue
+            key = (str(item.get("path") or ""), str(item.get("kind") or ""))
+            if key in known_endpoints:
+                continue
+            snapshot["endpoints"].append(dict(item))
+            known_endpoints.add(key)
+        for item in list(fragment.get("extensions") or []):
+            normalized = str(item or "").strip()
+            if not normalized or normalized in known_extensions:
+                continue
+            snapshot["extensions"].append(normalized)
+            known_extensions.add(normalized)
+        for item in list(fragment.get("capabilities") or []):
+            normalized = str(item or "").strip()
+            if not normalized or normalized in known_capabilities:
+                continue
+            snapshot["capabilities"].append(normalized)
+            known_capabilities.add(normalized)
+        for item in list(fragment.get("external_ref_models") or []):
+            normalized = str(item or "").strip()
+            if not normalized or normalized in known_external_ref_models:
+                continue
+            snapshot["external_ref_models"].append(normalized)
+            known_external_ref_models.add(normalized)
+        contract_version = str(fragment.get("contract_version") or "").strip()
+        if contract_version:
+            snapshot["tapdb_dag_contract_version"] = contract_version
+        return snapshot
 
     def projection(
         self, *, observed_at: str | None = None, detail: str | None = None
@@ -546,6 +587,14 @@ def build_obs_services_payload(
         ),
     }
     payload["managed_services"] = list(snapshot.get("managed_services") or [])
+    if snapshot.get("capabilities"):
+        payload["capabilities"] = list(snapshot.get("capabilities") or [])
+    if snapshot.get("external_ref_models"):
+        payload["external_ref_models"] = list(snapshot.get("external_ref_models") or [])
+    if snapshot.get("tapdb_dag_contract_version"):
+        payload["tapdb_dag_contract_version"] = str(
+            snapshot.get("tapdb_dag_contract_version") or ""
+        )
     return _with_projection(payload, projection)
 
 

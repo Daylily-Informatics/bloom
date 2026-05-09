@@ -32,6 +32,7 @@ from bloom_lims.health import health_router, probe_router
 from bloom_lims.integrations.tapdb_mount import mount_tapdb_admin_subapp
 from bloom_lims.observability import BloomObservabilityStore
 from bloom_lims.observability_routes import router as observability_router
+from bloom_lims.tapdb_dag import mount_tapdb_dag_api
 from bloom_lims.tapdb_metrics import (
     request_method_var,
     request_path_var,
@@ -181,6 +182,7 @@ def create_app() -> FastAPI:
     setup_bloom_session_middleware(app)
 
     mount_tapdb_admin_subapp(app)
+    mount_tapdb_dag_api(app)
 
     # Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
     if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":
