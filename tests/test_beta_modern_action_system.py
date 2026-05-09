@@ -9,6 +9,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from daylily_tapdb.euid import format_euid
 from fastapi.testclient import TestClient
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -52,7 +53,24 @@ def _external_rw_user() -> APIUser:
     )
 
 
+_ATLAS_EUID_PREFIXES = {
+    "trf": "TRF",
+    "test": "TST",
+    "test-primary": "TST",
+    "test-secondary": "TST",
+    "patient": "PAT",
+    "kit": "AGX",
+    "shipment": "SHP",
+    "site": "STE",
+    "proc": "TPC",
+    "tpc": "TPC",
+}
+
+
 def _opaque(prefix: str) -> str:
+    euid_prefix = _ATLAS_EUID_PREFIXES.get(prefix)
+    if euid_prefix:
+        return format_euid(euid_prefix, secrets.randbelow(1_000_000) + 1, domain_code="Z")
     return f"{prefix}-{secrets.token_hex(8)}"
 
 

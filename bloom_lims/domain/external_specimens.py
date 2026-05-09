@@ -9,6 +9,11 @@ from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.bobjs import BloomObj
+from bloom_lims.atlas_reference_validation import (
+    reference_type_declares_atlas_euid,
+    validate_atlas_euid_properties,
+    validate_meridian_euid_field,
+)
 from bloom_lims.config import get_settings
 from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
@@ -349,6 +354,9 @@ class ExternalSpecimenService:
             for key, value in payload.items()
             if value is not None and str(value).strip()
         }
+        for key in ("atlas_trf_euid", "atlas_test_euid"):
+            if key in normalized:
+                normalized[key] = validate_meridian_euid_field(key, normalized[key])
         if not normalized:
             raise ValueError("At least one Atlas reference is required")
 
@@ -732,18 +740,18 @@ class ExternalSpecimenService:
             value = str(reference_value or "").strip()
             if not value:
                 continue
+            if reference_type_declares_atlas_euid(str(reference_type)):
+                value = validate_meridian_euid_field(str(reference_type), value)
             validation_payload = atlas_validation.get(reference_type)
-            ref_payload = {
-                "properties": {
-                    "provider": "atlas",
-                    "reference_type": str(reference_type),
-                    "reference_value": value,
-                    "foreign_reference": value,
-                    "validation": validation_payload
-                    if isinstance(validation_payload, dict)
-                    else {},
-                }
+            properties = {
+                "provider": "atlas",
+                "reference_type": str(reference_type),
+                "reference_value": value,
+                "foreign_reference": value,
+                "validation": validation_payload if isinstance(validation_payload, dict) else {},
             }
+            validate_atlas_euid_properties(properties)
+            ref_payload = {"properties": properties}
             ref_obj = self.bobj.create_instance_by_code(
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
                 {"json_addl": ref_payload},

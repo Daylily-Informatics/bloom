@@ -8,6 +8,7 @@ import secrets
 import sys
 
 import pytest
+from daylily_tapdb.euid import format_euid
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -34,6 +35,10 @@ def _token_user(groups: list[str]) -> APIUser:
         groups=groups,
         auth_source="token",
     )
+
+
+def _atlas_euid(prefix: str, sequence: int) -> str:
+    return format_euid(prefix, sequence, domain_code="Z")
 
 
 def test_require_external_ursa_api_enabled_rejects_missing_group():
@@ -106,15 +111,15 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
     try:
         atlas_context = {
             "atlas_tenant_id": f"tenant-{secrets.token_hex(8)}",
-            "atlas_trf_euid": f"trf-{secrets.token_hex(8)}",
-            "atlas_patient_euid": f"patient-{secrets.token_hex(8)}",
-            "atlas_testkit_euid": f"kit-{secrets.token_hex(8)}",
-            "atlas_shipment_euid": f"shipment-{secrets.token_hex(8)}",
-            "atlas_organization_site_euid": f"site-{secrets.token_hex(8)}",
+            "atlas_trf_euid": _atlas_euid("TRF", 1),
+            "atlas_patient_euid": _atlas_euid("PAT", 1),
+            "atlas_testkit_euid": _atlas_euid("AGX", 1),
+            "atlas_shipment_euid": _atlas_euid("SHP", 1),
+            "atlas_organization_site_euid": _atlas_euid("STE", 1),
             "fulfillment_items": [
                 {
-                    "atlas_test_euid": f"test-{secrets.token_hex(8)}",
-                    "atlas_test_fulfillment_item_euid": f"proc-{secrets.token_hex(8)}",
+                    "atlas_test_euid": _atlas_euid("TST", 1),
+                    "atlas_test_fulfillment_item_euid": _atlas_euid("TPC", 1),
                 }
             ],
         }
@@ -252,9 +257,9 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
     client = TestClient(app)
     try:
         tenant_id = f"tenant-{secrets.token_hex(8)}"
-        shipment_euid = f"shipment-{secrets.token_hex(8)}"
-        testkit_euid = f"kit-{secrets.token_hex(8)}"
-        site_euid = f"site-{secrets.token_hex(8)}"
+        shipment_euid = _atlas_euid("SHP", 2)
+        testkit_euid = _atlas_euid("AGX", 2)
+        site_euid = _atlas_euid("STE", 2)
         create_tube = client.post(
             "/api/v1/external/atlas/beta/tubes",
             headers={"Idempotency-Key": f"idem-tube-{secrets.token_hex(8)}"},
@@ -271,7 +276,7 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         tube_body = create_tube.json()
         container_euid = tube_body["container_euid"]
 
-        collection_event_euid = f"cev-{secrets.token_hex(8)}"
+        collection_event_euid = _atlas_euid("CEV", 1)
         specimen_resp = client.post(
             "/api/v1/external/atlas/beta/materials",
             headers={"Idempotency-Key": f"idem-specimen-{secrets.token_hex(8)}"},

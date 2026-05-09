@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from bloom_lims.atlas_reference_validation import validate_optional_meridian_euid_field
+
 
 class AtlasReferences(BaseModel):
     trf_euid: str | None = None
@@ -16,6 +18,18 @@ class AtlasReferences(BaseModel):
     atlas_tenant_id: str | None = None
     atlas_trf_euid: str | None = None
     atlas_test_euid: str | None = None
+
+    @model_validator(mode="after")
+    def validate_atlas_euids(self) -> "AtlasReferences":
+        self.atlas_trf_euid = validate_optional_meridian_euid_field(
+            "atlas_trf_euid",
+            self.atlas_trf_euid,
+        )
+        self.atlas_test_euid = validate_optional_meridian_euid_field(
+            "atlas_test_euid",
+            self.atlas_test_euid,
+        )
+        return self
 
 
 class ExternalSpecimenCreateRequest(BaseModel):

@@ -13,6 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from daylily_tapdb.euid import format_euid
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -99,7 +100,24 @@ def _reset_bloom_auth_env():
     yield
 
 
+_ATLAS_EUID_PREFIXES = {
+    "trf": "TRF",
+    "test": "TST",
+    "test-primary": "TST",
+    "test-secondary": "TST",
+    "patient": "PAT",
+    "kit": "AGX",
+    "shipment": "SHP",
+    "site": "STE",
+    "proc": "TPC",
+    "tpc": "TPC",
+}
+
+
 def _opaque(prefix: str) -> str:
+    euid_prefix = _ATLAS_EUID_PREFIXES.get(prefix)
+    if euid_prefix:
+        return format_euid(euid_prefix, secrets.randbelow(1_000_000) + 1, domain_code="Z")
     return f"{prefix}-{secrets.token_hex(8)}"
 
 

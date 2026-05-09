@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from bloom_lims.atlas_reference_validation import validate_optional_meridian_euid_field
+
 CanonicalQueueName = Literal[
     "extraction_prod",
     "extraction_rnd",
@@ -23,6 +25,18 @@ class AtlasFulfillmentItemReference(BaseModel):
     atlas_test_euid: str
     atlas_test_fulfillment_item_euid: str
 
+    @model_validator(mode="after")
+    def validate_reference_euids(self) -> "AtlasFulfillmentItemReference":
+        self.atlas_test_euid = validate_optional_meridian_euid_field(
+            "atlas_test_euid",
+            self.atlas_test_euid,
+        )
+        self.atlas_test_fulfillment_item_euid = validate_optional_meridian_euid_field(
+            "atlas_test_fulfillment_item_euid",
+            self.atlas_test_fulfillment_item_euid,
+        )
+        return self
+
 
 class AtlasCollectionEventSnapshot(BaseModel):
     collection_event_euid: str
@@ -34,6 +48,18 @@ class AtlasCollectionEventSnapshot(BaseModel):
     expected_dob: str | None = None
     expected_name: str | None = None
     expected_label_text: str | None = None
+
+    @model_validator(mode="after")
+    def validate_snapshot_euids(self) -> "AtlasCollectionEventSnapshot":
+        self.collection_event_euid = validate_optional_meridian_euid_field(
+            "collection_event_euid",
+            self.collection_event_euid,
+        )
+        self.site_euid = validate_optional_meridian_euid_field(
+            "site_euid",
+            self.site_euid,
+        )
+        return self
 
 
 class AtlasFulfillmentContext(BaseModel):
@@ -55,8 +81,16 @@ class AtlasFulfillmentContext(BaseModel):
             raise ValueError("atlas_tenant_id is required")
         if self.atlas_trf_euid is not None and not self.atlas_trf_euid.strip():
             raise ValueError("atlas_trf_euid must not be empty when provided")
+        self.atlas_trf_euid = validate_optional_meridian_euid_field(
+            "atlas_trf_euid",
+            self.atlas_trf_euid,
+        )
         if self.atlas_test_euid is not None and not self.atlas_test_euid.strip():
             raise ValueError("atlas_test_euid must not be empty when provided")
+        self.atlas_test_euid = validate_optional_meridian_euid_field(
+            "atlas_test_euid",
+            self.atlas_test_euid,
+        )
         normalized_test_euids: list[str] = []
         seen_test_euids: set[str] = set()
         primary_test_euid = str(self.atlas_test_euid or "").strip()
@@ -67,6 +101,10 @@ class AtlasFulfillmentContext(BaseModel):
             clean_item = str(item or "").strip()
             if not clean_item or clean_item in seen_test_euids:
                 continue
+            clean_item = validate_optional_meridian_euid_field(
+                "atlas_test_euids",
+                clean_item,
+            )
             seen_test_euids.add(clean_item)
             normalized_test_euids.append(clean_item)
         self.atlas_test_euids = normalized_test_euids
@@ -74,20 +112,40 @@ class AtlasFulfillmentContext(BaseModel):
             self.atlas_test_euid = self.atlas_test_euids[0]
         if self.atlas_patient_euid is not None and not self.atlas_patient_euid.strip():
             raise ValueError("atlas_patient_euid must not be empty when provided")
+        self.atlas_patient_euid = validate_optional_meridian_euid_field(
+            "atlas_patient_euid",
+            self.atlas_patient_euid,
+        )
         if self.atlas_testkit_euid is not None and not self.atlas_testkit_euid.strip():
             raise ValueError("atlas_testkit_euid must not be empty when provided")
+        self.atlas_testkit_euid = validate_optional_meridian_euid_field(
+            "atlas_testkit_euid",
+            self.atlas_testkit_euid,
+        )
         if self.atlas_shipment_euid is not None and not self.atlas_shipment_euid.strip():
             raise ValueError("atlas_shipment_euid must not be empty when provided")
+        self.atlas_shipment_euid = validate_optional_meridian_euid_field(
+            "atlas_shipment_euid",
+            self.atlas_shipment_euid,
+        )
         if (
             self.atlas_organization_site_euid is not None
             and not self.atlas_organization_site_euid.strip()
         ):
             raise ValueError("atlas_organization_site_euid must not be empty when provided")
+        self.atlas_organization_site_euid = validate_optional_meridian_euid_field(
+            "atlas_organization_site_euid",
+            self.atlas_organization_site_euid,
+        )
         if (
             self.atlas_collection_event_euid is not None
             and not self.atlas_collection_event_euid.strip()
         ):
             raise ValueError("atlas_collection_event_euid must not be empty when provided")
+        self.atlas_collection_event_euid = validate_optional_meridian_euid_field(
+            "atlas_collection_event_euid",
+            self.atlas_collection_event_euid,
+        )
         if self.collection_event_snapshot is not None:
             if not self.collection_event_snapshot.collection_event_euid.strip():
                 raise ValueError("collection_event_snapshot.collection_event_euid is required")

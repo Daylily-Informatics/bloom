@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from bloom_lims.atlas_reference_validation import validate_atlas_euid_properties
 from bloom_lims.db import get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import instance_semantic_category
 
@@ -187,23 +188,21 @@ class _BetaLabReferenceMixin:
                 and atlas_test_fulfillment_item_euid
             ):
                 continue
+            properties = {
+                "provider": "atlas",
+                "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
+                "reference_value": atlas_test_fulfillment_item_euid,
+                "foreign_reference": atlas_test_fulfillment_item_euid,
+                "atlas_tenant_id": atlas_tenant_id,
+                "atlas_trf_euid": atlas_trf_euid,
+                "atlas_test_euid": atlas_test_euid,
+                "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
+                "validation": {},
+            }
+            validate_atlas_euid_properties(properties)
             ref_obj = self.bobj.create_instance_by_code(
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                {
-                    "json_addl": {
-                        "properties": {
-                            "provider": "atlas",
-                            "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
-                            "reference_value": atlas_test_fulfillment_item_euid,
-                            "foreign_reference": atlas_test_fulfillment_item_euid,
-                            "atlas_tenant_id": atlas_tenant_id,
-                            "atlas_trf_euid": atlas_trf_euid,
-                            "atlas_test_euid": atlas_test_euid,
-                            "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
-                            "validation": {},
-                        }
-                    }
-                },
+                {"json_addl": {"properties": properties}},
             )
             self.bobj.create_generic_instance_lineage_by_euids(
                 instance.euid,
@@ -260,6 +259,7 @@ class _BetaLabReferenceMixin:
                 }
                 if atlas_trf_euid:
                     properties["atlas_trf_euid"] = atlas_trf_euid
+                validate_atlas_euid_properties(properties)
                 ref_obj = self.bobj.create_instance_by_code(
                     self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
                     {"json_addl": {"properties": properties}},
@@ -287,6 +287,7 @@ class _BetaLabReferenceMixin:
             if atlas_trf_euid:
                 properties["atlas_trf_euid"] = atlas_trf_euid
             properties[field_name] = reference_value
+            validate_atlas_euid_properties(properties)
             ref_obj = self.bobj.create_instance_by_code(
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
                 {"json_addl": {"properties": properties}},
@@ -319,25 +320,21 @@ class _BetaLabReferenceMixin:
         snapshot_payload = atlas_context.get("collection_event_snapshot")
         if not isinstance(snapshot_payload, dict):
             snapshot_payload = {}
+        properties = {
+            "provider": "atlas",
+            "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
+            "reference_value": collection_event_euid,
+            "foreign_reference": collection_event_euid,
+            "atlas_tenant_id": atlas_tenant_id,
+            "atlas_collection_event_euid": collection_event_euid,
+            "atlas_trf_euid": str(atlas_context.get("atlas_trf_euid") or "").strip(),
+            "collection_event_snapshot": snapshot_payload,
+            "validation": {},
+        }
+        validate_atlas_euid_properties(properties)
         ref_obj = self.bobj.create_instance_by_code(
             self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-            {
-                "json_addl": {
-                    "properties": {
-                        "provider": "atlas",
-                        "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
-                        "reference_value": collection_event_euid,
-                        "foreign_reference": collection_event_euid,
-                        "atlas_tenant_id": atlas_tenant_id,
-                        "atlas_collection_event_euid": collection_event_euid,
-                        "atlas_trf_euid": str(
-                            atlas_context.get("atlas_trf_euid") or ""
-                        ).strip(),
-                        "collection_event_snapshot": snapshot_payload,
-                        "validation": {},
-                    }
-                }
-            },
+            {"json_addl": {"properties": properties}},
         )
         self.bobj.create_generic_instance_lineage_by_euids(
             instance.euid,
@@ -357,22 +354,20 @@ class _BetaLabReferenceMixin:
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
         if not (atlas_tenant_id and atlas_patient_euid):
             return
+        properties = {
+            "provider": "atlas",
+            "reference_type": self.PATIENT_REFERENCE_TYPE,
+            "reference_value": atlas_patient_euid,
+            "foreign_reference": atlas_patient_euid,
+            "atlas_tenant_id": atlas_tenant_id,
+            "atlas_patient_euid": atlas_patient_euid,
+            "atlas_trf_euid": atlas_trf_euid,
+            "validation": {},
+        }
+        validate_atlas_euid_properties(properties)
         ref_obj = self.bobj.create_instance_by_code(
             self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-            {
-                "json_addl": {
-                    "properties": {
-                        "provider": "atlas",
-                        "reference_type": self.PATIENT_REFERENCE_TYPE,
-                        "reference_value": atlas_patient_euid,
-                        "foreign_reference": atlas_patient_euid,
-                        "atlas_tenant_id": atlas_tenant_id,
-                        "atlas_patient_euid": atlas_patient_euid,
-                        "atlas_trf_euid": atlas_trf_euid,
-                        "validation": {},
-                    }
-                }
-            },
+            {"json_addl": {"properties": properties}},
         )
         self.bobj.create_generic_instance_lineage_by_euids(
             instance.euid,
