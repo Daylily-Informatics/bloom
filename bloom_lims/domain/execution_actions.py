@@ -186,6 +186,9 @@ class ExecutionQueueActionRecorder:
                 "properties": {
                     "graph": {
                         "node_role": "workflow_action",
+                        "role": "bloom_workflow_action",
+                        "expected_fanout_max": 1,
+                        "fanout_reason": "action record links to its execution target",
                         "expected_fanout": [
                             {
                                 "scope": "same_service",

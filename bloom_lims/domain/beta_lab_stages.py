@@ -385,6 +385,22 @@ class _BetaLabStagesMixin:
             lib_output.euid,
             relationship_type="beta_library_prep_output",
         )
+        self._write_graph_metadata(
+            lib_output,
+            node_role="bloom_library_prep_output",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_assignment_source"],
+                    max_child_count=1,
+                    reason="library prep output can feed one sequencing assignment",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_used_reagent", "executed_on"],
+                    max_child_count=4,
+                    reason="library prep output carries bounded reagent and execution links",
+                ),
+            ],
+        )
         extraction_type = (
             str(self._props(source).get("extraction_type") or "gdna").strip().lower()
         )
@@ -416,6 +432,22 @@ class _BetaLabStagesMixin:
             source.euid,
             library_material.euid,
             relationship_type="beta_library_material_output",
+        )
+        self._write_graph_metadata(
+            library_material,
+            node_role="bloom_library_material",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_library_material_output", "beta_pool_member"],
+                    max_child_count=2,
+                    reason="library material intentionally links prep source and sequencing pool",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=["contains", "beta_used_reagent", "executed_on"],
+                    max_child_count=6,
+                    reason="library material carries bounded container, reagent, and execution links",
+                ),
+            ],
         )
         library_plate = self._resolve_or_create_plate(
             plate_euid=None,

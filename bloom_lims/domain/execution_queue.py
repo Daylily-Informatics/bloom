@@ -1270,6 +1270,23 @@ class ExecutionQueueService:
             "diagnostics_enabled": True,
             "revision": 1,
             "disabled_reason": None,
+            "graph": {
+                "node_role": "execution_queue",
+                "role": "bloom_execution_queue",
+                "expected_fanout_max": int(defaults.get("max_attempts_default") or 5) * 2,
+                "fanout_reason": "execution queue intentionally links bounded queue leases and records",
+                "expected_fanout": [
+                    {
+                        "scope": "same_service",
+                        "relationship_types": [
+                            self.REL_QUEUE_LEASE,
+                            self.REL_QUEUE_RECORD,
+                        ],
+                        "max_child_count": int(defaults.get("max_attempts_default") or 5) * 2,
+                        "reason": "execution queue intentionally links bounded queue leases and records",
+                    }
+                ],
+            },
         }
 
     def _create_dead_letter(

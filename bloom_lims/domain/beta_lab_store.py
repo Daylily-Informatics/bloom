@@ -271,6 +271,21 @@ class _BetaLabStoreMixin:
         graph = dict(existing_graph) if isinstance(existing_graph, dict) else {}
         graph["node_role"] = node_role
         graph["expected_fanout"] = expected_fanout
+        graph["role"] = (
+            f"bloom_{node_role.replace('-', '_')}"
+            if not str(node_role).startswith("bloom_")
+            else str(node_role)
+        )
+        graph["expected_fanout_max"] = sum(
+            int(entry.get("max_child_count") or 0)
+            for entry in expected_fanout
+            if isinstance(entry, dict)
+        )
+        graph["fanout_reason"] = "; ".join(
+            str(entry.get("reason") or "").strip()
+            for entry in expected_fanout
+            if isinstance(entry, dict) and str(entry.get("reason") or "").strip()
+        )
         props["graph"] = graph
         self._write_props(instance, props)
 

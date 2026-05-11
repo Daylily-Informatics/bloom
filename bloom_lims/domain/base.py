@@ -543,6 +543,9 @@ class BloomObj:
             max_wells = 96 if subtype == "fixed-plate-96" else 24
             graph = {
                 "node_role": subtype,
+                "role": f"bloom_{subtype.replace('-', '_')}",
+                "expected_fanout_max": max_wells,
+                "fanout_reason": f"{subtype} contains at most {max_wells} wells",
                 "expected_fanout": [
                     self._expected_fanout_entry(
                         relationship_types=["contains"],
@@ -554,6 +557,9 @@ class BloomObj:
         elif type_name == "well":
             graph = {
                 "node_role": "fixed_plate_well",
+                "role": "bloom_fixed_plate_well",
+                "expected_fanout_max": 1,
+                "fanout_reason": "plate well contains at most one material",
                 "expected_fanout": [
                     self._expected_fanout_entry(
                         relationship_types=["contains"],
