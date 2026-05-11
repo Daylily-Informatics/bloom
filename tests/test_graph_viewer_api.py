@@ -229,15 +229,15 @@ class TestGraphViewerApis:
                             ],
                         },
                         "external_payload": {
-                            "tapdb_graph": {
-                                "refs": [
-                                    {
-                                        "system": "atlas",
-                                        "root_euid": "AT-TST-1",
-                                        "relationship_type": "prepared_for_atlas_test",
-                                    }
-                                ]
-                            }
+                            "tapdb_graph": [
+                                {
+                                    "system": "atlas",
+                                    "root_euid": "AT-TST-1",
+                                    "relationship_type": "prepared_for_atlas_test",
+                                    "label": "prepared_for_atlas_test: AT-TST-1",
+                                    "source_field": "external_payload.tapdb_graph",
+                                }
+                            ]
                         },
                     }
                 },

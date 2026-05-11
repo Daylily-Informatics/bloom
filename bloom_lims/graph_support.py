@@ -486,8 +486,7 @@ def _props_from_json_addl(json_addl: Any) -> dict[str, Any]:
 
 def _explicit_refs_from_props(props: dict[str, Any]) -> list[dict[str, Any]]:
     external_payload = _as_dict(props.get("external_payload"))
-    tapdb_graph = _as_dict(external_payload.get("tapdb_graph"))
-    raw_refs = _as_list(tapdb_graph.get("refs"))
+    raw_refs = _as_list(external_payload.get("tapdb_graph"))
     refs: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str]] = set()
     for raw_ref in raw_refs:

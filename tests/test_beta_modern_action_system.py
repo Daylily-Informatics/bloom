@@ -892,11 +892,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
 
     def graph_ref_tuples(euid: str):
         props = _props(instance(euid))
-        refs = (
-            props.get("external_payload", {})
-            .get("tapdb_graph", {})
-            .get("refs", [])
-        )
+        refs = props.get("external_payload", {}).get("tapdb_graph", [])
         return {
             (ref["system"], ref["root_euid"], ref["relationship_type"])
             for ref in refs

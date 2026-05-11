@@ -135,11 +135,7 @@ class _BetaLabReferenceMixin:
         external_payload = props.get("external_payload")
         if not isinstance(external_payload, dict):
             external_payload = {}
-        tapdb_graph = external_payload.get("tapdb_graph")
-        if not isinstance(tapdb_graph, dict):
-            tapdb_graph = {}
-        tapdb_graph["refs"] = refs
-        external_payload["tapdb_graph"] = tapdb_graph
+        external_payload["tapdb_graph"] = refs
         props["external_payload"] = external_payload
         self._write_props(instance, props)
 
@@ -154,6 +150,7 @@ class _BetaLabReferenceMixin:
             "root_euid": root_euid,
             "target_euid": root_euid,
             "relationship_type": relationship_type,
+            "source_field": ref_type or "reference_value",
         }
         tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
         if tenant_id:
