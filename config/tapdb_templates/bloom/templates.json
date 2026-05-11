@@ -2642,23 +2642,6 @@
       }
     },
     {
-      "name": "Bloom User API Token Revision",
-      "polymorphic_discriminator": "generic_template",
-      "category": "BBX",
-      "type": "auth",
-      "subtype": "user-api-token-revision",
-      "version": "1.0",
-      "instance_prefix": "BBX",
-      "instance_polymorphic_identity": "generic_instance",
-      "bstatus": "active",
-      "is_singleton": false,
-      "json_addl": {
-        "managed_by": "bloom",
-        "domain": "auth",
-        "semantic_category": "bloom"
-      }
-    },
-    {
       "name": "Bloom User API Token Usage Log",
       "polymorphic_discriminator": "generic_template",
       "category": "BBX",
@@ -2722,23 +2705,6 @@
       "category": "BBX",
       "type": "auth",
       "subtype": "user-group-membership",
-      "version": "1.0",
-      "instance_prefix": "BBX",
-      "instance_polymorphic_identity": "generic_instance",
-      "bstatus": "active",
-      "is_singleton": false,
-      "json_addl": {
-        "managed_by": "bloom",
-        "domain": "auth",
-        "semantic_category": "bloom"
-      }
-    },
-    {
-      "name": "Bloom User Group Revision",
-      "polymorphic_discriminator": "generic_template",
-      "category": "BBX",
-      "type": "auth",
-      "subtype": "user-group-revision",
       "version": "1.0",
       "instance_prefix": "BBX",
       "instance_polymorphic_identity": "generic_instance",

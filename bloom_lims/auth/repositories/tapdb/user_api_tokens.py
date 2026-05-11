@@ -23,11 +23,9 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 from bloom_lims.config import get_settings
 
 TOKEN_TEMPLATE_CODE = "BBX/auth/user-api-token/1.0/"
-TOKEN_REVISION_TEMPLATE_CODE = "BBX/auth/user-api-token-revision/1.0/"
 TOKEN_USAGE_LOG_TEMPLATE_CODE = "BBX/auth/user-api-token-usage-log/1.0/"
 
 TOKEN_PREFIX = "BBX"
-TOKEN_REVISION_PREFIX = "BBX"
 TOKEN_USAGE_PREFIX = "BBX"
 
 
@@ -131,20 +129,6 @@ class TapdbUserAPITokenRepository:
             "token_name": token_name,
             "token_prefix": token_prefix,
             "scope": scope,
-            "created_by": str(created_by) if created_by else None,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        token_id = ensure_public_id_property(token_properties, "id", prefix="tok")
-        token_instance = self.factory.create_instance(
-            session=self.db,
-            template_code=TOKEN_TEMPLATE_CODE,
-            name=token_name,
-            properties=token_properties,
-        )
-
-        revision_properties = {
-            "token_id": str(token_id),
-            "revision_no": 1,
             "token_hash": token_hash,
             "status": "ACTIVE",
             "expires_at": expires_at.isoformat(),
@@ -153,26 +137,23 @@ class TapdbUserAPITokenRepository:
             "revoked_by": None,
             "revocation_reason": None,
             "note": note,
+            "revision_no": 1,
+            "object_version": 1,
             "created_by": str(created_by) if created_by else None,
             "created_at": datetime.now(UTC).isoformat(),
         }
-        ensure_public_id_property(revision_properties, "id", prefix="tokrev")
-        revision_instance = self.factory.create_instance(
+        token_id = ensure_public_id_property(token_properties, "id", prefix="tok")
+        token_properties["token_id"] = str(token_id)
+        token_instance = self.factory.create_instance(
             session=self.db,
-            template_code=TOKEN_REVISION_TEMPLATE_CODE,
-            name=f"{token_name} revision 1",
-            properties=revision_properties,
-        )
-        self.factory.link_instances(
-            session=self.db,
-            parent=token_instance,
-            child=revision_instance,
-            relationship_type="revision",
+            template_code=TOKEN_TEMPLATE_CODE,
+            name=token_name,
+            properties=token_properties,
         )
         self.db.commit()
 
         token = self._to_token(token_instance)
-        revision = self._to_revision(revision_instance)
+        revision = self._to_revision(token_instance)
         if token is None or revision is None:
             raise ValueError("Failed to persist token")
         return token, revision
@@ -213,20 +194,10 @@ class TapdbUserAPITokenRepository:
         return token, revision
 
     def get_latest_revision(self, token_id: str) -> UserTokenRevisionRecord | None:
-        revisions: list[UserTokenRevisionRecord] = []
-        for revision_instance in self._instances_for_template(
-            TOKEN_REVISION_TEMPLATE_CODE
-        ):
-            revision = self._to_revision(revision_instance)
-            if revision is None:
-                continue
-            if revision.token_id != token_id:
-                continue
-            revisions.append(revision)
-        if not revisions:
+        token_instance = self._find_token_instance(token_id)
+        if token_instance is None:
             return None
-        revisions.sort(key=lambda row: row.revision_no, reverse=True)
-        return revisions[0]
+        return self._to_revision(token_instance)
 
     def create_revision(
         self,
@@ -244,49 +215,40 @@ class TapdbUserAPITokenRepository:
         note: str | None,
     ) -> UserTokenRevisionRecord:
         self._ensure_templates_bootstrapped()
-        revision_properties = {
-            "token_id": str(token_id),
-            "revision_no": revision_no,
-            "token_hash": token_hash,
-            "status": status,
-            "expires_at": expires_at.isoformat(),
-            "last_used_at": last_used_at.isoformat() if last_used_at else None,
-            "revoked_at": revoked_at.isoformat() if revoked_at else None,
-            "revoked_by": str(revoked_by) if revoked_by else None,
-            "revocation_reason": revocation_reason,
-            "note": note,
-            "created_by": str(created_by) if created_by else None,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        ensure_public_id_property(revision_properties, "id", prefix="tokrev")
-        revision_instance = self.factory.create_instance(
-            session=self.db,
-            template_code=TOKEN_REVISION_TEMPLATE_CODE,
-            name=f"token-{token_id} revision {revision_no}",
-            properties=revision_properties,
-        )
         token_instance = self._find_token_instance(token_id)
-        if token_instance is not None:
-            self.factory.link_instances(
-                session=self.db,
-                parent=token_instance,
-                child=revision_instance,
-                relationship_type="revision",
-            )
+        if token_instance is None:
+            raise ValueError(f"Unknown token_id: {token_id}")
+        token_props = self._props(token_instance)
+        token_props.update(
+            {
+                "token_id": str(token_id),
+                "revision_no": revision_no,
+                "object_version": revision_no,
+                "token_hash": token_hash,
+                "status": status,
+                "expires_at": expires_at.isoformat(),
+                "last_used_at": last_used_at.isoformat() if last_used_at else None,
+                "revoked_at": revoked_at.isoformat() if revoked_at else None,
+                "revoked_by": str(revoked_by) if revoked_by else None,
+                "revocation_reason": revocation_reason,
+                "note": note,
+                "updated_by": str(created_by) if created_by else None,
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        )
+        self._write_props(token_instance, token_props)
         self.db.commit()
-        record = self._to_revision(revision_instance)
+        record = self._to_revision(token_instance)
         if record is None:
-            raise ValueError("Failed to persist token revision")
+            raise ValueError("Failed to persist token state")
         return record
 
     def find_latest_revision_by_hash(
         self, token_hash: str
     ) -> UserTokenRevisionRecord | None:
         revisions: list[UserTokenRevisionRecord] = []
-        for revision_instance in self._instances_for_template(
-            TOKEN_REVISION_TEMPLATE_CODE
-        ):
-            revision = self._to_revision(revision_instance)
+        for token_instance in self._instances_for_template(TOKEN_TEMPLATE_CODE):
+            revision = self._to_revision(token_instance)
             if revision is None:
                 continue
             if revision.token_hash != token_hash:
@@ -464,7 +426,6 @@ class TapdbUserAPITokenRepository:
             self.db,
             [
                 (TOKEN_TEMPLATE_CODE, TOKEN_PREFIX),
-                (TOKEN_REVISION_TEMPLATE_CODE, TOKEN_REVISION_PREFIX),
                 (TOKEN_USAGE_LOG_TEMPLATE_CODE, TOKEN_USAGE_PREFIX),
             ],
             app_name="Bloom",
