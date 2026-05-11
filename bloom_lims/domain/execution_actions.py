@@ -183,6 +183,19 @@ class ExecutionQueueActionRecorder:
                 "idempotency_key": str(idempotency_key or "").strip(),
                 "payload_hash": str(payload_hash or "").strip(),
                 "target_euid": target_instance.euid,
+                "properties": {
+                    "graph": {
+                        "node_role": "workflow_action",
+                        "expected_fanout": [
+                            {
+                                "scope": "same_service",
+                                "relationship_types": ["executed_on"],
+                                "max_child_count": 1,
+                                "reason": "action record links to its execution target",
+                            }
+                        ],
+                    }
+                },
             },
             bstatus="completed",
         )

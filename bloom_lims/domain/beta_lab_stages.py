@@ -102,6 +102,9 @@ class _BetaLabStagesMixin:
             ),
             executed_by=self.bdb.app_username,
         )
+        self._replace_fulfillment_item_references(
+            output, atlas_context=fulfillment_item_context
+        )
         response = BetaQueueTransitionResponse(
             material_euid=output.euid,
             queue_euid=self.execution.get_queue("post_extract_qc").queue_euid,
@@ -469,6 +472,14 @@ class _BetaLabStagesMixin:
             ),
             executed_by=self.bdb.app_username,
         )
+        self._replace_fulfillment_item_references(
+            lib_output,
+            atlas_context=fulfillment_item_context,
+        )
+        self._replace_fulfillment_item_references(
+            library_material,
+            atlas_context=fulfillment_item_context,
+        )
         if payload.consume_source:
             self._consume_material_instance(
                 source,
@@ -608,6 +619,22 @@ class _BetaLabStagesMixin:
                 pool.euid,
                 relationship_type="beta_pool_member",
             )
+        self._write_graph_metadata(
+            pool,
+            node_role="sequencing_pool",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_pool_member"],
+                    max_child_count=len(members),
+                    reason="sequencing pool has bounded same-service member lineage",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_sequencing_run"],
+                    max_child_count=1,
+                    reason="sequencing pool produces at most one run in this handoff",
+                ),
+            ],
+        )
         self._attach_execution_metadata_lineage(pool, normalized_metadata)
 
         self.execution.queue_subject(
@@ -817,6 +844,23 @@ class _BetaLabStagesMixin:
                 relationship_type="beta_run_artifact",
             )
             self._attach_execution_metadata_lineage(artifact_record, artifact_metadata)
+
+        self._write_graph_metadata(
+            run,
+            node_role="sequencing_run",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_sequenced_library_assignment"],
+                    max_child_count=len(payload.assignments),
+                    reason="sequencing run has bounded assignment children",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_run_artifact"],
+                    max_child_count=len(payload.artifacts),
+                    reason="sequencing run has bounded run artifact children",
+                ),
+            ],
+        )
 
         if payload.consume_pool:
             self._consume_material_instance(

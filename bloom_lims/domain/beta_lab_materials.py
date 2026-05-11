@@ -52,6 +52,14 @@ class _BetaLabMaterialsMixin:
             container,
             atlas_context=payload.atlas_context.model_dump(),
         )
+        self._replace_container_entity_references(
+            specimen,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self._replace_fulfillment_item_references(
+            specimen,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
         self._replace_collection_event_reference(
             specimen,
             atlas_context=payload.atlas_context.model_dump(),

@@ -14,6 +14,7 @@ os.environ["BLOOM_OAUTH"] = "no"
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 from main import _build_graph_elements_for_start, app, require_auth
+from bloom_lims.graph_support import build_graph_meta_for_nodes
 
 
 @pytest.fixture
@@ -200,6 +201,64 @@ class TestGraphViewerApis:
         assert node_data["subtype"] == "tube-generic"
         assert "btype" not in node_data
         assert "b_sub_type" not in node_data
+
+    def test_build_graph_elements_emits_explicit_refs_timestamps_and_fanout(self):
+        fake_bobj = MagicMock()
+        fake_bobj.fetch_graph_data_by_node_depth.return_value = [
+            (
+                "BCN-1",
+                None,
+                "Fixed Plate",
+                "plate",
+                "container",
+                "fixed-plate-96",
+                "1.0",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-02T00:00:00+00:00",
+                {
+                    "properties": {
+                        "graph": {
+                            "node_role": "fixed-plate-96",
+                            "expected_fanout": [
+                                {
+                                    "scope": "same_service",
+                                    "relationship_types": ["contains"],
+                                    "max_child_count": 96,
+                                    "reason": "fixed-plate-96 contains at most 96 wells",
+                                }
+                            ],
+                        },
+                        "external_payload": {
+                            "tapdb_graph": {
+                                "refs": [
+                                    {
+                                        "system": "atlas",
+                                        "root_euid": "AT-TST-1",
+                                        "relationship_type": "prepared_for_atlas_test",
+                                    }
+                                ]
+                            }
+                        },
+                    }
+                },
+                0,
+                None,
+                None,
+                None,
+                None,
+            )
+        ]
+
+        nodes, _edges = _build_graph_elements_for_start(fake_bobj, "BCN-1", 3)
+        node_data = nodes[0]["data"]
+        assert node_data["created_dt"] == "2026-05-01T00:00:00+00:00"
+        assert node_data["modified_dt"] == "2026-05-02T00:00:00+00:00"
+        assert node_data["external_refs"][0]["system"] == "atlas"
+        assert node_data["external_refs"][0]["relationship_type"] == "prepared_for_atlas_test"
+        meta = build_graph_meta_for_nodes(nodes)
+        assert meta["expected_fanout"][0]["euid"] == "BCN-1"
+        assert meta["expected_fanout"][0]["relationship_types"] == ["contains"]
+        assert meta["expected_fanout"][0]["max_child_count"] == 96
 
     def test_api_graph_data_returns_elements(self, client):
         fake_nodes = [

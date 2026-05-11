@@ -110,6 +110,87 @@ class _BetaLabReferenceMixin:
             payloads.append(payload)
         return payloads
 
+    def _sync_atlas_tapdb_graph_refs(
+        self,
+        instance,
+        *,
+        additional_payloads: list[dict[str, Any]] | None = None,
+    ) -> None:
+        refs: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        payloads = [
+            *self._atlas_reference_payloads_for_instance(instance),
+            *(additional_payloads or []),
+        ]
+        for payload in payloads:
+            ref = self._atlas_tapdb_graph_ref(payload)
+            if ref is None:
+                continue
+            key = (ref["system"], ref["root_euid"], ref["relationship_type"])
+            if key in seen:
+                continue
+            seen.add(key)
+            refs.append(ref)
+        props = self._props(instance)
+        external_payload = props.get("external_payload")
+        if not isinstance(external_payload, dict):
+            external_payload = {}
+        tapdb_graph = external_payload.get("tapdb_graph")
+        if not isinstance(tapdb_graph, dict):
+            tapdb_graph = {}
+        tapdb_graph["refs"] = refs
+        external_payload["tapdb_graph"] = tapdb_graph
+        props["external_payload"] = external_payload
+        self._write_props(instance, props)
+
+    def _atlas_tapdb_graph_ref(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+        root_euid = self._atlas_graph_root_euid(payload)
+        if not root_euid:
+            return None
+        ref_type = str(payload.get("reference_type") or "").strip()
+        relationship_type = self._atlas_relationship_type(ref_type)
+        ref = {
+            "system": "atlas",
+            "root_euid": root_euid,
+            "target_euid": root_euid,
+            "relationship_type": relationship_type,
+        }
+        tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
+        if tenant_id:
+            ref["tenant_id"] = tenant_id
+        ref["label"] = f"atlas:{relationship_type}:{root_euid}"
+        return ref
+
+    def _atlas_graph_root_euid(self, payload: dict[str, Any]) -> str:
+        ref_type = str(payload.get("reference_type") or "").strip()
+        field_name = {
+            self.PROCESS_ITEM_REFERENCE_TYPE: "atlas_test_fulfillment_item_euid",
+            self.PATIENT_REFERENCE_TYPE: "atlas_patient_euid",
+            self.TRF_REFERENCE_TYPE: "atlas_trf_euid",
+            self.TEST_REFERENCE_TYPE: "atlas_test_euid",
+            self.TESTKIT_REFERENCE_TYPE: "atlas_testkit_euid",
+            self.SHIPMENT_REFERENCE_TYPE: "atlas_shipment_euid",
+            self.ORGANIZATION_SITE_REFERENCE_TYPE: "atlas_organization_site_euid",
+            self.COLLECTION_EVENT_REFERENCE_TYPE: "atlas_collection_event_euid",
+        }.get(ref_type)
+        if field_name:
+            value = str(payload.get(field_name) or "").strip()
+            if value:
+                return value
+        return str(payload.get("reference_value") or "").strip()
+
+    def _atlas_relationship_type(self, ref_type: str) -> str:
+        return {
+            self.PROCESS_ITEM_REFERENCE_TYPE: "fulfills_atlas_test_fulfillment_item",
+            self.PATIENT_REFERENCE_TYPE: "derived_from_atlas_patient",
+            self.TRF_REFERENCE_TYPE: "received_from_atlas_trf",
+            self.TEST_REFERENCE_TYPE: "prepared_for_atlas_test",
+            self.TESTKIT_REFERENCE_TYPE: "received_with_atlas_testkit",
+            self.SHIPMENT_REFERENCE_TYPE: "received_in_atlas_shipment",
+            self.ORGANIZATION_SITE_REFERENCE_TYPE: "received_from_atlas_organization_site",
+            self.COLLECTION_EVENT_REFERENCE_TYPE: "collected_during_atlas_event",
+        }.get(ref_type, f"references_{ref_type or 'atlas_object'}")
+
     def _patient_ref_for_instance(self, instance) -> dict[str, str] | None:
         for payload in self._atlas_reference_payloads_for_instance(instance):
             ref_type = str(payload.get("reference_type") or "").strip()
@@ -174,6 +255,18 @@ class _BetaLabReferenceMixin:
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
         fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
+        direct_fulfillment_item_euid = str(
+            atlas_context.get("atlas_test_fulfillment_item_euid") or ""
+        ).strip()
+        direct_test_euid = str(atlas_context.get("atlas_test_euid") or "").strip()
+        if direct_fulfillment_item_euid and direct_test_euid and not fulfillment_items:
+            fulfillment_items.append(
+                {
+                    "atlas_test_euid": direct_test_euid,
+                    "atlas_test_fulfillment_item_euid": direct_fulfillment_item_euid,
+                }
+            )
+        created_payloads: list[dict[str, Any]] = []
 
         for fulfillment_item in fulfillment_items:
             atlas_test_euid = str(fulfillment_item.get("atlas_test_euid") or "").strip()
@@ -187,29 +280,28 @@ class _BetaLabReferenceMixin:
                 and atlas_test_fulfillment_item_euid
             ):
                 continue
+            properties = {
+                "provider": "atlas",
+                "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
+                "reference_value": atlas_test_fulfillment_item_euid,
+                "foreign_reference": atlas_test_fulfillment_item_euid,
+                "atlas_tenant_id": atlas_tenant_id,
+                "atlas_trf_euid": atlas_trf_euid,
+                "atlas_test_euid": atlas_test_euid,
+                "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
+                "validation": {},
+            }
+            created_payloads.append(properties)
             ref_obj = self.bobj.create_instance_by_code(
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                {
-                    "json_addl": {
-                        "properties": {
-                            "provider": "atlas",
-                            "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
-                            "reference_value": atlas_test_fulfillment_item_euid,
-                            "foreign_reference": atlas_test_fulfillment_item_euid,
-                            "atlas_tenant_id": atlas_tenant_id,
-                            "atlas_trf_euid": atlas_trf_euid,
-                            "atlas_test_euid": atlas_test_euid,
-                            "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
-                            "validation": {},
-                        }
-                    }
-                },
+                {"json_addl": {"properties": properties}},
             )
             self.bobj.create_generic_instance_lineage_by_euids(
                 instance.euid,
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
+        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=created_payloads)
 
     def _replace_container_entity_references(
         self,
@@ -246,6 +338,7 @@ class _BetaLabReferenceMixin:
             (self.SHIPMENT_REFERENCE_TYPE, "atlas_shipment_euid"),
             (self.ORGANIZATION_SITE_REFERENCE_TYPE, "atlas_organization_site_euid"),
         )
+        created_payloads: list[dict[str, Any]] = []
         self._delete_reference_type(instance, reference_type=self.TEST_REFERENCE_TYPE)
         if atlas_tenant_id:
             for reference_value in atlas_test_euids:
@@ -260,6 +353,7 @@ class _BetaLabReferenceMixin:
                 }
                 if atlas_trf_euid:
                     properties["atlas_trf_euid"] = atlas_trf_euid
+                created_payloads.append(properties)
                 ref_obj = self.bobj.create_instance_by_code(
                     self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
                     {"json_addl": {"properties": properties}},
@@ -287,6 +381,7 @@ class _BetaLabReferenceMixin:
             if atlas_trf_euid:
                 properties["atlas_trf_euid"] = atlas_trf_euid
             properties[field_name] = reference_value
+            created_payloads.append(properties)
             ref_obj = self.bobj.create_instance_by_code(
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
                 {"json_addl": {"properties": properties}},
@@ -296,6 +391,7 @@ class _BetaLabReferenceMixin:
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
+        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=created_payloads)
 
     def _replace_collection_event_reference(
         self, instance, *, atlas_context: dict[str, Any]
@@ -315,35 +411,32 @@ class _BetaLabReferenceMixin:
                     snapshot.get("collection_event_euid") or ""
                 ).strip()
         if not (atlas_tenant_id and collection_event_euid):
+            self._sync_atlas_tapdb_graph_refs(instance)
             return
         snapshot_payload = atlas_context.get("collection_event_snapshot")
         if not isinstance(snapshot_payload, dict):
             snapshot_payload = {}
+        properties = {
+            "provider": "atlas",
+            "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
+            "reference_value": collection_event_euid,
+            "foreign_reference": collection_event_euid,
+            "atlas_tenant_id": atlas_tenant_id,
+            "atlas_collection_event_euid": collection_event_euid,
+            "atlas_trf_euid": str(atlas_context.get("atlas_trf_euid") or "").strip(),
+            "collection_event_snapshot": snapshot_payload,
+            "validation": {},
+        }
         ref_obj = self.bobj.create_instance_by_code(
             self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-            {
-                "json_addl": {
-                    "properties": {
-                        "provider": "atlas",
-                        "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
-                        "reference_value": collection_event_euid,
-                        "foreign_reference": collection_event_euid,
-                        "atlas_tenant_id": atlas_tenant_id,
-                        "atlas_collection_event_euid": collection_event_euid,
-                        "atlas_trf_euid": str(
-                            atlas_context.get("atlas_trf_euid") or ""
-                        ).strip(),
-                        "collection_event_snapshot": snapshot_payload,
-                        "validation": {},
-                    }
-                }
-            },
+            {"json_addl": {"properties": properties}},
         )
         self.bobj.create_generic_instance_lineage_by_euids(
             instance.euid,
             ref_obj.euid,
             relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
         )
+        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=[properties])
 
     def _replace_patient_reference(
         self, instance, *, atlas_context: dict[str, Any]
@@ -356,29 +449,28 @@ class _BetaLabReferenceMixin:
         atlas_patient_euid = str(atlas_context.get("atlas_patient_euid") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
         if not (atlas_tenant_id and atlas_patient_euid):
+            self._sync_atlas_tapdb_graph_refs(instance)
             return
+        properties = {
+            "provider": "atlas",
+            "reference_type": self.PATIENT_REFERENCE_TYPE,
+            "reference_value": atlas_patient_euid,
+            "foreign_reference": atlas_patient_euid,
+            "atlas_tenant_id": atlas_tenant_id,
+            "atlas_patient_euid": atlas_patient_euid,
+            "atlas_trf_euid": atlas_trf_euid,
+            "validation": {},
+        }
         ref_obj = self.bobj.create_instance_by_code(
             self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-            {
-                "json_addl": {
-                    "properties": {
-                        "provider": "atlas",
-                        "reference_type": self.PATIENT_REFERENCE_TYPE,
-                        "reference_value": atlas_patient_euid,
-                        "foreign_reference": atlas_patient_euid,
-                        "atlas_tenant_id": atlas_tenant_id,
-                        "atlas_patient_euid": atlas_patient_euid,
-                        "atlas_trf_euid": atlas_trf_euid,
-                        "validation": {},
-                    }
-                }
-            },
+            {"json_addl": {"properties": properties}},
         )
         self.bobj.create_generic_instance_lineage_by_euids(
             instance.euid,
             ref_obj.euid,
             relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
         )
+        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=[properties])
 
     def _delete_reference_type(self, instance, *, reference_type: str) -> None:
         existing_refs = []

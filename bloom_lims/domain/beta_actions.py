@@ -141,6 +141,19 @@ class BloomBetaActionRecorder:
                 "result": result,
                 "executed_by": executed_by,
                 "executed_at": now,
+                "properties": {
+                    "graph": {
+                        "node_role": "workflow_action",
+                        "expected_fanout": [
+                            {
+                                "scope": "same_service",
+                                "relationship_types": ["executed_on"],
+                                "max_child_count": 1,
+                                "reason": "action record links to its execution target",
+                            }
+                        ],
+                    }
+                },
             },
             bstatus="completed",
         )
