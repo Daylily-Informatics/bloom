@@ -21,7 +21,7 @@ from bloom_lims.auth.rbac import (
 from bloom_lims.auth.repositories.tapdb.user_api_tokens import (
     TapdbUserAPITokenRepository,
     UserTokenRecord,
-    UserTokenRevisionRecord,
+    UserTokenStateRecord,
     UserTokenUsageRecord,
 )
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
@@ -44,7 +44,7 @@ class TokenCreateInput:
 @dataclass(frozen=True)
 class TokenCreateResult:
     token: UserTokenRecord
-    revision: UserTokenRevisionRecord
+    state: UserTokenStateRecord
     plaintext_token: str
 
 
@@ -53,7 +53,7 @@ class TokenValidationResult:
     is_valid: bool
     error: str | None = None
     token: UserTokenRecord | None = None
-    revision: UserTokenRevisionRecord | None = None
+    state: UserTokenStateRecord | None = None
 
 
 class UserAPITokenService:
@@ -114,7 +114,7 @@ class UserAPITokenService:
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=expires_in_days)
 
-        token, revision = self.repo.create_token(
+        token, state = self.repo.create_token(
             user_id=owner_user_id,
             token_name=payload.token_name.strip(),
             token_prefix=self.display_prefix(plaintext),
@@ -124,33 +124,31 @@ class UserAPITokenService:
             created_by=actor_user_id,
             note=payload.note,
         )
-        return TokenCreateResult(
-            token=token, revision=revision, plaintext_token=plaintext
-        )
+        return TokenCreateResult(token=token, state=state, plaintext_token=plaintext)
 
     def list_user_tokens(
         self, *, user_id: str
-    ) -> list[tuple[UserTokenRecord, UserTokenRevisionRecord]]:
-        rows: list[tuple[UserTokenRecord, UserTokenRevisionRecord]] = []
+    ) -> list[tuple[UserTokenRecord, UserTokenStateRecord]]:
+        rows: list[tuple[UserTokenRecord, UserTokenStateRecord]] = []
         for token in self.repo.list_tokens(user_id=user_id):
-            revision = self.repo.get_latest_revision(token.id)
-            if revision is None:
+            state = self.repo.get_current_state(token.id)
+            if state is None:
                 continue
-            rows.append((token, revision))
+            rows.append((token, state))
         return rows
 
-    def list_all_tokens(self) -> list[tuple[UserTokenRecord, UserTokenRevisionRecord]]:
-        rows: list[tuple[UserTokenRecord, UserTokenRevisionRecord]] = []
+    def list_all_tokens(self) -> list[tuple[UserTokenRecord, UserTokenStateRecord]]:
+        rows: list[tuple[UserTokenRecord, UserTokenStateRecord]] = []
         for token in self.repo.list_tokens(user_id=None):
-            revision = self.repo.get_latest_revision(token.id)
-            if revision is None:
+            state = self.repo.get_current_state(token.id)
+            if state is None:
                 continue
-            rows.append((token, revision))
+            rows.append((token, state))
         return rows
 
     def get_token(
         self, *, token_id: str
-    ) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
+    ) -> tuple[UserTokenRecord, UserTokenStateRecord] | None:
         return self.repo.get_token(token_id)
 
     def revoke_token(
@@ -159,32 +157,28 @@ class UserAPITokenService:
         token_id: str,
         actor_user_id: str,
         actor_roles: list[str],
-    ) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
+    ) -> tuple[UserTokenRecord, UserTokenStateRecord] | None:
         current = self.repo.get_token(token_id)
         if current is None:
             return None
-        token, revision = current
+        token, state = current
         roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
         if token.user_id != actor_user_id and not is_admin(roles):
             raise PermissionError("Cannot revoke another user's token")
 
-        if revision.status == TOKEN_STATUS_REVOKED:
-            return token, revision
+        if state.status == TOKEN_STATUS_REVOKED:
+            return token, state
 
-        new_revision = self.repo.create_revision(
+        new_state = self.repo.update_token_state(
             token_id=token.id,
-            revision_no=revision.revision_no + 1,
-            token_hash=revision.token_hash,
             status=TOKEN_STATUS_REVOKED,
-            expires_at=revision.expires_at,
-            last_used_at=revision.last_used_at,
             revoked_at=datetime.now(UTC),
             revoked_by=actor_user_id,
             revocation_reason="revoked_by_user",
-            created_by=actor_user_id,
+            updated_by=actor_user_id,
             note="Token revoked",
         )
-        return token, new_revision
+        return token, new_state
 
     def validate_token(self, plaintext_token: str) -> TokenValidationResult:
         token_value = str(plaintext_token or "").strip()
@@ -192,51 +186,44 @@ class UserAPITokenService:
             return TokenValidationResult(is_valid=False, error="Invalid token prefix")
 
         token_hash = self.hash_token(token_value)
-        revision = self.repo.find_latest_revision_by_hash(token_hash)
-        if revision is None:
+        state = self.repo.find_current_state_by_hash(token_hash)
+        if state is None:
             return TokenValidationResult(is_valid=False, error="Token not found")
 
-        if not hmac.compare_digest(revision.token_hash, token_hash):
+        if not hmac.compare_digest(state.token_hash, token_hash):
             return TokenValidationResult(is_valid=False, error="Token mismatch")
 
-        if revision.status == TOKEN_STATUS_REVOKED:
+        if state.status == TOKEN_STATUS_REVOKED:
             return TokenValidationResult(is_valid=False, error="Token is revoked")
 
         now = datetime.now(UTC)
-        if revision.expires_at < now:
+        if state.expires_at < now:
             return TokenValidationResult(is_valid=False, error="Token is expired")
 
-        token_result = self.repo.get_token(revision.token_id)
+        token_result = self.repo.get_token(state.token_id)
         if token_result is None:
             return TokenValidationResult(is_valid=False, error="Token owner not found")
-        token, latest_revision = token_result
-        if latest_revision.status == TOKEN_STATUS_REVOKED:
+        token, current_state = token_result
+        if current_state.status == TOKEN_STATUS_REVOKED:
             return TokenValidationResult(is_valid=False, error="Token is revoked")
-        if latest_revision.expires_at < now:
+        if current_state.expires_at < now:
             return TokenValidationResult(is_valid=False, error="Token is expired")
 
         return TokenValidationResult(
             is_valid=True,
             token=token,
-            revision=latest_revision,
+            state=current_state,
         )
 
     def mark_token_used(self, *, token_id: str) -> None:
         token_result = self.repo.get_token(token_id)
         if token_result is None:
             return
-        token, revision = token_result
-        self.repo.create_revision(
+        token, _state = token_result
+        self.repo.update_token_state(
             token_id=token.id,
-            revision_no=revision.revision_no + 1,
-            token_hash=revision.token_hash,
-            status=revision.status,
-            expires_at=revision.expires_at,
             last_used_at=datetime.now(UTC),
-            revoked_at=revision.revoked_at,
-            revoked_by=revision.revoked_by,
-            revocation_reason=revision.revocation_reason,
-            created_by=None,
+            updated_by=None,
             note="Last used timestamp updated",
         )
 

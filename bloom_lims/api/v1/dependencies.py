@@ -202,7 +202,7 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
         if (
             not validation.is_valid
             or validation.token is None
-            or validation.revision is None
+            or validation.state is None
         ):
             raise HTTPException(
                 status_code=401,

@@ -38,23 +38,24 @@ def _require_token_id(token_id: str) -> str:
 
 def _token_row_to_dict(
     token,
-    revision,
+    state,
     *,
     usage_count: int,
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
-    is_expired = revision.expires_at < now
+    is_expired = state.expires_at < now
     return {
         "token_id": str(token.id),
         "user_id": str(token.user_id),
         "token_name": token.token_name,
         "token_prefix": token.token_prefix,
         "scope": token.scope,
-        "status": revision.status,
-        "expires_at": revision.expires_at.isoformat(),
-        "last_used_at": revision.last_used_at.isoformat() if revision.last_used_at else None,
-        "revoked_at": revision.revoked_at.isoformat() if revision.revoked_at else None,
-        "revocation_reason": revision.revocation_reason,
+        "status": state.status,
+        "expires_at": state.expires_at.isoformat(),
+        "last_used_at": state.last_used_at.isoformat() if state.last_used_at else None,
+        "revoked_at": state.revoked_at.isoformat() if state.revoked_at else None,
+        "revocation_reason": state.revocation_reason,
+        "object_version": state.object_version,
         "created_at": token.created_at.isoformat() if token.created_at else None,
         "usage_count": usage_count,
         "is_expired": is_expired,
@@ -71,10 +72,10 @@ async def list_user_tokens(user: APIUser = Depends(require_api_auth)):
         items = [
             _token_row_to_dict(
                 token,
-                revision,
+                state,
                 usage_count=service.repo.count_usage(token_id=token.id),
             )
-            for token, revision in rows
+            for token, state in rows
         ]
         return {"items": items, "total": len(items)}
     finally:
@@ -106,7 +107,7 @@ async def create_user_token(
         return {
             "token": _token_row_to_dict(
                 created.token,
-                created.revision,
+                created.state,
                 usage_count=0,
             ),
             "plaintext_token": created.plaintext_token,
@@ -136,11 +137,11 @@ async def revoke_user_token(
         )
         if revoked is None:
             raise HTTPException(status_code=404, detail="Token not found")
-        token, revision = revoked
+        token, state = revoked
         return {
             "token": _token_row_to_dict(
                 token,
-                revision,
+                state,
                 usage_count=service.repo.count_usage(token_id=token.id),
             ),
             "message": "Token revoked",

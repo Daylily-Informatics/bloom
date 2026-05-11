@@ -17,6 +17,12 @@ class GroupMemberAddRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
 
 
+class GroupUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    is_active: bool | None = None
+
+
 class AdminIssueTokenRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
     token_name: str = Field(..., min_length=3, max_length=120)
@@ -47,13 +53,50 @@ async def list_groups(user: APIUser = Depends(require_admin)):
                     "description": group.description,
                     "is_system_group": group.is_system_group,
                     "is_active": group.is_active,
-                    "revision_no": group.revision_no,
+                    "object_version": group.object_version,
                     "created_at": group.created_at.isoformat() if group.created_at else None,
                 }
                 for group in groups
             ],
             "total": len(groups),
         }
+    finally:
+        bdb.close()
+
+
+@router.patch("/groups/{group_code}")
+async def update_group(
+    group_code: str,
+    payload: GroupUpdateRequest,
+    user: APIUser = Depends(require_admin),
+):
+    actor_user_id = _require_id(user.user_id, field_name="authenticated user_id")
+    updates = {
+        field_name: getattr(payload, field_name)
+        for field_name in payload.model_fields_set
+    }
+    bdb = BLOOMdb3(app_username=user.email)
+    try:
+        service = GroupService(bdb.session)
+        group = service.update_group(
+            group_code=group_code,
+            updates=updates,
+            updated_by=actor_user_id,
+        )
+        if group is None:
+            raise HTTPException(status_code=404, detail="Group not found")
+        return {
+            "id": str(group.id),
+            "group_code": group.group_code,
+            "name": group.name,
+            "description": group.description,
+            "is_system_group": group.is_system_group,
+            "is_active": group.is_active,
+            "object_version": group.object_version,
+            "created_at": group.created_at.isoformat() if group.created_at else None,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         bdb.close()
 
@@ -175,14 +218,15 @@ async def list_admin_user_tokens(user: APIUser = Depends(require_admin)):
                     "token_name": token.token_name,
                     "token_prefix": token.token_prefix,
                     "scope": token.scope,
-                    "status": revision.status,
-                    "expires_at": revision.expires_at.isoformat(),
-                    "last_used_at": revision.last_used_at.isoformat() if revision.last_used_at else None,
-                    "revoked_at": revision.revoked_at.isoformat() if revision.revoked_at else None,
+                    "status": state.status,
+                    "expires_at": state.expires_at.isoformat(),
+                    "last_used_at": state.last_used_at.isoformat() if state.last_used_at else None,
+                    "revoked_at": state.revoked_at.isoformat() if state.revoked_at else None,
+                    "object_version": state.object_version,
                     "created_at": token.created_at.isoformat() if token.created_at else None,
                     "usage_count": service.repo.count_usage(token_id=token.id),
                 }
-                for token, revision in rows
+                for token, state in rows
             ],
             "total": len(rows),
         }
@@ -220,8 +264,9 @@ async def issue_admin_user_token(
                 "token_name": created.token.token_name,
                 "token_prefix": created.token.token_prefix,
                 "scope": created.token.scope,
-                "status": created.revision.status,
-                "expires_at": created.revision.expires_at.isoformat(),
+                "status": created.state.status,
+                "expires_at": created.state.expires_at.isoformat(),
+                "object_version": created.state.object_version,
                 "created_at": created.token.created_at.isoformat() if created.token.created_at else None,
             },
             "plaintext_token": created.plaintext_token,
@@ -250,13 +295,14 @@ async def revoke_admin_user_token(
         )
         if revoked is None:
             raise HTTPException(status_code=404, detail="Token not found")
-        token, revision = revoked
+        token, state = revoked
         return {
             "token_id": str(token.id),
             "user_id": str(token.user_id),
             "token_name": token.token_name,
-            "status": revision.status,
-            "revoked_at": revision.revoked_at.isoformat() if revision.revoked_at else None,
+            "status": state.status,
+            "revoked_at": state.revoked_at.isoformat() if state.revoked_at else None,
+            "object_version": state.object_version,
         }
     finally:
         bdb.close()

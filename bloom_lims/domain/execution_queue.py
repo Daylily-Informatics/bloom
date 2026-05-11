@@ -210,7 +210,7 @@ class ExecutionQueueService:
             if queue is not None:
                 props = self._props(queue)
                 merged = self._queue_definition_defaults(queue_key, defaults)
-                merged["revision"] = int(props.get("revision") or 0) + 1
+                merged["object_version"] = int(props.get("object_version") or 0) + 1
                 props.update(merged)
                 queue.name = defaults["display_name"]
                 props["name"] = queue.name
@@ -263,7 +263,7 @@ class ExecutionQueueService:
                 "process_identity": payload.process_identity,
                 "drain_requested": payload.drain_requested,
                 "disabled_reason": None,
-                "revision": int(props.get("revision") or 0) + 1,
+                "object_version": int(props.get("object_version") or 0) + 1,
             }
         )
         worker.name = payload.display_name
@@ -306,7 +306,7 @@ class ExecutionQueueService:
             props["host"] = payload.host
         if payload.process_identity is not None:
             props["process_identity"] = payload.process_identity
-        props["revision"] = int(props.get("revision") or 0) + 1
+        props["object_version"] = int(props.get("object_version") or 0) + 1
         self._write_props(worker, props)
         self.action_recorder.record(
             target_instance=worker,
@@ -356,7 +356,7 @@ class ExecutionQueueService:
                 **dict(props.get("selection_policy") or {})
             ),
             diagnostics_enabled=bool(props.get("diagnostics_enabled", True)),
-            revision=int(props.get("revision") or 1),
+            object_version=int(props.get("object_version") or 1),
             disabled_reason=str(props.get("disabled_reason") or "") or None,
         )
 
@@ -501,7 +501,7 @@ class ExecutionQueueService:
                 "ttl_seconds": lease_ttl_seconds,
                 "next_action_key": execution.get("next_action_key"),
                 "idempotency_key": payload.idempotency_key,
-                "subject_revision_at_claim": int(execution.get("revision") or 1),
+                "subject_object_version_at_claim": int(execution.get("object_version") or 1),
                 "payload_hash": payload_hash,
             },
         )
@@ -525,8 +525,8 @@ class ExecutionQueueService:
                 "expected_state": payload.expected_state.value,
                 "start_state": execution.get("state"),
                 "end_state": None,
-                "start_revision": int(execution.get("revision") or 1),
-                "end_revision": None,
+                "start_object_version": int(execution.get("object_version") or 1),
+                "end_object_version": None,
                 "started_at": self._timestamp(now),
                 "finished_at": None,
                 "duration_ms": None,
@@ -687,7 +687,7 @@ class ExecutionQueueService:
 
         execution = self._ensure_execution_envelope(subject, write=True)
         self._assert_expected_state(
-            subject, execution, payload.expected_state, payload.expected_revision
+            subject, execution, payload.expected_state, payload.expected_object_version
         )
 
         next_state = (
@@ -702,7 +702,7 @@ class ExecutionQueueService:
                 else ExecutionState.COMPLETED
             )
         execution["state"] = next_state.value
-        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["object_version"] = int(execution.get("object_version") or 1) + 1
         execution["next_queue_key"] = payload.next_queue_key
         execution["next_action_key"] = payload.next_action_key
         execution["ready_at"] = self._timestamp()
@@ -719,7 +719,7 @@ class ExecutionQueueService:
             record,
             status=RecordStatus.SUCCEEDED,
             end_state=next_state.value,
-            end_revision=int(execution["revision"]),
+            end_object_version=int(execution["object_version"]),
             result_snapshot=payload.result_payload,
             retryable=False,
         )
@@ -783,7 +783,7 @@ class ExecutionQueueService:
 
         execution = self._ensure_execution_envelope(subject, write=True)
         self._assert_expected_state(
-            subject, execution, payload.expected_state, payload.expected_revision
+            subject, execution, payload.expected_state, payload.expected_object_version
         )
 
         queue_key = str(
@@ -820,7 +820,7 @@ class ExecutionQueueService:
                 record,
                 status=RecordStatus.FAILED_RETRYABLE,
                 end_state=ExecutionState.FAILED_RETRYABLE.value,
-                end_revision=int(execution.get("revision") or 1) + 1,
+                end_object_version=int(execution.get("object_version") or 1) + 1,
                 result_snapshot=payload.result_payload,
                 retryable=True,
                 error_class=payload.error_class,
@@ -838,7 +838,7 @@ class ExecutionQueueService:
                 record,
                 status=RecordStatus.FAILED_TERMINAL,
                 end_state=ExecutionState.FAILED_TERMINAL.value,
-                end_revision=int(execution.get("revision") or 1) + 1,
+                end_object_version=int(execution.get("object_version") or 1) + 1,
                 result_snapshot=payload.result_payload,
                 retryable=False,
                 error_class=payload.error_class,
@@ -852,7 +852,7 @@ class ExecutionQueueService:
                 subject, queue, record, lease, payload
             )
             dead_letter_euid = dead_letter.euid
-        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["object_version"] = int(execution.get("object_version") or 1) + 1
         execution["last_execution_record_euid"] = record.euid
         execution["queue_cache"]["current_queue_key"] = execution.get("next_queue_key")
         execution["queue_cache"]["computed_at"] = self._timestamp()
@@ -912,7 +912,7 @@ class ExecutionQueueService:
         execution["state"] = ExecutionState.HELD.value
         execution["hold_state"] = "ACTIVE"
         execution["hold_reason"] = payload.reason
-        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["object_version"] = int(execution.get("object_version") or 1) + 1
         self._set_execution_envelope(subject, execution)
 
         hold = self._create_execution_instance(
@@ -982,7 +982,7 @@ class ExecutionQueueService:
                 if execution.get("retry_at")
                 else ExecutionState.READY.value
             )
-        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["object_version"] = int(execution.get("object_version") or 1) + 1
         self._set_execution_envelope(subject, execution)
         payload_hash = self._payload_hash(payload.model_dump())
         self.action_recorder.record(
@@ -1029,7 +1029,7 @@ class ExecutionQueueService:
         execution = self._ensure_execution_envelope(subject, write=True)
         if payload.expected_state is not None:
             self._assert_expected_state(
-                subject, execution, payload.expected_state, payload.expected_revision
+                subject, execution, payload.expected_state, payload.expected_object_version
             )
         execution["state"] = ExecutionState.READY.value
         execution["next_queue_key"] = payload.queue_key
@@ -1045,7 +1045,7 @@ class ExecutionQueueService:
         execution["hold_reason"] = None
         execution["cancel_requested"] = False
         execution["terminal"] = False
-        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["object_version"] = int(execution.get("object_version") or 1) + 1
         execution["queue_cache"]["current_queue_key"] = payload.queue_key
         execution["queue_cache"]["computed_at"] = self._timestamp()
         self._set_execution_envelope(subject, execution)
@@ -1092,14 +1092,14 @@ class ExecutionQueueService:
         execution = self._ensure_execution_envelope(subject, write=True)
         if payload.expected_state is not None:
             self._assert_expected_state(
-                subject, execution, payload.expected_state, payload.expected_revision
+                subject, execution, payload.expected_state, payload.expected_object_version
             )
         execution["state"] = ExecutionState.CANCELED.value
         execution["cancel_requested"] = True
         execution["terminal"] = True
         execution["next_queue_key"] = None
         execution["next_action_key"] = None
-        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["object_version"] = int(execution.get("object_version") or 1) + 1
         execution["queue_cache"]["current_queue_key"] = None
         execution["queue_cache"]["computed_at"] = self._timestamp()
         self._set_execution_envelope(subject, execution)
@@ -1268,7 +1268,7 @@ class ExecutionQueueService:
             "retry_policy": deepcopy(self.DEFAULT_RETRY_POLICY),
             "selection_policy": deepcopy(self.DEFAULT_SELECTION_POLICY),
             "diagnostics_enabled": True,
-            "revision": 1,
+            "object_version": 1,
             "disabled_reason": None,
         }
 
@@ -1787,18 +1787,18 @@ class ExecutionQueueService:
         subject,
         execution: dict[str, Any],
         expected_state: ExecutionState,
-        expected_revision: int | None,
+        expected_object_version: int | None,
     ) -> None:
         if str(execution.get("state") or "") != expected_state.value:
             raise ExecutionQueueConflictError(
                 f"Expected state {expected_state.value} but found {execution.get('state')} for {subject.euid}"
             )
         if (
-            expected_revision is not None
-            and int(execution.get("revision") or 0) != expected_revision
+            expected_object_version is not None
+            and int(execution.get("object_version") or 0) != expected_object_version
         ):
             raise ExecutionQueueConflictError(
-                f"Expected revision {expected_revision} but found {execution.get('revision')} for {subject.euid}"
+                f"Expected object_version {expected_object_version} but found {execution.get('object_version')} for {subject.euid}"
             )
 
     def _assert_lease_active_for_subject(
@@ -1846,7 +1846,7 @@ class ExecutionQueueService:
         *,
         status: RecordStatus,
         end_state: str,
-        end_revision: int,
+        end_object_version: int,
         result_snapshot: dict[str, Any],
         retryable: bool,
         error_class: str | None = None,
@@ -1858,7 +1858,7 @@ class ExecutionQueueService:
         started_at = self._parse_datetime(props.get("started_at")) or finished_at
         props["status"] = status.value
         props["end_state"] = end_state
-        props["end_revision"] = end_revision
+        props["end_object_version"] = end_object_version
         props["finished_at"] = self._timestamp(finished_at)
         props["duration_ms"] = int((finished_at - started_at).total_seconds() * 1000)
         props["retryable"] = retryable
@@ -1912,7 +1912,7 @@ class ExecutionQueueService:
             disabled_reason=str(props.get("disabled_reason") or "") or None,
             last_error_at=str(props.get("last_error_at") or "") or None,
             last_error_class=str(props.get("last_error_class") or "") or None,
-            revision=int(props.get("revision") or 1),
+            object_version=int(props.get("object_version") or 1),
         )
 
     def _queue_item(self, instance) -> ExecutionQueueItem:

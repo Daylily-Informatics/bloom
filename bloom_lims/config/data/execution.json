@@ -46,7 +46,7 @@
           ]
         },
         "diagnostics_enabled": true,
-        "revision": 1,
+        "object_version": 1,
         "disabled_reason": null
       },
       "singleton": "0"
@@ -79,7 +79,7 @@
         "ttl_seconds": 900,
         "next_action_key": null,
         "idempotency_key": "",
-        "subject_revision_at_claim": 0,
+        "subject_object_version_at_claim": 0,
         "payload_hash": ""
       },
       "singleton": "0"
@@ -110,8 +110,8 @@
         "expected_state": "",
         "start_state": "",
         "end_state": null,
-        "start_revision": 0,
-        "end_revision": null,
+        "start_object_version": 0,
+        "end_object_version": null,
         "started_at": "",
         "finished_at": null,
         "duration_ms": null,

@@ -93,6 +93,20 @@ class GroupService:
             group_code=group_code, user_id=user_id, removed_by=removed_by
         )
 
+    def update_group(
+        self,
+        *,
+        group_code: str,
+        updates: dict[str, object],
+        updated_by: str | None,
+    ) -> GroupRecord | None:
+        self.ensure_system_groups()
+        return self.repo.update_group(
+            group_code=group_code,
+            updates=dict(updates),
+            updated_by=updated_by,
+        )
+
     def get_group_codes_for_user(self, user_id: str | None) -> list[str]:
         self.ensure_system_groups()
         if not user_id:

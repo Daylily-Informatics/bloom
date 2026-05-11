@@ -91,7 +91,7 @@ class QueueCache(BaseModel):
 
 class ExecutionEnvelope(BaseModel):
     state: ExecutionState = ExecutionState.PENDING
-    revision: int = 1
+    object_version: int = 1
     next_queue_key: str | None = None
     next_action_key: str | None = None
     priority: int = 0
@@ -137,7 +137,7 @@ class ExecutionQueueDetail(ExecutionQueueSummary):
     retry_policy: QueueRetryPolicy
     selection_policy: QueueSelectionPolicy
     diagnostics_enabled: bool
-    revision: int
+    object_version: int
     disabled_reason: str | None = None
 
 
@@ -183,7 +183,7 @@ class WorkerDetail(WorkerSummary):
     disabled_reason: str | None = None
     last_error_at: str | None = None
     last_error_class: str | None = None
-    revision: int = 1
+    object_version: int = 1
 
 
 class LeaseSummary(BaseModel):
@@ -335,7 +335,7 @@ class CompleteQueueExecutionRequest(BaseModel):
     lease_euid: str
     action_key: str
     expected_state: ExecutionState
-    expected_revision: int | None = None
+    expected_object_version: int | None = None
     idempotency_key: str
     next_queue_key: str | None = None
     next_action_key: str | None = None
@@ -349,7 +349,7 @@ class FailQueueExecutionRequest(BaseModel):
     lease_euid: str
     action_key: str
     expected_state: ExecutionState
-    expected_revision: int | None = None
+    expected_object_version: int | None = None
     idempotency_key: str
     retryable: bool = True
     error_class: str | None = None
@@ -381,14 +381,14 @@ class RequeueSubjectRequest(BaseModel):
     ready_at: str | None = None
     due_at: str | None = None
     expected_state: ExecutionState | None = None
-    expected_revision: int | None = None
+    expected_object_version: int | None = None
     idempotency_key: str
 
 
 class CancelSubjectExecutionRequest(BaseModel):
     subject_euid: str
     expected_state: ExecutionState | None = None
-    expected_revision: int | None = None
+    expected_object_version: int | None = None
     idempotency_key: str
     reason: str | None = None
 

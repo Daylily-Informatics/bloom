@@ -107,7 +107,7 @@ def _queue_detail() -> dict:
                 ]
             },
             "diagnostics_enabled": True,
-            "revision": 1,
+            "object_version": 1,
             "disabled_reason": None,
         }
     )
@@ -137,7 +137,7 @@ def _worker_detail(worker_euid: str) -> dict:
         "disabled_reason": None,
         "last_error_at": None,
         "last_error_class": None,
-        "revision": 1,
+        "object_version": 1,
     }
 
 
@@ -168,7 +168,7 @@ def _subject_detail() -> dict:
         "template_code": "workflow_step/queue/all-purpose/1.0",
         "execution": {
             "state": "READY",
-            "revision": 2,
+            "object_version": 2,
             "next_queue_key": "extraction_prod",
             "next_action_key": "extract",
             "priority": 5,

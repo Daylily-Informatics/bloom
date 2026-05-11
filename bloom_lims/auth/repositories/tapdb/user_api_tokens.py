@@ -23,12 +23,11 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 from bloom_lims.config import get_settings
 
 TOKEN_TEMPLATE_CODE = "BBX/auth/user-api-token/1.0/"
-TOKEN_REVISION_TEMPLATE_CODE = "BBX/auth/user-api-token-revision/1.0/"
 TOKEN_USAGE_LOG_TEMPLATE_CODE = "BBX/auth/user-api-token-usage-log/1.0/"
 
 TOKEN_PREFIX = "BBX"
-TOKEN_REVISION_PREFIX = "BBX"
 TOKEN_USAGE_PREFIX = "BBX"
+_UNSET = object()
 
 
 def _parse_template_code(template_code: str) -> tuple[str, str, str, str]:
@@ -68,10 +67,10 @@ class UserTokenRecord:
 
 
 @dataclass(frozen=True)
-class UserTokenRevisionRecord:
+class UserTokenStateRecord:
     id: str
     token_id: str
-    revision_no: int
+    object_version: int
     token_hash: str
     status: str
     expires_at: datetime
@@ -101,7 +100,7 @@ class UserTokenUsageRecord:
 
 
 class TapdbUserAPITokenRepository:
-    """Stores token identities/revisions/usage using generic TapDB objects."""
+    """Stores token identities/state/usage using generic TapDB objects."""
 
     def __init__(self, db: Session):
         self.db = db
@@ -124,27 +123,15 @@ class TapdbUserAPITokenRepository:
         expires_at: datetime,
         created_by: str | None,
         note: str | None = None,
-    ) -> tuple[UserTokenRecord, UserTokenRevisionRecord]:
+    ) -> tuple[UserTokenRecord, UserTokenStateRecord]:
         self._ensure_templates_bootstrapped()
+        now = datetime.now(UTC)
         token_properties = {
             "user_id": str(user_id),
             "token_name": token_name,
             "token_prefix": token_prefix,
             "scope": scope,
-            "created_by": str(created_by) if created_by else None,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        token_id = ensure_public_id_property(token_properties, "id", prefix="tok")
-        token_instance = self.factory.create_instance(
-            session=self.db,
-            template_code=TOKEN_TEMPLATE_CODE,
-            name=token_name,
-            properties=token_properties,
-        )
-
-        revision_properties = {
-            "token_id": str(token_id),
-            "revision_no": 1,
+            "object_version": 1,
             "token_hash": token_hash,
             "status": "ACTIVE",
             "expires_at": expires_at.isoformat(),
@@ -154,28 +141,24 @@ class TapdbUserAPITokenRepository:
             "revocation_reason": None,
             "note": note,
             "created_by": str(created_by) if created_by else None,
-            "created_at": datetime.now(UTC).isoformat(),
+            "created_at": now.isoformat(),
+            "updated_by": str(created_by) if created_by else None,
+            "updated_at": now.isoformat(),
         }
-        ensure_public_id_property(revision_properties, "id", prefix="tokrev")
-        revision_instance = self.factory.create_instance(
+        ensure_public_id_property(token_properties, "id", prefix="tok")
+        token_instance = self.factory.create_instance(
             session=self.db,
-            template_code=TOKEN_REVISION_TEMPLATE_CODE,
-            name=f"{token_name} revision 1",
-            properties=revision_properties,
-        )
-        self.factory.link_instances(
-            session=self.db,
-            parent=token_instance,
-            child=revision_instance,
-            relationship_type="revision",
+            template_code=TOKEN_TEMPLATE_CODE,
+            name=token_name,
+            properties=token_properties,
         )
         self.db.commit()
 
         token = self._to_token(token_instance)
-        revision = self._to_revision(revision_instance)
-        if token is None or revision is None:
+        state = self._to_state(token_instance)
+        if token is None or state is None:
             raise ValueError("Failed to persist token")
-        return token, revision
+        return token, state
 
     def list_tokens(
         self,
@@ -199,7 +182,7 @@ class TapdbUserAPITokenRepository:
 
     def get_token(
         self, token_id: str
-    ) -> tuple[UserTokenRecord, UserTokenRevisionRecord] | None:
+    ) -> tuple[UserTokenRecord, UserTokenStateRecord] | None:
         self._ensure_templates_bootstrapped()
         token_instance = self._find_token_instance(token_id)
         if token_instance is None:
@@ -207,95 +190,78 @@ class TapdbUserAPITokenRepository:
         token = self._to_token(token_instance)
         if token is None:
             return None
-        revision = self.get_latest_revision(token.id)
-        if revision is None:
+        state = self._to_state(token_instance)
+        if state is None:
             return None
-        return token, revision
+        return token, state
 
-    def get_latest_revision(self, token_id: str) -> UserTokenRevisionRecord | None:
-        revisions: list[UserTokenRevisionRecord] = []
-        for revision_instance in self._instances_for_template(
-            TOKEN_REVISION_TEMPLATE_CODE
-        ):
-            revision = self._to_revision(revision_instance)
-            if revision is None:
-                continue
-            if revision.token_id != token_id:
-                continue
-            revisions.append(revision)
-        if not revisions:
+    def get_current_state(self, token_id: str) -> UserTokenStateRecord | None:
+        self._ensure_templates_bootstrapped()
+        token_instance = self._find_token_instance(token_id)
+        if token_instance is None:
             return None
-        revisions.sort(key=lambda row: row.revision_no, reverse=True)
-        return revisions[0]
+        return self._to_state(token_instance)
 
-    def create_revision(
+    def update_token_state(
         self,
         *,
         token_id: str,
-        revision_no: int,
-        token_hash: str,
-        status: str,
-        expires_at: datetime,
-        last_used_at: datetime | None,
-        revoked_at: datetime | None,
-        revoked_by: str | None,
-        revocation_reason: str | None,
-        created_by: str | None,
-        note: str | None,
-    ) -> UserTokenRevisionRecord:
+        status: str | None = None,
+        expires_at: datetime | None = None,
+        last_used_at: datetime | None | object = _UNSET,
+        revoked_at: datetime | None | object = _UNSET,
+        revoked_by: str | None | object = _UNSET,
+        revocation_reason: str | None | object = _UNSET,
+        updated_by: str | None = None,
+        note: str | None | object = _UNSET,
+    ) -> UserTokenStateRecord:
         self._ensure_templates_bootstrapped()
-        revision_properties = {
-            "token_id": str(token_id),
-            "revision_no": revision_no,
-            "token_hash": token_hash,
-            "status": status,
-            "expires_at": expires_at.isoformat(),
-            "last_used_at": last_used_at.isoformat() if last_used_at else None,
-            "revoked_at": revoked_at.isoformat() if revoked_at else None,
-            "revoked_by": str(revoked_by) if revoked_by else None,
-            "revocation_reason": revocation_reason,
-            "note": note,
-            "created_by": str(created_by) if created_by else None,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        ensure_public_id_property(revision_properties, "id", prefix="tokrev")
-        revision_instance = self.factory.create_instance(
-            session=self.db,
-            template_code=TOKEN_REVISION_TEMPLATE_CODE,
-            name=f"token-{token_id} revision {revision_no}",
-            properties=revision_properties,
-        )
         token_instance = self._find_token_instance(token_id)
-        if token_instance is not None:
-            self.factory.link_instances(
-                session=self.db,
-                parent=token_instance,
-                child=revision_instance,
-                relationship_type="revision",
+        if token_instance is None:
+            raise ValueError(f"Unknown token_id: {token_id}")
+
+        props = self._props(token_instance)
+        object_version = self._require_object_version(props, object_type="token")
+        if status is not None:
+            props["status"] = status
+        if expires_at is not None:
+            props["expires_at"] = expires_at.isoformat()
+        if last_used_at is not _UNSET:
+            props["last_used_at"] = (
+                last_used_at.isoformat() if isinstance(last_used_at, datetime) else None
             )
+        if revoked_at is not _UNSET:
+            props["revoked_at"] = (
+                revoked_at.isoformat() if isinstance(revoked_at, datetime) else None
+            )
+        if revoked_by is not _UNSET:
+            props["revoked_by"] = str(revoked_by) if revoked_by else None
+        if revocation_reason is not _UNSET:
+            props["revocation_reason"] = revocation_reason
+        if note is not _UNSET:
+            props["note"] = note
+        props["object_version"] = object_version + 1
+        props["updated_by"] = str(updated_by) if updated_by else None
+        props["updated_at"] = datetime.now(UTC).isoformat()
+        self._write_props(token_instance, props)
         self.db.commit()
-        record = self._to_revision(revision_instance)
+        record = self._to_state(token_instance)
         if record is None:
-            raise ValueError("Failed to persist token revision")
+            raise ValueError("Failed to persist token state")
         return record
 
-    def find_latest_revision_by_hash(
+    def find_current_state_by_hash(
         self, token_hash: str
-    ) -> UserTokenRevisionRecord | None:
-        revisions: list[UserTokenRevisionRecord] = []
-        for revision_instance in self._instances_for_template(
-            TOKEN_REVISION_TEMPLATE_CODE
-        ):
-            revision = self._to_revision(revision_instance)
-            if revision is None:
+    ) -> UserTokenStateRecord | None:
+        self._ensure_templates_bootstrapped()
+        for token_instance in self._instances_for_template(TOKEN_TEMPLATE_CODE):
+            state = self._to_state(token_instance)
+            if state is None:
                 continue
-            if revision.token_hash != token_hash:
+            if state.token_hash != token_hash:
                 continue
-            revisions.append(revision)
-        if not revisions:
-            return None
-        revisions.sort(key=lambda row: row.revision_no, reverse=True)
-        return revisions[0]
+            return state
+        return None
 
     def log_usage(
         self,
@@ -388,21 +354,26 @@ class TapdbUserAPITokenRepository:
             euid=token_instance.euid,
         )
 
-    def _to_revision(
-        self, revision_instance: generic_instance
-    ) -> UserTokenRevisionRecord | None:
-        props = self._props(revision_instance)
-        token_id = normalize_public_id(props.get("token_id"))
-        revision_id = resolve_public_id(revision_instance, props, prefix="tokrev")
+    def _to_state(
+        self, token_instance: generic_instance
+    ) -> UserTokenStateRecord | None:
+        props = self._props(token_instance)
+        token_id = resolve_public_id(token_instance, props, prefix="tok")
         expires_at = _to_dt(props.get("expires_at"))
-        if token_id is None or expires_at is None:
+        token_hash = str(props.get("token_hash") or "")
+        status = str(props.get("status") or "")
+        if not token_hash or not status or expires_at is None:
             return None
-        return UserTokenRevisionRecord(
-            id=revision_id,
+        try:
+            object_version = int(props["object_version"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        return UserTokenStateRecord(
+            id=token_id,
             token_id=token_id,
-            revision_no=int(props.get("revision_no", 0)),
-            token_hash=str(props.get("token_hash") or ""),
-            status=str(props.get("status") or "UNKNOWN"),
+            object_version=object_version,
+            token_hash=token_hash,
+            status=status,
             expires_at=expires_at,
             last_used_at=_to_dt(props.get("last_used_at")),
             revoked_at=_to_dt(props.get("revoked_at")),
@@ -410,8 +381,8 @@ class TapdbUserAPITokenRepository:
             revocation_reason=props.get("revocation_reason"),
             note=props.get("note"),
             created_by=normalize_public_id(props.get("created_by")),
-            created_at=_to_dt(props.get("created_at")) or revision_instance.created_dt,
-            euid=revision_instance.euid,
+            created_at=_to_dt(props.get("created_at")) or token_instance.created_dt,
+            euid=token_instance.euid,
         )
 
     def _to_usage(
@@ -464,7 +435,6 @@ class TapdbUserAPITokenRepository:
             self.db,
             [
                 (TOKEN_TEMPLATE_CODE, TOKEN_PREFIX),
-                (TOKEN_REVISION_TEMPLATE_CODE, TOKEN_REVISION_PREFIX),
                 (TOKEN_USAGE_LOG_TEMPLATE_CODE, TOKEN_USAGE_PREFIX),
             ],
             app_name="Bloom",
@@ -503,3 +473,18 @@ class TapdbUserAPITokenRepository:
         payload["properties"] = properties
         instance.json_addl = payload
         flag_modified(instance, "json_addl")
+
+    def _require_object_version(
+        self, properties: dict[str, Any], *, object_type: str
+    ) -> int:
+        try:
+            object_version = int(properties["object_version"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"{object_type} object is missing properties.object_version"
+            ) from exc
+        if object_version < 1:
+            raise ValueError(
+                f"{object_type} object has invalid properties.object_version"
+            )
+        return object_version

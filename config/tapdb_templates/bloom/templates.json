@@ -2596,7 +2596,7 @@
           "disabled_reason": null,
           "last_error_at": null,
           "last_error_class": null,
-          "revision": 1
+          "object_version": 1
         },
         "singleton": "0",
         "semantic_category": "actor"
@@ -2639,23 +2639,6 @@
         },
         "instantiation_layouts": [],
         "semantic_category": "actor"
-      }
-    },
-    {
-      "name": "Bloom User API Token Revision",
-      "polymorphic_discriminator": "generic_template",
-      "category": "BBX",
-      "type": "auth",
-      "subtype": "user-api-token-revision",
-      "version": "1.0",
-      "instance_prefix": "BBX",
-      "instance_polymorphic_identity": "generic_instance",
-      "bstatus": "active",
-      "is_singleton": false,
-      "json_addl": {
-        "managed_by": "bloom",
-        "domain": "auth",
-        "semantic_category": "bloom"
       }
     },
     {
@@ -2722,23 +2705,6 @@
       "category": "BBX",
       "type": "auth",
       "subtype": "user-group-membership",
-      "version": "1.0",
-      "instance_prefix": "BBX",
-      "instance_polymorphic_identity": "generic_instance",
-      "bstatus": "active",
-      "is_singleton": false,
-      "json_addl": {
-        "managed_by": "bloom",
-        "domain": "auth",
-        "semantic_category": "bloom"
-      }
-    },
-    {
-      "name": "Bloom User Group Revision",
-      "polymorphic_discriminator": "generic_template",
-      "category": "BBX",
-      "type": "auth",
-      "subtype": "user-group-revision",
       "version": "1.0",
       "instance_prefix": "BBX",
       "instance_polymorphic_identity": "generic_instance",
@@ -6120,8 +6086,8 @@
           "expected_state": "",
           "start_state": "",
           "end_state": null,
-          "start_revision": 0,
-          "end_revision": null,
+          "start_object_version": 0,
+          "end_object_version": null,
           "started_at": "",
           "finished_at": null,
           "duration_ms": null,
@@ -6232,7 +6198,7 @@
             ]
           },
           "diagnostics_enabled": true,
-          "revision": 1,
+          "object_version": 1,
           "disabled_reason": null
         },
         "singleton": "0",
@@ -6276,7 +6242,7 @@
           "ttl_seconds": 900,
           "next_action_key": null,
           "idempotency_key": "",
-          "subject_revision_at_claim": 0,
+          "subject_object_version_at_claim": 0,
           "payload_hash": ""
         },
         "singleton": "0",

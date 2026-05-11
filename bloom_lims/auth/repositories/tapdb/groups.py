@@ -23,11 +23,9 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 from bloom_lims.config import get_settings
 
 GROUP_TEMPLATE_CODE = "BBX/auth/user-group/1.0/"
-GROUP_REVISION_TEMPLATE_CODE = "BBX/auth/user-group-revision/1.0/"
 GROUP_MEMBERSHIP_TEMPLATE_CODE = "BBX/auth/user-group-membership/1.0/"
 
 GROUP_PREFIX = "BBX"
-GROUP_REVISION_PREFIX = "BBX"
 GROUP_MEMBERSHIP_PREFIX = "BBX"
 
 
@@ -64,7 +62,7 @@ class GroupRecord:
     description: str | None
     is_system_group: bool
     is_active: bool
-    revision_no: int
+    object_version: int
     created_at: datetime | None
     euid: str | None = None
 
@@ -122,7 +120,7 @@ class TapdbGroupRepository:
             if not include_inactive and not group.is_active:
                 continue
             groups.append(group)
-        groups.sort(key=lambda row: (row.group_code, row.revision_no))
+        groups.sort(key=lambda row: (row.group_code, row.object_version))
         return groups
 
     def get_group_by_code(self, group_code: str) -> GroupRecord | None:
@@ -246,6 +244,50 @@ class TapdbGroupRepository:
         self.db.commit()
         return self._to_membership(membership_instance, group_code=group.group_code)
 
+    def update_group(
+        self,
+        *,
+        group_code: str,
+        updates: dict[str, Any],
+        updated_by: str | None,
+    ) -> GroupRecord | None:
+        self._ensure_templates_bootstrapped()
+        unsupported = sorted(set(updates) - {"name", "description", "is_active"})
+        if unsupported:
+            raise ValueError("Unsupported group update fields: " + ", ".join(unsupported))
+
+        group = self.get_group_by_code(group_code)
+        if group is None:
+            return None
+        group_instance = self._find_group_instance(group.id)
+        if group_instance is None:
+            return None
+
+        props = self._props(group_instance)
+        if updates:
+            if "name" in updates:
+                name = str(updates["name"] or "").strip()
+                if not name:
+                    raise ValueError("Group name cannot be empty")
+                props["name"] = name
+                group_instance.name = name
+            if "description" in updates:
+                description = updates["description"]
+                props["description"] = (
+                    str(description) if description is not None else None
+                )
+            if "is_active" in updates:
+                props["is_active"] = bool(updates["is_active"])
+            props["object_version"] = (
+                self._require_object_version(props, object_type="group") + 1
+            )
+            props["updated_by"] = str(updated_by) if updated_by else None
+            props["updated_at"] = datetime.now(UTC).isoformat()
+            self._write_props(group_instance, props)
+            self.db.commit()
+
+        return self._to_group(group_instance)
+
     def _list_memberships(
         self,
         *,
@@ -304,43 +346,23 @@ class TapdbGroupRepository:
     ) -> GroupRecord:
         group_properties = {
             "group_code": group_code,
+            "name": name,
+            "description": description,
             "is_system_group": bool(is_system_group),
             "is_active": True,
+            "object_version": 1,
             "created_by": str(created_by) if created_by else None,
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_by": str(created_by) if created_by else None,
+            "updated_at": datetime.now(UTC).isoformat(),
         }
-        group_public_id = ensure_public_id_property(
-            group_properties, "id", prefix="grp"
-        )
+        ensure_public_id_property(group_properties, "id", prefix="grp")
 
         group_instance = self.factory.create_instance(
             session=self.db,
             template_code=GROUP_TEMPLATE_CODE,
             name=name,
             properties=group_properties,
-        )
-
-        revision_properties = {
-            "group_id": str(group_public_id),
-            "revision_no": 1,
-            "name": name,
-            "description": description,
-            "is_active": True,
-            "is_system_group": bool(is_system_group),
-            "created_by": str(created_by) if created_by else None,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        ensure_public_id_property(revision_properties, "id", prefix="grev")
-        revision_instance = self.factory.create_instance(
-            session=self.db,
-            template_code=GROUP_REVISION_TEMPLATE_CODE,
-            name=f"{group_code} revision 1",
-            properties=revision_properties,
-        )
-        self.factory.link_instances(
-            session=self.db,
-            parent=group_instance,
-            child=revision_instance,
-            relationship_type="revision",
         )
 
         group = self._to_group(group_instance)
@@ -354,24 +376,19 @@ class TapdbGroupRepository:
         if not group_code:
             return None
         group_id = resolve_public_id(group_instance, props, prefix="grp")
-        revision = self._latest_revision_for_group(group_id)
-        revision_props = self._props(revision) if revision is not None else {}
+        try:
+            object_version = int(props["object_version"])
+        except (KeyError, TypeError, ValueError):
+            return None
         return GroupRecord(
             id=group_id,
             group_code=group_code,
-            name=str(revision_props.get("name") or group_instance.name or group_code),
-            description=revision_props.get("description"),
-            is_system_group=bool(
-                revision_props.get(
-                    "is_system_group", props.get("is_system_group", False)
-                )
-            ),
-            is_active=bool(
-                revision_props.get("is_active", props.get("is_active", True))
-            ),
-            revision_no=int(revision_props.get("revision_no", 1)),
-            created_at=_to_dt(revision_props.get("created_at"))
-            or group_instance.created_dt,
+            name=str(props.get("name") or group_instance.name or group_code),
+            description=props.get("description"),
+            is_system_group=bool(props.get("is_system_group", False)),
+            is_active=bool(props.get("is_active", True)),
+            object_version=object_version,
+            created_at=_to_dt(props.get("created_at")) or group_instance.created_dt,
             euid=group_instance.euid,
         )
 
@@ -411,22 +428,6 @@ class TapdbGroupRepository:
             euid=membership_instance.euid,
         )
 
-    def _latest_revision_for_group(self, group_id: str) -> generic_instance | None:
-        revisions: list[generic_instance] = []
-        for revision_instance in self._instances_for_template(
-            GROUP_REVISION_TEMPLATE_CODE
-        ):
-            props = self._props(revision_instance)
-            if normalize_public_id(props.get("group_id")) != group_id:
-                continue
-            revisions.append(revision_instance)
-        if not revisions:
-            return None
-        revisions.sort(
-            key=lambda row: int(self._props(row).get("revision_no", 0)), reverse=True
-        )
-        return revisions[0]
-
     def _instances_for_template(self, template_code: str) -> list[generic_instance]:
         category, type_name, subtype, version = _parse_template_code(template_code)
         stmt = (
@@ -450,7 +451,6 @@ class TapdbGroupRepository:
             self.db,
             [
                 (GROUP_TEMPLATE_CODE, GROUP_PREFIX),
-                (GROUP_REVISION_TEMPLATE_CODE, GROUP_REVISION_PREFIX),
                 (GROUP_MEMBERSHIP_TEMPLATE_CODE, GROUP_MEMBERSHIP_PREFIX),
             ],
             app_name="Bloom",
@@ -489,3 +489,18 @@ class TapdbGroupRepository:
         payload["properties"] = properties
         instance.json_addl = payload
         flag_modified(instance, "json_addl")
+
+    def _require_object_version(
+        self, properties: dict[str, Any], *, object_type: str
+    ) -> int:
+        try:
+            object_version = int(properties["object_version"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"{object_type} object is missing properties.object_version"
+            ) from exc
+        if object_version < 1:
+            raise ValueError(
+                f"{object_type} object has invalid properties.object_version"
+            )
+        return object_version
