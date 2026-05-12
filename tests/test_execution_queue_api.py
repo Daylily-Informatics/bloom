@@ -72,6 +72,11 @@ def _queue_summary() -> dict:
         "queue_depth": 3,
         "oldest_job_age_seconds": 12.0,
         "newest_job_age_seconds": 1.0,
+        "average_job_age_seconds": 6.5,
+        "p50_job_age_seconds": 5.0,
+        "p95_job_age_seconds": 12.0,
+        "straggler_threshold_seconds": 86400.0,
+        "straggler_count": 0,
         "active_leases": 1,
         "held_count": 0,
         "dead_letter_count": 0,
@@ -224,6 +229,7 @@ def _queue_item() -> dict:
         "attempt_count": 1,
         "created_at": datetime.now(UTC).isoformat(),
         "queue_ready_timestamp": "2026-04-08T21:00:00+00:00",
+        "queue_residence_seconds": 300.0,
     }
 
 
@@ -264,6 +270,20 @@ class _FakeExecutionQueueService:
         payload = _queue_item()
         payload["next_queue_key"] = queue_key
         return [payload]
+
+    def list_queue_stragglers(
+        self, queue_key: str, *, threshold_seconds: float | None = None
+    ):
+        payload = _queue_item()
+        payload["next_queue_key"] = queue_key
+        payload["straggler_threshold_seconds"] = threshold_seconds or 60.0
+        return [payload]
+
+    def get_queue_stats(self, queue_key: str):
+        payload = _queue_summary()
+        payload["queue_key"] = queue_key
+        payload["generated_at"] = "2026-04-08T21:05:00+00:00"
+        return payload
 
     def get_subject_detail(self, euid: str):
         payload = _subject_detail()
@@ -405,6 +425,36 @@ class _FakeExecutionQueueService:
             "result": {"queue_key": payload.queue_key},
         }
 
+    def force_add_queue_item(self, payload, *, executed_by: str):
+        return {
+            "status": "force_added",
+            "action_key": "force_add_queue_item",
+            "subject_euid": payload.subject_euid,
+            "replayed": False,
+            "result": {"queue_key": payload.queue_key, "reason": payload.reason},
+        }
+
+    def force_remove_queue_item(self, payload, *, executed_by: str):
+        return {
+            "status": "force_removed",
+            "action_key": "force_remove_queue_item",
+            "subject_euid": payload.subject_euid,
+            "replayed": False,
+            "result": {"queue_key": payload.queue_key, "reason": payload.reason},
+        }
+
+    def update_queue_policy(self, queue_key: str, payload, *, executed_by: str):
+        return {
+            "status": "policy_updated",
+            "action_key": "update_queue_policy",
+            "subject_euid": "WQ_EXTRACT",
+            "replayed": False,
+            "result": {
+                "queue_key": queue_key,
+                "straggler_threshold_seconds": payload.straggler_threshold_seconds,
+            },
+        }
+
     def cancel_subject_execution(self, payload, *, executed_by: str):
         return {
             "status": "canceled",
@@ -501,6 +551,27 @@ def test_execution_queue_router_covers_remaining_runtime_routes(monkeypatch):
         queue_items = client.get("/api/v1/execution/queues/extraction_prod/items")
         assert queue_items.status_code == 200, queue_items.text
         assert queue_items.json()[0]["subject_euid"] == "SUBJ-1"
+
+        stragglers = client.get(
+            "/api/v1/execution/queues/extraction_prod/stragglers?threshold_seconds=60"
+        )
+        assert stragglers.status_code == 200, stragglers.text
+        assert stragglers.json()[0]["straggler_threshold_seconds"] == 60.0
+
+        stats = client.get("/api/v1/execution/queues/extraction_prod/stats")
+        assert stats.status_code == 200, stats.text
+        assert stats.json()["p95_job_age_seconds"] == 12.0
+
+        policy = client.patch(
+            "/api/v1/execution/queues/extraction_prod/policy",
+            json={
+                "idempotency_key": "idem-policy",
+                "straggler_threshold_seconds": 3600,
+                "selection_policy": {"order": ["ready_at_asc", "euid_asc"]},
+            },
+        )
+        assert policy.status_code == 200, policy.text
+        assert policy.json()["action_key"] == "update_queue_policy"
 
         subject = client.get("/api/v1/execution/subjects/SUBJ-1")
         assert subject.status_code == 200, subject.text
@@ -633,6 +704,32 @@ def test_execution_queue_router_covers_remaining_runtime_routes(monkeypatch):
         )
         assert requeue.status_code == 200, requeue.text
         assert requeue.json()["status"] == "requeued"
+
+        force_add = client.post(
+            "/api/v1/execution/actions/force-add",
+            json={
+                "subject_euid": "SUBJ-1",
+                "queue_key": "extraction_prod",
+                "next_action_key": "extract",
+                "priority": 99,
+                "reason": "manual beta override",
+                "idempotency_key": "idem-force-add",
+            },
+        )
+        assert force_add.status_code == 200, force_add.text
+        assert force_add.json()["action_key"] == "force_add_queue_item"
+
+        force_remove = client.post(
+            "/api/v1/execution/actions/force-remove",
+            json={
+                "subject_euid": "SUBJ-1",
+                "queue_key": "extraction_prod",
+                "reason": "manual exception routing",
+                "idempotency_key": "idem-force-remove",
+            },
+        )
+        assert force_remove.status_code == 200, force_remove.text
+        assert force_remove.json()["action_key"] == "force_remove_queue_item"
 
         cancel = client.post(
             "/api/v1/execution/actions/cancel",

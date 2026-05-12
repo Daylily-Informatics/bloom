@@ -26,9 +26,13 @@ from bloom_lims.schemas.execution_queue import (
     ExecutionQueueSummary,
     ExpireQueueLeaseRequest,
     FailQueueExecutionRequest,
+    ForceAddQueueItemRequest,
+    ForceRemoveQueueItemRequest,
     HeartbeatWorkerRequest,
     LeaseSummary,
     PlaceExecutionHoldRequest,
+    QueueStatsResponse,
+    QueueStragglerItem,
     RegisterWorkerRequest,
     ReleaseExecutionHoldRequest,
     ReleaseQueueLeaseRequest,
@@ -36,6 +40,7 @@ from bloom_lims.schemas.execution_queue import (
     RequeueSubjectRequest,
     SubjectExecutionDetail,
     SubjectExecutionHistory,
+    UpdateQueuePolicyRequest,
     WorkerDetail,
     WorkerSummary,
 )
@@ -109,6 +114,49 @@ async def list_queue_items(queue_key: str, user: APIUser = Depends(_require_read
         service.close()
 
 
+@router.get("/queues/{queue_key}/stragglers", response_model=list[QueueStragglerItem])
+async def list_queue_stragglers(
+    queue_key: str,
+    threshold_seconds: float | None = Query(None),
+    user: APIUser = Depends(_require_read),
+):
+    service = ExecutionQueueService(app_username=user.email)
+    try:
+        return service.list_queue_stragglers(
+            queue_key, threshold_seconds=threshold_seconds
+        )
+    except Exception as exc:
+        _raise_execution_http_error(exc)
+    finally:
+        service.close()
+
+
+@router.get("/queues/{queue_key}/stats", response_model=QueueStatsResponse)
+async def get_queue_stats(queue_key: str, user: APIUser = Depends(_require_read)):
+    service = ExecutionQueueService(app_username=user.email)
+    try:
+        return service.get_queue_stats(queue_key)
+    except Exception as exc:
+        _raise_execution_http_error(exc)
+    finally:
+        service.close()
+
+
+@router.patch("/queues/{queue_key}/policy", response_model=ExecutionActionResponse)
+async def update_queue_policy(
+    queue_key: str,
+    payload: UpdateQueuePolicyRequest,
+    user: APIUser = Depends(_require_admin),
+):
+    service = ExecutionQueueService(app_username=user.email)
+    try:
+        return service.update_queue_policy(queue_key, payload, executed_by=user.email)
+    except Exception as exc:
+        _raise_execution_http_error(exc)
+    finally:
+        service.close()
+
+
 @router.get("/subjects/{euid}", response_model=SubjectExecutionDetail)
 async def get_subject_execution(euid: str, user: APIUser = Depends(_require_read)):
     service = ExecutionQueueService(app_username=user.email)
@@ -121,7 +169,9 @@ async def get_subject_execution(euid: str, user: APIUser = Depends(_require_read
 
 
 @router.get("/subjects/{euid}/history", response_model=SubjectExecutionHistory)
-async def get_subject_execution_history(euid: str, user: APIUser = Depends(_require_read)):
+async def get_subject_execution_history(
+    euid: str, user: APIUser = Depends(_require_read)
+):
     service = ExecutionQueueService(app_username=user.email)
     try:
         return service.get_subject_history(euid)
@@ -312,6 +362,34 @@ async def requeue_subject(
     service = ExecutionQueueService(app_username=user.email)
     try:
         return service.requeue_subject(payload, executed_by=user.email)
+    except Exception as exc:
+        _raise_execution_http_error(exc)
+    finally:
+        service.close()
+
+
+@router.post("/actions/force-add", response_model=ExecutionActionResponse)
+async def force_add_queue_item(
+    payload: ForceAddQueueItemRequest,
+    user: APIUser = Depends(_require_admin),
+):
+    service = ExecutionQueueService(app_username=user.email)
+    try:
+        return service.force_add_queue_item(payload, executed_by=user.email)
+    except Exception as exc:
+        _raise_execution_http_error(exc)
+    finally:
+        service.close()
+
+
+@router.post("/actions/force-remove", response_model=ExecutionActionResponse)
+async def force_remove_queue_item(
+    payload: ForceRemoveQueueItemRequest,
+    user: APIUser = Depends(_require_admin),
+):
+    service = ExecutionQueueService(app_username=user.email)
+    try:
+        return service.force_remove_queue_item(payload, executed_by=user.email)
     except Exception as exc:
         _raise_execution_http_error(exc)
     finally:

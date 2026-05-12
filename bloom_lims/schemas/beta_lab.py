@@ -177,6 +177,12 @@ class BetaExtractionCreateRequest(BaseModel):
     plate_template_code: str = Field(default="container/plate/fixed-plate-24/1.0")
     plate_name: str | None = None
     well_name: str
+    extraction_batch_euid: str | None = None
+    extraction_batch_name: str | None = None
+    extraction_run_euid: str | None = None
+    extraction_run_name: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
     extraction_type: Literal["cfdna", "gdna"] = Field(default="cfdna")
     output_name: str | None = None
     atlas_test_fulfillment_item_euid: str | None = None
@@ -190,6 +196,8 @@ class BetaExtractionResponse(BaseModel):
     plate_euid: str
     well_euid: str
     well_name: str
+    extraction_batch_euid: str | None = None
+    extraction_run_euid: str | None = None
     extraction_output_euid: str
     atlas_test_fulfillment_item_euid: str
     current_queue: str
@@ -201,6 +209,8 @@ class BetaPostExtractQCRequest(BaseModel):
     passed: bool
     next_queue: Literal["ilmn_lib_prep", "ont_lib_prep"] | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
+    quant_artifact_euid: str | None = None
+    quant_file_name: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -212,7 +222,9 @@ class BetaPostExtractQCRequest(BaseModel):
 
 class BetaPostExtractQCResponse(BaseModel):
     extraction_output_euid: str
+    qc_record_euid: str | None = None
     qc_passed: bool
+    next_queue: str | None = None
     current_queue: str | None
     idempotent_replay: bool = False
 
@@ -221,6 +233,8 @@ class BetaLibraryPrepCreateRequest(BaseModel):
     source_extraction_output_euid: str
     platform: Literal["ILMN", "ONT"]
     output_name: str | None = None
+    library_plate_euid: str | None = None
+    library_well_name: str | None = None
     claim_euid: str | None = None
     consume_source: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -268,6 +282,8 @@ class BetaRunAssignmentInput(BaseModel):
     lane: str
     library_barcode: str
     library_prep_output_euid: str
+    library_material_euid: str | None = None
+    barcode_reagent_euid: str | None = None
 
 
 class BetaRunArtifactInput(BaseModel):
