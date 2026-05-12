@@ -103,6 +103,7 @@ class ExecutionQueueService:
 
     DEFAULT_RETRY_POLICY = QueueRetryPolicy().model_dump()
     DEFAULT_SELECTION_POLICY = QueueSelectionPolicy().model_dump()
+    PERSISTENT_QUEUE_EXPECTED_FANOUT_MAX = 500
 
     WETLAB_QUEUE_DEFAULTS: dict[str, dict[str, Any]] = {
         "extraction_prod": {
@@ -1270,23 +1271,31 @@ class ExecutionQueueService:
             "diagnostics_enabled": True,
             "revision": 1,
             "disabled_reason": None,
-            "graph": {
-                "node_role": "execution_queue",
-                "role": "bloom_execution_queue",
-                "expected_fanout_max": int(defaults.get("max_attempts_default") or 5) * 2,
-                "fanout_reason": "execution queue intentionally links bounded queue leases and records",
-                "expected_fanout": [
-                    {
-                        "scope": "same_service",
-                        "relationship_types": [
-                            self.REL_QUEUE_LEASE,
-                            self.REL_QUEUE_RECORD,
-                        ],
-                        "max_child_count": int(defaults.get("max_attempts_default") or 5) * 2,
-                        "reason": "execution queue intentionally links bounded queue leases and records",
-                    }
-                ],
-            },
+            "graph": self._persistent_queue_graph_metadata(),
+        }
+
+    def _persistent_queue_graph_metadata(self) -> dict[str, Any]:
+        fanout_max = self.PERSISTENT_QUEUE_EXPECTED_FANOUT_MAX
+        reason = (
+            "persistent execution queues retain bounded queue lease and "
+            "execution record history"
+        )
+        return {
+            "node_role": "execution_queue",
+            "role": "bloom_execution_queue",
+            "expected_fanout_max": fanout_max,
+            "fanout_reason": reason,
+            "expected_fanout": [
+                {
+                    "scope": "same_service",
+                    "relationship_types": [
+                        self.REL_QUEUE_LEASE,
+                        self.REL_QUEUE_RECORD,
+                    ],
+                    "max_child_count": fanout_max,
+                    "reason": reason,
+                }
+            ],
         }
 
     def _create_dead_letter(
