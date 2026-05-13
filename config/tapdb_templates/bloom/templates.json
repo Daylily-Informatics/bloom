@@ -140,6 +140,29 @@
       }
     },
     {
+      "name": "Record Library QC",
+      "polymorphic_discriminator": "action_template",
+      "category": "BAC",
+      "type": "beta_lab",
+      "subtype": "record_library_qc",
+      "version": "1.0",
+      "instance_prefix": "BAC",
+      "instance_polymorphic_identity": "action_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "managed_by": "bloom",
+        "domain": "beta_lab",
+        "action_definition": {
+          "action_group": "beta_lab",
+          "action_key": "record_library_qc",
+          "name": "Record Library QC",
+          "description": "Records ILMN library QC and optional queue progression."
+        },
+        "semantic_category": "action"
+      }
+    },
+    {
       "name": "Create Run",
       "polymorphic_discriminator": "action_template",
       "category": "BAC",

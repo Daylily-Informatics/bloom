@@ -12,10 +12,13 @@ CanonicalQueueName = Literal[
     "post_extract_qc",
     "ilmn_lib_prep",
     "ont_lib_prep",
+    "ilmn_lib_qc",
     "ilmn_seq_pool",
     "ont_seq_pool",
     "ilmn_start_seq_run",
     "ont_start_seq_run",
+    "post_extract_exception",
+    "ilmn_lib_qc_exception",
 ]
 
 
@@ -207,7 +210,7 @@ class BetaExtractionResponse(BaseModel):
 class BetaPostExtractQCRequest(BaseModel):
     extraction_output_euid: str
     passed: bool
-    next_queue: Literal["ilmn_lib_prep", "ont_lib_prep"] | None = None
+    next_queue: Literal["ilmn_lib_prep", "post_extract_exception"] | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
     quant_artifact_euid: str | None = None
     quant_file_name: str | None = None
@@ -217,6 +220,10 @@ class BetaPostExtractQCRequest(BaseModel):
     def validate_next_queue(self) -> "BetaPostExtractQCRequest":
         if self.passed and not self.next_queue:
             raise ValueError("next_queue is required when passed=true")
+        if self.passed and self.next_queue != "ilmn_lib_prep":
+            raise ValueError("ILMN proband beta only supports next_queue=ilmn_lib_prep")
+        if not self.passed and self.next_queue == "ilmn_lib_prep":
+            raise ValueError("failed post-extract QC cannot route to ilmn_lib_prep")
         return self
 
 
@@ -231,7 +238,7 @@ class BetaPostExtractQCResponse(BaseModel):
 
 class BetaLibraryPrepCreateRequest(BaseModel):
     source_extraction_output_euid: str
-    platform: Literal["ILMN", "ONT"]
+    platform: Literal["ILMN"]
     output_name: str | None = None
     library_plate_euid: str | None = None
     library_well_name: str | None = None
@@ -252,9 +259,36 @@ class BetaLibraryPrepResponse(BaseModel):
     idempotent_replay: bool = False
 
 
+class BetaLibraryQCRequest(BaseModel):
+    library_material_euid: str
+    passed: bool
+    next_queue: Literal["ilmn_seq_pool", "ilmn_lib_qc_exception"] | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_next_queue(self) -> "BetaLibraryQCRequest":
+        if self.passed and not self.next_queue:
+            raise ValueError("next_queue is required when passed=true")
+        if self.passed and self.next_queue != "ilmn_seq_pool":
+            raise ValueError("ILMN proband beta only supports next_queue=ilmn_seq_pool")
+        if not self.passed and self.next_queue == "ilmn_seq_pool":
+            raise ValueError("failed library QC cannot route to ilmn_seq_pool")
+        return self
+
+
+class BetaLibraryQCResponse(BaseModel):
+    library_material_euid: str
+    qc_record_euid: str | None = None
+    qc_passed: bool
+    next_queue: str | None = None
+    current_queue: str | None
+    idempotent_replay: bool = False
+
+
 class BetaPoolCreateRequest(BaseModel):
     member_euids: list[str]
-    platform: Literal["ILMN", "ONT"]
+    platform: Literal["ILMN"]
     pool_name: str | None = None
     claim_euid: str | None = None
     consume_members: bool = False
@@ -297,7 +331,7 @@ class BetaRunArtifactInput(BaseModel):
 
 class BetaRunCreateRequest(BaseModel):
     pool_euid: str
-    platform: Literal["ILMN", "ONT"]
+    platform: Literal["ILMN"]
     flowcell_id: str
     run_name: str | None = None
     status: Literal["started", "completed"] = Field(default="completed")

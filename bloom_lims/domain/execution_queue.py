@@ -161,6 +161,15 @@ class ExecutionQueueService:
             ],
             "required_worker_capabilities": ["wetlab.library_prep", "platform.ILMN"],
         },
+        "ilmn_lib_qc": {
+            "display_name": "Illumina Library QC",
+            "dispatch_priority": 100,
+            "subject_template_codes": [
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
+            "required_worker_capabilities": ["wetlab.library_qc", "platform.ILMN"],
+        },
         "ont_lib_prep": {
             "display_name": "ONT Library Prep",
             "dispatch_priority": 100,
@@ -201,6 +210,24 @@ class ExecutionQueueService:
             "dispatch_priority": 100,
             "subject_template_codes": ["content/pool/generic/1.0"],
             "required_worker_capabilities": ["wetlab.run_start", "platform.ONT"],
+        },
+        "post_extract_exception": {
+            "display_name": "Post-Extract QC Exception",
+            "dispatch_priority": 10,
+            "subject_template_codes": [
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
+            "required_worker_capabilities": ["wetlab.exception_review"],
+        },
+        "ilmn_lib_qc_exception": {
+            "display_name": "Illumina Library QC Exception",
+            "dispatch_priority": 10,
+            "subject_template_codes": [
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
+            "required_worker_capabilities": ["wetlab.exception_review", "platform.ILMN"],
         },
     }
 

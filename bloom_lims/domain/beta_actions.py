@@ -71,6 +71,10 @@ _ACTION_TEMPLATE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Create Library Prep",
         "description": "Creates a Bloom beta library-prep output from an extraction output.",
     },
+    "record_library_qc": {
+        "name": "Record Library QC",
+        "description": "Records ILMN library QC and queue progression.",
+    },
     "create_pool": {
         "name": "Create Pool",
         "description": "Creates a Bloom beta sequencing pool from library-prep outputs.",

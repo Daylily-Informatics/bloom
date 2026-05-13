@@ -63,6 +63,9 @@ class BetaLabService(
         "ILMN": "ilmn_lib_prep",
         "ONT": "ont_lib_prep",
     }
+    LIB_QC_QUEUE_BY_PLATFORM = {
+        "ILMN": "ilmn_lib_qc",
+    }
     SEQ_POOL_QUEUE_BY_PLATFORM = {
         "ILMN": "ilmn_seq_pool",
         "ONT": "ont_seq_pool",
@@ -77,10 +80,13 @@ class BetaLabService(
         "post_extract_qc",
         "ilmn_lib_prep",
         "ont_lib_prep",
+        "ilmn_lib_qc",
         "ilmn_seq_pool",
         "ont_seq_pool",
         "ilmn_start_seq_run",
         "ont_start_seq_run",
+        "post_extract_exception",
+        "ilmn_lib_qc_exception",
     )
     NEXT_ACTION_BY_QUEUE = {
         "extraction_prod": "create_extraction",
@@ -88,10 +94,13 @@ class BetaLabService(
         "post_extract_qc": "record_post_extract_qc",
         "ilmn_lib_prep": "create_library_prep",
         "ont_lib_prep": "create_library_prep",
+        "ilmn_lib_qc": "record_library_qc",
         "ilmn_seq_pool": "create_pool",
         "ont_seq_pool": "create_pool",
         "ilmn_start_seq_run": "create_run",
         "ont_start_seq_run": "create_run",
+        "post_extract_exception": "review_post_extract_qc_failure",
+        "ilmn_lib_qc_exception": "review_library_qc_failure",
     }
     QUEUE_CAPABILITIES = {
         "extraction_prod": ["wetlab.extraction"],
@@ -99,10 +108,13 @@ class BetaLabService(
         "post_extract_qc": ["wetlab.post_extract_qc"],
         "ilmn_lib_prep": ["wetlab.library_prep", "platform.ILMN"],
         "ont_lib_prep": ["wetlab.library_prep", "platform.ONT"],
+        "ilmn_lib_qc": ["wetlab.library_qc", "platform.ILMN"],
         "ilmn_seq_pool": ["wetlab.pooling", "platform.ILMN"],
         "ont_seq_pool": ["wetlab.pooling", "platform.ONT"],
         "ilmn_start_seq_run": ["wetlab.run_start", "platform.ILMN"],
         "ont_start_seq_run": ["wetlab.run_start", "platform.ONT"],
+        "post_extract_exception": ["wetlab.exception_review"],
+        "ilmn_lib_qc_exception": ["wetlab.exception_review", "platform.ILMN"],
     }
 
     def __init__(

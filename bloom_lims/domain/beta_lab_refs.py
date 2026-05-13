@@ -9,6 +9,22 @@ from bloom_lims.template_identity import instance_semantic_category
 
 
 class _BetaLabReferenceMixin:
+    _FULFILLMENT_CONTEXT_PARENT_RELATIONSHIPS = frozenset(
+        {
+            "contains",
+            "beta_assignment_source",
+            "beta_assignment_library_material",
+            "beta_extraction_output",
+            "beta_extraction_run_input",
+            "beta_extraction_run_output",
+            "beta_library_material_output",
+            "beta_library_prep_output",
+            "beta_pool_member",
+            "beta_sequenced_library_assignment",
+            "beta_sequencing_run",
+        }
+    )
+
     def _resolve_fulfillment_item_context(
         self,
         instance,
@@ -53,6 +69,11 @@ class _BetaLabReferenceMixin:
                 refs[ref["atlas_test_fulfillment_item_euid"]] = ref
             for lineage in get_child_lineages(current):
                 if lineage.is_deleted:
+                    continue
+                if (
+                    lineage.relationship_type
+                    not in self._FULFILLMENT_CONTEXT_PARENT_RELATIONSHIPS
+                ):
                     continue
                 parent = lineage.parent_instance
                 if parent is None or parent.is_deleted:

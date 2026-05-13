@@ -11,6 +11,8 @@ from bloom_lims.schemas.beta_lab import (
     BetaExtractionResponse,
     BetaLibraryPrepCreateRequest,
     BetaLibraryPrepResponse,
+    BetaLibraryQCRequest,
+    BetaLibraryQCResponse,
     BetaPoolCreateRequest,
     BetaPoolResponse,
     BetaPostExtractQCRequest,
@@ -217,6 +219,35 @@ class _BetaLabStagesMixin:
             output.euid,
             relationship_type="contains",
         )
+        self._write_graph_metadata(
+            output,
+            node_role="extraction_output",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_extraction_output",
+                        "beta_extraction_run_output",
+                        "beta_library_material_output",
+                        "beta_library_prep_output",
+                        "beta_post_extract_qc",
+                        "contains",
+                    ],
+                    max_child_count=6,
+                    reason="extraction output links its specimen, run, well, QC, and library material handoff",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "has_external_reference",
+                    ],
+                    max_child_count=16,
+                    reason="extraction output carries bounded action, queue, and Atlas provenance links",
+                ),
+            ],
+        )
         self._attach_execution_metadata_lineage(output, normalized_metadata)
         self._replace_fulfillment_item_references(
             output, atlas_context=fulfillment_item_context
@@ -416,6 +447,7 @@ class _BetaLabStagesMixin:
             )
             next_queue = payload.next_queue
         else:
+            next_queue = payload.next_queue or "post_extract_exception"
             lease = self._resolve_stage_claim(
                 material=output,
                 expected_queues={"post_extract_qc"},
@@ -428,9 +460,12 @@ class _BetaLabStagesMixin:
                 action_key="record_post_extract_qc",
                 idempotency_key=idempotency_key
                 or f"complete:post_extract_qc:{output.euid}",
-                terminal=True,
+                next_queue_key=next_queue,
+                next_action_key="review_post_extract_qc_failure",
+                terminal=False,
                 result_payload={
                     "passed": False,
+                    "next_queue": next_queue,
                     "metrics": payload.metrics or {},
                 },
             )
@@ -559,14 +594,22 @@ class _BetaLabStagesMixin:
             node_role="bloom_library_prep_output",
             expected_fanout=[
                 self._graph_expected_fanout_entry(
-                    relationship_types=["beta_assignment_source"],
-                    max_child_count=1,
+                    relationship_types=[
+                        "beta_assignment_source",
+                        "beta_library_prep_output",
+                    ],
+                    max_child_count=2,
                     reason="library prep output can feed one sequencing assignment",
                 ),
                 self._graph_expected_fanout_entry(
-                    relationship_types=["beta_used_reagent", "executed_on"],
-                    max_child_count=4,
-                    reason="library prep output carries bounded reagent and execution links",
+                    relationship_types=[
+                        "beta_used_reagent",
+                        "executed_on",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "has_external_reference",
+                    ],
+                    max_child_count=10,
+                    reason="library prep output carries bounded reagent, action, and Atlas provenance links",
                 ),
             ],
         )
@@ -607,14 +650,27 @@ class _BetaLabStagesMixin:
             node_role="bloom_library_material",
             expected_fanout=[
                 self._graph_expected_fanout_entry(
-                    relationship_types=["beta_library_material_output", "beta_pool_member"],
-                    max_child_count=2,
-                    reason="library material intentionally links prep source and sequencing pool",
+                    relationship_types=[
+                        "beta_assignment_library_material",
+                        "beta_library_material_output",
+                        "beta_library_qc",
+                        "beta_pool_member",
+                    ],
+                    max_child_count=4,
+                    reason="library material intentionally links prep source, QC, assignment, and sequencing pool",
                 ),
                 self._graph_expected_fanout_entry(
-                    relationship_types=["contains", "beta_used_reagent", "executed_on"],
-                    max_child_count=6,
-                    reason="library material carries bounded container, reagent, and execution links",
+                    relationship_types=[
+                        "contains",
+                        "beta_used_reagent",
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "has_external_reference",
+                    ],
+                    max_child_count=18,
+                    reason="library material carries bounded container, reagent, queue, action, and Atlas provenance links",
                 ),
             ],
         )
@@ -651,21 +707,11 @@ class _BetaLabStagesMixin:
         )
         self._attach_execution_metadata_lineage(lib_output, normalized_metadata)
         self._attach_execution_metadata_lineage(library_material, normalized_metadata)
-        self.execution.queue_subject(
-            subject_euid=lib_output.euid,
-            queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
-            next_action_key="create_pool",
-            idempotency_key=(
-                f"{idempotency_key}:queue"
-                if idempotency_key
-                else f"queue:libprep:{lib_output.euid}"
-            ),
-            executed_by=self.bdb.app_username,
-        )
+        next_queue = self.LIB_QC_QUEUE_BY_PLATFORM[payload.platform]
         self.execution.queue_subject(
             subject_euid=library_material.euid,
-            queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
-            next_action_key="create_pool",
+            queue_key=next_queue,
+            next_action_key="record_library_qc",
             idempotency_key=(
                 f"{idempotency_key}:queue:material"
                 if idempotency_key
@@ -695,7 +741,7 @@ class _BetaLabStagesMixin:
             or f"complete:create_library_prep:{source.euid}",
             result_payload={
                 "library_prep_output_euid": lib_output.euid,
-                "queue_name": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+                "queue_name": next_queue,
             },
         )
         self._record_action(
@@ -720,7 +766,7 @@ class _BetaLabStagesMixin:
                 "library_container_euid": library_plate.euid,
                 "library_plate_euid": library_plate.euid,
                 "library_well_euid": library_well.euid,
-                "current_queue": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+                "current_queue": next_queue,
             },
         )
         self.bdb.session.commit()
@@ -734,7 +780,125 @@ class _BetaLabStagesMixin:
             atlas_test_fulfillment_item_euid=fulfillment_item_context[
                 "atlas_test_fulfillment_item_euid"
             ],
-            current_queue=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+            current_queue=next_queue,
+            idempotent_replay=False,
+        )
+
+    def record_library_qc(
+        self,
+        *,
+        payload: BetaLibraryQCRequest,
+        idempotency_key: str | None,
+    ) -> BetaLibraryQCResponse:
+        library_material = self._require_instance(payload.library_material_euid)
+        self._assert_not_reserved(library_material)
+        self._assert_not_consumed(library_material, stage_label="library_qc")
+        if idempotency_key:
+            existing = self._find_operation_record(
+                beta_kind="library_qc_result",
+                idempotency_key=idempotency_key,
+            )
+            if existing is not None:
+                existing_props = self._props(existing)
+                return BetaLibraryQCResponse(
+                    library_material_euid=library_material.euid,
+                    qc_record_euid=existing.euid,
+                    qc_passed=bool(existing_props.get("passed")),
+                    next_queue=str(existing_props.get("next_queue") or "") or None,
+                    current_queue=self._current_queue_for_instance(library_material),
+                    idempotent_replay=True,
+                )
+
+        current_queue = self._current_queue_for_instance(library_material)
+        if current_queue != "ilmn_lib_qc":
+            raise ValueError(
+                "Library material must be queued in ilmn_lib_qc "
+                f"(current_queue={current_queue!r})"
+            )
+
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
+        next_queue = (
+            payload.next_queue
+            if payload.passed and payload.next_queue
+            else payload.next_queue or "ilmn_lib_qc_exception"
+        )
+        qc_record = self._create_data_record(
+            beta_kind="library_qc_result",
+            name=f"library-qc:{library_material.euid}",
+            properties={
+                "passed": bool(payload.passed),
+                "next_queue": next_queue,
+                "metrics": payload.metrics or {},
+                "metadata": normalized_metadata,
+                "idempotency_key": idempotency_key or "",
+                "occurred_at": self._timestamp(),
+            },
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            library_material.euid,
+            qc_record.euid,
+            relationship_type="beta_library_qc",
+        )
+        self._attach_execution_metadata_lineage(qc_record, normalized_metadata)
+        material_props = self._props(library_material)
+        material_props["library_qc"] = {
+            "passed": bool(payload.passed),
+            "metrics": payload.metrics or {},
+            "qc_record_euid": qc_record.euid,
+            "occurred_at": self._timestamp(),
+        }
+        self._write_props(library_material, material_props)
+
+        lease = self._resolve_stage_claim(
+            material=library_material,
+            expected_queues={"ilmn_lib_qc"},
+            claim_euid=None,
+            stage_label="library_qc",
+        )
+        self._complete_stage_execution(
+            subject=library_material,
+            lease=lease,
+            action_key="record_library_qc",
+            idempotency_key=idempotency_key
+            or f"complete:library_qc:{library_material.euid}",
+            next_queue_key=next_queue,
+            next_action_key=(
+                "create_pool" if payload.passed else "review_library_qc_failure"
+            ),
+            terminal=False,
+            result_payload={
+                "passed": bool(payload.passed),
+                "next_queue": next_queue,
+                "metrics": payload.metrics or {},
+            },
+        )
+        self._record_action(
+            target_instance=library_material,
+            action_key="record_library_qc",
+            captured_data={
+                "library_material_euid": payload.library_material_euid,
+                "passed": bool(payload.passed),
+                "next_queue": payload.next_queue,
+                "metrics": payload.metrics or {},
+                "metadata": normalized_metadata,
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "library_material_euid": library_material.euid,
+                "qc_record_euid": qc_record.euid,
+                "qc_passed": bool(payload.passed),
+                "next_queue": next_queue,
+                "current_queue": next_queue,
+            },
+        )
+        self.bdb.session.commit()
+        return BetaLibraryQCResponse(
+            library_material_euid=library_material.euid,
+            qc_record_euid=qc_record.euid,
+            qc_passed=bool(payload.passed),
+            next_queue=next_queue,
+            current_queue=next_queue,
             idempotent_replay=False,
         )
 
@@ -832,9 +996,15 @@ class _BetaLabStagesMixin:
                     reason="sequencing pool has bounded same-service member lineage",
                 ),
                 self._graph_expected_fanout_entry(
-                    relationship_types=["beta_sequencing_run"],
-                    max_child_count=1,
-                    reason="sequencing pool produces at most one run in this handoff",
+                    relationship_types=[
+                        "beta_sequencing_run",
+                        "contains",
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                    ],
+                    max_child_count=10,
+                    reason="sequencing pool carries bounded container, queue, action, and run setup links",
                 ),
             ],
         )
@@ -1034,6 +1204,31 @@ class _BetaLabStagesMixin:
                     assignment_record.euid,
                     relationship_type="beta_assignment_barcode_reagent",
                 )
+            self._write_graph_metadata(
+                assignment_record,
+                node_role="sequenced_library_assignment",
+                expected_fanout=[
+                    self._graph_expected_fanout_entry(
+                        relationship_types=[
+                            "beta_assignment_barcode_reagent",
+                            "beta_assignment_library_material",
+                            "beta_assignment_source",
+                            "beta_sequenced_library_assignment",
+                        ],
+                        max_child_count=4,
+                        reason="sequenced library assignment links one source, library material, barcode reagent, and run",
+                    ),
+                    self._graph_expected_fanout_entry(
+                        relationship_types=[
+                            "fulfills_atlas_test_fulfillment_item",
+                            "has_external_reference",
+                            "uses_bloom_library",
+                        ],
+                        max_child_count=8,
+                        reason="sequenced library assignment carries bounded Atlas and downstream analysis provenance",
+                    ),
+                ],
+            )
             self._replace_fulfillment_item_references(
                 assignment_record,
                 atlas_context=fulfillment_item_context,

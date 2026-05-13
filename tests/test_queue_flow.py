@@ -255,6 +255,17 @@ def test_beta_queue_flow_end_to_end():
         extraction_batch_euid = extraction_body["extraction_batch_euid"]
         extraction_run_euid = extraction_body["extraction_run_euid"]
 
+        ont_qc_route = client.post(
+            "/api/v1/external/atlas/beta/post-extract-qc",
+            headers={"Idempotency-Key": _opaque("idem-ont-qc")},
+            json={
+                "extraction_output_euid": extraction_output_euid,
+                "passed": True,
+                "next_queue": "ont_lib_prep",
+            },
+        )
+        assert ont_qc_route.status_code == 422, ont_qc_route.text
+
         qc = client.post(
             "/api/v1/external/atlas/beta/post-extract-qc",
             headers={"Idempotency-Key": _opaque("idem-qc")},
@@ -272,6 +283,16 @@ def test_beta_queue_flow_end_to_end():
         assert qc_body["next_queue"] == "ilmn_lib_prep"
         _assert_domain_scoped_euid(qc_body["qc_record_euid"], "BDT-")
 
+        ont_library_prep = client.post(
+            "/api/v1/external/atlas/beta/library-prep",
+            headers={"Idempotency-Key": _opaque("idem-ont-libprep")},
+            json={
+                "source_extraction_output_euid": extraction_output_euid,
+                "platform": "ONT",
+            },
+        )
+        assert ont_library_prep.status_code == 422, ont_library_prep.text
+
         library_prep = client.post(
             "/api/v1/external/atlas/beta/library-prep",
             headers={"Idempotency-Key": _opaque("idem-libprep")},
@@ -285,7 +306,7 @@ def test_beta_queue_flow_end_to_end():
         )
         assert library_prep.status_code == 200, library_prep.text
         library_body = library_prep.json()
-        assert library_body["current_queue"] == "ilmn_seq_pool"
+        assert library_body["current_queue"] == "ilmn_lib_qc"
         assert (
             library_body["atlas_test_fulfillment_item_euid"]
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
@@ -299,6 +320,24 @@ def test_beta_queue_flow_end_to_end():
         _assert_domain_scoped_euid(library_container_euid, "BCN-")
         _assert_domain_scoped_euid(library_plate_euid, "BCN-")
         _assert_domain_scoped_euid(library_well_euid, "BCN-")
+
+        library_qc = client.post(
+            "/api/v1/external/atlas/beta/library-qc",
+            headers={"Idempotency-Key": _opaque("idem-library-qc")},
+            json={
+                "library_material_euid": library_material_euid,
+                "passed": True,
+                "next_queue": "ilmn_seq_pool",
+                "metrics": {"library_concentration_ng_ul": 18.4},
+                "metadata": {"operator": "pytest"},
+            },
+        )
+        assert library_qc.status_code == 200, library_qc.text
+        library_qc_body = library_qc.json()
+        assert library_qc_body["qc_passed"] is True
+        assert library_qc_body["next_queue"] == "ilmn_seq_pool"
+        assert library_qc_body["current_queue"] == "ilmn_seq_pool"
+        _assert_domain_scoped_euid(library_qc_body["qc_record_euid"], "BDT-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
