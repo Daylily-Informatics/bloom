@@ -110,7 +110,12 @@ def read_pyproject_dependency_spec(package_name: str) -> str:
         except Exception:
             continue
         if requirement.name == package_name:
-            return str(requirement.specifier)
+            specifier = str(requirement.specifier)
+            if specifier:
+                return specifier
+            if requirement.url and "@" in requirement.url:
+                return f"=={requirement.url.rsplit('@', 1)[1].strip()}"
+            return ""
 
     raise RuntimeError(f"Dependency {package_name!r} is not declared in pyproject.toml")
 

@@ -459,7 +459,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
             json={
                 "extraction_output_euid": extraction_output_euid,
                 "passed": True,
-                "next_queue": "ont_lib_prep",
+                "next_queue": "ilmn_lib_prep",
             },
         )
         assert qc.status_code == 200, qc.text
@@ -469,18 +469,30 @@ def test_cross_repo_beta_smoke(monkeypatch):
             headers={"Idempotency-Key": _opaque("idem-libprep")},
             json={
                 "source_extraction_output_euid": extraction_output_euid,
-                "platform": "ONT",
+                "platform": "ILMN",
             },
         )
         assert library_prep.status_code == 200, library_prep.text
         library_prep_output_euid = library_prep.json()["library_prep_output_euid"]
+        library_material_euid = library_prep.json()["library_material_euid"]
+
+        library_qc = bloom_client.post(
+            "/api/v1/external/atlas/beta/library-qc",
+            headers={"Idempotency-Key": _opaque("idem-library-qc")},
+            json={
+                "library_material_euid": library_material_euid,
+                "passed": True,
+                "next_queue": "ilmn_seq_pool",
+            },
+        )
+        assert library_qc.status_code == 200, library_qc.text
 
         pool = bloom_client.post(
             "/api/v1/external/atlas/beta/pools",
             headers={"Idempotency-Key": _opaque("idem-pool")},
             json={
-                "member_euids": [library_prep_output_euid],
-                "platform": "ONT",
+                "member_euids": [library_material_euid],
+                "platform": "ILMN",
             },
         )
         assert pool.status_code == 200, pool.text
@@ -488,13 +500,13 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
         flowcell_id = "FLOW-BETA-01"
         lane = "2"
-        library_barcode = "ONT-LIB-01"
+        library_barcode = "ILMN-LIB-01"
         run = bloom_client.post(
             "/api/v1/external/atlas/beta/runs",
             headers={"Idempotency-Key": _opaque("idem-run")},
             json={
                 "pool_euid": pool_euid,
-                "platform": "ONT",
+                "platform": "ILMN",
                 "flowcell_id": flowcell_id,
                 "status": "completed",
                 "assignments": [
@@ -502,6 +514,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                         "lane": lane,
                         "library_barcode": library_barcode,
                         "library_prep_output_euid": library_prep_output_euid,
+                        "library_material_euid": library_material_euid,
                     }
                 ],
                 "artifacts": [

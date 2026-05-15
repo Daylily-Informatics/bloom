@@ -30,6 +30,8 @@ from bloom_lims.schemas.beta_lab import (
     BetaExtractionResponse,
     BetaLibraryPrepCreateRequest,
     BetaLibraryPrepResponse,
+    BetaLibraryQCRequest,
+    BetaLibraryQCResponse,
     BetaMaterialResponse,
     BetaPoolCreateRequest,
     BetaPoolResponse,
@@ -85,7 +87,14 @@ def _raise_beta_http_error(exc: Exception, *, logger_message: str) -> None:
         ) from exc
     if isinstance(exc, ExecutionQueueNotFoundError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    if isinstance(exc, (ExecutionQueueConflictError, ExecutionQueuePermissionError, ExecutionQueueError)):
+    if isinstance(
+        exc,
+        (
+            ExecutionQueueConflictError,
+            ExecutionQueuePermissionError,
+            ExecutionQueueError,
+        ),
+    ):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     logger.exception(logger_message)
     raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -393,6 +402,27 @@ async def create_library_prep(
         _raise_beta_http_error(
             exc,
             logger_message="Failed creating Bloom beta library prep output",
+        )
+    finally:
+        service.close()
+
+
+@router.post("/library-qc", response_model=BetaLibraryQCResponse)
+async def record_library_qc(
+    payload: BetaLibraryQCRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.record_library_qc(
+            payload=payload,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as exc:
+        _raise_beta_http_error(
+            exc,
+            logger_message="Failed recording Bloom beta library QC",
         )
     finally:
         service.close()

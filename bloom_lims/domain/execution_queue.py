@@ -30,6 +30,8 @@ from bloom_lims.schemas.execution_queue import (
     ExecutionState,
     ExpireQueueLeaseRequest,
     FailQueueExecutionRequest,
+    ForceAddQueueItemRequest,
+    ForceRemoveQueueItemRequest,
     HeartbeatWorkerRequest,
     HoldStatus,
     HoldSummary,
@@ -38,6 +40,8 @@ from bloom_lims.schemas.execution_queue import (
     PlaceExecutionHoldRequest,
     QueueRetryPolicy,
     QueueSelectionPolicy,
+    QueueStatsResponse,
+    QueueStragglerItem,
     RecordStatus,
     RegisterWorkerRequest,
     ReleaseExecutionHoldRequest,
@@ -47,6 +51,7 @@ from bloom_lims.schemas.execution_queue import (
     SubjectExecutionDetail,
     SubjectExecutionDiagnostics,
     SubjectExecutionHistory,
+    UpdateQueuePolicyRequest,
     WorkerDetail,
     WorkerStatus,
     WorkerSummary,
@@ -103,6 +108,21 @@ class ExecutionQueueService:
 
     DEFAULT_RETRY_POLICY = QueueRetryPolicy().model_dump()
     DEFAULT_SELECTION_POLICY = QueueSelectionPolicy().model_dump()
+    PERSISTENT_QUEUE_EXPECTED_FANOUT_MAX = 500
+    DEFAULT_STRAGGLER_THRESHOLD_SECONDS = 24 * 60 * 60.0
+    QUEUE_POLICY_KEYS = {
+        "enabled",
+        "manual_only",
+        "operator_visible",
+        "dispatch_priority",
+        "lease_ttl_seconds",
+        "max_attempts_default",
+        "retry_policy",
+        "selection_policy",
+        "diagnostics_enabled",
+        "disabled_reason",
+        "straggler_threshold_seconds",
+    }
 
     WETLAB_QUEUE_DEFAULTS: dict[str, dict[str, Any]] = {
         "extraction_prod": {
@@ -140,6 +160,15 @@ class ExecutionQueueService:
                 "content/sample/gdna/1.0",
             ],
             "required_worker_capabilities": ["wetlab.library_prep", "platform.ILMN"],
+        },
+        "ilmn_lib_qc": {
+            "display_name": "Illumina Library QC",
+            "dispatch_priority": 100,
+            "subject_template_codes": [
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
+            "required_worker_capabilities": ["wetlab.library_qc", "platform.ILMN"],
         },
         "ont_lib_prep": {
             "display_name": "ONT Library Prep",
@@ -182,6 +211,27 @@ class ExecutionQueueService:
             "subject_template_codes": ["content/pool/generic/1.0"],
             "required_worker_capabilities": ["wetlab.run_start", "platform.ONT"],
         },
+        "post_extract_exception": {
+            "display_name": "Post-Extract QC Exception",
+            "dispatch_priority": 10,
+            "subject_template_codes": [
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
+            "required_worker_capabilities": ["wetlab.exception_review"],
+        },
+        "ilmn_lib_qc_exception": {
+            "display_name": "Illumina Library QC Exception",
+            "dispatch_priority": 10,
+            "subject_template_codes": [
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
+            ],
+            "required_worker_capabilities": [
+                "wetlab.exception_review",
+                "platform.ILMN",
+            ],
+        },
     }
 
     def __init__(
@@ -211,7 +261,10 @@ class ExecutionQueueService:
                 props = self._props(queue)
                 merged = self._queue_definition_defaults(queue_key, defaults)
                 merged["revision"] = int(props.get("revision") or 0) + 1
-                props.update(merged)
+                for key, value in merged.items():
+                    if key in self.QUEUE_POLICY_KEYS and key in props:
+                        continue
+                    props[key] = value
                 queue.name = defaults["display_name"]
                 props["name"] = queue.name
                 self._write_props(queue, props)
@@ -363,10 +416,36 @@ class ExecutionQueueService:
     def list_queue_items(self, queue_key: str) -> list[ExecutionQueueItem]:
         self.ensure_default_queue_definitions()
         queue = self._require_queue(queue_key)
+        now = self.clock()
         return [
-            self._queue_item(instance)
-            for instance in self._visible_queue_items(queue, self.clock())
+            self._queue_item(instance, now=now)
+            for instance in self._visible_queue_items(queue, now)
         ]
+
+    def get_queue_stats(self, queue_key: str) -> QueueStatsResponse:
+        self.ensure_default_queue_definitions()
+        queue = self._require_queue(queue_key)
+        return self._queue_stats(queue, now=self.clock())
+
+    def list_queue_stragglers(
+        self, queue_key: str, *, threshold_seconds: float | None = None
+    ) -> list[QueueStragglerItem]:
+        self.ensure_default_queue_definitions()
+        queue = self._require_queue(queue_key)
+        now = self.clock()
+        threshold = self._straggler_threshold_seconds(queue, override=threshold_seconds)
+        stragglers: list[QueueStragglerItem] = []
+        for instance in self._visible_queue_items(queue, now):
+            residence = self._queue_residence_seconds(instance, now)
+            if residence is None or residence < threshold:
+                continue
+            stragglers.append(
+                QueueStragglerItem(
+                    **self._queue_item(instance, now=now).model_dump(),
+                    straggler_threshold_seconds=threshold,
+                )
+            )
+        return stragglers
 
     def list_workers(self) -> list[WorkerSummary]:
         now = self.clock()
@@ -1073,6 +1152,198 @@ class ExecutionQueueService:
             result={"execution": execution},
         )
 
+    def force_add_queue_item(
+        self,
+        payload: ForceAddQueueItemRequest,
+        *,
+        executed_by: str | None,
+    ) -> ExecutionActionResponse:
+        self.ensure_default_queue_definitions()
+        payload_hash = self._payload_hash(payload.model_dump())
+        replay = self._maybe_replay_action(
+            action_key="force_add_queue_item",
+            subject_euid=payload.subject_euid,
+            idempotency_key=payload.idempotency_key,
+            payload_hash=payload_hash,
+        )
+        if replay is not None:
+            return replay
+
+        subject = self._lock_subject(payload.subject_euid)
+        self._require_queue(payload.queue_key)
+        execution = self._ensure_execution_envelope(subject, write=True)
+        execution["state"] = ExecutionState.READY.value
+        execution["next_queue_key"] = payload.queue_key
+        execution["next_action_key"] = payload.next_action_key
+        if payload.priority is not None:
+            execution["priority"] = payload.priority
+        execution["ready_at"] = payload.ready_at
+        if payload.due_at is not None:
+            execution["due_at"] = payload.due_at
+        execution["retry_at"] = None
+        execution["hold_state"] = "NONE"
+        execution["hold_reason"] = None
+        execution["cancel_requested"] = False
+        execution["terminal"] = False
+        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["queue_cache"]["current_queue_key"] = payload.queue_key
+        execution["queue_cache"]["computed_at"] = self._timestamp()
+        execution["operator_override"] = {
+            "action": "force_add",
+            "reason": payload.reason,
+            "at": self._timestamp(),
+            "by": executed_by,
+        }
+        self._set_execution_envelope(subject, execution)
+        self.action_recorder.record(
+            target_instance=subject,
+            action_key="force_add_queue_item",
+            captured_data=payload.model_dump(),
+            result={
+                "status": "success",
+                "subject_euid": subject.euid,
+                "queue_key": payload.queue_key,
+                "reason": payload.reason,
+            },
+            executed_by=executed_by,
+            subject_euid=subject.euid,
+            worker_euid=None,
+            lease_euid=None,
+            idempotency_key=payload.idempotency_key,
+            payload_hash=payload_hash,
+        )
+        self.bdb.session.commit()
+        return ExecutionActionResponse(
+            status="success",
+            action_key="force_add_queue_item",
+            subject_euid=subject.euid,
+            result={"execution": execution, "reason": payload.reason},
+        )
+
+    def force_remove_queue_item(
+        self,
+        payload: ForceRemoveQueueItemRequest,
+        *,
+        executed_by: str | None,
+    ) -> ExecutionActionResponse:
+        payload_hash = self._payload_hash(payload.model_dump())
+        replay = self._maybe_replay_action(
+            action_key="force_remove_queue_item",
+            subject_euid=payload.subject_euid,
+            idempotency_key=payload.idempotency_key,
+            payload_hash=payload_hash,
+        )
+        if replay is not None:
+            return replay
+
+        subject = self._lock_subject(payload.subject_euid)
+        execution = self._ensure_execution_envelope(subject, write=True)
+        current_queue_key = str(execution.get("next_queue_key") or "") or None
+        if payload.queue_key is not None and current_queue_key != payload.queue_key:
+            raise ExecutionQueueConflictError(
+                f"Subject {subject.euid} is not in queue {payload.queue_key}"
+            )
+        execution["state"] = (
+            ExecutionState.CANCELED.value
+            if payload.terminal
+            else ExecutionState.WAITING_EXTERNAL.value
+        )
+        execution["next_queue_key"] = None
+        execution["next_action_key"] = None
+        execution["retry_at"] = None
+        execution["cancel_requested"] = bool(payload.terminal)
+        execution["terminal"] = bool(payload.terminal)
+        execution["revision"] = int(execution.get("revision") or 1) + 1
+        execution["queue_cache"]["current_queue_key"] = None
+        execution["queue_cache"]["computed_at"] = self._timestamp()
+        execution["operator_override"] = {
+            "action": "force_remove",
+            "reason": payload.reason,
+            "from_queue_key": current_queue_key,
+            "terminal": bool(payload.terminal),
+            "at": self._timestamp(),
+            "by": executed_by,
+        }
+        self._set_execution_envelope(subject, execution)
+        self.action_recorder.record(
+            target_instance=subject,
+            action_key="force_remove_queue_item",
+            captured_data=payload.model_dump(),
+            result={
+                "status": "success",
+                "subject_euid": subject.euid,
+                "from_queue_key": current_queue_key,
+                "reason": payload.reason,
+                "terminal": bool(payload.terminal),
+            },
+            executed_by=executed_by,
+            subject_euid=subject.euid,
+            worker_euid=None,
+            lease_euid=None,
+            idempotency_key=payload.idempotency_key,
+            payload_hash=payload_hash,
+        )
+        self.bdb.session.commit()
+        return ExecutionActionResponse(
+            status="success",
+            action_key="force_remove_queue_item",
+            subject_euid=subject.euid,
+            result={
+                "execution": execution,
+                "from_queue_key": current_queue_key,
+                "reason": payload.reason,
+            },
+        )
+
+    def update_queue_policy(
+        self,
+        queue_key: str,
+        payload: UpdateQueuePolicyRequest,
+        *,
+        executed_by: str | None,
+    ) -> ExecutionActionResponse:
+        self.ensure_default_queue_definitions()
+        queue = self._require_queue(queue_key)
+        payload_hash = self._payload_hash(payload.model_dump())
+        replay = self._maybe_replay_action(
+            action_key="update_queue_policy",
+            subject_euid=queue.euid,
+            idempotency_key=payload.idempotency_key,
+            payload_hash=payload_hash,
+        )
+        if replay is not None:
+            return replay
+
+        props = self._props(queue)
+        updates = payload.model_dump(exclude={"idempotency_key"}, exclude_none=True)
+        if "selection_policy" in updates and isinstance(
+            payload.selection_policy, QueueSelectionPolicy
+        ):
+            updates["selection_policy"] = payload.selection_policy.model_dump()
+        for key, value in updates.items():
+            props[key] = value
+        props["revision"] = int(props.get("revision") or 1) + 1
+        self._write_props(queue, props)
+        self.action_recorder.record(
+            target_instance=queue,
+            action_key="update_queue_policy",
+            captured_data=payload.model_dump(),
+            result={"status": "success", "queue_key": queue_key, "updates": updates},
+            executed_by=executed_by,
+            subject_euid=queue.euid,
+            worker_euid=None,
+            lease_euid=None,
+            idempotency_key=payload.idempotency_key,
+            payload_hash=payload_hash,
+        )
+        self.bdb.session.commit()
+        return ExecutionActionResponse(
+            status="success",
+            action_key="update_queue_policy",
+            subject_euid=queue.euid,
+            result={"queue": self.get_queue(queue_key).model_dump()},
+        )
+
     def cancel_subject_execution(
         self,
         payload: CancelSubjectExecutionRequest,
@@ -1267,9 +1538,35 @@ class ExecutionQueueService:
             "max_attempts_default": 5,
             "retry_policy": deepcopy(self.DEFAULT_RETRY_POLICY),
             "selection_policy": deepcopy(self.DEFAULT_SELECTION_POLICY),
+            "straggler_threshold_seconds": self.DEFAULT_STRAGGLER_THRESHOLD_SECONDS,
             "diagnostics_enabled": True,
             "revision": 1,
             "disabled_reason": None,
+            "graph": self._persistent_queue_graph_metadata(),
+        }
+
+    def _persistent_queue_graph_metadata(self) -> dict[str, Any]:
+        fanout_max = self.PERSISTENT_QUEUE_EXPECTED_FANOUT_MAX
+        reason = (
+            "persistent execution queues retain bounded queue lease and "
+            "execution record history"
+        )
+        return {
+            "node_role": "execution_queue",
+            "role": "bloom_execution_queue",
+            "expected_fanout_max": fanout_max,
+            "fanout_reason": reason,
+            "expected_fanout": [
+                {
+                    "scope": "same_service",
+                    "relationship_types": [
+                        self.REL_QUEUE_LEASE,
+                        self.REL_QUEUE_RECORD,
+                    ],
+                    "max_child_count": fanout_max,
+                    "reason": reason,
+                }
+            ],
         }
 
     def _create_dead_letter(
@@ -1431,9 +1728,14 @@ class ExecutionQueueService:
         items = []
         for instance in self._candidate_subjects():
             template_code = self._template_code(instance)
-            if template_code not in subject_template_codes:
-                continue
             execution = self._ensure_execution_envelope(instance, write=False)
+            operator_override = execution.get("operator_override")
+            force_added = (
+                isinstance(operator_override, dict)
+                and operator_override.get("action") == "force_add"
+            )
+            if template_code not in subject_template_codes and not force_added:
+                continue
             if str(execution.get("next_queue_key") or "") != str(
                 props.get("queue_key") or ""
             ):
@@ -1453,7 +1755,7 @@ class ExecutionQueueService:
             ready_ts = self._queue_ready_at(instance, execution)
             if ready_ts is not None and ready_ts > now:
                 continue
-            if not self._scopes_match(instance, queue):
+            if not force_added and not self._scopes_match(instance, queue):
                 continue
             items.append(instance)
         items.sort(key=lambda instance: self._queue_sort_key(instance))
@@ -1501,23 +1803,7 @@ class ExecutionQueueService:
     def _queue_summary(self, queue, *, now: datetime) -> ExecutionQueueSummary:
         props = self._props(queue)
         visible_items = self._visible_queue_items(queue, now)
-        oldest_age = None
-        newest_age = None
-        if visible_items:
-            ages = [
-                (
-                    now
-                    - (
-                        self._queue_ready_at(
-                            item, self._ensure_execution_envelope(item, write=False)
-                        )
-                        or now
-                    )
-                ).total_seconds()
-                for item in visible_items
-            ]
-            oldest_age = max(ages)
-            newest_age = min(ages)
+        age_stats = self._queue_age_stats(queue, visible_items, now)
         queue_key = str(props.get("queue_key") or "")
         return ExecutionQueueSummary(
             queue_euid=queue.euid,
@@ -1528,13 +1814,100 @@ class ExecutionQueueService:
             operator_visible=bool(props.get("operator_visible", True)),
             dispatch_priority=int(props.get("dispatch_priority") or 100),
             queue_depth=len(visible_items),
-            oldest_job_age_seconds=oldest_age,
-            newest_job_age_seconds=newest_age,
+            oldest_job_age_seconds=age_stats["oldest"],
+            newest_job_age_seconds=age_stats["newest"],
+            average_job_age_seconds=age_stats["average"],
+            p50_job_age_seconds=age_stats["p50"],
+            p95_job_age_seconds=age_stats["p95"],
+            straggler_threshold_seconds=age_stats["straggler_threshold"],
+            straggler_count=age_stats["straggler_count"],
             active_leases=len(self._active_leases_for_queue(queue, now)),
             held_count=len(self._holds_for_queue(queue)),
             dead_letter_count=len(self._dead_letters_for_queue(queue)),
             failure_rate=self._queue_failure_rate(queue),
         )
+
+    def _queue_stats(self, queue, *, now: datetime) -> QueueStatsResponse:
+        summary = self._queue_summary(queue, now=now)
+        return QueueStatsResponse(
+            **summary.model_dump(
+                include={
+                    "queue_euid",
+                    "queue_key",
+                    "display_name",
+                    "queue_depth",
+                    "oldest_job_age_seconds",
+                    "newest_job_age_seconds",
+                    "average_job_age_seconds",
+                    "p50_job_age_seconds",
+                    "p95_job_age_seconds",
+                    "straggler_threshold_seconds",
+                    "straggler_count",
+                    "active_leases",
+                    "held_count",
+                    "dead_letter_count",
+                    "failure_rate",
+                }
+            ),
+            generated_at=self._timestamp(now),
+        )
+
+    def _queue_age_stats(
+        self, queue, visible_items: list[Any], now: datetime
+    ) -> dict[str, float | int | None]:
+        ages = [
+            age
+            for age in (
+                self._queue_residence_seconds(instance, now)
+                for instance in visible_items
+            )
+            if age is not None
+        ]
+        threshold = self._straggler_threshold_seconds(queue)
+        if not ages:
+            return {
+                "oldest": None,
+                "newest": None,
+                "average": None,
+                "p50": None,
+                "p95": None,
+                "straggler_threshold": threshold,
+                "straggler_count": 0,
+            }
+        ordered = sorted(ages)
+        return {
+            "oldest": max(ordered),
+            "newest": min(ordered),
+            "average": sum(ordered) / len(ordered),
+            "p50": self._percentile(ordered, 0.50),
+            "p95": self._percentile(ordered, 0.95),
+            "straggler_threshold": threshold,
+            "straggler_count": sum(1 for age in ordered if age >= threshold),
+        }
+
+    def _queue_residence_seconds(self, instance, now: datetime) -> float | None:
+        execution = self._ensure_execution_envelope(instance, write=False)
+        ready_at = self._queue_ready_at(instance, execution)
+        if ready_at is None:
+            return None
+        return max(0.0, (now - ready_at).total_seconds())
+
+    def _straggler_threshold_seconds(
+        self, queue, *, override: float | None = None
+    ) -> float:
+        if override is not None:
+            return max(0.0, float(override))
+        props = self._props(queue)
+        value = props.get("straggler_threshold_seconds")
+        if value is None:
+            return self.DEFAULT_STRAGGLER_THRESHOLD_SECONDS
+        return max(0.0, float(value))
+
+    def _percentile(self, ordered_values: list[float], percentile: float) -> float:
+        if not ordered_values:
+            return 0.0
+        index = int(round((len(ordered_values) - 1) * percentile))
+        return ordered_values[max(0, min(index, len(ordered_values) - 1))]
 
     def _queue_failure_rate(self, queue) -> float:
         queue_key = str(self._props(queue).get("queue_key") or "")
@@ -1915,8 +2288,12 @@ class ExecutionQueueService:
             revision=int(props.get("revision") or 1),
         )
 
-    def _queue_item(self, instance) -> ExecutionQueueItem:
+    def _queue_item(
+        self, instance, *, now: datetime | None = None
+    ) -> ExecutionQueueItem:
         execution = self._ensure_execution_envelope(instance, write=False)
+        observed_at = now or self.clock()
+        queue_ready_at = self._queue_ready_at(instance, execution)
         return ExecutionQueueItem(
             subject_euid=instance.euid,
             subject_name=instance.name,
@@ -1933,11 +2310,12 @@ class ExecutionQueueService:
             retry_at=str(execution.get("retry_at") or "") or None,
             attempt_count=int(execution.get("attempt_count") or 0),
             created_at=getattr(instance, "created_dt", None),
-            queue_ready_timestamp=self._timestamp(
-                self._queue_ready_at(instance, execution)
-            )
-            if self._queue_ready_at(instance, execution) is not None
+            queue_ready_timestamp=self._timestamp(queue_ready_at)
+            if queue_ready_at is not None
             else None,
+            queue_residence_seconds=self._queue_residence_seconds(
+                instance, observed_at
+            ),
         )
 
     def _lease_summary(self, lease) -> LeaseSummary:

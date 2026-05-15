@@ -77,7 +77,9 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
             "source_specimen_euid": specimen_euid,
             "well_name": "A1",
             "extraction_type": "gdna",
-            "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"],
+            "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][0][
+                "atlas_test_fulfillment_item_euid"
+            ],
         },
     )
     assert extraction.status_code == 200, extraction.text
@@ -89,7 +91,7 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         json={
             "extraction_output_euid": extraction_output_euid,
             "passed": True,
-            "next_queue": "ont_lib_prep",
+            "next_queue": "ilmn_lib_prep",
         },
     )
     assert qc.status_code == 200, qc.text
@@ -99,18 +101,30 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         headers={"Idempotency-Key": _opaque("idem-libprep")},
         json={
             "source_extraction_output_euid": extraction_output_euid,
-            "platform": "ONT",
+            "platform": "ILMN",
         },
     )
     assert lib_prep.status_code == 200, lib_prep.text
     lib_output_euid = lib_prep.json()["library_prep_output_euid"]
+    library_material_euid = lib_prep.json()["library_material_euid"]
+
+    library_qc = client.post(
+        "/api/v1/external/atlas/beta/library-qc",
+        headers={"Idempotency-Key": _opaque("idem-library-qc")},
+        json={
+            "library_material_euid": library_material_euid,
+            "passed": True,
+            "next_queue": "ilmn_seq_pool",
+        },
+    )
+    assert library_qc.status_code == 200, library_qc.text
 
     pool = client.post(
         "/api/v1/external/atlas/beta/pools",
         headers={"Idempotency-Key": _opaque("idem-pool")},
         json={
-            "member_euids": [lib_output_euid],
-            "platform": "ONT",
+            "member_euids": [library_material_euid],
+            "platform": "ILMN",
         },
     )
     assert pool.status_code == 200, pool.text
@@ -121,20 +135,23 @@ def _seed_beta_run(client: TestClient) -> tuple[str, str]:
         headers={"Idempotency-Key": _opaque("idem-run")},
         json={
             "pool_euid": pool_euid,
-            "platform": "ONT",
-            "flowcell_id": "FLOW-ONT-01",
+            "platform": "ILMN",
+            "flowcell_id": "FLOW-ILMN-01",
             "status": "started",
             "assignments": [
                 {
                     "lane": "2",
-                    "library_barcode": "ONT-IDX-01",
+                    "library_barcode": "ILMN-IDX-01",
                     "library_prep_output_euid": lib_output_euid,
+                    "library_material_euid": library_material_euid,
                 }
             ],
         },
     )
     assert run.status_code == 200, run.text
-    return run.json()["run_euid"], atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
+    return run.json()["run_euid"], atlas_context["fulfillment_items"][0][
+        "atlas_test_fulfillment_item_euid"
+    ]
 
 
 def test_run_resolver_returns_404_for_unknown_index():
@@ -146,7 +163,7 @@ def test_run_resolver_returns_404_for_unknown_index():
         missing = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_euid}/resolve",
             params={
-                "flowcell_id": "FLOW-ONT-01",
+                "flowcell_id": "FLOW-ILMN-01",
                 "lane": "2",
                 "library_barcode": "DOES-NOT-EXIST",
             },
@@ -156,10 +173,13 @@ def test_run_resolver_returns_404_for_unknown_index():
         resolved = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_euid}/resolve",
             params={
-                "flowcell_id": "FLOW-ONT-01",
+                "flowcell_id": "FLOW-ILMN-01",
                 "lane": "2",
-                "library_barcode": "ONT-IDX-01",
+                "library_barcode": "ILMN-IDX-01",
             },
         )
         assert resolved.status_code == 200, resolved.text
-        assert resolved.json()["atlas_test_fulfillment_item_euid"] == expected_fulfillment_item
+        assert (
+            resolved.json()["atlas_test_fulfillment_item_euid"]
+            == expected_fulfillment_item
+        )

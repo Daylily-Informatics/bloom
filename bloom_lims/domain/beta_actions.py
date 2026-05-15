@@ -71,6 +71,10 @@ _ACTION_TEMPLATE_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Create Library Prep",
         "description": "Creates a Bloom beta library-prep output from an extraction output.",
     },
+    "record_library_qc": {
+        "name": "Record Library QC",
+        "description": "Records ILMN library QC and queue progression.",
+    },
     "create_pool": {
         "name": "Create Pool",
         "description": "Creates a Bloom beta sequencing pool from library-prep outputs.",
@@ -141,6 +145,19 @@ class BloomBetaActionRecorder:
                 "result": result,
                 "executed_by": executed_by,
                 "executed_at": now,
+                "properties": {
+                    "graph": {
+                        "node_role": "workflow_action",
+                        "expected_fanout": [
+                            {
+                                "scope": "same_service",
+                                "relationship_types": ["executed_on"],
+                                "max_child_count": 1,
+                                "reason": "action record links to its execution target",
+                            }
+                        ],
+                    }
+                },
             },
             bstatus="completed",
         )

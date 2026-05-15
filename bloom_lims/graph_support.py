@@ -39,6 +39,7 @@ ATLAS_REFERENCE_FIELD_BY_TYPE = {
     "atlas_testkit": "atlas_testkit_euid",
     "atlas_test": "atlas_test_euid",
     "atlas_test_process_item": "atlas_test_fulfillment_item_euid",
+    "atlas_test_fulfillment_item": "atlas_test_fulfillment_item_euid",
     "atlas_collection_event": "atlas_collection_event_euid",
     "atlas_organization_site": "atlas_organization_site_euid",
 }
@@ -53,6 +54,7 @@ class ExternalGraphRef:
     href: str | None
     graph_expandable: bool
     reason: str | None
+    relationship_type: str | None = None
 
     def to_public_dict(self, *, ref_index: int) -> dict[str, Any]:
         payload = {
@@ -66,6 +68,8 @@ class ExternalGraphRef:
         }
         if self.reason:
             payload["reason"] = self.reason
+        if self.relationship_type:
+            payload["relationship_type"] = self.relationship_type
         return payload
 
 
@@ -97,6 +101,7 @@ def build_graph_elements_for_start(
     lineage_result = {}
 
     for row in bobj.fetch_graph_data_by_node_depth(start_euid, depth):
+        extended_row = len(row) >= 15
         node_euid = row[0]
         if node_euid not in [None, "", "None"]:
             instance_result[node_euid] = {
@@ -106,36 +111,46 @@ def build_graph_elements_for_start(
                 "category": row[4],
                 "subtype": row[5],
                 "version": row[6],
+                "created_dt": row[7] if extended_row else None,
+                "modified_dt": row[8] if extended_row else None,
+                "json_addl": row[9] if extended_row else {},
             }
 
-        lineage_euid = row[8]
+        lineage_euid = row[11] if extended_row else row[8]
         if lineage_euid not in [None, "", "None"]:
             lineage_result[lineage_euid] = {
-                "parent_euid": row[9],
-                "child_euid": row[10],
+                "parent_euid": row[12] if extended_row else row[9],
+                "child_euid": row[13] if extended_row else row[10],
                 "lineage_euid": lineage_euid,
-                "relationship_type": row[11] or "generic",
+                "relationship_type": (row[14] if extended_row else row[11])
+                or "generic",
             }
 
     nodes = []
     for key in sorted(instance_result.keys()):
         node = instance_result[key]
         color = graph_node_color(node["category"], node["type"], node["subtype"])
-        nodes.append(
-            {
-                "data": {
-                    "id": str(node["euid"]),
-                    "euid": str(node["euid"]),
-                    "name": node["name"] or str(node["euid"]),
-                    "type": node["type"],
-                    "obj_type": node["type"],
-                    "category": node["category"],
-                    "subtype": node["subtype"],
-                    "version": node["version"],
-                    "color": color,
-                }
-            }
-        )
+        props = _props_from_json_addl(node.get("json_addl"))
+        graph = _as_dict(props.get("graph"))
+        external_refs = _explicit_refs_from_props(props)
+        node_data = {
+            "id": str(node["euid"]),
+            "euid": str(node["euid"]),
+            "name": node["name"] or str(node["euid"]),
+            "type": node["type"],
+            "obj_type": node["type"],
+            "category": node["category"],
+            "subtype": node["subtype"],
+            "version": node["version"],
+            "created_dt": _iso(node.get("created_dt")),
+            "modified_dt": _iso(node.get("modified_dt")),
+            "color": color,
+        }
+        if graph:
+            node_data["graph"] = graph
+        if external_refs:
+            node_data["external_refs"] = external_refs
+        nodes.append({"data": node_data})
 
     edges = []
     for key in sorted(lineage_result.keys()):
@@ -152,6 +167,22 @@ def build_graph_elements_for_start(
         )
 
     return nodes, edges
+
+
+def build_graph_meta_for_nodes(nodes: list[dict[str, Any]]) -> dict[str, Any]:
+    expected_fanout: list[dict[str, Any]] = []
+    for node in nodes:
+        data = _as_dict(_as_dict(node).get("data"))
+        euid = _clean(data.get("euid") or data.get("id"))
+        graph = _as_dict(data.get("graph"))
+        for entry in _as_list(graph.get("expected_fanout")):
+            row = _as_dict(entry)
+            if not euid or not row:
+                continue
+            expected_fanout.append({"euid": euid, "system": "bloom", **row})
+    if not expected_fanout:
+        return {}
+    return {"expected_fanout": expected_fanout}
 
 
 def build_graph_object_payload(bobj: Any, euid: str) -> dict[str, Any]:
@@ -222,7 +253,54 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
     settings = get_settings()
     atlas_base_url = str(settings.atlas.base_url or "").strip().rstrip("/")
     atlas_token = str(settings.atlas.token or "").strip()
-    refs: dict[tuple[str, str, str, str], ExternalGraphRef] = {}
+    refs: dict[tuple[str, str, str, str, str], ExternalGraphRef] = {}
+    for payload in _explicit_refs_from_props(_props(obj)):
+        system = _clean(payload.get("system"))
+        root_euid = _clean(payload.get("root_euid"))
+        relationship_type = _clean(payload.get("relationship_type"))
+        tenant_id = _clean(payload.get("tenant_id")) or None
+        if not (system and root_euid and relationship_type):
+            continue
+        href = None
+        graph_expandable = False
+        reason = None
+        if system == "atlas":
+            if atlas_base_url and root_euid:
+                params = {"start_euid": root_euid, "depth": 4}
+                if tenant_id:
+                    params["tenant_id"] = tenant_id
+                href = f"{atlas_base_url}/graph?{urlencode(params)}"
+            graph_expandable = True
+            missing: list[str] = []
+            if not tenant_id:
+                missing.append("atlas_tenant_id")
+            if not atlas_base_url:
+                missing.append("atlas.base_url")
+            if not atlas_token:
+                missing.append("atlas.token")
+            if missing:
+                graph_expandable = False
+                reason = "Missing Atlas graph metadata: " + ", ".join(missing)
+        ref = ExternalGraphRef(
+            label=_clean(payload.get("label"))
+            or f"{system}:{relationship_type}:{root_euid}",
+            system=system,
+            root_euid=root_euid,
+            tenant_id=tenant_id,
+            href=href,
+            graph_expandable=graph_expandable,
+            reason=reason,
+            relationship_type=relationship_type,
+        )
+        refs[
+            (
+                ref.system,
+                ref.label,
+                ref.root_euid,
+                ref.tenant_id or "",
+                relationship_type,
+            )
+        ] = ref
     try:
         lineages = list(get_parent_lineages(obj))
     except Exception:
@@ -282,8 +360,17 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
             href=href,
             graph_expandable=graph_expandable,
             reason=reason,
+            relationship_type=_atlas_relationship_type(payload),
         )
-        refs[(ref.system, ref.label, ref.root_euid, ref.tenant_id or "")] = ref
+        refs[
+            (
+                ref.system,
+                ref.label,
+                ref.root_euid,
+                ref.tenant_id or "",
+                ref.relationship_type or "",
+            )
+        ] = ref
 
     return [refs[key] for key in sorted(refs.keys())]
 
@@ -387,12 +474,52 @@ def _iso(value: Any) -> str | None:
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC).isoformat()
         return value.isoformat()
+    if isinstance(value, str):
+        clean = value.strip()
+        return clean or None
     return None
 
 
 def _props(instance: Any) -> dict[str, Any]:
     payload = _as_dict(getattr(instance, "json_addl", None))
     return _as_dict(payload.get("properties"))
+
+
+def _props_from_json_addl(json_addl: Any) -> dict[str, Any]:
+    payload = _as_dict(json_addl)
+    return _as_dict(payload.get("properties"))
+
+
+def _explicit_refs_from_props(props: dict[str, Any]) -> list[dict[str, Any]]:
+    external_payload = _as_dict(props.get("external_payload"))
+    raw_refs = _as_list(external_payload.get("tapdb_graph"))
+    refs: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for raw_ref in raw_refs:
+        row = _as_dict(raw_ref)
+        system = _clean(row.get("system"))
+        root_euid = _clean(row.get("root_euid") or row.get("target_euid"))
+        relationship_type = _clean(row.get("relationship_type"))
+        if not (system and root_euid and relationship_type):
+            continue
+        tenant_id = _clean(row.get("tenant_id"))
+        key = (system, root_euid, relationship_type, tenant_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        public_ref = dict(row)
+        public_ref["system"] = system
+        public_ref["root_euid"] = root_euid
+        public_ref["target_euid"] = _clean(row.get("target_euid")) or root_euid
+        public_ref["relationship_type"] = relationship_type
+        public_ref["graph_expandable"] = bool(public_ref.get("graph_expandable", True))
+        if tenant_id:
+            public_ref["tenant_id"] = tenant_id
+        if not _clean(public_ref.get("label")):
+            public_ref["label"] = f"{system}:{relationship_type}:{root_euid}"
+        public_ref["ref_index"] = len(refs)
+        refs.append(public_ref)
+    return refs
 
 
 def _atlas_root_euid(payload: dict[str, Any]) -> str:
@@ -403,3 +530,18 @@ def _atlas_root_euid(payload: dict[str, Any]) -> str:
         if direct:
             return direct
     return _clean(payload.get("reference_value"))
+
+
+def _atlas_relationship_type(payload: dict[str, Any]) -> str:
+    ref_type = _clean(payload.get("reference_type"))
+    return {
+        "atlas_test_fulfillment_item": "fulfills_atlas_test_fulfillment_item",
+        "atlas_test_process_item": "fulfills_atlas_test_fulfillment_item",
+        "atlas_patient": "derived_from_atlas_patient",
+        "atlas_trf": "received_from_atlas_trf",
+        "atlas_test": "prepared_for_atlas_test",
+        "atlas_testkit": "received_with_atlas_testkit",
+        "atlas_shipment": "received_in_atlas_shipment",
+        "atlas_organization_site": "received_from_atlas_organization_site",
+        "atlas_collection_event": "collected_during_atlas_event",
+    }.get(ref_type, f"references_{ref_type or 'atlas_object'}")

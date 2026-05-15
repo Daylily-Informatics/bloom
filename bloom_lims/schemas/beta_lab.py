@@ -12,10 +12,13 @@ CanonicalQueueName = Literal[
     "post_extract_qc",
     "ilmn_lib_prep",
     "ont_lib_prep",
+    "ilmn_lib_qc",
     "ilmn_seq_pool",
     "ont_seq_pool",
     "ilmn_start_seq_run",
     "ont_start_seq_run",
+    "post_extract_exception",
+    "ilmn_lib_qc_exception",
 ]
 
 
@@ -76,21 +79,30 @@ class AtlasFulfillmentContext(BaseModel):
             raise ValueError("atlas_patient_euid must not be empty when provided")
         if self.atlas_testkit_euid is not None and not self.atlas_testkit_euid.strip():
             raise ValueError("atlas_testkit_euid must not be empty when provided")
-        if self.atlas_shipment_euid is not None and not self.atlas_shipment_euid.strip():
+        if (
+            self.atlas_shipment_euid is not None
+            and not self.atlas_shipment_euid.strip()
+        ):
             raise ValueError("atlas_shipment_euid must not be empty when provided")
         if (
             self.atlas_organization_site_euid is not None
             and not self.atlas_organization_site_euid.strip()
         ):
-            raise ValueError("atlas_organization_site_euid must not be empty when provided")
+            raise ValueError(
+                "atlas_organization_site_euid must not be empty when provided"
+            )
         if (
             self.atlas_collection_event_euid is not None
             and not self.atlas_collection_event_euid.strip()
         ):
-            raise ValueError("atlas_collection_event_euid must not be empty when provided")
+            raise ValueError(
+                "atlas_collection_event_euid must not be empty when provided"
+            )
         if self.collection_event_snapshot is not None:
             if not self.collection_event_snapshot.collection_event_euid.strip():
-                raise ValueError("collection_event_snapshot.collection_event_euid is required")
+                raise ValueError(
+                    "collection_event_snapshot.collection_event_euid is required"
+                )
             if (
                 self.atlas_collection_event_euid is not None
                 and self.collection_event_snapshot.collection_event_euid.strip()
@@ -102,9 +114,15 @@ class AtlasFulfillmentContext(BaseModel):
                 )
         if self.fulfillment_items:
             if not (self.atlas_trf_euid and self.atlas_trf_euid.strip()):
-                raise ValueError("atlas_trf_euid is required when fulfillment_items are provided")
-        elif (self.atlas_test_euid is not None or self.atlas_test_euids) and not self.atlas_trf_euid:
-            raise ValueError("atlas_trf_euid is required when atlas_test_euid is provided")
+                raise ValueError(
+                    "atlas_trf_euid is required when fulfillment_items are provided"
+                )
+        elif (
+            self.atlas_test_euid is not None or self.atlas_test_euids
+        ) and not self.atlas_trf_euid:
+            raise ValueError(
+                "atlas_trf_euid is required when atlas_test_euid is provided"
+            )
         return self
 
 
@@ -177,6 +195,12 @@ class BetaExtractionCreateRequest(BaseModel):
     plate_template_code: str = Field(default="container/plate/fixed-plate-24/1.0")
     plate_name: str | None = None
     well_name: str
+    extraction_batch_euid: str | None = None
+    extraction_batch_name: str | None = None
+    extraction_run_euid: str | None = None
+    extraction_run_name: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
     extraction_type: Literal["cfdna", "gdna"] = Field(default="cfdna")
     output_name: str | None = None
     atlas_test_fulfillment_item_euid: str | None = None
@@ -190,6 +214,8 @@ class BetaExtractionResponse(BaseModel):
     plate_euid: str
     well_euid: str
     well_name: str
+    extraction_batch_euid: str | None = None
+    extraction_run_euid: str | None = None
     extraction_output_euid: str
     atlas_test_fulfillment_item_euid: str
     current_queue: str
@@ -199,28 +225,38 @@ class BetaExtractionResponse(BaseModel):
 class BetaPostExtractQCRequest(BaseModel):
     extraction_output_euid: str
     passed: bool
-    next_queue: Literal["ilmn_lib_prep", "ont_lib_prep"] | None = None
+    next_queue: Literal["ilmn_lib_prep", "post_extract_exception"] | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
+    quant_artifact_euid: str | None = None
+    quant_file_name: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_next_queue(self) -> "BetaPostExtractQCRequest":
         if self.passed and not self.next_queue:
             raise ValueError("next_queue is required when passed=true")
+        if self.passed and self.next_queue != "ilmn_lib_prep":
+            raise ValueError("ILMN proband beta only supports next_queue=ilmn_lib_prep")
+        if not self.passed and self.next_queue == "ilmn_lib_prep":
+            raise ValueError("failed post-extract QC cannot route to ilmn_lib_prep")
         return self
 
 
 class BetaPostExtractQCResponse(BaseModel):
     extraction_output_euid: str
+    qc_record_euid: str | None = None
     qc_passed: bool
+    next_queue: str | None = None
     current_queue: str | None
     idempotent_replay: bool = False
 
 
 class BetaLibraryPrepCreateRequest(BaseModel):
     source_extraction_output_euid: str
-    platform: Literal["ILMN", "ONT"]
+    platform: Literal["ILMN"]
     output_name: str | None = None
+    library_plate_euid: str | None = None
+    library_well_name: str | None = None
     claim_euid: str | None = None
     consume_source: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -238,9 +274,36 @@ class BetaLibraryPrepResponse(BaseModel):
     idempotent_replay: bool = False
 
 
+class BetaLibraryQCRequest(BaseModel):
+    library_material_euid: str
+    passed: bool
+    next_queue: Literal["ilmn_seq_pool", "ilmn_lib_qc_exception"] | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_next_queue(self) -> "BetaLibraryQCRequest":
+        if self.passed and not self.next_queue:
+            raise ValueError("next_queue is required when passed=true")
+        if self.passed and self.next_queue != "ilmn_seq_pool":
+            raise ValueError("ILMN proband beta only supports next_queue=ilmn_seq_pool")
+        if not self.passed and self.next_queue == "ilmn_seq_pool":
+            raise ValueError("failed library QC cannot route to ilmn_seq_pool")
+        return self
+
+
+class BetaLibraryQCResponse(BaseModel):
+    library_material_euid: str
+    qc_record_euid: str | None = None
+    qc_passed: bool
+    next_queue: str | None = None
+    current_queue: str | None
+    idempotent_replay: bool = False
+
+
 class BetaPoolCreateRequest(BaseModel):
     member_euids: list[str]
-    platform: Literal["ILMN", "ONT"]
+    platform: Literal["ILMN"]
     pool_name: str | None = None
     claim_euid: str | None = None
     consume_members: bool = False
@@ -268,6 +331,8 @@ class BetaRunAssignmentInput(BaseModel):
     lane: str
     library_barcode: str
     library_prep_output_euid: str
+    library_material_euid: str | None = None
+    barcode_reagent_euid: str | None = None
 
 
 class BetaRunArtifactInput(BaseModel):
@@ -281,7 +346,7 @@ class BetaRunArtifactInput(BaseModel):
 
 class BetaRunCreateRequest(BaseModel):
     pool_euid: str
-    platform: Literal["ILMN", "ONT"]
+    platform: Literal["ILMN"]
     flowcell_id: str
     run_name: str | None = None
     status: Literal["started", "completed"] = Field(default="completed")

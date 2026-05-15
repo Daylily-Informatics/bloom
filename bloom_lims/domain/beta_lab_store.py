@@ -28,6 +28,7 @@ class _BetaLabStoreMixin:
             plate = self._require_instance(plate_euid)
             if instance_semantic_category(plate) != "container":
                 raise ValueError(f"EUID is not a container plate: {plate_euid}")
+            self._ensure_fixed_container_graph_metadata(plate)
             return plate
 
         template = self._require_template(plate_template_code)
@@ -39,6 +40,7 @@ class _BetaLabStoreMixin:
             plate.name = str(resolved_name)
             props["name"] = str(resolved_name)
             self._write_props(plate, props)
+        self._ensure_fixed_container_graph_metadata(plate)
         return plate
 
     def _resolve_or_create_container(
@@ -100,6 +102,7 @@ class _BetaLabStoreMixin:
             if not candidate:
                 candidate = str(self._props(child).get("name") or "").strip().upper()
             if candidate == expected:
+                self._ensure_fixed_container_graph_metadata(child)
                 return child
         raise ValueError(f"Well not found on plate {plate.euid}: {well_name}")
 
@@ -244,6 +247,78 @@ class _BetaLabStoreMixin:
         props["name"] = name
         self._write_props(record, props)
         return record
+
+    @staticmethod
+    def _graph_expected_fanout_entry(
+        *, relationship_types: list[str], max_child_count: int, reason: str
+    ) -> dict[str, Any]:
+        return {
+            "scope": "same_service",
+            "relationship_types": relationship_types,
+            "max_child_count": max_child_count,
+            "reason": reason,
+        }
+
+    def _write_graph_metadata(
+        self,
+        instance,
+        *,
+        node_role: str,
+        expected_fanout: list[dict[str, Any]],
+    ) -> None:
+        props = self._props(instance)
+        existing_graph = props.get("graph")
+        graph = dict(existing_graph) if isinstance(existing_graph, dict) else {}
+        graph["node_role"] = node_role
+        graph["expected_fanout"] = expected_fanout
+        graph["role"] = (
+            f"bloom_{node_role.replace('-', '_')}"
+            if not str(node_role).startswith("bloom_")
+            else str(node_role)
+        )
+        graph["expected_fanout_max"] = sum(
+            int(entry.get("max_child_count") or 0)
+            for entry in expected_fanout
+            if isinstance(entry, dict)
+        )
+        graph["fanout_reason"] = "; ".join(
+            str(entry.get("reason") or "").strip()
+            for entry in expected_fanout
+            if isinstance(entry, dict) and str(entry.get("reason") or "").strip()
+        )
+        props["graph"] = graph
+        self._write_props(instance, props)
+
+    def _ensure_fixed_container_graph_metadata(self, instance) -> None:
+        if instance_semantic_category(instance) != "container":
+            return
+        type_name = str(instance.type or "").strip()
+        subtype = str(instance.subtype or "").strip()
+        if type_name == "plate" and subtype in {"fixed-plate-96", "fixed-plate-24"}:
+            max_wells = 96 if subtype == "fixed-plate-96" else 24
+            self._write_graph_metadata(
+                instance,
+                node_role=subtype,
+                expected_fanout=[
+                    self._graph_expected_fanout_entry(
+                        relationship_types=["contains"],
+                        max_child_count=max_wells,
+                        reason=f"{subtype} contains at most {max_wells} wells",
+                    )
+                ],
+            )
+        elif type_name == "well":
+            self._write_graph_metadata(
+                instance,
+                node_role="fixed_plate_well",
+                expected_fanout=[
+                    self._graph_expected_fanout_entry(
+                        relationship_types=["contains"],
+                        max_child_count=1,
+                        reason="plate well contains at most one material",
+                    )
+                ],
+            )
 
     def _linked_container_euid(self, instance) -> str | None:
         for lineage in get_child_lineages(instance):

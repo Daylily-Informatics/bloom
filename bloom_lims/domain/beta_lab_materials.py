@@ -43,6 +43,59 @@ class _BetaLabMaterialsMixin:
             specimen_props["idempotency_key"] = idempotency_key
         self._write_props(specimen, specimen_props)
         self._ensure_container_link(container.euid, specimen.euid)
+        self._write_graph_metadata(
+            container,
+            node_role="accepted_container",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["contains"],
+                    max_child_count=1,
+                    reason="accepted specimen container holds one accepted beta material",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                        "has_external_reference",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "prepared_for_atlas_test",
+                        "received_from_atlas_organization_site",
+                        "received_from_atlas_trf",
+                    ],
+                    max_child_count=19,
+                    reason="accepted specimen container carries bounded intake, queue, and Atlas provenance links",
+                ),
+            ],
+        )
+        self._write_graph_metadata(
+            specimen,
+            node_role="accepted_specimen",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_extraction_output",
+                        "beta_extraction_run_input",
+                        "contains",
+                    ],
+                    max_child_count=3,
+                    reason="accepted specimen feeds one extraction path in the ILMN proband beta",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "executed_on",
+                        "has_external_reference",
+                        "derived_from_atlas_patient",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "prepared_for_atlas_test",
+                        "received_from_atlas_organization_site",
+                        "received_from_atlas_trf",
+                    ],
+                    max_child_count=21,
+                    reason="accepted specimen carries bounded intake, action, and Atlas provenance links",
+                ),
+            ],
+        )
 
         self._replace_container_entity_references(
             container,
@@ -50,6 +103,14 @@ class _BetaLabMaterialsMixin:
         )
         self._replace_fulfillment_item_references(
             container,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self._replace_container_entity_references(
+            specimen,
+            atlas_context=payload.atlas_context.model_dump(),
+        )
+        self._replace_fulfillment_item_references(
+            specimen,
             atlas_context=payload.atlas_context.model_dump(),
         )
         self._replace_collection_event_reference(
