@@ -319,7 +319,9 @@ class _BetaLabReferenceMixin:
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
-        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=created_payloads)
+        self._sync_atlas_tapdb_graph_refs(
+            instance, additional_payloads=created_payloads
+        )
 
     def _replace_container_entity_references(
         self,
@@ -409,7 +411,9 @@ class _BetaLabReferenceMixin:
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
-        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=created_payloads)
+        self._sync_atlas_tapdb_graph_refs(
+            instance, additional_payloads=created_payloads
+        )
 
     def _replace_collection_event_reference(
         self, instance, *, atlas_context: dict[str, Any]

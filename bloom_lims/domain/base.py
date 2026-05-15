@@ -533,7 +533,9 @@ class BloomObj:
         }
 
     def _apply_default_graph_metadata(self, instance) -> None:
-        category = instance_semantic_category(instance) or str(instance.category or "").strip()
+        category = (
+            instance_semantic_category(instance) or str(instance.category or "").strip()
+        )
         if category != "container":
             return
         type_name = str(instance.type or "").strip()
@@ -576,7 +578,9 @@ class BloomObj:
             props = {}
             payload["properties"] = props
         existing_graph = props.get("graph")
-        props["graph"] = {**graph, **existing_graph} if isinstance(existing_graph, dict) else graph
+        props["graph"] = (
+            {**graph, **existing_graph} if isinstance(existing_graph, dict) else graph
+        )
         instance.json_addl = payload
         flag_modified(instance, "json_addl")
 

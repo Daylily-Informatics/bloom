@@ -227,7 +227,10 @@ class ExecutionQueueService:
                 "content/sample/cfdna/1.0",
                 "content/sample/gdna/1.0",
             ],
-            "required_worker_capabilities": ["wetlab.exception_review", "platform.ILMN"],
+            "required_worker_capabilities": [
+                "wetlab.exception_review",
+                "platform.ILMN",
+            ],
         },
     }
 

@@ -532,7 +532,9 @@ class _BetaLabStagesMixin:
                     existing
                 )
                 return BetaLibraryPrepResponse(
-                    source_extraction_output_euid=source.euid if source is not None else "",
+                    source_extraction_output_euid=source.euid
+                    if source is not None
+                    else "",
                     library_prep_output_euid=existing.euid,
                     library_material_euid=(
                         library_material.euid if library_material is not None else None
@@ -540,8 +542,12 @@ class _BetaLabStagesMixin:
                     library_container_euid=(
                         library_plate.euid if library_plate is not None else None
                     ),
-                    library_plate_euid=library_plate.euid if library_plate is not None else None,
-                    library_well_euid=library_well.euid if library_well is not None else None,
+                    library_plate_euid=library_plate.euid
+                    if library_plate is not None
+                    else None,
+                    library_well_euid=library_well.euid
+                    if library_well is not None
+                    else None,
                     atlas_test_fulfillment_item_euid=fulfillment_item_context[
                         "atlas_test_fulfillment_item_euid"
                     ],
@@ -566,7 +572,9 @@ class _BetaLabStagesMixin:
 
         fulfillment_item_context = self._resolve_fulfillment_item_context(source)
         source_well = self._first_parent(source, "contains")
-        source_well_name = payload.library_well_name or self._well_name(source_well) or "A1"
+        source_well_name = (
+            payload.library_well_name or self._well_name(source_well) or "A1"
+        )
         lib_output = self.bobj.create_instance_by_code(
             self.LIBRARY_PREP_OUTPUT_TEMPLATE_CODE,
             {
@@ -580,7 +588,9 @@ class _BetaLabStagesMixin:
             },
         )
         lib_props = self._props(lib_output)
-        lib_name = payload.output_name or f"{payload.platform.lower()}-lib-prep:{source.euid}"
+        lib_name = (
+            payload.output_name or f"{payload.platform.lower()}-lib-prep:{source.euid}"
+        )
         lib_output.name = lib_name
         lib_props["name"] = lib_name
         self._write_props(lib_output, lib_props)
@@ -1096,7 +1106,9 @@ class _BetaLabStagesMixin:
                 idempotency_key=f"{run_euid}:{artifact_type}:{storage_uri}",
             )
         except DeweyClientError as exc:
-            raise ValueError(f"Failed registering run artifact in Dewey: {exc}") from exc
+            raise ValueError(
+                f"Failed registering run artifact in Dewey: {exc}"
+            ) from exc
 
     def create_run(
         self,
@@ -1115,7 +1127,9 @@ class _BetaLabStagesMixin:
                     run_euid=existing.euid,
                     pool_euid=self._pool_euid_for_run(existing) or "",
                     flowcell_id=str(existing_props.get("flowcell_id") or ""),
-                    run_folder=str(existing_props.get("run_folder") or f"{existing.euid}/"),
+                    run_folder=str(
+                        existing_props.get("run_folder") or f"{existing.euid}/"
+                    ),
                     status=str(existing_props.get("status") or ""),
                     artifact_count=self._count_children(existing, "beta_run_artifact"),
                     assignment_count=self._count_children(
@@ -1235,7 +1249,9 @@ class _BetaLabStagesMixin:
             )
 
         for artifact in payload.artifacts:
-            artifact_metadata = self.normalize_execution_metadata(artifact.metadata or {})
+            artifact_metadata = self.normalize_execution_metadata(
+                artifact.metadata or {}
+            )
             s3_key = f"{run.euid}/{artifact.filename}"
             s3_uri = f"s3://{artifact.bucket}/{s3_key}"
             dewey_artifact_euid = self._register_run_artifact_in_dewey(

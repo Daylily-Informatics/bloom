@@ -906,11 +906,12 @@ def test_beta_flow_records_modern_action_instances(bdb):
         props = _props(instance(euid))
         refs = props.get("external_payload", {}).get("tapdb_graph", [])
         return {
-            (ref["system"], ref["root_euid"], ref["relationship_type"])
-            for ref in refs
+            (ref["system"], ref["root_euid"], ref["relationship_type"]) for ref in refs
         }
 
-    process_ref = atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
+    process_ref = atlas_context["fulfillment_items"][0][
+        "atlas_test_fulfillment_item_euid"
+    ]
     test_ref = atlas_context["fulfillment_items"][0]["atlas_test_euid"]
     expected_atlas_refs = {
         ("atlas", atlas_context["atlas_trf_euid"], "received_from_atlas_trf"),
@@ -927,7 +928,9 @@ def test_beta_flow_records_modern_action_instances(bdb):
         "atlas",
         process_ref,
         "fulfills_atlas_test_fulfillment_item",
-    ) in graph_ref_tuples(library_material_euid), _props(instance(library_material_euid))
+    ) in graph_ref_tuples(library_material_euid), _props(
+        instance(library_material_euid)
+    )
 
     plate_graph = _props(instance(plate_euid))["graph"]
     well_graph = _props(instance(well_euid))["graph"]

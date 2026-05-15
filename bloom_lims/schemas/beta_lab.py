@@ -79,21 +79,30 @@ class AtlasFulfillmentContext(BaseModel):
             raise ValueError("atlas_patient_euid must not be empty when provided")
         if self.atlas_testkit_euid is not None and not self.atlas_testkit_euid.strip():
             raise ValueError("atlas_testkit_euid must not be empty when provided")
-        if self.atlas_shipment_euid is not None and not self.atlas_shipment_euid.strip():
+        if (
+            self.atlas_shipment_euid is not None
+            and not self.atlas_shipment_euid.strip()
+        ):
             raise ValueError("atlas_shipment_euid must not be empty when provided")
         if (
             self.atlas_organization_site_euid is not None
             and not self.atlas_organization_site_euid.strip()
         ):
-            raise ValueError("atlas_organization_site_euid must not be empty when provided")
+            raise ValueError(
+                "atlas_organization_site_euid must not be empty when provided"
+            )
         if (
             self.atlas_collection_event_euid is not None
             and not self.atlas_collection_event_euid.strip()
         ):
-            raise ValueError("atlas_collection_event_euid must not be empty when provided")
+            raise ValueError(
+                "atlas_collection_event_euid must not be empty when provided"
+            )
         if self.collection_event_snapshot is not None:
             if not self.collection_event_snapshot.collection_event_euid.strip():
-                raise ValueError("collection_event_snapshot.collection_event_euid is required")
+                raise ValueError(
+                    "collection_event_snapshot.collection_event_euid is required"
+                )
             if (
                 self.atlas_collection_event_euid is not None
                 and self.collection_event_snapshot.collection_event_euid.strip()
@@ -105,9 +114,15 @@ class AtlasFulfillmentContext(BaseModel):
                 )
         if self.fulfillment_items:
             if not (self.atlas_trf_euid and self.atlas_trf_euid.strip()):
-                raise ValueError("atlas_trf_euid is required when fulfillment_items are provided")
-        elif (self.atlas_test_euid is not None or self.atlas_test_euids) and not self.atlas_trf_euid:
-            raise ValueError("atlas_trf_euid is required when atlas_test_euid is provided")
+                raise ValueError(
+                    "atlas_trf_euid is required when fulfillment_items are provided"
+                )
+        elif (
+            self.atlas_test_euid is not None or self.atlas_test_euids
+        ) and not self.atlas_trf_euid:
+            raise ValueError(
+                "atlas_trf_euid is required when atlas_test_euid is provided"
+            )
         return self
 
 

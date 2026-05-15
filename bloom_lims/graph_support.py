@@ -122,7 +122,8 @@ def build_graph_elements_for_start(
                 "parent_euid": row[12] if extended_row else row[9],
                 "child_euid": row[13] if extended_row else row[10],
                 "lineage_euid": lineage_euid,
-                "relationship_type": (row[14] if extended_row else row[11]) or "generic",
+                "relationship_type": (row[14] if extended_row else row[11])
+                or "generic",
             }
 
     nodes = []
@@ -149,11 +150,7 @@ def build_graph_elements_for_start(
             node_data["graph"] = graph
         if external_refs:
             node_data["external_refs"] = external_refs
-        nodes.append(
-            {
-                "data": node_data
-            }
-        )
+        nodes.append({"data": node_data})
 
     edges = []
     for key in sorted(lineage_result.keys()):
@@ -285,7 +282,8 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
                 graph_expandable = False
                 reason = "Missing Atlas graph metadata: " + ", ".join(missing)
         ref = ExternalGraphRef(
-            label=_clean(payload.get("label")) or f"{system}:{relationship_type}:{root_euid}",
+            label=_clean(payload.get("label"))
+            or f"{system}:{relationship_type}:{root_euid}",
             system=system,
             root_euid=root_euid,
             tenant_id=tenant_id,
@@ -294,7 +292,15 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
             reason=reason,
             relationship_type=relationship_type,
         )
-        refs[(ref.system, ref.label, ref.root_euid, ref.tenant_id or "", relationship_type)] = ref
+        refs[
+            (
+                ref.system,
+                ref.label,
+                ref.root_euid,
+                ref.tenant_id or "",
+                relationship_type,
+            )
+        ] = ref
     try:
         lineages = list(get_parent_lineages(obj))
     except Exception:

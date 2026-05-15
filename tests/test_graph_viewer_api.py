@@ -13,8 +13,8 @@ from fastapi.testclient import TestClient
 os.environ["BLOOM_OAUTH"] = "no"
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
-from main import _build_graph_elements_for_start, app, require_auth
 from bloom_lims.graph_support import build_graph_meta_for_nodes
+from main import _build_graph_elements_for_start, app, require_auth
 
 
 @pytest.fixture
@@ -254,7 +254,10 @@ class TestGraphViewerApis:
         assert node_data["created_dt"] == "2026-05-01T00:00:00+00:00"
         assert node_data["modified_dt"] == "2026-05-02T00:00:00+00:00"
         assert node_data["external_refs"][0]["system"] == "atlas"
-        assert node_data["external_refs"][0]["relationship_type"] == "prepared_for_atlas_test"
+        assert (
+            node_data["external_refs"][0]["relationship_type"]
+            == "prepared_for_atlas_test"
+        )
         meta = build_graph_meta_for_nodes(nodes)
         assert meta["expected_fanout"][0]["euid"] == "BCN-1"
         assert meta["expected_fanout"][0]["relationship_types"] == ["contains"]

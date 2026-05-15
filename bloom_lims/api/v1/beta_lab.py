@@ -87,7 +87,14 @@ def _raise_beta_http_error(exc: Exception, *, logger_message: str) -> None:
         ) from exc
     if isinstance(exc, ExecutionQueueNotFoundError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    if isinstance(exc, (ExecutionQueueConflictError, ExecutionQueuePermissionError, ExecutionQueueError)):
+    if isinstance(
+        exc,
+        (
+            ExecutionQueueConflictError,
+            ExecutionQueuePermissionError,
+            ExecutionQueueError,
+        ),
+    ):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     logger.exception(logger_message)
     raise HTTPException(status_code=500, detail=str(exc)) from exc

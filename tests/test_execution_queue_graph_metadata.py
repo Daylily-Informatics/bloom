@@ -87,5 +87,7 @@ def test_ensure_default_queue_definitions_refreshes_existing_queue_graph() -> No
     assert props["name"] == "Illumina Start Run"
     assert props["revision"] == 8
     assert graph["expected_fanout_max"] >= 200
-    assert graph["expected_fanout"][0]["max_child_count"] == graph["expected_fanout_max"]
+    assert (
+        graph["expected_fanout"][0]["max_child_count"] == graph["expected_fanout_max"]
+    )
     assert session.flush_count == 1
