@@ -119,6 +119,11 @@ class ExecutionQueueSummary(BaseModel):
     queue_depth: int
     oldest_job_age_seconds: float | None = None
     newest_job_age_seconds: float | None = None
+    average_job_age_seconds: float | None = None
+    p50_job_age_seconds: float | None = None
+    p95_job_age_seconds: float | None = None
+    straggler_threshold_seconds: float | None = None
+    straggler_count: int = 0
     active_leases: int
     held_count: int
     dead_letter_count: int
@@ -156,6 +161,11 @@ class ExecutionQueueItem(BaseModel):
     attempt_count: int = 0
     created_at: datetime | None = None
     queue_ready_timestamp: str | None = None
+    queue_residence_seconds: float | None = None
+
+
+class QueueStragglerItem(ExecutionQueueItem):
+    straggler_threshold_seconds: float
 
 
 class WorkerSummary(BaseModel):
@@ -383,6 +393,56 @@ class RequeueSubjectRequest(BaseModel):
     expected_state: ExecutionState | None = None
     expected_revision: int | None = None
     idempotency_key: str
+
+
+class ForceAddQueueItemRequest(BaseModel):
+    subject_euid: str
+    queue_key: str
+    next_action_key: str | None = None
+    priority: int | None = None
+    ready_at: str | None = None
+    due_at: str | None = None
+    reason: str
+    idempotency_key: str
+
+
+class ForceRemoveQueueItemRequest(BaseModel):
+    subject_euid: str
+    queue_key: str | None = None
+    reason: str
+    terminal: bool = False
+    idempotency_key: str
+
+
+class UpdateQueuePolicyRequest(BaseModel):
+    idempotency_key: str
+    enabled: bool | None = None
+    manual_only: bool | None = None
+    operator_visible: bool | None = None
+    dispatch_priority: int | None = None
+    lease_ttl_seconds: int | None = None
+    max_attempts_default: int | None = None
+    straggler_threshold_seconds: float | None = None
+    selection_policy: QueueSelectionPolicy | None = None
+
+
+class QueueStatsResponse(BaseModel):
+    queue_euid: str
+    queue_key: str
+    display_name: str
+    queue_depth: int
+    oldest_job_age_seconds: float | None = None
+    newest_job_age_seconds: float | None = None
+    average_job_age_seconds: float | None = None
+    p50_job_age_seconds: float | None = None
+    p95_job_age_seconds: float | None = None
+    straggler_threshold_seconds: float | None = None
+    straggler_count: int = 0
+    active_leases: int
+    held_count: int
+    dead_letter_count: int
+    failure_rate: float = 0.0
+    generated_at: str
 
 
 class CancelSubjectExecutionRequest(BaseModel):

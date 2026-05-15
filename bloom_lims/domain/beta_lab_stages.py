@@ -11,6 +11,8 @@ from bloom_lims.schemas.beta_lab import (
     BetaExtractionResponse,
     BetaLibraryPrepCreateRequest,
     BetaLibraryPrepResponse,
+    BetaLibraryQCRequest,
+    BetaLibraryQCResponse,
     BetaPoolCreateRequest,
     BetaPoolResponse,
     BetaPostExtractQCRequest,
@@ -23,6 +25,44 @@ from bloom_lims.schemas.beta_lab import (
 
 
 class _BetaLabStagesMixin:
+    def _resolve_or_create_stage_data_record(
+        self,
+        *,
+        beta_kind: str,
+        supplied_euid: str | None,
+        default_name: str,
+        properties: dict[str, Any],
+        idempotency_key: str | None,
+    ):
+        if supplied_euid:
+            record = self._require_instance(supplied_euid)
+            if not self._is_data_kind(record, beta_kind):
+                raise ValueError(
+                    f"{supplied_euid} is not a Bloom beta {beta_kind} data record"
+                )
+            return record
+
+        record_idempotency_key = (
+            f"{idempotency_key}:{beta_kind}" if idempotency_key else ""
+        )
+        if record_idempotency_key:
+            existing = self._find_data_record(
+                beta_kind=beta_kind,
+                idempotency_key=record_idempotency_key,
+            )
+            if existing is not None:
+                return existing
+
+        return self._create_data_record(
+            beta_kind=beta_kind,
+            name=default_name,
+            properties={
+                **properties,
+                "idempotency_key": record_idempotency_key,
+                "occurred_at": self._timestamp(),
+            },
+        )
+
     def create_extraction(
         self,
         *,
@@ -59,6 +99,88 @@ class _BetaLabStagesMixin:
             plate_name=payload.plate_name,
         )
         well = self._require_plate_well(plate, payload.well_name)
+        extraction_batch = self._resolve_or_create_stage_data_record(
+            beta_kind="extraction_batch",
+            supplied_euid=payload.extraction_batch_euid,
+            default_name=payload.extraction_batch_name
+            or f"extraction-batch:{source.euid}",
+            properties={
+                "source_specimen_euid": source.euid,
+                "plate_euid": plate.euid,
+                "plate_name": payload.plate_name or "",
+                "extraction_type": payload.extraction_type,
+                "metadata": normalized_metadata,
+            },
+            idempotency_key=idempotency_key,
+        )
+        extraction_run = self._resolve_or_create_stage_data_record(
+            beta_kind="extraction_run",
+            supplied_euid=payload.extraction_run_euid,
+            default_name=payload.extraction_run_name
+            or f"extraction-run:{source.euid}:{payload.well_name}",
+            properties={
+                "source_specimen_euid": source.euid,
+                "extraction_batch_euid": extraction_batch.euid,
+                "plate_euid": plate.euid,
+                "well_name": payload.well_name,
+                "started_at": payload.started_at or "",
+                "completed_at": payload.completed_at or "",
+                "extraction_type": payload.extraction_type,
+                "metadata": normalized_metadata,
+            },
+            idempotency_key=idempotency_key,
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            extraction_batch.euid,
+            extraction_run.euid,
+            relationship_type="beta_extraction_batch_run",
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            source.euid,
+            extraction_run.euid,
+            relationship_type="beta_extraction_run_input",
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            plate.euid,
+            extraction_run.euid,
+            relationship_type="beta_extraction_plate",
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            well.euid,
+            extraction_run.euid,
+            relationship_type="beta_extraction_well",
+        )
+        self._write_graph_metadata(
+            extraction_batch,
+            node_role="extraction_batch",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_extraction_batch_run"],
+                    max_child_count=96,
+                    reason="extraction batch fans out to bounded extraction runs",
+                )
+            ],
+        )
+        self._write_graph_metadata(
+            extraction_run,
+            node_role="extraction_run",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_extraction_run_output"],
+                    max_child_count=96,
+                    reason="extraction run has bounded output wells",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_extraction_run_input",
+                        "beta_extraction_plate",
+                        "beta_extraction_well",
+                    ],
+                    max_child_count=98,
+                    reason="extraction run links bounded input and scanned container context",
+                ),
+            ],
+        )
         output = self.bobj.create_instance_by_code(
             self.EXTRACTION_TEMPLATE_BY_TYPE[payload.extraction_type],
             {
@@ -66,6 +188,11 @@ class _BetaLabStagesMixin:
                     "properties": {
                         "beta_kind": "extraction_output",
                         "extraction_type": payload.extraction_type,
+                        "extraction_batch_euid": extraction_batch.euid,
+                        "extraction_run_euid": extraction_run.euid,
+                        "plate_euid": plate.euid,
+                        "well_euid": well.euid,
+                        "well_name": payload.well_name,
                         "idempotency_key": idempotency_key or "",
                         "metadata": normalized_metadata,
                     }
@@ -83,9 +210,43 @@ class _BetaLabStagesMixin:
             relationship_type="beta_extraction_output",
         )
         self.bobj.create_generic_instance_lineage_by_euids(
+            extraction_run.euid,
+            output.euid,
+            relationship_type="beta_extraction_run_output",
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
             well.euid,
             output.euid,
             relationship_type="contains",
+        )
+        self._write_graph_metadata(
+            output,
+            node_role="extraction_output",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_extraction_output",
+                        "beta_extraction_run_output",
+                        "beta_library_material_output",
+                        "beta_library_prep_output",
+                        "beta_post_extract_qc",
+                        "contains",
+                    ],
+                    max_child_count=6,
+                    reason="extraction output links its specimen, run, well, QC, and library material handoff",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "has_external_reference",
+                    ],
+                    max_child_count=16,
+                    reason="extraction output carries bounded action, queue, and Atlas provenance links",
+                ),
+            ],
         )
         self._attach_execution_metadata_lineage(output, normalized_metadata)
         self._replace_fulfillment_item_references(
@@ -101,6 +262,9 @@ class _BetaLabStagesMixin:
                 else f"queue:post_extract_qc:{output.euid}"
             ),
             executed_by=self.bdb.app_username,
+        )
+        self._replace_fulfillment_item_references(
+            output, atlas_context=fulfillment_item_context
         )
         response = BetaQueueTransitionResponse(
             material_euid=output.euid,
@@ -137,6 +301,12 @@ class _BetaLabStagesMixin:
                 "plate_template_code": payload.plate_template_code,
                 "plate_name": payload.plate_name,
                 "well_name": payload.well_name,
+                "extraction_batch_euid": extraction_batch.euid,
+                "extraction_batch_name": payload.extraction_batch_name,
+                "extraction_run_euid": extraction_run.euid,
+                "extraction_run_name": payload.extraction_run_name,
+                "started_at": payload.started_at,
+                "completed_at": payload.completed_at,
                 "extraction_type": payload.extraction_type,
                 "output_name": payload.output_name,
                 "atlas_test_fulfillment_item_euid": payload.atlas_test_fulfillment_item_euid,
@@ -149,6 +319,8 @@ class _BetaLabStagesMixin:
                 "status": "success",
                 "source_specimen_euid": source.euid,
                 "extraction_output_euid": output.euid,
+                "extraction_batch_euid": extraction_batch.euid,
+                "extraction_run_euid": extraction_run.euid,
                 "plate_euid": plate.euid,
                 "well_euid": well.euid,
                 "current_queue": response.current_queue,
@@ -160,6 +332,8 @@ class _BetaLabStagesMixin:
             plate_euid=plate.euid,
             well_euid=well.euid,
             well_name=payload.well_name,
+            extraction_batch_euid=extraction_batch.euid,
+            extraction_run_euid=extraction_run.euid,
             extraction_output_euid=output.euid,
             atlas_test_fulfillment_item_euid=fulfillment_item_context[
                 "atlas_test_fulfillment_item_euid"
@@ -183,9 +357,12 @@ class _BetaLabStagesMixin:
                 idempotency_key=idempotency_key,
             )
             if existing is not None:
+                existing_props = self._props(existing)
                 return BetaPostExtractQCResponse(
                     extraction_output_euid=payload.extraction_output_euid,
-                    qc_passed=bool(self._props(existing).get("passed")),
+                    qc_record_euid=existing.euid,
+                    qc_passed=bool(existing_props.get("passed")),
+                    next_queue=str(existing_props.get("next_queue") or "") or None,
                     current_queue=self._current_queue_for_instance(output),
                     idempotent_replay=True,
                 )
@@ -197,6 +374,7 @@ class _BetaLabStagesMixin:
                 f"(current_queue={current_queue!r})"
             )
 
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
         qc_record = self._create_data_record(
             beta_kind="post_extract_qc_result",
             name=f"post-extract-qc:{output.euid}",
@@ -204,24 +382,43 @@ class _BetaLabStagesMixin:
                 "passed": bool(payload.passed),
                 "next_queue": payload.next_queue or "",
                 "metrics": payload.metrics or {},
-                "metadata": self.normalize_execution_metadata(payload.metadata or {}),
+                "quant_artifact_euid": payload.quant_artifact_euid or "",
+                "quant_file_name": payload.quant_file_name or "",
+                "metadata": normalized_metadata,
                 "idempotency_key": idempotency_key or "",
                 "occurred_at": self._timestamp(),
             },
         )
+        if payload.quant_artifact_euid:
+            qc_props = self._props(qc_record)
+            external_payload = qc_props.get("external_payload")
+            if not isinstance(external_payload, dict):
+                external_payload = {}
+            external_payload["tapdb_graph"] = [
+                {
+                    "system": "dewey",
+                    "root_euid": payload.quant_artifact_euid,
+                    "target_euid": payload.quant_artifact_euid,
+                    "relationship_type": "uses_quant_artifact",
+                    "label": f"dewey:uses_quant_artifact:{payload.quant_artifact_euid}",
+                    "source_field": "quant_artifact_euid",
+                }
+            ]
+            qc_props["external_payload"] = external_payload
+            self._write_props(qc_record, qc_props)
         self.bobj.create_generic_instance_lineage_by_euids(
             output.euid,
             qc_record.euid,
             relationship_type="beta_post_extract_qc",
         )
-        self._attach_execution_metadata_lineage(
-            qc_record,
-            self.normalize_execution_metadata(payload.metadata or {}),
-        )
+        self._attach_execution_metadata_lineage(qc_record, normalized_metadata)
         output_props = self._props(output)
         output_props["qc"] = {
             "passed": bool(payload.passed),
             "metrics": payload.metrics or {},
+            "quant_artifact_euid": payload.quant_artifact_euid or "",
+            "quant_file_name": payload.quant_file_name or "",
+            "qc_record_euid": qc_record.euid,
             "occurred_at": self._timestamp(),
         }
         self._write_props(output, output_props)
@@ -250,6 +447,7 @@ class _BetaLabStagesMixin:
             )
             next_queue = payload.next_queue
         else:
+            next_queue = payload.next_queue or "post_extract_exception"
             lease = self._resolve_stage_claim(
                 material=output,
                 expected_queues={"post_extract_qc"},
@@ -262,9 +460,12 @@ class _BetaLabStagesMixin:
                 action_key="record_post_extract_qc",
                 idempotency_key=idempotency_key
                 or f"complete:post_extract_qc:{output.euid}",
-                terminal=True,
+                next_queue_key=next_queue,
+                next_action_key="review_post_extract_qc_failure",
+                terminal=False,
                 result_payload={
                     "passed": False,
+                    "next_queue": next_queue,
                     "metrics": payload.metrics or {},
                 },
             )
@@ -277,20 +478,26 @@ class _BetaLabStagesMixin:
                 "passed": bool(payload.passed),
                 "next_queue": payload.next_queue,
                 "metrics": payload.metrics or {},
-                "metadata": payload.metadata or {},
+                "quant_artifact_euid": payload.quant_artifact_euid,
+                "quant_file_name": payload.quant_file_name,
+                "metadata": normalized_metadata,
                 "idempotency_key": idempotency_key or "",
             },
             result={
                 "status": "success",
                 "extraction_output_euid": output.euid,
+                "qc_record_euid": qc_record.euid,
                 "qc_passed": bool(payload.passed),
+                "next_queue": next_queue,
                 "current_queue": next_queue,
             },
         )
         self.bdb.session.commit()
         return BetaPostExtractQCResponse(
             extraction_output_euid=output.euid,
+            qc_record_euid=qc_record.euid,
             qc_passed=bool(payload.passed),
+            next_queue=next_queue,
             current_queue=next_queue,
             idempotent_replay=False,
         )
@@ -359,7 +566,7 @@ class _BetaLabStagesMixin:
 
         fulfillment_item_context = self._resolve_fulfillment_item_context(source)
         source_well = self._first_parent(source, "contains")
-        source_well_name = self._well_name(source_well) or "A1"
+        source_well_name = payload.library_well_name or self._well_name(source_well) or "A1"
         lib_output = self.bobj.create_instance_by_code(
             self.LIBRARY_PREP_OUTPUT_TEMPLATE_CODE,
             {
@@ -381,6 +588,30 @@ class _BetaLabStagesMixin:
             source.euid,
             lib_output.euid,
             relationship_type="beta_library_prep_output",
+        )
+        self._write_graph_metadata(
+            lib_output,
+            node_role="bloom_library_prep_output",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_assignment_source",
+                        "beta_library_prep_output",
+                    ],
+                    max_child_count=2,
+                    reason="library prep output can feed one sequencing assignment",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_used_reagent",
+                        "executed_on",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "has_external_reference",
+                    ],
+                    max_child_count=10,
+                    reason="library prep output carries bounded reagent, action, and Atlas provenance links",
+                ),
+            ],
         )
         extraction_type = (
             str(self._props(source).get("extraction_type") or "gdna").strip().lower()
@@ -414,8 +645,37 @@ class _BetaLabStagesMixin:
             library_material.euid,
             relationship_type="beta_library_material_output",
         )
+        self._write_graph_metadata(
+            library_material,
+            node_role="bloom_library_material",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_assignment_library_material",
+                        "beta_library_material_output",
+                        "beta_library_qc",
+                        "beta_pool_member",
+                    ],
+                    max_child_count=4,
+                    reason="library material intentionally links prep source, QC, assignment, and sequencing pool",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "contains",
+                        "beta_used_reagent",
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                        "fulfills_atlas_test_fulfillment_item",
+                        "has_external_reference",
+                    ],
+                    max_child_count=18,
+                    reason="library material carries bounded container, reagent, queue, action, and Atlas provenance links",
+                ),
+            ],
+        )
         library_plate = self._resolve_or_create_plate(
-            plate_euid=None,
+            plate_euid=payload.library_plate_euid,
             plate_template_code=self.LIBRARY_PLATE_TEMPLATE_CODE,
             plate_name=(
                 f"{payload.output_name} plate"
@@ -447,27 +707,25 @@ class _BetaLabStagesMixin:
         )
         self._attach_execution_metadata_lineage(lib_output, normalized_metadata)
         self._attach_execution_metadata_lineage(library_material, normalized_metadata)
-        self.execution.queue_subject(
-            subject_euid=lib_output.euid,
-            queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
-            next_action_key="create_pool",
-            idempotency_key=(
-                f"{idempotency_key}:queue"
-                if idempotency_key
-                else f"queue:libprep:{lib_output.euid}"
-            ),
-            executed_by=self.bdb.app_username,
-        )
+        next_queue = self.LIB_QC_QUEUE_BY_PLATFORM[payload.platform]
         self.execution.queue_subject(
             subject_euid=library_material.euid,
-            queue_key=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
-            next_action_key="create_pool",
+            queue_key=next_queue,
+            next_action_key="record_library_qc",
             idempotency_key=(
                 f"{idempotency_key}:queue:material"
                 if idempotency_key
                 else f"queue:libprep-material:{library_material.euid}"
             ),
             executed_by=self.bdb.app_username,
+        )
+        self._replace_fulfillment_item_references(
+            lib_output,
+            atlas_context=fulfillment_item_context,
+        )
+        self._replace_fulfillment_item_references(
+            library_material,
+            atlas_context=fulfillment_item_context,
         )
         if payload.consume_source:
             self._consume_material_instance(
@@ -483,7 +741,7 @@ class _BetaLabStagesMixin:
             or f"complete:create_library_prep:{source.euid}",
             result_payload={
                 "library_prep_output_euid": lib_output.euid,
-                "queue_name": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+                "queue_name": next_queue,
             },
         )
         self._record_action(
@@ -493,6 +751,8 @@ class _BetaLabStagesMixin:
                 "source_extraction_output_euid": payload.source_extraction_output_euid,
                 "platform": payload.platform,
                 "output_name": payload.output_name,
+                "library_plate_euid": payload.library_plate_euid,
+                "library_well_name": payload.library_well_name,
                 "metadata": normalized_metadata,
                 "claim_euid": payload.claim_euid,
                 "consume_source": bool(payload.consume_source),
@@ -506,7 +766,7 @@ class _BetaLabStagesMixin:
                 "library_container_euid": library_plate.euid,
                 "library_plate_euid": library_plate.euid,
                 "library_well_euid": library_well.euid,
-                "current_queue": self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+                "current_queue": next_queue,
             },
         )
         self.bdb.session.commit()
@@ -520,7 +780,125 @@ class _BetaLabStagesMixin:
             atlas_test_fulfillment_item_euid=fulfillment_item_context[
                 "atlas_test_fulfillment_item_euid"
             ],
-            current_queue=self.SEQ_POOL_QUEUE_BY_PLATFORM[payload.platform],
+            current_queue=next_queue,
+            idempotent_replay=False,
+        )
+
+    def record_library_qc(
+        self,
+        *,
+        payload: BetaLibraryQCRequest,
+        idempotency_key: str | None,
+    ) -> BetaLibraryQCResponse:
+        library_material = self._require_instance(payload.library_material_euid)
+        self._assert_not_reserved(library_material)
+        self._assert_not_consumed(library_material, stage_label="library_qc")
+        if idempotency_key:
+            existing = self._find_operation_record(
+                beta_kind="library_qc_result",
+                idempotency_key=idempotency_key,
+            )
+            if existing is not None:
+                existing_props = self._props(existing)
+                return BetaLibraryQCResponse(
+                    library_material_euid=library_material.euid,
+                    qc_record_euid=existing.euid,
+                    qc_passed=bool(existing_props.get("passed")),
+                    next_queue=str(existing_props.get("next_queue") or "") or None,
+                    current_queue=self._current_queue_for_instance(library_material),
+                    idempotent_replay=True,
+                )
+
+        current_queue = self._current_queue_for_instance(library_material)
+        if current_queue != "ilmn_lib_qc":
+            raise ValueError(
+                "Library material must be queued in ilmn_lib_qc "
+                f"(current_queue={current_queue!r})"
+            )
+
+        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
+        next_queue = (
+            payload.next_queue
+            if payload.passed and payload.next_queue
+            else payload.next_queue or "ilmn_lib_qc_exception"
+        )
+        qc_record = self._create_data_record(
+            beta_kind="library_qc_result",
+            name=f"library-qc:{library_material.euid}",
+            properties={
+                "passed": bool(payload.passed),
+                "next_queue": next_queue,
+                "metrics": payload.metrics or {},
+                "metadata": normalized_metadata,
+                "idempotency_key": idempotency_key or "",
+                "occurred_at": self._timestamp(),
+            },
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            library_material.euid,
+            qc_record.euid,
+            relationship_type="beta_library_qc",
+        )
+        self._attach_execution_metadata_lineage(qc_record, normalized_metadata)
+        material_props = self._props(library_material)
+        material_props["library_qc"] = {
+            "passed": bool(payload.passed),
+            "metrics": payload.metrics or {},
+            "qc_record_euid": qc_record.euid,
+            "occurred_at": self._timestamp(),
+        }
+        self._write_props(library_material, material_props)
+
+        lease = self._resolve_stage_claim(
+            material=library_material,
+            expected_queues={"ilmn_lib_qc"},
+            claim_euid=None,
+            stage_label="library_qc",
+        )
+        self._complete_stage_execution(
+            subject=library_material,
+            lease=lease,
+            action_key="record_library_qc",
+            idempotency_key=idempotency_key
+            or f"complete:library_qc:{library_material.euid}",
+            next_queue_key=next_queue,
+            next_action_key=(
+                "create_pool" if payload.passed else "review_library_qc_failure"
+            ),
+            terminal=False,
+            result_payload={
+                "passed": bool(payload.passed),
+                "next_queue": next_queue,
+                "metrics": payload.metrics or {},
+            },
+        )
+        self._record_action(
+            target_instance=library_material,
+            action_key="record_library_qc",
+            captured_data={
+                "library_material_euid": payload.library_material_euid,
+                "passed": bool(payload.passed),
+                "next_queue": payload.next_queue,
+                "metrics": payload.metrics or {},
+                "metadata": normalized_metadata,
+                "idempotency_key": idempotency_key or "",
+            },
+            result={
+                "status": "success",
+                "library_material_euid": library_material.euid,
+                "qc_record_euid": qc_record.euid,
+                "qc_passed": bool(payload.passed),
+                "next_queue": next_queue,
+                "current_queue": next_queue,
+            },
+        )
+        self.bdb.session.commit()
+        return BetaLibraryQCResponse(
+            library_material_euid=library_material.euid,
+            qc_record_euid=qc_record.euid,
+            qc_passed=bool(payload.passed),
+            next_queue=next_queue,
+            current_queue=next_queue,
             idempotent_replay=False,
         )
 
@@ -608,6 +986,28 @@ class _BetaLabStagesMixin:
                 pool.euid,
                 relationship_type="beta_pool_member",
             )
+        self._write_graph_metadata(
+            pool,
+            node_role="sequencing_pool",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_pool_member"],
+                    max_child_count=len(members),
+                    reason="sequencing pool has bounded same-service member lineage",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=[
+                        "beta_sequencing_run",
+                        "contains",
+                        "executed_on",
+                        "execution_subject_lease",
+                        "execution_subject_record",
+                    ],
+                    max_child_count=10,
+                    reason="sequencing pool carries bounded container, queue, action, and run setup links",
+                ),
+            ],
+        )
         self._attach_execution_metadata_lineage(pool, normalized_metadata)
 
         self.execution.queue_subject(
@@ -759,6 +1159,16 @@ class _BetaLabStagesMixin:
 
         for assignment in payload.assignments:
             source = self._require_instance(assignment.library_prep_output_euid)
+            library_material = (
+                self._require_instance(assignment.library_material_euid)
+                if assignment.library_material_euid
+                else None
+            )
+            barcode_reagent = (
+                self._require_instance(assignment.barcode_reagent_euid)
+                if assignment.barcode_reagent_euid
+                else None
+            )
             fulfillment_item_context = self._resolve_fulfillment_item_context(source)
             assignment_record = self._create_data_record(
                 beta_kind="sequenced_library_assignment",
@@ -767,6 +1177,9 @@ class _BetaLabStagesMixin:
                     "flowcell_id": payload.flowcell_id,
                     "lane": assignment.lane,
                     "library_barcode": assignment.library_barcode,
+                    "library_prep_output_euid": assignment.library_prep_output_euid,
+                    "library_material_euid": assignment.library_material_euid or "",
+                    "barcode_reagent_euid": assignment.barcode_reagent_euid or "",
                 },
             )
             self.bobj.create_generic_instance_lineage_by_euids(
@@ -778,6 +1191,43 @@ class _BetaLabStagesMixin:
                 source.euid,
                 assignment_record.euid,
                 relationship_type="beta_assignment_source",
+            )
+            if library_material is not None:
+                self.bobj.create_generic_instance_lineage_by_euids(
+                    library_material.euid,
+                    assignment_record.euid,
+                    relationship_type="beta_assignment_library_material",
+                )
+            if barcode_reagent is not None:
+                self.bobj.create_generic_instance_lineage_by_euids(
+                    barcode_reagent.euid,
+                    assignment_record.euid,
+                    relationship_type="beta_assignment_barcode_reagent",
+                )
+            self._write_graph_metadata(
+                assignment_record,
+                node_role="sequenced_library_assignment",
+                expected_fanout=[
+                    self._graph_expected_fanout_entry(
+                        relationship_types=[
+                            "beta_assignment_barcode_reagent",
+                            "beta_assignment_library_material",
+                            "beta_assignment_source",
+                            "beta_sequenced_library_assignment",
+                        ],
+                        max_child_count=4,
+                        reason="sequenced library assignment links one source, library material, barcode reagent, and run",
+                    ),
+                    self._graph_expected_fanout_entry(
+                        relationship_types=[
+                            "fulfills_atlas_test_fulfillment_item",
+                            "has_external_reference",
+                            "uses_bloom_library",
+                        ],
+                        max_child_count=8,
+                        reason="sequenced library assignment carries bounded Atlas and downstream analysis provenance",
+                    ),
+                ],
             )
             self._replace_fulfillment_item_references(
                 assignment_record,
@@ -817,6 +1267,23 @@ class _BetaLabStagesMixin:
                 relationship_type="beta_run_artifact",
             )
             self._attach_execution_metadata_lineage(artifact_record, artifact_metadata)
+
+        self._write_graph_metadata(
+            run,
+            node_role="sequencing_run",
+            expected_fanout=[
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_sequenced_library_assignment"],
+                    max_child_count=len(payload.assignments),
+                    reason="sequencing run has bounded assignment children",
+                ),
+                self._graph_expected_fanout_entry(
+                    relationship_types=["beta_run_artifact"],
+                    max_child_count=len(payload.artifacts),
+                    reason="sequencing run has bounded run artifact children",
+                ),
+            ],
+        )
 
         if payload.consume_pool:
             self._consume_material_instance(
@@ -940,6 +1407,12 @@ class _BetaLabStagesMixin:
         source = self._first_parent(extraction_output, "beta_extraction_output")
         well = self._first_parent(extraction_output, "contains")
         plate = self._first_parent(well, "contains") if well is not None else None
+        run = self._first_parent(extraction_output, "beta_extraction_run_output")
+        batch = (
+            self._first_parent(run, "beta_extraction_batch_run")
+            if run is not None
+            else None
+        )
         fulfillment_item_context = self._resolve_fulfillment_item_context(
             extraction_output
         )
@@ -948,6 +1421,8 @@ class _BetaLabStagesMixin:
             plate_euid=plate.euid if plate is not None else "",
             well_euid=well.euid if well is not None else "",
             well_name=self._well_name(well),
+            extraction_batch_euid=batch.euid if batch is not None else None,
+            extraction_run_euid=run.euid if run is not None else None,
             extraction_output_euid=extraction_output.euid,
             atlas_test_fulfillment_item_euid=fulfillment_item_context[
                 "atlas_test_fulfillment_item_euid"

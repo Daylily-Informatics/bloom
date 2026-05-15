@@ -226,8 +226,13 @@ def test_beta_queue_flow_end_to_end():
             headers={"Idempotency-Key": _opaque("idem-extract")},
             json={
                 "source_specimen_euid": specimen_euid,
+                "plate_template_code": "container/plate/fixed-plate-96/1.0",
                 "plate_name": "beta-extract-plate",
                 "well_name": "A1",
+                "extraction_batch_name": "beta-extract-batch",
+                "extraction_run_name": "beta-extract-run",
+                "started_at": "2026-05-12T00:00:00Z",
+                "completed_at": "2026-05-12T00:05:00Z",
                 "extraction_type": "cfdna",
                 "output_name": "beta-cfdna-output",
                 "atlas_test_fulfillment_item_euid": atlas_context["fulfillment_items"][
@@ -244,7 +249,22 @@ def test_beta_queue_flow_end_to_end():
             extraction_body["atlas_test_fulfillment_item_euid"]
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
+        _assert_domain_scoped_euid(extraction_body["extraction_batch_euid"], "BDT-")
+        _assert_domain_scoped_euid(extraction_body["extraction_run_euid"], "BDT-")
         extraction_output_euid = extraction_body["extraction_output_euid"]
+        extraction_batch_euid = extraction_body["extraction_batch_euid"]
+        extraction_run_euid = extraction_body["extraction_run_euid"]
+
+        ont_qc_route = client.post(
+            "/api/v1/external/atlas/beta/post-extract-qc",
+            headers={"Idempotency-Key": _opaque("idem-ont-qc")},
+            json={
+                "extraction_output_euid": extraction_output_euid,
+                "passed": True,
+                "next_queue": "ont_lib_prep",
+            },
+        )
+        assert ont_qc_route.status_code == 422, ont_qc_route.text
 
         qc = client.post(
             "/api/v1/external/atlas/beta/post-extract-qc",
@@ -254,10 +274,24 @@ def test_beta_queue_flow_end_to_end():
                 "passed": True,
                 "next_queue": "ilmn_lib_prep",
                 "metrics": {"yield_ng": 42.5},
+                "quant_file_name": "post-extract-quant.csv",
             },
         )
         assert qc.status_code == 200, qc.text
-        assert qc.json()["current_queue"] == "ilmn_lib_prep"
+        qc_body = qc.json()
+        assert qc_body["current_queue"] == "ilmn_lib_prep"
+        assert qc_body["next_queue"] == "ilmn_lib_prep"
+        _assert_domain_scoped_euid(qc_body["qc_record_euid"], "BDT-")
+
+        ont_library_prep = client.post(
+            "/api/v1/external/atlas/beta/library-prep",
+            headers={"Idempotency-Key": _opaque("idem-ont-libprep")},
+            json={
+                "source_extraction_output_euid": extraction_output_euid,
+                "platform": "ONT",
+            },
+        )
+        assert ont_library_prep.status_code == 422, ont_library_prep.text
 
         library_prep = client.post(
             "/api/v1/external/atlas/beta/library-prep",
@@ -266,12 +300,13 @@ def test_beta_queue_flow_end_to_end():
                 "source_extraction_output_euid": extraction_output_euid,
                 "platform": "ILMN",
                 "output_name": "beta-ilmn-lib",
+                "library_well_name": "B1",
                 "metadata": {"kit": "ilmn-beta"},
             },
         )
         assert library_prep.status_code == 200, library_prep.text
         library_body = library_prep.json()
-        assert library_body["current_queue"] == "ilmn_seq_pool"
+        assert library_body["current_queue"] == "ilmn_lib_qc"
         assert (
             library_body["atlas_test_fulfillment_item_euid"]
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
@@ -285,6 +320,24 @@ def test_beta_queue_flow_end_to_end():
         _assert_domain_scoped_euid(library_container_euid, "BCN-")
         _assert_domain_scoped_euid(library_plate_euid, "BCN-")
         _assert_domain_scoped_euid(library_well_euid, "BCN-")
+
+        library_qc = client.post(
+            "/api/v1/external/atlas/beta/library-qc",
+            headers={"Idempotency-Key": _opaque("idem-library-qc")},
+            json={
+                "library_material_euid": library_material_euid,
+                "passed": True,
+                "next_queue": "ilmn_seq_pool",
+                "metrics": {"library_concentration_ng_ul": 18.4},
+                "metadata": {"operator": "pytest"},
+            },
+        )
+        assert library_qc.status_code == 200, library_qc.text
+        library_qc_body = library_qc.json()
+        assert library_qc_body["qc_passed"] is True
+        assert library_qc_body["next_queue"] == "ilmn_seq_pool"
+        assert library_qc_body["current_queue"] == "ilmn_seq_pool"
+        _assert_domain_scoped_euid(library_qc_body["qc_record_euid"], "BDT-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
@@ -304,6 +357,9 @@ def test_beta_queue_flow_end_to_end():
         flowcell_id = "FLOWCELL-001"
         lane = "1"
         library_barcode = "IDX-ILMN-A1"
+        barcode_reagent_euid = _ensure_reference_instance(
+            category="content", type_name="reagent"
+        )
         run = client.post(
             "/api/v1/external/atlas/beta/runs",
             headers={"Idempotency-Key": _opaque("idem-run")},
@@ -318,6 +374,8 @@ def test_beta_queue_flow_end_to_end():
                         "lane": lane,
                         "library_barcode": library_barcode,
                         "library_prep_output_euid": lib_output_euid,
+                        "library_material_euid": library_material_euid,
+                        "barcode_reagent_euid": barcode_reagent_euid,
                     }
                 ],
                 "artifacts": [
@@ -362,6 +420,34 @@ def test_beta_queue_flow_end_to_end():
             resolved_body["atlas_test_fulfillment_item_euid"]
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
+
+    bdb = BLOOMdb3(app_username="pytest-beta-queue")
+    try:
+        GI = bdb.Base.classes.generic_instance
+        batch = (
+            bdb.session.query(GI)
+            .filter(GI.euid == extraction_batch_euid, GI.is_deleted.is_(False))
+            .one()
+        )
+        run_record = (
+            bdb.session.query(GI)
+            .filter(GI.euid == extraction_run_euid, GI.is_deleted.is_(False))
+            .one()
+        )
+        batch_children = {
+            (lineage.relationship_type, lineage.child_instance.euid)
+            for lineage in get_parent_lineages(batch)
+            if not lineage.is_deleted and lineage.child_instance is not None
+        }
+        run_children = {
+            (lineage.relationship_type, lineage.child_instance.euid)
+            for lineage in get_parent_lineages(run_record)
+            if not lineage.is_deleted and lineage.child_instance is not None
+        }
+        assert ("beta_extraction_batch_run", extraction_run_euid) in batch_children
+        assert ("beta_extraction_run_output", extraction_output_euid) in run_children
+    finally:
+        bdb.close()
 
 
 def test_queue_claim_success_and_conflict_blocked():

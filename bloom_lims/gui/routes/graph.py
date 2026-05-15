@@ -13,6 +13,7 @@ from bloom_lims.bobjs import BloomObj
 from bloom_lims.db import BLOOMdb3
 from bloom_lims.graph_support import (
     build_graph_elements_for_start as _shared_build_graph_elements_for_start,
+    build_graph_meta_for_nodes,
     build_graph_object_payload,
     namespace_external_graph,
     normalize_graph_request_params as _shared_normalize_graph_request_params,
@@ -133,9 +134,11 @@ async def api_graph_data(
     try:
         bobj = BloomObj(BLOOMdb3(app_username=user_email))
         nodes, edges = _build_graph_elements_for_start(bobj, resolved_start_euid, resolved_depth)
+        meta = {"start_euid": resolved_start_euid, "depth": resolved_depth}
+        meta.update(build_graph_meta_for_nodes(nodes))
         return {
             "elements": {"nodes": nodes, "edges": edges},
-            "meta": {"start_euid": resolved_start_euid, "depth": resolved_depth},
+            "meta": meta,
         }
     except Exception as exc:
         logging.error(

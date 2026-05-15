@@ -507,6 +507,7 @@ class BloomObj:
         try:
             json_addl_overrides["action_groups"] = ai
             _update_recursive(parent_instance.json_addl, json_addl_overrides)
+            self._apply_default_graph_metadata(parent_instance)
             self.session.add(parent_instance)
             ##self.session.flush()
             self.session.commit()
@@ -519,6 +520,65 @@ class BloomObj:
             )
 
         return parent_instance
+
+    @staticmethod
+    def _expected_fanout_entry(
+        *, relationship_types: list[str], max_child_count: int, reason: str
+    ) -> dict:
+        return {
+            "scope": "same_service",
+            "relationship_types": relationship_types,
+            "max_child_count": max_child_count,
+            "reason": reason,
+        }
+
+    def _apply_default_graph_metadata(self, instance) -> None:
+        category = instance_semantic_category(instance) or str(instance.category or "").strip()
+        if category != "container":
+            return
+        type_name = str(instance.type or "").strip()
+        subtype = str(instance.subtype or "").strip()
+        graph = None
+        if type_name == "plate" and subtype in {"fixed-plate-96", "fixed-plate-24"}:
+            max_wells = 96 if subtype == "fixed-plate-96" else 24
+            graph = {
+                "node_role": subtype,
+                "role": f"bloom_{subtype.replace('-', '_')}",
+                "expected_fanout_max": max_wells,
+                "fanout_reason": f"{subtype} contains at most {max_wells} wells",
+                "expected_fanout": [
+                    self._expected_fanout_entry(
+                        relationship_types=["contains"],
+                        max_child_count=max_wells,
+                        reason=f"{subtype} contains at most {max_wells} wells",
+                    )
+                ],
+            }
+        elif type_name == "well":
+            graph = {
+                "node_role": "fixed_plate_well",
+                "role": "bloom_fixed_plate_well",
+                "expected_fanout_max": 1,
+                "fanout_reason": "plate well contains at most one material",
+                "expected_fanout": [
+                    self._expected_fanout_entry(
+                        relationship_types=["contains"],
+                        max_child_count=1,
+                        reason="plate well contains at most one material",
+                    )
+                ],
+            }
+        if graph is None:
+            return
+        payload = instance.json_addl if isinstance(instance.json_addl, dict) else {}
+        props = payload.get("properties")
+        if not isinstance(props, dict):
+            props = {}
+            payload["properties"] = props
+        existing_graph = props.get("graph")
+        props["graph"] = {**graph, **existing_graph} if isinstance(existing_graph, dict) else graph
+        instance.json_addl = payload
+        flag_modified(instance, "json_addl")
 
     # fix naming, instance_type==table_name_prefix
     def create_instances(self, template_euid):
@@ -1210,6 +1270,9 @@ class BloomObj:
                     gi.category,
                     gi.subtype,
                     gi.version,
+                    gi.created_dt,
+                    gi.modified_dt,
+                    gi.json_addl,
                     0 AS depth,
                     NULL::text AS lineage_euid,
                     NULL::text AS lineage_parent_euid,
@@ -1230,6 +1293,9 @@ class BloomObj:
                     gi.category,
                     gi.subtype,
                     gi.version,
+                    gi.created_dt,
+                    gi.modified_dt,
+                    gi.json_addl,
                     gd.depth + 1,
                     gil.euid AS lineage_euid,
                     parent_instance.euid AS lineage_parent_euid,

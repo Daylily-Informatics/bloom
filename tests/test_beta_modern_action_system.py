@@ -814,7 +814,10 @@ def test_beta_flow_records_modern_action_instances(bdb):
             },
         )
         assert extraction.status_code == 200, extraction.text
-        extraction_output_euid = extraction.json()["extraction_output_euid"]
+        extraction_body = extraction.json()
+        extraction_output_euid = extraction_body["extraction_output_euid"]
+        plate_euid = extraction_body["plate_euid"]
+        well_euid = extraction_body["well_euid"]
 
         qc = client.post(
             "/api/v1/external/atlas/beta/post-extract-qc",
@@ -837,9 +840,24 @@ def test_beta_flow_records_modern_action_instances(bdb):
             },
         )
         assert library_prep.status_code == 200, library_prep.text
-        lib_output_euid = library_prep.json()["library_prep_output_euid"]
-        library_material_euid = library_prep.json()["library_material_euid"]
+        library_prep_body = library_prep.json()
+        lib_output_euid = library_prep_body["library_prep_output_euid"]
+        library_material_euid = library_prep_body["library_material_euid"]
+        library_plate_euid = library_prep_body["library_plate_euid"]
+        library_well_euid = library_prep_body["library_well_euid"]
         _assert_domain_scoped_euid(library_material_euid, "BCT-")
+
+        library_qc = client.post(
+            "/api/v1/external/atlas/beta/library-qc",
+            headers={"Idempotency-Key": _opaque("idem-library-qc")},
+            json={
+                "library_material_euid": library_material_euid,
+                "passed": True,
+                "next_queue": "ilmn_seq_pool",
+                "metadata": {"operator": "pytest"},
+            },
+        )
+        assert library_qc.status_code == 200, library_qc.text
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
@@ -875,6 +893,74 @@ def test_beta_flow_records_modern_action_instances(bdb):
         assert run.status_code == 200, run.text
         run_euid = run.json()["run_euid"]
 
+    GI = bdb.Base.classes.generic_instance
+
+    def instance(euid: str):
+        return (
+            bdb.session.query(GI)
+            .filter(GI.euid == euid, GI.is_deleted.is_(False))
+            .one()
+        )
+
+    def graph_ref_tuples(euid: str):
+        props = _props(instance(euid))
+        refs = props.get("external_payload", {}).get("tapdb_graph", [])
+        return {
+            (ref["system"], ref["root_euid"], ref["relationship_type"])
+            for ref in refs
+        }
+
+    process_ref = atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
+    test_ref = atlas_context["fulfillment_items"][0]["atlas_test_euid"]
+    expected_atlas_refs = {
+        ("atlas", atlas_context["atlas_trf_euid"], "received_from_atlas_trf"),
+        ("atlas", test_ref, "prepared_for_atlas_test"),
+        ("atlas", process_ref, "fulfills_atlas_test_fulfillment_item"),
+    }
+    assert expected_atlas_refs.issubset(graph_ref_tuples(specimen_euid))
+    assert (
+        "atlas",
+        process_ref,
+        "fulfills_atlas_test_fulfillment_item",
+    ) in graph_ref_tuples(lib_output_euid), _props(instance(lib_output_euid))
+    assert (
+        "atlas",
+        process_ref,
+        "fulfills_atlas_test_fulfillment_item",
+    ) in graph_ref_tuples(library_material_euid), _props(instance(library_material_euid))
+
+    plate_graph = _props(instance(plate_euid))["graph"]
+    well_graph = _props(instance(well_euid))["graph"]
+    library_plate_graph = _props(instance(library_plate_euid))["graph"]
+    library_well_graph = _props(instance(library_well_euid))["graph"]
+    specimen_graph = _props(instance(specimen_euid))["graph"]
+    assert plate_graph["node_role"] == "fixed-plate-24"
+    assert plate_graph["expected_fanout"][0]["max_child_count"] == 24
+    assert library_plate_graph["node_role"] == "fixed-plate-96"
+    assert library_plate_graph["expected_fanout"][0]["max_child_count"] == 96
+    assert well_graph["expected_fanout"][0]["max_child_count"] == 1
+    assert library_well_graph["expected_fanout"][0]["max_child_count"] == 1
+    assert specimen_graph["role"] == "bloom_accepted_specimen"
+
+    pool_graph = _props(instance(pool_euid))["graph"]
+    pool_fanout = {
+        tuple(entry["relationship_types"]): entry["max_child_count"]
+        for entry in pool_graph["expected_fanout"]
+    }
+    assert pool_fanout[("beta_pool_member",)] == 1
+    assert (
+        "beta_sequencing_run",
+        "contains",
+        "executed_on",
+        "execution_subject_lease",
+        "execution_subject_record",
+    ) in pool_fanout
+    run_graph = _props(instance(run_euid))["graph"]
+    assert {
+        tuple(entry["relationship_types"]): entry["max_child_count"]
+        for entry in run_graph["expected_fanout"]
+    } == {("beta_sequenced_library_assignment",): 1, ("beta_run_artifact",): 0}
+
     subtypes = {
         row.subtype
         for row in bdb.session.query(action_instance)
@@ -889,6 +975,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
         "create_extraction",
         "record_post_extract_qc",
         "create_library_prep",
+        "record_library_qc",
         "create_pool",
         "create_run",
     }.issubset(subtypes)
@@ -906,6 +993,10 @@ def test_beta_flow_records_modern_action_instances(bdb):
     assert run_action is not None
     assert "target_instance_euid" not in (run_action.json_addl or {})
     assert "target_instance_uid" not in (run_action.json_addl or {})
+    action_graph = (run_action.json_addl or {}).get("properties", {}).get("graph", {})
+    assert action_graph["node_role"] == "workflow_action"
+    assert action_graph["expected_fanout"][0]["relationship_types"] == ["executed_on"]
+    assert action_graph["expected_fanout"][0]["max_child_count"] == 1
 
     link = (
         bdb.session.query(action_instance_lineage)
@@ -1008,7 +1099,7 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
             json={
                 "extraction_output_euid": extraction_output_euid,
                 "passed": True,
-                "next_queue": "ont_lib_prep",
+                "next_queue": "ilmn_lib_prep",
             },
         )
         assert qc.status_code == 200, qc.text
@@ -1018,19 +1109,31 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
             headers={"Idempotency-Key": _opaque("idem-libprep")},
             json={
                 "source_extraction_output_euid": extraction_output_euid,
-                "platform": "ONT",
+                "platform": "ILMN",
             },
         )
         assert library_prep.status_code == 200, library_prep.text
         lib_output_euid = library_prep.json()["library_prep_output_euid"]
-        _clear_current_queue(bdb, lib_output_euid)
+        library_material_euid = library_prep.json()["library_material_euid"]
+
+        library_qc = client.post(
+            "/api/v1/external/atlas/beta/library-qc",
+            headers={"Idempotency-Key": _opaque("idem-library-qc")},
+            json={
+                "library_material_euid": library_material_euid,
+                "passed": True,
+                "next_queue": "ilmn_seq_pool",
+            },
+        )
+        assert library_qc.status_code == 200, library_qc.text
+        _clear_current_queue(bdb, library_material_euid)
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
             headers={"Idempotency-Key": _opaque("idem-pool")},
             json={
-                "member_euids": [lib_output_euid],
-                "platform": "ONT",
+                "member_euids": [library_material_euid],
+                "platform": "ILMN",
             },
         )
         assert pool.status_code == 200, pool.text
@@ -1042,7 +1145,7 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
             headers={"Idempotency-Key": _opaque("idem-run")},
             json={
                 "pool_euid": pool_euid,
-                "platform": "ONT",
+                "platform": "ILMN",
                 "flowcell_id": "FLOW-GRAPH-01",
                 "status": "completed",
                 "assignments": [
@@ -1086,12 +1189,12 @@ def test_queue_reads_work_without_current_queue_cache(bdb):
     qc_worker = workers[
         "worker://bloom/service/beta-modern-actions@example.com/post_extract_qc"
     ]
-    ont_lib_prep_worker = workers[
-        "worker://bloom/service/beta-modern-actions@example.com/ont_lib_prep"
+    ilmn_lib_qc_worker = workers[
+        "worker://bloom/service/beta-modern-actions@example.com/ilmn_lib_qc"
     ]
-    assert qc_worker.worker_euid != ont_lib_prep_worker.worker_euid
+    assert qc_worker.worker_euid != ilmn_lib_qc_worker.worker_euid
     assert qc_worker.capabilities == ["wetlab.post_extract_qc"]
-    assert ont_lib_prep_worker.capabilities == [
-        "wetlab.library_prep",
-        "platform.ONT",
+    assert ilmn_lib_qc_worker.capabilities == [
+        "wetlab.library_qc",
+        "platform.ILMN",
     ]

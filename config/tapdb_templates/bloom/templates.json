@@ -140,6 +140,29 @@
       }
     },
     {
+      "name": "Record Library QC",
+      "polymorphic_discriminator": "action_template",
+      "category": "BAC",
+      "type": "beta_lab",
+      "subtype": "record_library_qc",
+      "version": "1.0",
+      "instance_prefix": "BAC",
+      "instance_polymorphic_identity": "action_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "managed_by": "bloom",
+        "domain": "beta_lab",
+        "action_definition": {
+          "action_group": "beta_lab",
+          "action_key": "record_library_qc",
+          "name": "Record Library QC",
+          "description": "Records ILMN library QC and optional queue progression."
+        },
+        "semantic_category": "action"
+      }
+    },
+    {
       "name": "Create Run",
       "polymorphic_discriminator": "action_template",
       "category": "BAC",
@@ -2642,23 +2665,6 @@
       }
     },
     {
-      "name": "Bloom User API Token Revision",
-      "polymorphic_discriminator": "generic_template",
-      "category": "BBX",
-      "type": "auth",
-      "subtype": "user-api-token-revision",
-      "version": "1.0",
-      "instance_prefix": "BBX",
-      "instance_polymorphic_identity": "generic_instance",
-      "bstatus": "active",
-      "is_singleton": false,
-      "json_addl": {
-        "managed_by": "bloom",
-        "domain": "auth",
-        "semantic_category": "bloom"
-      }
-    },
-    {
       "name": "Bloom User API Token Usage Log",
       "polymorphic_discriminator": "generic_template",
       "category": "BBX",
@@ -2722,23 +2728,6 @@
       "category": "BBX",
       "type": "auth",
       "subtype": "user-group-membership",
-      "version": "1.0",
-      "instance_prefix": "BBX",
-      "instance_polymorphic_identity": "generic_instance",
-      "bstatus": "active",
-      "is_singleton": false,
-      "json_addl": {
-        "managed_by": "bloom",
-        "domain": "auth",
-        "semantic_category": "bloom"
-      }
-    },
-    {
-      "name": "Bloom User Group Revision",
-      "polymorphic_discriminator": "generic_template",
-      "category": "BBX",
-      "type": "auth",
-      "subtype": "user-group-revision",
       "version": "1.0",
       "instance_prefix": "BBX",
       "instance_polymorphic_identity": "generic_instance",

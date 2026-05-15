@@ -65,7 +65,7 @@ def test_run_resolver_requires_full_key_query_params():
         app.dependency_overrides.pop(require_external_ursa_read, None)
 
 
-def test_material_registration_links_fulfillment_items_on_container_and_patient_on_specimen(
+def test_material_registration_links_fulfillment_items_on_container_and_specimen(
     bdb,
 ):
     def _atlas_rw_user() -> APIUser:
@@ -156,8 +156,10 @@ def test_material_registration_links_fulfillment_items_on_container_and_patient_
             == atlas_context["atlas_patient_euid"]
             for ref in specimen_refs
         )
-        assert not any(
+        assert any(
             str(ref.get("reference_type")) == "atlas_test_fulfillment_item"
+            and str(ref.get("atlas_test_fulfillment_item_euid"))
+            == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
             for ref in specimen_refs
         )
         assert any(
