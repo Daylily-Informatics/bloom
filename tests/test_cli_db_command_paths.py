@@ -154,6 +154,21 @@ def test_update_tapdb_namespace_config_uses_db_config_update(
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
     monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            config_path="/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
+            env="dev",
+            owner_repo_name="bloom",
+            schema_name="tapdb_bloom_tests_dev",
+            physical_database="bloom",
+            database_name="bloom",
+            domain_code="Z",
+            domain_registry_path="/tmp/domain_code_registry.json",
+            prefix_ownership_registry_path="/tmp/prefix_ownership_registry.json",
+        ),
+    )
+    monkeypatch.setattr(
         db_commands, "_tapdb_support_email", lambda _env: "support@example.com"
     )
     monkeypatch.setattr(
@@ -234,7 +249,7 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
                 "--database-name",
                 "bloomy",
                 "--schema-name",
-                "tapdb_bloom_dev",
+                "dev=tapdb_bloom_dev",
                 "--owner-repo-name",
                 "bloom",
                 "--domain-code",

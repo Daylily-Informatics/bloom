@@ -179,7 +179,7 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
         "--database-name",
         ctx.database_name,
         "--schema-name",
-        ctx.schema_name,
+        f"{env_name}={ctx.schema_name}",
         "--owner-repo-name",
         ctx.owner_repo_name,
         "--domain-code",
