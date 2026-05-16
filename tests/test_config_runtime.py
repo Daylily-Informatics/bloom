@@ -236,6 +236,11 @@ def test_runtime_context_requires_explicit_tapdb_paths(monkeypatch):
             "tapdb.config_path must be a full absolute path",
         ),
         (
+            "schema_name",
+            "",
+            "tapdb.schema_name is required and must be passed explicitly",
+        ),
+        (
             "config_path",
             "~/tapdb-config.yaml",
             "tapdb.config_path must be a full absolute path",
@@ -257,8 +262,12 @@ def test_tapdb_path_fields_reject_non_absolute_values(
     field_value: str,
     message: str,
 ):
-    with pytest.raises(ValidationError, match=message):
-        BloomSettings(tapdb={field_name: field_value})
+    if field_name == "schema_name":
+        with pytest.raises(RuntimeError, match=message):
+            get_tapdb_runtime_context(BloomSettings(tapdb={field_name: field_value}))
+    else:
+        with pytest.raises(ValidationError, match=message):
+            BloomSettings(tapdb={field_name: field_value})
 
 
 def test_strict_app_startup_accepts_synthesized_test_config(
@@ -351,6 +360,7 @@ def test_runtime_context_preserves_explicit_tapdb_paths(tmp_path: Path):
     settings = BloomSettings(
         tapdb={
             "config_path": str(config_path),
+            "schema_name": "tapdb_bloom_test",
             "domain_registry_path": str(domain_registry_path),
             "prefix_ownership_registry_path": str(prefix_registry_path),
         }
@@ -358,6 +368,7 @@ def test_runtime_context_preserves_explicit_tapdb_paths(tmp_path: Path):
     ctx = get_tapdb_runtime_context(settings)
 
     assert ctx.config_path == str(config_path)
+    assert ctx.schema_name == "tapdb_bloom_test"
     assert ctx.domain_registry_path == str(domain_registry_path)
     assert ctx.prefix_ownership_registry_path == str(prefix_registry_path)
 
@@ -376,6 +387,7 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
         "TAPDB_DOMAIN_REGISTRY_PATH",
         "TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH",
         "BLOOM_TAPDB__CONFIG_PATH",
+        "BLOOM_TAPDB__SCHEMA_NAME",
         "BLOOM_TAPDB__OWNER_REPO_NAME",
         "BLOOM_TAPDB__DOMAIN_CODE",
         "BLOOM_TAPDB__DOMAIN_REGISTRY_PATH",
@@ -392,6 +404,7 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert settings.tapdb.domain_registry_path == ""
     assert settings.tapdb.prefix_ownership_registry_path == ""
     assert settings.tapdb.config_path == ""
+    assert settings.tapdb.schema_name == ""
 
     project_root = Path(__file__).resolve().parents[1]
     root_template = (project_root / "config" / "bloom-config-template.yaml").read_text(
@@ -419,11 +432,15 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert 'domain_registry_path: ""' in root_template
     assert 'prefix_ownership_registry_path: ""' in root_template
     assert 'config_path: ""' in root_template
+    assert 'schema_name: ""' in root_template
+    assert 'physical_database: ""' in root_template
     assert 'owner_repo_name: "bloom"' in packaged_template
     assert 'domain_code: "Z"' in packaged_template
     assert 'domain_registry_path: ""' in packaged_template
     assert 'prefix_ownership_registry_path: ""' in packaged_template
     assert 'config_path: ""' in packaged_template
+    assert 'schema_name: ""' in packaged_template
+    assert 'physical_database: ""' in packaged_template
     assert "allowed_hosts: []" in root_template
     assert "allowed_hosts: []" in packaged_template
     assert pyproject["tool"]["setuptools"]["package-data"]["bloom_lims"] == [

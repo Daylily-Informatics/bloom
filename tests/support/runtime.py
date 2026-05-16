@@ -251,6 +251,7 @@ def ensure_test_runtime_environment() -> Path:
     os.environ["TAPDB_DOMAIN_CODE"] = "Z"
     os.environ["BLOOM_TAPDB__CLIENT_ID"] = "bloom"
     os.environ["BLOOM_TAPDB__DATABASE_NAME"] = "bloom"
+    os.environ["BLOOM_TAPDB__SCHEMA_NAME"] = "tapdb_bloom_tests_dev"
     os.environ["BLOOM_TAPDB__OWNER_REPO_NAME"] = "bloom"
     os.environ["BLOOM_TAPDB__DOMAIN_CODE"] = "Z"
     os.environ["BLOOM_TAPDB__STRICT_NAMESPACE"] = "1"

@@ -37,6 +37,8 @@ tapdb:
   env: "dev"                    # dev, test, prod
   client_id: "bloom"            # TapDB client namespace key stored in config
   database_name: "bloom"        # TapDB database namespace stored in config
+  schema_name: ""               # REQUIRED explicit PostgreSQL schema namespace
+  physical_database: ""         # Optional physical PostgreSQL database for shared local TapDB
   owner_repo_name: "bloom"      # TapDB owner repo token for governance checks
   domain_code: "Z"              # Meridian domain code required for runtime
   domain_registry_path: ""      # REQUIRED absolute path to the domain registry JSON

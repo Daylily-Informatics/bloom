@@ -498,6 +498,14 @@ class TapDBSettings(BaseModel):
         default="bloom",
         description="TapDB database namespace key for Bloom runtime config",
     )
+    schema_name: str = Field(
+        default="",
+        description="Explicit PostgreSQL schema namespace for Bloom TapDB runtime",
+    )
+    physical_database: str = Field(
+        default="",
+        description="Physical PostgreSQL database name for local shared TapDB runtime",
+    )
     owner_repo_name: str = Field(
         default=DEFAULT_TAPDB_OWNER_REPO_NAME,
         description="TapDB owner repo name for Meridian governance",
@@ -551,6 +559,16 @@ class TapDBSettings(BaseModel):
             raise ValueError("tapdb.database_name cannot be empty")
         return cleaned
 
+    @field_validator("schema_name")
+    @classmethod
+    def validate_schema_name(cls, value: str) -> str:
+        return str(value or "").strip()
+
+    @field_validator("physical_database")
+    @classmethod
+    def validate_physical_database(cls, value: str) -> str:
+        return str(value or "").strip()
+
     @field_validator("owner_repo_name")
     @classmethod
     def validate_owner_repo_name(cls, value: str) -> str:
@@ -601,6 +619,8 @@ class TapDBRuntimeContext(BaseModel):
     env: str
     client_id: str
     database_name: str
+    schema_name: str
+    physical_database: str = ""
     owner_repo_name: str = DEFAULT_TAPDB_OWNER_REPO_NAME
     domain_code: str = DEFAULT_TAPDB_DOMAIN_CODE
     domain_registry_path: str = ""
@@ -1140,6 +1160,11 @@ def get_tapdb_runtime_context(
 ) -> TapDBRuntimeContext:
     """Resolve active TapDB runtime context from Bloom config."""
     settings = settings or get_settings()
+    schema_name = settings.tapdb.schema_name.strip()
+    if not schema_name:
+        raise RuntimeError(
+            "tapdb.schema_name is required and must be passed explicitly for Bloom TapDB runtime"
+        )
     config_path = _require_explicit_absolute_path(
         settings.tapdb.config_path,
         field_name="tapdb.config_path",
@@ -1156,6 +1181,8 @@ def get_tapdb_runtime_context(
         env=settings.tapdb.env.strip().lower(),
         client_id=settings.tapdb.client_id.strip(),
         database_name=settings.tapdb.database_name.strip(),
+        schema_name=schema_name,
+        physical_database=settings.tapdb.physical_database.strip(),
         owner_repo_name=settings.tapdb.owner_repo_name.strip(),
         domain_code=settings.tapdb.domain_code.strip().upper(),
         domain_registry_path=domain_registry_path,

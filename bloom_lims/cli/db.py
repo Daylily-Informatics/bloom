@@ -88,6 +88,7 @@ def _runtime_env() -> dict[str, str]:
     env["MERIDIAN_DOMAIN_CODE"] = ctx.domain_code
     env["TAPDB_DOMAIN_CODE"] = ctx.domain_code
     env["TAPDB_OWNER_REPO"] = ctx.owner_repo_name or DEFAULT_TAPDB_OWNER_REPO_NAME
+    env["TAPDB_SCHEMA_NAME"] = ctx.schema_name
     env["TAPDB_DOMAIN_REGISTRY_PATH"] = domain_registry_path
     env["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"] = prefix_registry_path
     return env
@@ -122,6 +123,7 @@ def _tapdb_support_email(env_name: str) -> str:
 
 
 def _update_tapdb_namespace_config(env_name: str) -> None:
+    ctx = apply_runtime_environment(get_settings())
     _run_tapdb(
         [
             "db-config",
@@ -130,6 +132,10 @@ def _update_tapdb_namespace_config(env_name: str) -> None:
             env_name,
             "--support-email",
             _tapdb_support_email(env_name),
+            "--database",
+            ctx.physical_database or ctx.database_name,
+            "--schema-name",
+            ctx.schema_name,
         ]
     )
 
@@ -172,6 +178,8 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
         ctx.client_id,
         "--database-name",
         ctx.database_name,
+        "--schema-name",
+        ctx.schema_name,
         "--owner-repo-name",
         ctx.owner_repo_name,
         "--domain-code",
