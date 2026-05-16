@@ -66,3 +66,17 @@ def test_rate_limit_middleware_skips_atlas_external_paths():
 
     assert _status(first) == 200
     assert _status(second) == 200
+
+
+def test_rate_limit_middleware_skips_readyz_probe():
+    middleware = RateLimitMiddleware(
+        _ok_app,
+        requests_per_minute=1,
+        requests_per_hour=1000,
+    )
+
+    first = asyncio.run(_run_request("/readyz", middleware))
+    second = asyncio.run(_run_request("/readyz", middleware))
+
+    assert _status(first) == 200
+    assert _status(second) == 200

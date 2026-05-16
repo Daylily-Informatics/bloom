@@ -40,6 +40,7 @@ DEFAULT_EXCLUDE_PATHS = [
     "/health",
     "/health/live",
     "/health/ready",
+    "/readyz",
     # Atlas talks to these endpoints with an API key as a trusted service client.
     # Applying the generic per-IP middleware limiter here blocks legitimate
     # internal workflows like high-volume tube/specimen creation.
