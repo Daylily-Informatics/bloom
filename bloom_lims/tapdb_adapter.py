@@ -288,6 +288,7 @@ class BLOOMdb3:
             db_user=cfg["user"],
             db_pass=cfg.get("password") or "",
             db_name=cfg["database"],
+            schema_name=cfg["schema_name"],
             app_username=app_username,
             echo_sql=echo_sql,
             pool_size=pool_size,

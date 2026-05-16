@@ -42,7 +42,8 @@ class _FakeSession:
 
 
 class _FakeTapdbConnection:
-    def __init__(self, **_kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
         self.engine = object()
         self._Session = self._raw_session
         self.get_session_calls = 0
@@ -80,6 +81,7 @@ def fake_tapdb(monkeypatch: pytest.MonkeyPatch) -> _FakeTapdbConnection:
             "user": "tester",
             "password": "",
             "database": "tapdb_bloom_dev",
+            "schema_name": "tapdb_bloom_tests_dev",
         },
     )
     monkeypatch.setattr(tapdb_adapter, "TAPDBConnection", _factory)
@@ -94,6 +96,7 @@ def test_bloomdb3_bootstraps_sessions_via_tapdb_connection(fake_tapdb):
     conn = fake_tapdb["conn"]
 
     assert conn.get_session_calls == 1
+    assert conn.kwargs["schema_name"] == "tapdb_bloom_tests_dev"
     assert db.session is conn.sessions[0]
     assert conn.sessions[0].executed[-1][1] == {"username": "pytest@example.com"}
 
