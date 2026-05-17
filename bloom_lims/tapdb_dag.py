@@ -21,7 +21,6 @@ def mount_tapdb_dag_api(app: FastAPI) -> None:
     app.include_router(
         create_tapdb_dag_router(
             config_path=runtime_ctx.config_path,
-            env_name=runtime_ctx.env,
             service_name="bloom",
         ),
         dependencies=[Depends(require_api_auth)],

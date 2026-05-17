@@ -198,7 +198,7 @@ def _default_upload_dir_for_runtime(
     *,
     client_id: str,
     namespace: str,
-    env_name: str,
+    target_label: str,
     config_path: str = "",
 ) -> str:
     _ = client_id
@@ -208,7 +208,7 @@ def _default_upload_dir_for_runtime(
         field_name="tapdb.config_path",
     )
     scoped_root = Path(resolved_config_path).expanduser().resolve().parent
-    return str(scoped_root / env_name.strip().lower() / "uploads")
+    return str(scoped_root / target_label.strip().lower() / "uploads")
 
 
 def _ensure_directory(path_value: str) -> None:
@@ -226,6 +226,14 @@ def _validate_optional_https_url(value: str, *, field_name: str) -> str:
     if not normalized.startswith("https://"):
         raise ValueError(f"{field_name} must use an absolute https:// URL")
     return normalized.rstrip("/")
+
+
+def _read_first_env(*names: str) -> str:
+    for name in names:
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _validate_bare_host(value: str, *, field_name: str) -> str:
@@ -487,9 +495,6 @@ def _yaml_config_files() -> list[Path]:
 class TapDBSettings(BaseModel):
     """TapDB runtime targeting configuration."""
 
-    env: str = Field(
-        default="dev", description="TapDB target environment: dev/test/prod"
-    )
     client_id: str = Field(
         default="bloom",
         description="TapDB client namespace key for Bloom runtime config",
@@ -534,14 +539,6 @@ class TapDBSettings(BaseModel):
         default=DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT,
         description="Default local PostgreSQL port for TapDB dev/test runtime",
     )
-
-    @field_validator("env")
-    @classmethod
-    def validate_env(cls, value: str) -> str:
-        env = value.strip().lower()
-        if env not in {"dev", "test", "prod"}:
-            raise ValueError("tapdb.env must be one of: dev, test, prod")
-        return env
 
     @field_validator("client_id")
     @classmethod
@@ -616,7 +613,7 @@ class TapDBSettings(BaseModel):
 class TapDBRuntimeContext(BaseModel):
     """Resolved runtime context to pass to daylily-tapdb."""
 
-    env: str
+    target_label: str = "target"
     client_id: str
     database_name: str
     schema_name: str
@@ -749,9 +746,37 @@ class DeploymentSettings(BaseModel):
         return self
 
 
+class ExternalBrokerSettings(BaseModel):
+    """Browser-auth broker settings for the LSMC login broker contract."""
+
+    service_id: str = Field(default="bloom", description="Broker service identifier")
+    login_url: str = Field(default="", description="External broker login URL")
+    handoff_exchange_url: str = Field(
+        default="", description="External broker handoff exchange URL"
+    )
+    callback_url: str = Field(default="", description="Bloom broker callback URL")
+    logout_url: str = Field(default="", description="External broker logout URL")
+
+    @field_validator("service_id")
+    @classmethod
+    def validate_service_id(cls, value: str) -> str:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            raise ValueError("auth.external_broker.service_id cannot be empty")
+        return cleaned
+
+    @field_validator("login_url", "handoff_exchange_url", "callback_url", "logout_url")
+    @classmethod
+    def validate_urls(cls, value: str, info) -> str:
+        return _validate_optional_https_url(
+            value, field_name=f"auth.external_broker.{info.field_name}"
+        )
+
+
 class AuthSettings(BaseModel):
     """Authentication configuration."""
 
+    mode: str = Field(default="cognito", description="Browser auth mode")
     cognito_user_pool_id: str = Field(default="", description="Cognito user pool ID")
     cognito_client_id: str = Field(default="", description="Cognito app client ID")
     cognito_client_secret: str = Field(
@@ -786,6 +811,10 @@ class AuthSettings(BaseModel):
         default_factory=lambda: ["lsmc.com"],
         description="Email domains allowed to auto-provision missing users",
     )
+    external_broker: ExternalBrokerSettings = Field(
+        default_factory=ExternalBrokerSettings,
+        description="External browser-auth broker configuration",
+    )
 
     jwt_secret: str = Field(default="", description="JWT secret key")
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
@@ -798,6 +827,47 @@ class AuthSettings(BaseModel):
     @classmethod
     def validate_cognito_domain(cls, value: str) -> str:
         return _validate_bare_host(value, field_name="auth.cognito_domain")
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, value: str) -> str:
+        mode = str(value or "").strip().lower()
+        if mode not in {"cognito", "external_broker"}:
+            raise ValueError("auth.mode must be 'cognito' or 'external_broker'")
+        return mode
+
+    @model_validator(mode="after")
+    def apply_shared_broker_environment(self) -> "AuthSettings":
+        shared_mode = _read_first_env("LSMC_AUTH_MODE")
+        if shared_mode:
+            self.mode = self.validate_mode(shared_mode)
+        shared_broker = {
+            "service_id": _read_first_env("LSMC_AUTH_BROKER_SERVICE_ID"),
+            "login_url": _read_first_env("LSMC_AUTH_BROKER_LOGIN_URL"),
+            "handoff_exchange_url": _read_first_env(
+                "LSMC_AUTH_BROKER_HANDOFF_EXCHANGE_URL"
+            ),
+            "callback_url": _read_first_env("LSMC_AUTH_BROKER_CALLBACK_URL"),
+            "logout_url": _read_first_env("LSMC_AUTH_BROKER_LOGOUT_URL"),
+        }
+        current = self.external_broker.model_dump()
+        updated = {
+            key: value if value else current.get(key, "")
+            for key, value in shared_broker.items()
+        }
+        self.external_broker = ExternalBrokerSettings.model_validate(updated)
+        if self.mode == "external_broker":
+            missing = [
+                f"auth.external_broker.{key}"
+                for key, value in self.external_broker.model_dump().items()
+                if not str(value or "").strip()
+            ]
+            if missing:
+                raise ValueError(
+                    "external broker auth requires explicit settings: "
+                    + ", ".join(missing)
+                )
+        return self
 
 
 class AtlasSettings(BaseModel):
@@ -1111,7 +1181,7 @@ class BloomSettings(BaseSettings):
             self.storage.upload_dir = _default_upload_dir_for_runtime(
                 client_id=self.tapdb.client_id.strip(),
                 namespace=self.tapdb.database_name.strip(),
-                env_name=self.tapdb.env.strip().lower(),
+                target_label="target",
                 config_path=self.tapdb.config_path,
             )
 
@@ -1135,11 +1205,6 @@ class BloomSettings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.environment == "development"
-
-    # Compatibility aliases for explicit tapdb context naming.
-    @property
-    def tapdb_env(self) -> str:
-        return self.tapdb.env
 
     @property
     def tapdb_database_name(self) -> str:
@@ -1178,7 +1243,7 @@ def get_tapdb_runtime_context(
         field_name="tapdb.prefix_ownership_registry_path",
     )
     return TapDBRuntimeContext(
-        env=settings.tapdb.env.strip().lower(),
+        target_label="target",
         client_id=settings.tapdb.client_id.strip(),
         database_name=settings.tapdb.database_name.strip(),
         schema_name=schema_name,
@@ -1197,7 +1262,7 @@ def get_tapdb_runtime_context(
 def apply_runtime_environment(
     settings: Optional[BloomSettings] = None,
 ) -> TapDBRuntimeContext:
-    """Return normalized Bloom runtime context without mutating TAPDB env."""
+    """Return normalized Bloom runtime context without mutating TapDB globals."""
     settings = settings or get_settings()
     ctx = get_tapdb_runtime_context(settings=settings)
     return ctx
@@ -1212,12 +1277,11 @@ def get_tapdb_db_config(
     settings = get_settings()
     ctx = apply_runtime_environment(settings)
 
-    target_env = (env_name or ctx.env).strip().lower()
+    _ = env_name
 
-    from daylily_tapdb.cli.db_config import get_db_config_for_env
+    from daylily_tapdb.cli.db_config import get_db_config
 
-    return get_db_config_for_env(
-        target_env,
+    return get_db_config(
         config_path=(config_path or ctx.config_path or None),
         client_id=ctx.client_id,
         database_name=(database_name or ctx.database_name),

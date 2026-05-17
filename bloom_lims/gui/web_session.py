@@ -34,14 +34,25 @@ def build_bloom_web_session_config(
 ) -> CognitoWebSessionConfig:
     settings = get_settings()
     auth_settings = settings.auth
+    if auth_settings.mode == "external_broker":
+        broker = auth_settings.external_broker
+        public_base_url = _origin(broker.callback_url or "https://localhost:8912")
+        return CognitoWebSessionConfig(
+            domain=urlparse(broker.login_url).netloc,
+            client_id=broker.service_id,
+            redirect_uri=broker.callback_url,
+            logout_uri=broker.logout_url,
+            public_base_url=public_base_url,
+            session_secret_key=_session_secret(auth_settings),
+            session_cookie_name="bloom_session",
+            session_max_age=max(int(auth_settings.session_timeout_minutes or 30) * 60, 300),
+            allow_insecure_http=public_base_url.startswith("http://"),
+            server_instance_id=get_server_instance_id(),
+            auth_mode="external_broker",
+        )
+
     public_base_url = _origin(auth_settings.cognito_redirect_uri or "https://localhost:8912")
-    explicit_secret = str(os.environ.get("BLOOM_SESSION_SECRET") or "").strip()
-    base_secret = (
-        explicit_secret
-        or auth_settings.jwt_secret
-        or auth_settings.cognito_client_secret
-        or _SESSION_SECRET_FALLBACK
-    )
+    base_secret = _session_secret(auth_settings)
     scopes = auth_settings.cognito_scopes or ["openid", "email", "profile"]
 
     return CognitoWebSessionConfig(
@@ -57,6 +68,16 @@ def build_bloom_web_session_config(
         scope=" ".join(scopes),
         allow_insecure_http=public_base_url.startswith("http://"),
         server_instance_id=get_server_instance_id(),
+    )
+
+
+def _session_secret(auth_settings: Any) -> str:
+    explicit_secret = str(os.environ.get("BLOOM_SESSION_SECRET") or "").strip()
+    return (
+        explicit_secret
+        or auth_settings.jwt_secret
+        or auth_settings.cognito_client_secret
+        or _SESSION_SECRET_FALLBACK
     )
 
 
@@ -96,6 +117,8 @@ def clear_bloom_session(request: Request) -> None:
     clear_session_principal(request)
     request.session.pop("_cognito_oauth_state", None)
     request.session.pop("_cognito_post_auth_redirect", None)
+    request.session.pop("bloom_external_broker_state", None)
+    request.session.pop("bloom_external_broker_next", None)
     request.session.pop("user_data", None)
     request.session.pop("bloom_post_auth_redirect", None)
 

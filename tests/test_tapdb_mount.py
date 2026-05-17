@@ -118,7 +118,7 @@ def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
         tapdb_dag,
         "apply_runtime_environment",
         lambda: SimpleNamespace(
-            env="dev",
+            target_label="target",
             config_path="/tmp/bloom-tapdb-config.yaml",
         ),
     )
@@ -136,7 +136,6 @@ def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
 
     assert captured == {
         "config_path": "/tmp/bloom-tapdb-config.yaml",
-        "env_name": "dev",
         "service_name": "bloom",
     }
     assert "/api/dag/search" in {route.path for route in app.routes}
@@ -166,7 +165,7 @@ def test_mount_uses_explicit_tapdb_context(monkeypatch):
         tapdb_mount,
         "apply_runtime_environment",
         lambda: SimpleNamespace(
-            env="dev",
+            target_label="target",
             config_path="/tmp/bloom-tapdb-config.yaml",
             client_id="bloom",
             database_name="bloom",
@@ -185,7 +184,6 @@ def test_mount_uses_explicit_tapdb_context(monkeypatch):
 
     assert config is not None
     assert captured == {
-        "tapdb_env": "dev",
         "config_path": "/tmp/bloom-tapdb-config.yaml",
         "client_id": "bloom",
         "database_name": "bloom",

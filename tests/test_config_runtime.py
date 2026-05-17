@@ -31,7 +31,7 @@ from bloom_lims.config import (
 )
 from tests.support.runtime import (
     ensure_test_runtime_environment,
-    read_pyproject_pinned_version,
+    read_pyproject_dependency_spec,
 )
 
 
@@ -47,7 +47,7 @@ def test_storage_upload_dir_defaults_to_deployment_scoped_runtime(
     get_settings.cache_clear()
 
     settings = BloomSettings()
-    expected = config_path.parent / "dev" / "uploads"
+    expected = config_path.parent / "target" / "uploads"
 
     assert Path(settings.storage.upload_dir) == expected
     assert expected.is_dir()
@@ -127,6 +127,39 @@ def test_nested_env_overrides_template_defaults(monkeypatch):
     assert settings.auth.cognito_redirect_uri == "https://example.test/auth/callback"
 
 
+def test_external_broker_configuration_from_shared_env(monkeypatch):
+    monkeypatch.setenv("LSMC_AUTH_MODE", "external_broker")
+    monkeypatch.setenv("LSMC_AUTH_BROKER_SERVICE_ID", "bloom")
+    monkeypatch.setenv(
+        "LSMC_AUTH_BROKER_LOGIN_URL", "https://dev.login.lsmc.com/auth/login"
+    )
+    monkeypatch.setenv(
+        "LSMC_AUTH_BROKER_HANDOFF_EXCHANGE_URL",
+        "https://dev.login.lsmc.com/auth/handoff/consume",
+    )
+    monkeypatch.setenv(
+        "LSMC_AUTH_BROKER_CALLBACK_URL",
+        "https://localhost:8912/auth/lsmc/callback",
+    )
+    monkeypatch.setenv(
+        "LSMC_AUTH_BROKER_LOGOUT_URL", "https://dev.login.lsmc.com/auth/logout"
+    )
+    get_settings.cache_clear()
+
+    settings = BloomSettings()
+
+    assert settings.auth.mode == "external_broker"
+    assert settings.auth.external_broker.service_id == "bloom"
+    assert settings.auth.external_broker.handoff_exchange_url.endswith(
+        "/auth/handoff/consume"
+    )
+
+
+def test_external_broker_mode_requires_explicit_settings():
+    with pytest.raises(ValidationError, match="external broker auth requires"):
+        BloomSettings(auth={"mode": "external_broker"})
+
+
 def test_env_overrides_user_yaml_for_auth_cognito_domain(monkeypatch, tmp_path: Path):
     xdg_config_home = tmp_path / ".config"
     user_config_dir = xdg_config_home / "bloom-local"
@@ -174,6 +207,14 @@ def test_build_default_config_template_injects_fresh_jwt_secret():
         assert len(match.group(1)) >= 32
         data = yaml.safe_load(template)
         auth = data["auth"]
+        assert auth["mode"] == "cognito"
+        assert auth["external_broker"] == {
+            "service_id": "bloom",
+            "login_url": "",
+            "handoff_exchange_url": "",
+            "callback_url": "",
+            "logout_url": "",
+        }
         assert auth["cognito_allowed_domains"] == [
             "lsmc.com",
             "lsmc.bio",
@@ -396,9 +437,10 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
     settings = BloomSettings()
-    expected_tapdb_version = read_pyproject_pinned_version("daylily-tapdb")
+    expected_tapdb_spec = read_pyproject_dependency_spec("daylily-tapdb")
 
-    assert assert_tapdb_version() == expected_tapdb_version
+    assert expected_tapdb_spec == "<8.0.0,>=7.0.1"
+    assert assert_tapdb_version()
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
     assert settings.tapdb.domain_registry_path == ""
@@ -441,6 +483,10 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     assert 'config_path: ""' in packaged_template
     assert 'schema_name: ""' in packaged_template
     assert 'physical_database: ""' in packaged_template
+    assert "tapdb.env" not in root_template
+    assert "tapdb.env" not in packaged_template
+    assert "  env:" not in root_template
+    assert "  env:" not in packaged_template
     assert "allowed_hosts: []" in root_template
     assert "allowed_hosts: []" in packaged_template
     assert pyproject["tool"]["setuptools"]["package-data"]["bloom_lims"] == [

@@ -136,8 +136,8 @@ If the shared pool already has a `bloom` app client, reuse it. If not:
 
 ```bash
 source ./activate bringup
-tapdb --config ~/.config/tapdb/bloom/bloom-bringup/tapdb-config.yaml --env dev \
-  cognito add-app dev \
+tapdb --config ~/.config/tapdb/bloom/bloom-bringup/tapdb-config.yaml \
+  cognito add-app \
   --app-name bloom \
   --pool-name <shared-pool-name> \
   --callback-url https://localhost:8912/auth/callback \
@@ -148,9 +148,8 @@ tapdb --config ~/.config/tapdb/bloom/bloom-bringup/tapdb-config.yaml --env dev \
 
 ```bash
 source ./activate bringup
-tapdb --config ~/.config/tapdb/bloom/bloom-bringup/tapdb-config.yaml --env dev \
+tapdb --config ~/.config/tapdb/bloom/bloom-bringup/tapdb-config.yaml \
   db-config update \
-  --env dev \
   --cognito-user-pool-id <pool-id> \
   --cognito-app-client-id <client-id> \
   --cognito-client-name bloom \

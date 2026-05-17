@@ -15,6 +15,7 @@ os.environ.setdefault("BLOOM_DEV_AUTH_BYPASS", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import main
 from auth.cognito.client import CognitoConfigurationError
+from bloom_lims.config import BloomSettings
 from bloom_lims.gui.routes.auth import SessionBootstrapError
 from bloom_lims.gui.web_session import _normalize_user_data
 
@@ -130,6 +131,104 @@ def test_auth_callback_get_completes_login(
     assert response.headers["location"] == "/"
     assert client.cookies.get("bloom_session")
     assert not client.cookies.get("session")
+
+
+def _external_broker_settings() -> BloomSettings:
+    return BloomSettings(
+        auth={
+            "mode": "external_broker",
+            "jwt_secret": "test-session-secret",
+            "external_broker": {
+                "service_id": "bloom",
+                "login_url": "https://dev.login.lsmc.com/auth/login",
+                "handoff_exchange_url": "https://dev.login.lsmc.com/auth/handoff/consume",
+                "callback_url": "https://localhost:8912/auth/lsmc/callback",
+                "logout_url": "https://dev.login.lsmc.com/auth/logout",
+            },
+        }
+    )
+
+
+def test_external_broker_login_and_callback_create_session(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    settings = _external_broker_settings()
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("bloom_lims.gui.web_session.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._resolve_login_roles_and_groups",
+        lambda **kwargs: (
+            ["ADMIN"],
+            ["API_ACCESS"],
+            kwargs.get("cognito_sub") or kwargs.get("email"),
+            "ADMIN",
+        ),
+    )
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth.get_user_preferences",
+        lambda email: {"email": email, "display_timezone": "UTC"},
+    )
+
+    async def _exchange(code: str) -> dict:
+        assert code == "handoff-code"
+        return {
+            "user": {
+                "canonical_user_id": "email:johnm@lsmc.com",
+                "email": "johnm@lsmc.com",
+                "display_name": "John M",
+                "groups": ["lsmc:global-admin", "lsmc:bloom:admin"],
+                "roles": ["admin"],
+                "service_entitlements": [
+                    {"service": "bloom", "roles": ["admin"], "groups": []}
+                ],
+            }
+        }
+
+    monkeypatch.setattr(
+        "bloom_lims.gui.routes.auth._exchange_external_broker_handoff", _exchange
+    )
+
+    login = client.get("/auth/login?next=/user_home", follow_redirects=False)
+
+    assert login.status_code in (302, 303)
+    location = login.headers["location"]
+    parsed = urlparse(location)
+    assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == (
+        "https://dev.login.lsmc.com/auth/login"
+    )
+    params = parse_qs(parsed.query)
+    assert params["service"] == ["bloom"]
+    assert params["next"] == ["/user_home"]
+    assert params["callback_url"] == ["https://localhost:8912/auth/lsmc/callback"]
+    state = params["state"][0]
+
+    callback = client.get(
+        f"/auth/lsmc/callback?code=handoff-code&state={state}",
+        follow_redirects=False,
+    )
+
+    assert callback.status_code in (302, 303)
+    assert callback.headers["location"] == "/user_home"
+    assert client.cookies.get("bloom_session")
+    already_logged_in = client.get("/login?next=/user_home", follow_redirects=False)
+    assert already_logged_in.status_code in (302, 303)
+    assert already_logged_in.headers["location"] == "/user_home"
+
+
+def test_external_broker_callback_requires_prior_login(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    settings = _external_broker_settings()
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("bloom_lims.gui.web_session.get_settings", lambda: settings)
+
+    response = client.get(
+        "/auth/lsmc/callback?code=handoff-code&state=missing",
+        follow_redirects=False,
+    )
+
+    assert response.status_code in (302, 303)
+    assert response.headers["location"].startswith("/auth/error?reason=invalid_state")
 
 
 def test_auth_callback_get_requires_prior_login_state(

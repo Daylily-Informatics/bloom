@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import logging
 import os
-from urllib.parse import quote
+import secrets
+from typing import Any
+from urllib.parse import quote, urlencode
 
+import httpx
 from daylily_auth_cognito.browser.oauth import build_logout_url
 from daylily_auth_cognito.browser.session import (
     CognitoWebAuthError,
@@ -56,7 +59,16 @@ _AUTH_ERROR_MESSAGES: dict[str, str] = {
         "Bloom cleared your local session, but the shared Cognito logout contract is misconfigured. "
         "Update the shared app client redirect URLs for this Bloom deployment."
     ),
+    "external_broker_misconfigured": (
+        "Bloom external broker sign-in is misconfigured. Update the broker login, callback, "
+        "handoff exchange, and logout URLs for this deployment."
+    ),
+    "auth_error": "Bloom could not complete external broker sign-in. Start sign-in again.",
+    "not_authorized": "Your account is not authorized for this Bloom deployment.",
 }
+
+_EXTERNAL_BROKER_STATE_KEY = "bloom_external_broker_state"
+_EXTERNAL_BROKER_NEXT_KEY = "bloom_external_broker_next"
 
 
 class SessionBootstrapError(RuntimeError):
@@ -66,6 +78,31 @@ class SessionBootstrapError(RuntimeError):
 def _next_path(raw_value: str | None) -> str:
     value = str(raw_value or "").strip()
     return value if value.startswith("/") else "/"
+
+
+def _start_external_broker_login(
+    request: Request,
+    *,
+    next_path: str,
+) -> RedirectResponse:
+    settings = get_settings()
+    broker = settings.auth.external_broker
+    state_token = secrets.token_urlsafe(32)
+    target = _next_path(next_path)
+    request.session[_EXTERNAL_BROKER_STATE_KEY] = state_token
+    request.session[_EXTERNAL_BROKER_NEXT_KEY] = target
+    query = urlencode(
+        {
+            "service": broker.service_id,
+            "next": target,
+            "callback_url": broker.callback_url,
+            "state": state_token,
+        }
+    )
+    return RedirectResponse(
+        url=f"{broker.login_url.rstrip('/')}?{query}",
+        status_code=303,
+    )
 
 
 @router.get("/login", include_in_schema=False)
@@ -97,14 +134,22 @@ async def auth_login(request: Request, next: str = "/"):
         return RedirectResponse(url=_next_path(next), status_code=303)
     try:
         clear_bloom_session(request)
+        if get_settings().auth.mode == "external_broker":
+            return _start_external_broker_login(request, next_path=next)
         return start_cognito_login(
             request,
             build_bloom_web_session_config(request),
             _next_path(next),
         )
     except (CognitoConfigurationError, ValueError) as exc:
-        logging.error("Bloom Cognito sign-in is misconfigured: %s", exc)
-        return _auth_error_redirect("cognito_sign_in_misconfigured", next_path=next)
+        auth_mode = get_settings().auth.mode
+        logging.error("Bloom %s sign-in is misconfigured: %s", auth_mode, exc)
+        reason = (
+            "external_broker_misconfigured"
+            if auth_mode == "external_broker"
+            else "cognito_sign_in_misconfigured"
+        )
+        return _auth_error_redirect(reason, next_path=next)
 
 
 def _auth_error_redirect(reason: str, *, next_path: str = "/") -> RedirectResponse:
@@ -302,6 +347,196 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
     return principal, user_data
 
 
+def _roles_for_external_broker_user(user: dict[str, Any], *, service_id: str) -> list[str]:
+    groups = {str(group).strip() for group in user.get("groups") or [] if str(group).strip()}
+    roles = {
+        _normalize_external_broker_role(role)
+        for role in user.get("roles") or []
+        if str(role).strip()
+    }
+    if "lsmc:global-admin" in groups or f"lsmc:{service_id}:admin" in groups:
+        roles.add(Role.ADMIN.value)
+    if "lsmc:internal-user" in groups:
+        roles.add(Role.READ_WRITE.value)
+    for entitlement in user.get("service_entitlements") or []:
+        if not isinstance(entitlement, dict):
+            continue
+        if str(entitlement.get("service") or "").strip() != service_id:
+            continue
+        roles.update(
+            _normalize_external_broker_role(role)
+            for role in entitlement.get("roles") or []
+            if str(role).strip()
+        )
+    roles.discard("")
+    if Role.ADMIN.value in roles:
+        roles.add(Role.READ_WRITE.value)
+        roles.add(Role.READ_ONLY.value)
+    elif Role.READ_WRITE.value in roles:
+        roles.add(Role.READ_ONLY.value)
+    return sorted(roles, key=lambda role: (role != Role.ADMIN.value, role))
+
+
+def _normalize_external_broker_role(role: object) -> str:
+    normalized = str(role or "").strip().lower().replace("-", "_")
+    if normalized in {"admin", "administrator", "bloom_admin"}:
+        return Role.ADMIN.value
+    if normalized in {
+        "read_write",
+        "readwrite",
+        "write",
+        "operator",
+        "internal_user",
+        "internal",
+    }:
+        return Role.READ_WRITE.value
+    if normalized in {"read_only", "readonly", "read", "viewer", "auditor"}:
+        return Role.READ_ONLY.value
+    return str(role or "").strip().upper()
+
+
+def _build_bloom_principal_from_external_broker(
+    user: dict[str, Any],
+) -> tuple[SessionPrincipal, dict[str, Any]]:
+    settings = get_settings()
+    broker = settings.auth.external_broker
+    email = str(user.get("email") or "").strip().lower()
+    if not email:
+        raise CognitoWebAuthError(
+            "missing_email",
+            "External broker handoff omitted email",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            redirect_to_error=True,
+        )
+
+    roles = _roles_for_external_broker_user(user, service_id=broker.service_id)
+    if not roles:
+        raise CognitoWebAuthError(
+            "not_authorized",
+            "External broker user has no Bloom roles",
+            status_code=status.HTTP_403_FORBIDDEN,
+            redirect_to_error=True,
+        )
+
+    identity_groups = [
+        str(group).strip() for group in user.get("groups") or [] if str(group).strip()
+    ]
+    subject = str(
+        user.get("canonical_user_id") or user.get("sub") or user.get("user_id") or email
+    )
+    try:
+        service_roles, service_groups, resolved_user_id, persisted_role = (
+            _resolve_login_roles_and_groups(
+                email=email,
+                cognito_sub=subject,
+                fallback_role=roles[0],
+            )
+        )
+    except SessionBootstrapError as exc:
+        raise CognitoWebAuthError(
+            "session_bootstrap_failed",
+            str(exc),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            redirect_to_error=True,
+        ) from exc
+    normalized_roles = [
+        _normalize_external_broker_role(role)
+        for role in (service_roles or roles)
+        if str(role).strip()
+    ]
+    primary_role = (
+        persisted_role
+        or (normalized_roles[0] if normalized_roles else Role.READ_WRITE.value)
+    ).upper()
+    user_data = get_user_preferences(email)
+    user_data.update(
+        {
+            "cognito_username": user.get("canonical_user_id") or email,
+            "cognito_sub": subject,
+            "sub": subject,
+            "user_id": resolved_user_id or subject,
+            "name": user.get("display_name") or user.get("name") or email,
+            "role": primary_role,
+            "roles": normalized_roles or [primary_role],
+            "identity_groups": identity_groups,
+            "cognito_groups": identity_groups,
+            "service_groups": list(dict.fromkeys(service_groups)),
+            "groups": list(dict.fromkeys(service_groups)),
+        }
+    )
+    principal = SessionPrincipal(
+        user_sub=subject,
+        email=email,
+        name=str(user_data.get("name") or email),
+        roles=list(user_data["roles"]),
+        cognito_groups=identity_groups,
+        auth_mode="external_broker",
+        app_context={"user_data": dict(user_data)},
+    )
+    return principal, user_data
+
+
+async def _exchange_external_broker_handoff(code: str) -> dict[str, Any]:
+    broker = get_settings().auth.external_broker
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.post(broker.handoff_exchange_url, json={"code": code})
+    if response.status_code >= 400:
+        raise CognitoWebAuthError(
+            "auth_error",
+            f"External broker handoff exchange failed with status {response.status_code}",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            redirect_to_error=True,
+        )
+    data = response.json()
+    if not isinstance(data, dict):
+        raise CognitoWebAuthError(
+            "auth_error",
+            "External broker handoff response must be an object",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            redirect_to_error=True,
+        )
+    return data
+
+
+async def _complete_external_broker_login(
+    request: Request,
+    *,
+    code: str | None,
+    state_token: str | None,
+) -> RedirectResponse:
+    if not code:
+        raise CognitoWebAuthError(
+            "missing_code",
+            "External broker callback omitted code",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            redirect_to_error=True,
+        )
+    expected_state = str(request.session.get(_EXTERNAL_BROKER_STATE_KEY) or "")
+    if not expected_state or state_token != expected_state:
+        raise CognitoWebAuthError(
+            "invalid_state",
+            "External broker state mismatch",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            redirect_to_error=True,
+        )
+    payload = await _exchange_external_broker_handoff(code)
+    user = payload.get("user")
+    if not isinstance(user, dict):
+        raise CognitoWebAuthError(
+            "auth_error",
+            "External broker handoff response omitted user",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            redirect_to_error=True,
+        )
+    principal, user_data = _build_bloom_principal_from_external_broker(user)
+    request.session.pop(_EXTERNAL_BROKER_STATE_KEY, None)
+    redirect_to = _next_path(
+        str(request.session.pop(_EXTERNAL_BROKER_NEXT_KEY, "/") or "/")
+    )
+    store_bloom_session(request, principal, user_data=user_data)
+    return RedirectResponse(url=redirect_to, status_code=303)
+
+
 def _resolve_principal_from_token_payload(
     token_payload: dict, request: Request
 ) -> SessionPrincipal:
@@ -416,6 +651,18 @@ async def auth_callback_get(request: Request):
     return await oauth_callback_get(request)
 
 
+@router.get("/auth/lsmc/callback", include_in_schema=False)
+async def external_broker_callback_get(request: Request):
+    try:
+        return await _complete_external_broker_login(
+            request,
+            code=request.query_params.get("code"),
+            state_token=request.query_params.get("state"),
+        )
+    except CognitoWebAuthError as exc:
+        return _auth_error_redirect(exc.reason)
+
+
 @router.post("/auth/callback")
 async def auth_callback(request: Request):
     return await oauth_callback(request)
@@ -462,7 +709,14 @@ async def _logout_response(request: Request, response: Response):
 
         session_config = build_bloom_web_session_config(request)
         logout_reason: str | None = None
-        if (
+        if get_settings().auth.mode == "external_broker":
+            broker_logout_url = get_settings().auth.external_broker.logout_url
+            if not broker_logout_url:
+                logout_reason = "external_broker_misconfigured"
+                cognito_logout_url = "/login"
+            else:
+                cognito_logout_url = broker_logout_url
+        elif (
             not session_config.domain
             or not session_config.client_id
             or not session_config.logout_uri

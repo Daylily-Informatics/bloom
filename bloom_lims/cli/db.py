@@ -101,37 +101,45 @@ def _ensure_runtime_config_parent() -> None:
     Path(config_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
 
-def _current_env() -> str:
-    return apply_runtime_environment(get_settings()).env
+def _current_target_label() -> str:
+    return apply_runtime_environment(get_settings()).target_label
 
 
-def _local_pg_port(env_name: str) -> str:
+def _confirm_target_label() -> str:
+    ctx = apply_runtime_environment(get_settings())
+    return (
+        f"{ctx.client_id}/{ctx.database_name}/"
+        f"{ctx.schema_name}@{ctx.physical_database or ctx.database_name}"
+    )
+
+
+def _local_pg_port(target_label: str) -> str:
+    _ = target_label
     settings = get_settings()
     return str(
         settings.tapdb.local_pg_port or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
     ).strip()
 
 
-def _local_ui_port(env_name: str) -> str:
-    _ = env_name
+def _local_ui_port(target_label: str) -> str:
+    _ = target_label
     return str(DEFAULT_BLOOM_WEB_PORT).strip()
 
 
-def _tapdb_support_email(env_name: str) -> str:
-    _ = env_name
+def _tapdb_support_email(target_label: str) -> str:
+    _ = target_label
     return get_settings().ui.support_email.strip()
 
 
-def _update_tapdb_namespace_config(env_name: str) -> None:
+def _update_tapdb_namespace_config(target_label: str) -> None:
+    _ = target_label
     ctx = apply_runtime_environment(get_settings())
     _run_tapdb(
         [
             "db-config",
             "update",
-            "--env",
-            env_name,
             "--support-email",
-            _tapdb_support_email(env_name),
+            _tapdb_support_email("target"),
             "--database",
             ctx.physical_database or ctx.database_name,
             "--schema-name",
@@ -155,8 +163,6 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
     cmd = _tapdb_base_cmd() + [
         "--config",
         config_path,
-        "--env",
-        ctx.env,
     ]
     cmd.extend(args)
     env = _runtime_env()
@@ -166,8 +172,9 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
     return result.returncode
 
 
-def _ensure_tapdb_namespace_config(env_name: str) -> None:
+def _ensure_tapdb_namespace_config(target_label: str) -> None:
     """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
+    _ = target_label
     ctx = apply_runtime_environment(get_settings())
     _ensure_runtime_config_parent()
 
@@ -179,33 +186,34 @@ def _ensure_tapdb_namespace_config(env_name: str) -> None:
         "--database-name",
         ctx.database_name,
         "--schema-name",
-        f"{env_name}={ctx.schema_name}",
+        ctx.schema_name,
         "--owner-repo-name",
         ctx.owner_repo_name,
         "--domain-code",
-        f"{env_name}={ctx.domain_code}",
+        ctx.domain_code,
         "--domain-registry-path",
         str(ctx.domain_registry_path),
         "--prefix-ownership-registry-path",
         str(ctx.prefix_ownership_registry_path),
-        "--env",
-        env_name,
+        "--engine-type",
+        "local",
+        "--host",
+        "localhost",
+        "--port",
+        _local_pg_port("target"),
+        "--ui-port",
+        _local_ui_port("target"),
+        "--user",
+        "postgres",
+        "--database",
+        ctx.physical_database or ctx.database_name,
     ]
-    if env_name in {"dev", "test"}:
-        args.extend(
-            [
-                "--db-port",
-                f"{env_name}={_local_pg_port(env_name)}",
-                "--ui-port",
-                f"{env_name}={_local_ui_port(env_name)}",
-            ]
-        )
     _run_tapdb(args)
-    _update_tapdb_namespace_config(env_name)
+    _update_tapdb_namespace_config("target")
 
 
 def _seed_tapdb_templates(
-    env_name: str,
+    target_label: str,
     *,
     include_workflow: bool = False,
     overwrite: bool = False,
@@ -433,53 +441,46 @@ def db_build(
     ),
 ) -> None:
     """Build database/runtime via tapdb orchestration."""
-    env_name = _current_env()
     target_mode = target.strip().lower()
     if target_mode not in {"local", "aurora"}:
         raise typer.BadParameter("--target must be either local or aurora")
 
-    console.print(
-        f"[cyan]Initializing BLOOM database via tapdb (env={env_name}, target={target_mode})...[/cyan]"
-    )
-    _ensure_tapdb_namespace_config(env_name)
+    console.print(f"[cyan]Initializing BLOOM database via tapdb (target={target_mode})...[/cyan]")
+    target_label = _current_target_label()
+    _ensure_tapdb_namespace_config(target_label)
 
     if target_mode == "local":
         _ensure_schema_available_for_bloom_root()
-        local_port = _local_pg_port(env_name)
+        local_port = _local_pg_port(target_label)
         console.print(
-            f"[cyan]Using local TapDB PostgreSQL port {local_port} for env={env_name}[/cyan]"
+            f"[cyan]Using local TapDB PostgreSQL port {local_port}[/cyan]"
         )
-        _run_tapdb(["pg", "init", env_name], check=False)
-        _run_tapdb(["pg", "start-local", env_name, "--port", local_port])
-        if force:
-            _run_tapdb(["db", "delete", env_name, "--force"], check=False)
-        _run_tapdb(["db", "create", env_name], check=False)
-        schema_args = ["db", "schema", "apply", env_name]
+        _run_tapdb(["pg", "init"], check=False)
+        _run_tapdb(["pg", "start-local", "--port", local_port])
+        _run_tapdb(["db", "create"], check=False)
+        schema_args = ["db", "schema", "apply"]
         if force:
             schema_args.append("--reinitialize")
         _run_tapdb(schema_args)
-        _run_tapdb(["db", "schema", "migrate", env_name])
-        _seed_tapdb_templates(env_name, overwrite=force)
+        _run_tapdb(["db", "schema", "migrate"])
+        _seed_tapdb_templates(target_label, overwrite=force)
         return
 
-    create_args = ["db", "create", env_name]
-    if force:
-        create_args.append("--force")
-    _run_tapdb(create_args, check=False)
+    _run_tapdb(["db", "create"], check=False)
 
-    setup_args = ["db", "setup", env_name]
+    setup_args = ["db", "setup"]
     _ensure_schema_available_for_bloom_root()
     if force:
-        setup_args.append("--force")
+        setup_args.extend(["--recreate", "--confirm-target", _confirm_target_label()])
     _run_tapdb(setup_args)
-    _seed_tapdb_templates(env_name, overwrite=force)
+    _seed_tapdb_templates(target_label, overwrite=force)
 
 
 @db_app.command("seed")
 def db_seed() -> None:
     """Seed template data via tapdb."""
-    env_name = _current_env()
-    _seed_tapdb_templates(env_name, include_workflow=False, overwrite=False)
+    target_label = _current_target_label()
+    _seed_tapdb_templates(target_label, include_workflow=False, overwrite=False)
 
 
 @db_app.command("reset")
@@ -487,7 +488,7 @@ def db_reset(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Reset schema/data and rebuild via tapdb (destructive)."""
-    env_name = _current_env()
+    target_label = _current_target_label()
 
     if not yes:
         console.print(
@@ -498,9 +499,9 @@ def db_reset(
             return
 
     _ensure_schema_available_for_bloom_root()
-    _run_tapdb(["db", "schema", "reset", env_name, "--force"])
-    _run_tapdb(["db", "setup", env_name, "--force"])
-    _seed_tapdb_templates(env_name, include_workflow=False, overwrite=True)
+    _run_tapdb(["db", "schema", "reset", "--confirm-target", _confirm_target_label()])
+    _run_tapdb(["db", "setup"])
+    _seed_tapdb_templates(target_label, include_workflow=False, overwrite=True)
 
 
 @db_app.command("nuke")
@@ -510,8 +511,11 @@ def db_nuke(
     ),
 ) -> None:
     """Delete schema only via TapDB."""
-    env_name = _current_env()
-    _run_tapdb(["db", "schema", "reset", env_name] + (["--force"] if force else []))
+    _ = _current_target_label()
+    args = ["db", "schema", "reset"]
+    if force:
+        args.extend(["--confirm-target", _confirm_target_label()])
+    _run_tapdb(args)
 
 
 def register(registry: CommandRegistry, spec: CliSpec) -> None:

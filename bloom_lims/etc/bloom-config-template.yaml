@@ -10,7 +10,7 @@
 #
 # Prefer editing the deployment YAML file directly. Environment overrides remain
 # available for non-TapDB settings, but TapDB runtime selection should be driven
-# by the config file plus explicit absolute `--config` / `--env` at the TapDB CLI layer.
+# by the config file plus an explicit absolute `--config` at the TapDB CLI layer.
 # =============================================================================
 
 # AWS SETTINGS
@@ -34,7 +34,6 @@ ui:
 # TapDB Runtime Configuration
 # -----------------------------------------------------------------------------
 tapdb:
-  env: "dev"                    # dev, test, prod
   client_id: "bloom"            # TapDB client namespace key for Bloom
   database_name: "bloom"        # TapDB database namespace key for Bloom
   schema_name: ""               # REQUIRED explicit PostgreSQL schema namespace
@@ -45,7 +44,7 @@ tapdb:
   prefix_ownership_registry_path: ""  # REQUIRED absolute path to the prefix ownership registry JSON
   strict_namespace: true        # Require namespaced TapDB config semantics
   config_path: ""               # REQUIRED absolute path to the TapDB config YAML
-  local_pg_port: __BLOOM_TAPDB_LOCAL_PG_PORT__           # Default local TapDB PostgreSQL port for dev/test
+  local_pg_port: __BLOOM_TAPDB_LOCAL_PG_PORT__           # Default local TapDB PostgreSQL port
 
 # -----------------------------------------------------------------------------
 # Storage Configuration
@@ -99,6 +98,7 @@ api:
 # Authentication Configuration
 # -----------------------------------------------------------------------------
 auth:
+  mode: "cognito"              # cognito or external_broker
   # Bloom reads the full Cognito contract from this YAML config.
   cognito_user_pool_id: ""
   cognito_client_id: ""
@@ -119,6 +119,12 @@ auth:
   cognito_default_tenant_id: "00000000-0000-0000-0000-000000000000"
   auto_provision_allowed_domains:
     - "lsmc.com"
+  external_broker:
+    service_id: "bloom"
+    login_url: ""
+    handoff_exchange_url: ""
+    callback_url: ""
+    logout_url: ""
 
   # JWT settings
   jwt_secret: ""                # REQUIRED for production

@@ -252,10 +252,10 @@ class TestMainCommands:
         monkeypatch.setattr(
             config_extra,
             "run_schema_drift_check",
-            lambda env_name: {
+            lambda target_label: {
                 "status": "drift",
                 "checked_at": "2026-03-29T12:00:00+00:00",
-                "environment": env_name,
+                "target": target_label,
                 "tool_version": "3.0.9",
                 "summary": "expected=12 live=13",
                 "report": {"counts": {"expected": 12, "live": 13}},
@@ -284,10 +284,10 @@ class TestMainCommands:
         monkeypatch.setattr(
             config_extra,
             "run_schema_drift_check",
-            lambda env_name: {
+            lambda target_label: {
                 "status": "clean",
                 "checked_at": "2026-03-29T12:00:00+00:00",
-                "environment": env_name,
+                "target": target_label,
                 "tool_version": "4.1.1",
                 "summary": "ok",
                 "report": {"counts": {"expected": 12, "live": 12}},

@@ -169,81 +169,29 @@ class BloomAdminGuardedASGI:
 
 def _load_tapdb_admin_app(
     *,
-    tapdb_env: str,
     config_path: str,
     client_id: str,
     database_name: str,
 ) -> ASGIApp:
-    resolved_env = str(tapdb_env or "").strip().lower()
-    if not resolved_env:
-        raise RuntimeError("TapDB admin mount requires an explicit tapdb_env.")
     if not str(config_path or "").strip():
         raise RuntimeError("TapDB admin mount requires an explicit tapdb_config_path.")
     resolved_config_path = Path(config_path).expanduser().resolve()
 
-    from daylily_tapdb.cli import context as tapdb_context
-    from daylily_tapdb.cli import db_config as tapdb_db_config
+    from daylily_tapdb.cli.context import set_cli_context
 
-    original_active_env_name = tapdb_context.active_env_name
-    original_get_config_path = tapdb_db_config.get_config_path
-    original_get_db_config_for_env = tapdb_db_config.get_db_config_for_env
-    original_get_admin_settings_for_env = tapdb_db_config.get_admin_settings_for_env
-
-    def _active_env_name(default: str = "dev") -> str:
-        _ = default
-        return resolved_env
-
-    def _get_config_path(**_kwargs):
-        return resolved_config_path
-
-    def _get_db_config_for_env(env_name: str, **_kwargs):
-        effective_env = str(env_name or resolved_env).strip().lower() or resolved_env
-        return original_get_db_config_for_env(
-            effective_env,
-            config_path=resolved_config_path,
-            client_id=client_id,
-            database_name=database_name,
-        )
-
-    def _get_admin_settings_for_env(env_name: str, **_kwargs):
-        effective_env = str(env_name or resolved_env).strip().lower() or resolved_env
-        return original_get_admin_settings_for_env(
-            effective_env,
-            config_path=resolved_config_path,
-            client_id=client_id,
-            database_name=database_name,
-        )
-
-    tapdb_context.active_env_name = _active_env_name
-    tapdb_db_config.get_config_path = _get_config_path
-    tapdb_db_config.get_db_config_for_env = _get_db_config_for_env
-    tapdb_db_config.get_admin_settings_for_env = _get_admin_settings_for_env
-    try:
-        cognito_module = importlib.import_module("admin.cognito")
-        db_pool_module = importlib.import_module("admin.db_pool")
-        module = importlib.import_module("admin.main")
-        auth_module = importlib.import_module("admin.auth")
-    finally:
-        tapdb_context.active_env_name = original_active_env_name
-        tapdb_db_config.get_config_path = original_get_config_path
-        tapdb_db_config.get_db_config_for_env = original_get_db_config_for_env
-        tapdb_db_config.get_admin_settings_for_env = original_get_admin_settings_for_env
+    set_cli_context(
+        config_path=resolved_config_path,
+        client_id=client_id,
+        database_name=database_name,
+    )
+    cognito_module = importlib.import_module("admin.cognito")
+    db_pool_module = importlib.import_module("admin.db_pool")
+    module = importlib.import_module("admin.main")
+    auth_module = importlib.import_module("admin.auth")
 
     try:
         _configure_embedded_tapdb_auth(module, auth_module)
-        for loaded_module in (cognito_module, db_pool_module, module):
-            if hasattr(loaded_module, "active_env_name"):
-                loaded_module.active_env_name = _active_env_name
-            if hasattr(loaded_module, "get_config_path"):
-                loaded_module.get_config_path = _get_config_path
-            if hasattr(loaded_module, "get_db_config_for_env"):
-                loaded_module.get_db_config_for_env = _get_db_config_for_env
-            if hasattr(loaded_module, "get_admin_settings_for_env"):
-                loaded_module.get_admin_settings_for_env = _get_admin_settings_for_env
-        if hasattr(module, "APP_ENV"):
-            module.APP_ENV = resolved_env
-        if hasattr(module, "IS_PROD"):
-            module.IS_PROD = resolved_env == "prod"
+        _ = cognito_module, db_pool_module
     except Exception as exc:  # pragma: no cover - exercised by startup failure paths
         raise RuntimeError("Failed importing TapDB admin FastAPI app") from exc
 
@@ -264,7 +212,6 @@ def mount_tapdb_admin_subapp(app: FastAPI) -> TapDBMountConfig | None:
     runtime_ctx = apply_runtime_environment()
     try:
         tapdb_admin_app = _load_tapdb_admin_app(
-            tapdb_env=runtime_ctx.env,
             config_path=runtime_ctx.config_path,
             client_id=runtime_ctx.client_id,
             database_name=runtime_ctx.database_name,

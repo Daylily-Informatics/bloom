@@ -385,12 +385,11 @@ class BloomObservabilityStore:
     def db_health(self) -> tuple[ProjectionMetadata, dict[str, Any]]:
         from bloom_lims.tapdb_metrics import build_metrics_page_context
 
-        settings = get_settings()
-        env_name = settings.tapdb.env
-        metrics_ctx = build_metrics_page_context(env_name, limit=1000)
+        target_label = "target"
+        metrics_ctx = build_metrics_page_context(target_label, limit=1000)
         summary = dict(metrics_ctx.get("summary") or {})
         latest = self.latest_db_probe()
-        schema_drift = read_schema_drift_report(environment=env_name)
+        schema_drift = read_schema_drift_report(target=target_label)
         observed_at = (
             (latest or {}).get("observed_at")
             or str(summary.get("last_seen") or "")

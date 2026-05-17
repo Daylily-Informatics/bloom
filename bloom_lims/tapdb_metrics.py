@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-from daylily_tapdb.cli.db_config import get_admin_settings_for_env
+from daylily_tapdb.cli.db_config import get_admin_settings
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
@@ -62,10 +62,9 @@ def _resolved_bloom_runtime(
     env_name: str | None = None,
 ) -> tuple[str, Path, dict[str, object]]:
     ctx = apply_runtime_environment(get_settings())
-    resolved_env = str(env_name or ctx.env).strip().lower() or ctx.env
+    resolved_env = str(env_name or ctx.target_label).strip().lower() or ctx.target_label
     config_path = Path(ctx.config_path).expanduser().resolve()
-    admin_settings = get_admin_settings_for_env(
-        resolved_env,
+    admin_settings = get_admin_settings(
         config_path=config_path,
         client_id=ctx.client_id,
         database_name=ctx.database_name,

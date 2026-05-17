@@ -36,9 +36,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_POLICY = CommandPolicy(runtime_guard="required")
 
 
-def _tapdb_schema_drift_check(env_name: str) -> tuple[int, dict[str, object], str]:
+def _tapdb_schema_drift_check(target_label: str) -> tuple[int, dict[str, object], str]:
     """Run the TapDB schema drift check in report-only mode."""
-    result = run_schema_drift_check(env_name)
+    result = run_schema_drift_check(target_label)
     returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(
         str(result.get("status") or ""), 2
     )
@@ -117,7 +117,7 @@ def _status() -> None:
     rows = [
         ("deploy-name", settings.deployment.name),
         ("environment", settings.environment),
-        ("tapdb.env", settings.tapdb.env),
+        ("tapdb.target", "target"),
         ("tapdb.database_name", settings.tapdb.database_name),
         ("aws.profile", settings.aws.profile),
         ("aws.region", settings.aws.region),
@@ -188,8 +188,8 @@ def _doctor() -> None:
         issues.append(str(exc))
         console.print(f"[red]✗[/red] daylily-tapdb version check failed: {exc}")
 
-    env_name = apply_runtime_environment(get_settings()).env
-    drift_result = run_schema_drift_check(env_name)
+    target_label = apply_runtime_environment(get_settings()).target_label
+    drift_result = run_schema_drift_check(target_label)
     write_schema_drift_report(drift_result)
     drift_returncode = {"clean": 0, "drift": 1, "check_failed": 2}.get(
         str(drift_result.get("status") or ""),

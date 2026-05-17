@@ -49,7 +49,7 @@ def test_run_tapdb_raises_for_nonzero_check(monkeypatch: pytest.MonkeyPatch) -> 
         "apply_runtime_environment",
         lambda _settings: SimpleNamespace(
             config_path="/tmp/bloom-tapdb.yaml",
-            env="dev",
+            target_label="target",
             owner_repo_name="bloom",
             schema_name="tapdb_bloom_dev",
             domain_code="Z",
@@ -84,7 +84,7 @@ def test_run_tapdb_returns_nonzero_when_check_false(
         "apply_runtime_environment",
         lambda _settings: SimpleNamespace(
             config_path="/tmp/bloom-tapdb.yaml",
-            env="dev",
+            target_label="target",
         ),
     )
     monkeypatch.setattr(
@@ -104,7 +104,7 @@ def test_run_tapdb_rejects_non_absolute_config_path(
         "apply_runtime_environment",
         lambda _settings: SimpleNamespace(
             config_path="relative/bloom-tapdb.yaml",
-            env="dev",
+            target_label="target",
         ),
     )
 
@@ -158,7 +158,7 @@ def test_update_tapdb_namespace_config_uses_db_config_update(
         "apply_runtime_environment",
         lambda _settings: SimpleNamespace(
             config_path="/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
-            env="dev",
+            target_label="target",
             owner_repo_name="bloom",
             schema_name="tapdb_bloom_tests_dev",
             physical_database="bloom",
@@ -177,15 +177,13 @@ def test_update_tapdb_namespace_config_uses_db_config_update(
         lambda args, check=True: calls.append((args, check)) or 0,
     )
 
-    db_commands._update_tapdb_namespace_config("dev")
+    db_commands._update_tapdb_namespace_config("target")
 
     assert calls == [
         (
             [
                 "db-config",
                 "update",
-                "--env",
-                "dev",
                 "--support-email",
                 "support@example.com",
                 "--database",
@@ -209,7 +207,7 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
             client_id="bloomx",
             database_name="bloomy",
             config_path="/tmp/.config/tapdb/bloom/bloom-local2/tapdb-config.yaml",
-            env="dev",
+            target_label="target",
             aws_profile="lsmc",
             aws_region="us-west-2",
             owner_repo_name="bloom",
@@ -237,7 +235,7 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
         lambda args, check=True: calls.append((args, check)) or 0,
     )
 
-    db_commands._ensure_tapdb_namespace_config("dev")
+    db_commands._ensure_tapdb_namespace_config("target")
 
     assert calls == [
         (
@@ -249,21 +247,27 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
                 "--database-name",
                 "bloomy",
                 "--schema-name",
-                "dev=tapdb_bloom_dev",
+                "tapdb_bloom_dev",
                 "--owner-repo-name",
                 "bloom",
                 "--domain-code",
-                "dev=Z",
+                "Z",
                 "--domain-registry-path",
                 "/tmp/domain_code_registry.json",
                 "--prefix-ownership-registry-path",
                 "/tmp/prefix_ownership_registry.json",
-                "--env",
-                "dev",
-                "--db-port",
-                "dev=5566",
+                "--engine-type",
+                "local",
+                "--host",
+                "localhost",
+                "--port",
+                "5566",
                 "--ui-port",
-                "dev=8912",
+                "8912",
+                "--user",
+                "postgres",
+                "--database",
+                "tapdb_shared_dev",
             ],
             True,
         ),
@@ -271,8 +275,6 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
             [
                 "db-config",
                 "update",
-                "--env",
-                "dev",
                 "--support-email",
                 "support@example.com",
                 "--database",
@@ -298,7 +300,7 @@ def test_ensure_tapdb_namespace_config_creates_scoped_parent(
             client_id="bloom",
             database_name="bloom",
             config_path=str(config_path),
-            env="dev",
+            target_label="target",
             aws_profile="lsmc",
             aws_region="us-west-2",
             owner_repo_name="bloom",
@@ -322,7 +324,7 @@ def test_ensure_tapdb_namespace_config_creates_scoped_parent(
     )
     monkeypatch.setattr(db_commands, "_run_tapdb", lambda *_args, **_kwargs: 0)
 
-    db_commands._ensure_tapdb_namespace_config("dev")
+    db_commands._ensure_tapdb_namespace_config("target")
 
     assert config_path.parent.exists()
 
@@ -348,7 +350,7 @@ def test_db_seed_calls_tapdb_template_loader(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tapdb_seed: list[tuple[str, bool, bool]] = []
-    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(db_commands, "_current_target_label", lambda: "target")
     monkeypatch.setattr(
         db_commands,
         "_seed_tapdb_templates",
@@ -359,7 +361,7 @@ def test_db_seed_calls_tapdb_template_loader(
 
     result = runner.invoke(cli_app, ["db", "seed"])
     assert result.exit_code == 0
-    assert tapdb_seed == [("dev", False, False)]
+    assert tapdb_seed == [("target", False, False)]
 
 
 def test_seed_templates_split_core_and_client_ownership(
@@ -482,7 +484,7 @@ def test_seed_templates_split_core_and_client_ownership(
         lambda **_kwargs: SimpleNamespace(session=fake_session, engine=fake_engine),
     )
 
-    db_commands._seed_tapdb_templates("dev", overwrite=False)
+    db_commands._seed_tapdb_templates("target", overwrite=False)
 
     assert events == [
         ("seed", {"owner_repo_name": "daylily-tapdb", "templates": ["SYS"]}),
@@ -605,40 +607,37 @@ def test_claim_client_template_prefixes_repairs_ownerless_claim(
         (
             False,
             [
-                (["pg", "init", "dev"], False),
+                (["pg", "init"], False),
                 (
                     [
                         "pg",
                         "start-local",
-                        "dev",
                         "--port",
                         str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
                     ],
                     True,
                 ),
-                (["db", "create", "dev"], False),
-                (["db", "schema", "apply", "dev"], True),
-                (["db", "schema", "migrate", "dev"], True),
+                (["db", "create"], False),
+                (["db", "schema", "apply"], True),
+                (["db", "schema", "migrate"], True),
             ],
         ),
         (
             True,
             [
-                (["pg", "init", "dev"], False),
+                (["pg", "init"], False),
                 (
                     [
                         "pg",
                         "start-local",
-                        "dev",
                         "--port",
                         str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
                     ],
                     True,
                 ),
-                (["db", "delete", "dev", "--force"], False),
-                (["db", "create", "dev"], False),
-                (["db", "schema", "apply", "dev", "--reinitialize"], True),
-                (["db", "schema", "migrate", "dev"], True),
+                (["db", "create"], False),
+                (["db", "schema", "apply", "--reinitialize"], True),
+                (["db", "schema", "migrate"], True),
             ],
         ),
     ],
@@ -650,7 +649,7 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
     seeded: list[tuple[str, bool]] = []
-    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(db_commands, "_current_target_label", lambda: "target")
     monkeypatch.setattr(
         db_commands, "_ensure_tapdb_namespace_config", lambda _env: None
     )
@@ -678,7 +677,7 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
     db_commands.db_build(force=force, target="local")
 
     assert calls == expected_calls
-    assert seeded == [("dev", force)]
+    assert seeded == [("target", force)]
 
 
 @pytest.mark.parametrize(
@@ -687,15 +686,24 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
         (
             False,
             [
-                (["db", "create", "dev"], False),
-                (["db", "setup", "dev"], True),
+                (["db", "create"], False),
+                (["db", "setup"], True),
             ],
         ),
         (
             True,
             [
-                (["db", "create", "dev", "--force"], False),
-                (["db", "setup", "dev", "--force"], True),
+                (["db", "create"], False),
+                (
+                    [
+                        "db",
+                        "setup",
+                        "--recreate",
+                        "--confirm-target",
+                        "bloom/bloom/tapdb_bloom_dev@bloom",
+                    ],
+                    True,
+                ),
             ],
         ),
     ],
@@ -707,7 +715,12 @@ def test_db_build_aurora_skips_local_pg_bootstrap(
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
     seeded: list[tuple[str, bool]] = []
-    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(db_commands, "_current_target_label", lambda: "target")
+    monkeypatch.setattr(
+        db_commands,
+        "_confirm_target_label",
+        lambda: "bloom/bloom/tapdb_bloom_dev@bloom",
+    )
     monkeypatch.setattr(
         db_commands, "_ensure_tapdb_namespace_config", lambda _env: None
     )
@@ -730,14 +743,23 @@ def test_db_build_aurora_skips_local_pg_bootstrap(
     db_commands.db_build(force=force, target="aurora")
 
     assert calls == expected_calls
-    assert seeded == [("dev", force)]
+    assert seeded == [("target", force)]
 
 
 @pytest.mark.parametrize(
     ("force", "expected_args"),
     [
-        (False, ["db", "schema", "reset", "dev"]),
-        (True, ["db", "schema", "reset", "dev", "--force"]),
+        (False, ["db", "schema", "reset"]),
+        (
+            True,
+            [
+                "db",
+                "schema",
+                "reset",
+                "--confirm-target",
+                "bloom/bloom/tapdb_bloom_dev@bloom",
+            ],
+        ),
     ],
 )
 def test_db_nuke_calls_tapdb_schema_reset(
@@ -748,7 +770,12 @@ def test_db_nuke_calls_tapdb_schema_reset(
     expected_args: list[str],
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
-    monkeypatch.setattr(db_commands, "_current_env", lambda: "dev")
+    monkeypatch.setattr(db_commands, "_current_target_label", lambda: "target")
+    monkeypatch.setattr(
+        db_commands,
+        "_confirm_target_label",
+        lambda: "bloom/bloom/tapdb_bloom_dev@bloom",
+    )
     monkeypatch.setattr(
         db_commands,
         "_run_tapdb",

@@ -202,10 +202,10 @@ def test_db_health_exposes_last_known_schema_drift(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "bloom_lims.observability.read_schema_drift_report",
-        lambda *, environment: {
+        lambda *, target: {
             "status": "drift",
             "checked_at": "2026-03-29T12:01:00+00:00",
-            "environment": environment,
+            "target": target,
             "tool_version": "3.0.9",
             "summary": "expected=12 live=13",
             "report": {"counts": {"expected": 12, "live": 13}},

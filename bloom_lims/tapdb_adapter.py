@@ -307,7 +307,7 @@ class BLOOMdb3:
         self.Base = Base
         # Install TapDB-style per-query metrics once per engine.
         try:
-            maybe_install_engine_metrics(self.engine, env_name=get_settings().tapdb.env)
+            maybe_install_engine_metrics(self.engine, env_name="target")
         except Exception:
             # Metrics are best-effort; never block DB init.
             pass

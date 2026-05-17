@@ -50,7 +50,7 @@ def _bloom_info_hook() -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = [
         ("Project Root", str(PROJECT_ROOT)),
         ("Environment", settings.environment),
-        ("TapDB Env", ctx.env if ctx is not None else "(unresolved)"),
+        ("TapDB Target", ctx.target_label if ctx is not None else "(unresolved)"),
         ("TapDB Namespace", ctx.database_name if ctx is not None else "(unresolved)"),
         (
             "TapDB Config",

@@ -46,8 +46,6 @@ def _tapdb_cmd(args: list[str]) -> subprocess.CompletedProcess[str]:
         sys.executable,
         "-m",
         "daylily_tapdb.cli",
-        "--env",
-        env.env,
     ]
     if not str(env.config_path or "").strip():
         raise RuntimeError("TapDB schema drift checks require an explicit config path.")
@@ -85,8 +83,8 @@ def _truncate_stderr(stderr: str) -> str:
     return f"{cleaned[:1000]}..."
 
 
-def run_schema_drift_check(env_name: str) -> dict[str, Any]:
-    result = _tapdb_cmd(["db", "schema", "drift-check", env_name, "--json", "--no-strict"])
+def run_schema_drift_check(target_label: str = "target") -> dict[str, Any]:
+    result = _tapdb_cmd(["db", "schema", "drift-check", "--json", "--no-strict"])
     payload: dict[str, object] = {}
     if result.stdout.strip():
         try:
@@ -100,7 +98,7 @@ def run_schema_drift_check(env_name: str) -> dict[str, Any]:
     return {
         "status": status,
         "checked_at": _utcnow(),
-        "environment": env_name,
+        "target": target_label,
         "tool_version": tapdb_tool_version(),
         "summary": _schema_drift_summary(payload) if payload else ("schema drift check failed" if status == "check_failed" else "schema drift check completed"),
         "report": payload,
@@ -114,13 +112,13 @@ def write_schema_drift_report(report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def read_schema_drift_report(*, environment: str) -> dict[str, Any]:
+def read_schema_drift_report(*, target: str) -> dict[str, Any]:
     path = schema_drift_state_file()
     if not path.exists():
         return {
             "status": "not_run",
             "checked_at": None,
-            "environment": environment,
+            "target": target,
             "tool_version": tapdb_tool_version(),
             "summary": "Schema drift check has not been run",
             "report": {},
@@ -132,7 +130,7 @@ def read_schema_drift_report(*, environment: str) -> dict[str, Any]:
         return {
             "status": "check_failed",
             "checked_at": _utcnow(),
-            "environment": environment,
+            "target": target,
             "tool_version": tapdb_tool_version(),
             "summary": "Stored schema drift report could not be read",
             "report": {},
@@ -142,7 +140,7 @@ def read_schema_drift_report(*, environment: str) -> dict[str, Any]:
         return {
             "status": "check_failed",
             "checked_at": _utcnow(),
-            "environment": environment,
+            "target": target,
             "tool_version": tapdb_tool_version(),
             "summary": "Stored schema drift report has invalid format",
             "report": {},
@@ -150,7 +148,7 @@ def read_schema_drift_report(*, environment: str) -> dict[str, Any]:
         }
     payload.setdefault("status", "check_failed")
     payload.setdefault("checked_at", None)
-    payload.setdefault("environment", environment)
+    payload.setdefault("target", target)
     payload.setdefault("tool_version", tapdb_tool_version())
     payload.setdefault("summary", "")
     payload.setdefault("report", {})
