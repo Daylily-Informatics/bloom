@@ -6,10 +6,10 @@ import logging
 import os
 from typing import Any
 
-from fastapi import Depends, Header, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from daylily_auth_cognito.runtime.fastapi import create_auth_dependency
 from daylily_auth_cognito.runtime.verifier import CognitoTokenVerifier
+from fastapi import Depends, Header, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
@@ -21,10 +21,10 @@ from bloom_lims.auth.rbac import (
     has_permission,
     normalize_roles,
 )
-from bloom_lims.auth.services.groups import GroupService, map_legacy_role
+from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.auth.services.user_api_tokens import TOKEN_PREFIX, UserAPITokenService
 from bloom_lims.config import get_settings
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +46,12 @@ class APIUser:
         token_scope: str | None = None,
         token_id: str | None = None,
     ):
-        fallback_role = map_legacy_role(role)
-        normalized_roles = normalize_roles(
-            roles or ([fallback_role] if fallback_role else []), fallback=fallback_role
-        )
+        normalized_roles = normalize_roles(roles or ([role] if role else []))
         if not normalized_roles:
-            normalized_roles = [Role.READ_WRITE.value]
+            raise HTTPException(
+                status_code=403,
+                detail="Bloom API user requires an explicit canonical role",
+            )
         self.email = email
         self.user_id = user_id or email
         self.roles = normalized_roles
@@ -130,29 +130,27 @@ _cognito_get_user = _build_cognito_dependency()
 def _resolve_roles_and_groups(
     *,
     user_id: str | None,
-    fallback_role: str | None,
+    role_hint: str | None,
 ) -> tuple[list[str], list[str], list[str]]:
-    normalized_fallback = map_legacy_role(fallback_role)
     normalized_user_id = str(user_id or "").strip()
     if not normalized_user_id:
-        roles = normalize_roles([normalized_fallback], fallback=normalized_fallback)
-        permissions = sorted(effective_permissions(roles))
-        return roles, [], permissions
+        raise HTTPException(status_code=403, detail="Bloom user_id is required")
 
     bdb = BLOOMdb3(app_username="api-auth")
     try:
         groups = GroupService(bdb.session)
         resolution = groups.resolve_user_roles_and_groups(
             user_id=normalized_user_id,
-            fallback_role=normalized_fallback,
+            role_hint=role_hint,
         )
         permissions = sorted(effective_permissions(resolution.roles))
         return resolution.roles, resolution.groups, permissions
     except Exception as exc:
         logger.warning("Failed loading RBAC from groups for user %s: %s", user_id, exc)
-        roles = normalize_roles([normalized_fallback], fallback=normalized_fallback)
-        permissions = sorted(effective_permissions(roles))
-        return roles, [], permissions
+        raise HTTPException(
+            status_code=403,
+            detail="Bloom RBAC lookup failed; explicit group or role assignment is required",
+        ) from exc
     finally:
         bdb.close()
 
@@ -170,7 +168,7 @@ def _make_user(
 ) -> APIUser:
     roles, resolved_groups, permissions = _resolve_roles_and_groups(
         user_id=user_id,
-        fallback_role=role_hint,
+        role_hint=role_hint,
     )
     all_groups = sorted(set((groups_hint or []) + resolved_groups))
     if (
@@ -178,7 +176,12 @@ def _make_user(
         and Permission.TOKEN_SELF_MANAGE.value not in permissions
     ):
         permissions = sorted(set(permissions + [Permission.TOKEN_SELF_MANAGE.value]))
-    primary_role = roles[0] if roles else Role.READ_WRITE.value
+    if not roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Bloom user requires at least one explicit role",
+        )
+    primary_role = roles[0]
     return APIUser(
         email=email,
         user_id=user_id or email,
@@ -252,7 +255,9 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
 
 async def get_api_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        HTTPBearer(auto_error=False)
+    ),
 ) -> APIUser:
     """Authenticate API requests and return resolved RBAC context."""
     if _is_dev_bypass_active():

@@ -21,9 +21,8 @@ from auth.cognito.client import CognitoConfigurationError, CognitoTokenError
 from bloom_lims import __version__
 from bloom_lims.auth.rbac import Role
 from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
-from bloom_lims.auth.services.groups import GroupService, map_legacy_role
+from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.config import get_settings
-from bloom_lims.db import BLOOMdb3
 from bloom_lims.gui.deps import (
     _get_request_cognito_auth,
     get_allowed_domains,
@@ -37,6 +36,7 @@ from bloom_lims.gui.web_session import (
     load_bloom_user_data,
     store_bloom_session,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter()
 
@@ -170,10 +170,10 @@ def _auth_error_message(reason: str | None) -> str:
         return mapped
     if " " in normalized:
         return normalized
-    fallback = normalized.replace("_", " ").strip()
-    if not fallback:
+    readable = normalized.replace("_", " ").strip()
+    if not readable:
         return _AUTH_ERROR_MESSAGES["authentication_failed"]
-    return fallback[:1].upper() + fallback[1:]
+    return readable[:1].upper() + readable[1:]
 
 
 def _callback_error_response(error_message: str, *, status_code: int) -> JSONResponse:
@@ -185,7 +185,7 @@ def _resolve_login_roles_and_groups(
     *,
     email: str,
     cognito_sub: str | None,
-    fallback_role: str | None,
+    role_hint: str | None,
 ) -> tuple[list[str], list[str], str, str]:
     normalized_email = str(email or "").strip()
     normalized_sub = str(cognito_sub or "").strip()
@@ -196,7 +196,7 @@ def _resolve_login_roles_and_groups(
         service = GroupService(bdb.session)
         service.ensure_system_groups()
         found_user_id = ""
-        found_fallback = map_legacy_role(fallback_role)
+        found_role = ""
 
         for candidate in (normalized_sub, normalized_email):
             if not candidate:
@@ -204,21 +204,26 @@ def _resolve_login_roles_and_groups(
             stored_user = resolve_user_record(
                 bdb.session, candidate, include_inactive=True
             )
-            fallback = map_legacy_role(
-                stored_user.role if stored_user and stored_user.role else fallback_role
+            candidate_role = (
+                stored_user.role if stored_user and stored_user.role else role_hint
             )
             resolution = service.resolve_user_roles_and_groups(
                 user_id=candidate,
-                fallback_role=fallback,
+                role_hint=candidate_role,
             )
             if resolution.groups:
-                return resolution.roles, resolution.groups, candidate, fallback
+                return (
+                    resolution.roles,
+                    resolution.groups,
+                    candidate,
+                    resolution.roles[0],
+                )
             if stored_user is not None and not found_user_id:
                 found_user_id = candidate
-                found_fallback = fallback
+                found_role = resolution.roles[0]
 
         if found_user_id:
-            return [found_fallback], [], found_user_id, found_fallback
+            return [found_role], [], found_user_id, found_role
 
         allowed_domains = [
             str(domain or "").strip().lower()
@@ -238,12 +243,11 @@ def _resolve_login_roles_and_groups(
             )
 
         default_user_id = normalized_sub or normalized_email
-        fallback = map_legacy_role(fallback_role)
         resolution = service.resolve_user_roles_and_groups(
             user_id=default_user_id,
-            fallback_role=fallback,
+            role_hint=role_hint,
         )
-        return resolution.roles, resolution.groups, default_user_id, fallback
+        return resolution.roles, resolution.groups, default_user_id, resolution.roles[0]
     except Exception as exc:
         logging.warning(
             "Failed to resolve session RBAC for %s: %s", normalized_email, exc
@@ -299,7 +303,7 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
             _resolve_login_roles_and_groups(
                 email=primary_email,
                 cognito_sub=cognito_sub,
-                fallback_role=None,
+                role_hint=None,
             )
         )
     except SessionBootstrapError as exc:
@@ -311,10 +315,14 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
         ) from exc
 
     normalized_roles = [str(role).upper() for role in roles if str(role).strip()]
-    primary_role = (
-        persisted_role
-        or (normalized_roles[0] if normalized_roles else Role.READ_WRITE.value)
-    ).upper()
+    if not normalized_roles:
+        raise CognitoWebAuthError(
+            "not_authorized",
+            "Bloom user has no explicit role",
+            status_code=status.HTTP_403_FORBIDDEN,
+            redirect_to_error=True,
+        )
+    primary_role = (persisted_role or normalized_roles[0]).upper()
     service_groups = list(dict.fromkeys(groups))
     user_data = get_user_preferences(primary_email)
     user_data.update(
@@ -347,8 +355,12 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
     return principal, user_data
 
 
-def _roles_for_external_broker_user(user: dict[str, Any], *, service_id: str) -> list[str]:
-    groups = {str(group).strip() for group in user.get("groups") or [] if str(group).strip()}
+def _roles_for_external_broker_user(
+    user: dict[str, Any], *, service_id: str
+) -> list[str]:
+    groups = {
+        str(group).strip() for group in user.get("groups") or [] if str(group).strip()
+    }
     roles = {
         _normalize_external_broker_role(role)
         for role in user.get("roles") or []
@@ -429,7 +441,7 @@ def _build_bloom_principal_from_external_broker(
             _resolve_login_roles_and_groups(
                 email=email,
                 cognito_sub=subject,
-                fallback_role=roles[0],
+                role_hint=roles[0],
             )
         )
     except SessionBootstrapError as exc:
@@ -444,10 +456,14 @@ def _build_bloom_principal_from_external_broker(
         for role in (service_roles or roles)
         if str(role).strip()
     ]
-    primary_role = (
-        persisted_role
-        or (normalized_roles[0] if normalized_roles else Role.READ_WRITE.value)
-    ).upper()
+    if not normalized_roles:
+        raise CognitoWebAuthError(
+            "not_authorized",
+            "External broker user has no explicit Bloom roles",
+            status_code=status.HTTP_403_FORBIDDEN,
+            redirect_to_error=True,
+        )
+    primary_role = (persisted_role or normalized_roles[0]).upper()
     user_data = get_user_preferences(email)
     user_data.update(
         {

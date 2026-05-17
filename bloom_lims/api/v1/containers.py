@@ -8,24 +8,19 @@ import csv
 import io
 import json as json_lib
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
-from bloom_lims.db import get_parent_lineages
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
     ContainerCreateSchema,
     ContainerUpdateSchema,
-    ContainerResponseSchema,
     PlaceInContainerSchema,
-    BulkPlaceInContainerSchema,
-    PaginatedResponse,
-    SuccessResponse,
 )
-from bloom_lims.exceptions import NotFoundError, ValidationError
-from .dependencies import APIUser, require_read, require_write
+from bloom_lims.tapdb_adapter import get_parent_lineages
 
+from .dependencies import APIUser, require_read, require_write
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +29,14 @@ router = APIRouter(prefix="/containers", tags=["Containers"])
 
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
+
     return BLOOMdb3(app_username=username)
 
 
-def _container_event_payload(container, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def _container_event_payload(
+    container, extra: dict[str, Any] | None = None
+) -> dict[str, Any]:
     payload = {
         "euid": container.euid,
         "container_euid": container.euid,
@@ -63,7 +61,9 @@ def _container_event_payload(container, extra: dict[str, Any] | None = None) -> 
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_containers(
-    container_type: Optional[str] = Query(None, description="Filter by type (plate, rack, box)"),
+    container_type: Optional[str] = Query(
+        None, description="Filter by type (plate, rack, box)"
+    ),
     subtype: Optional[str] = Query(None, description="Filter by subtype"),
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
@@ -73,7 +73,7 @@ async def list_containers(
     """List containers with optional filters."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
         bc.set_actor_context(user_id=user.user_id, email=user.email)
@@ -81,13 +81,17 @@ async def list_containers(
         query = query.filter(bdb.Base.classes.generic_instance.category == "container")
 
         if container_type:
-            query = query.filter(bdb.Base.classes.generic_instance.type == container_type.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_instance.type == container_type.lower()
+            )
         if subtype:
-            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_instance.subtype == subtype.lower()
+            )
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
 
-        query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
+        query = query.filter(bdb.Base.classes.generic_instance.is_deleted.is_(False))
 
         total = query.count()
         offset = (page - 1) * page_size
@@ -122,14 +126,14 @@ async def get_container(
     """Get a container by EUID, optionally including contents."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
-        
+        from bloom_lims.domain import BloomContainer
+
         bc = BloomContainer(bdb)
         container = bc.get_by_euid(euid)
-        
+
         if not container:
             raise HTTPException(status_code=404, detail=f"Container not found: {euid}")
-        
+
         result = {
             "euid": container.euid,
             "name": container.name,
@@ -143,14 +147,18 @@ async def get_container(
             contents = []
             for lineage in get_parent_lineages(container):
                 child = lineage.child_instance
-                contents.append({
-                    "euid": child.euid,
-                    "name": child.name,
-                    "type": child.type,
-                    "position": child.json_addl.get("cont_address") if child.json_addl else None,
-                })
+                contents.append(
+                    {
+                        "euid": child.euid,
+                        "name": child.name,
+                        "type": child.type,
+                        "position": child.json_addl.get("cont_address")
+                        if child.json_addl
+                        else None,
+                    }
+                )
             result["contents"] = contents
-        
+
         return result
     except HTTPException:
         raise
@@ -171,7 +179,7 @@ async def create_container(
     """Create a new container from a template."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
 
@@ -210,8 +218,9 @@ async def update_container(
     """Update a container."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
         from sqlalchemy.orm.attributes import flag_modified
+
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
         bc.set_actor_context(user_id=user.user_id, email=user.email)
@@ -302,7 +311,7 @@ async def delete_container(
     """Delete a container (soft delete by default)."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
         container = bc.get_by_euid(euid)
@@ -343,7 +352,7 @@ async def add_content_to_container(
     """Add content to a container."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
         # Schema field is `object_euid`; this endpoint is used for content placement.
@@ -355,7 +364,9 @@ async def add_content_to_container(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{container_euid}/contents/{content_euid}", response_model=Dict[str, Any])
+@router.delete(
+    "/{container_euid}/contents/{content_euid}", response_model=Dict[str, Any]
+)
 async def remove_content_from_container(
     container_euid: str,
     content_euid: str,
@@ -364,13 +375,15 @@ async def remove_content_from_container(
     """Remove content from a container."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
         container = bc.get_by_euid(container_euid)
 
         if not container:
-            raise HTTPException(status_code=404, detail=f"Container not found: {container_euid}")
+            raise HTTPException(
+                status_code=404, detail=f"Container not found: {container_euid}"
+            )
 
         # Find and remove the lineage
         for lineage in get_parent_lineages(container):
@@ -379,7 +392,9 @@ async def remove_content_from_container(
                 bdb.session.commit()
                 return {"success": True, "message": "Content removed from container"}
 
-        raise HTTPException(status_code=404, detail=f"Content {content_euid} not found in container")
+        raise HTTPException(
+            status_code=404, detail=f"Content {content_euid} not found in container"
+        )
 
     except HTTPException:
         raise
@@ -396,7 +411,7 @@ async def get_container_layout(
     """Get the layout/wells of a container (for plates)."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContainer
+        from bloom_lims.domain import BloomContainer
 
         bc = BloomContainer(bdb)
         container = bc.get_by_euid(euid)
@@ -410,7 +425,9 @@ async def get_container_layout(
                 continue
             child = lineage.child_instance
             if child.type == "well":
-                addr = child.json_addl.get("cont_address", {}) if child.json_addl else {}
+                addr = (
+                    child.json_addl.get("cont_address", {}) if child.json_addl else {}
+                )
                 position = addr.get("name", child.name)
                 layout[position] = {
                     "euid": child.euid,
@@ -424,11 +441,13 @@ async def get_container_layout(
                         continue
                     content = well_lineage.child_instance
                     if content.category == "content":
-                        layout[position]["contents"].append({
-                            "euid": content.euid,
-                            "name": content.name,
-                            "type": content.type,
-                        })
+                        layout[position]["contents"].append(
+                            {
+                                "euid": content.euid,
+                                "name": content.name,
+                                "type": content.type,
+                            }
+                        )
 
         return {
             "container_euid": euid,
@@ -460,7 +479,7 @@ async def bulk_create_containers(
     """
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomObj
+        from bloom_lims.domain import BloomObj
 
         bobj = BloomObj(bdb)
 
@@ -496,7 +515,9 @@ async def bulk_create_containers(
                         raise ValueError(f"No container template found: {cx_type}")
                     cx_template = templates[0]
                 else:
-                    raise ValueError("container_template_euid or container_type required")
+                    raise ValueError(
+                        "container_template_euid or container_type required"
+                    )
 
                 # Get content template
                 mx_euid = row.get("content_template_euid", "").strip()
@@ -522,13 +543,18 @@ async def bulk_create_containers(
 
                 # Create container
                 container_result = bobj.create_instances(cx_template.euid)
-                container = container_result[0][0] if isinstance(container_result, list) else container_result
+                container = (
+                    container_result[0][0]
+                    if isinstance(container_result, list)
+                    else container_result
+                )
 
                 # Set container name if provided
                 cx_name = row.get("container_name", "").strip()
                 if cx_name:
                     container.name = cx_name
                     from sqlalchemy.orm.attributes import flag_modified
+
                     if container.json_addl and "properties" in container.json_addl:
                         container.json_addl["properties"]["name"] = cx_name
                         flag_modified(container, "json_addl")
@@ -542,7 +568,9 @@ async def bulk_create_containers(
                         try:
                             json_overrides = json_lib.loads(props_str)
                         except json_lib.JSONDecodeError:
-                            raise ValueError(f"Invalid JSON in content_properties: {props_str}")
+                            raise ValueError(
+                                f"Invalid JSON in content_properties: {props_str}"
+                            )
 
                     # Create content
                     content = bobj.create_instance(mx_template.euid, json_overrides)
@@ -556,23 +584,28 @@ async def bulk_create_containers(
                             flag_modified(content, "json_addl")
 
                     # Link content to container
-                    from bloom_lims.bobjs import BloomContainer
+                    from bloom_lims.domain import BloomContainer
+
                     bc = BloomContainer(bdb)
                     bc.link_content(container.euid, content.euid)
 
                 bdb.session.commit()
 
-                results["created"].append({
-                    "row": row_num,
-                    "container_euid": container.euid,
-                    "content_euid": content.euid if content else None,
-                })
+                results["created"].append(
+                    {
+                        "row": row_num,
+                        "container_euid": container.euid,
+                        "content_euid": content.euid if content else None,
+                    }
+                )
 
             except Exception as e:
-                results["errors"].append({
-                    "row": row_num,
-                    "error": str(e),
-                })
+                results["errors"].append(
+                    {
+                        "row": row_num,
+                        "error": str(e),
+                    }
+                )
 
         return {
             "success": True,

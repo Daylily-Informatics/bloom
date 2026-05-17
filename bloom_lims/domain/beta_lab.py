@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from bloom_lims.bobjs import BloomObj
 from bloom_lims.config import get_settings
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain import BloomObj
 from bloom_lims.domain.beta_actions import BloomBetaActionRecorder
 from bloom_lims.domain.beta_lab_materials import _BetaLabMaterialsMixin
 from bloom_lims.domain.beta_lab_queue import _BetaLabQueueMixin
@@ -13,6 +12,7 @@ from bloom_lims.domain.beta_lab_stages import _BetaLabStagesMixin
 from bloom_lims.domain.beta_lab_store import _BetaLabStoreMixin
 from bloom_lims.domain.execution_queue import ExecutionQueueService
 from bloom_lims.integrations.dewey.client import DeweyArtifactClient
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 class BetaLabService(

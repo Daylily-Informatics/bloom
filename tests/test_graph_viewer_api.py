@@ -3,7 +3,9 @@ Graph viewer route/API contract tests (mocked, no live DB dependency).
 """
 
 import os
+import tempfile
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -12,9 +14,29 @@ from fastapi.testclient import TestClient
 
 os.environ["BLOOM_OAUTH"] = "no"
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
+_TEST_CONFIG_ROOT = Path(tempfile.mkdtemp(prefix="bloom-graph-config-"))
+_TEST_UPLOAD_DIR = _TEST_CONFIG_ROOT / "uploads"
+_TEST_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+_TEST_CONFIG_PATH = _TEST_CONFIG_ROOT / "bloom-config.yaml"
+_TEST_CONFIG_PATH.write_text(
+    f"""
+storage:
+  upload_dir: "{_TEST_UPLOAD_DIR}"
+auth:
+  jwt_secret: "test-bloom-graph-session-secret-explicit"
+deployment:
+  name: "test"
+aws:
+  region: "us-west-2"
+""",
+    encoding="utf-8",
+)
+os.environ["BLOOM_CONFIG_PATH"] = str(_TEST_CONFIG_PATH)
 
-from bloom_lims.graph_support import build_graph_meta_for_nodes
-from main import _build_graph_elements_for_start, app, require_auth
+from bloom_lims.graph_support import build_graph_meta_for_nodes  # noqa: E402
+from bloom_lims.gui.deps import require_auth  # noqa: E402
+from bloom_lims.gui.routes.graph import _build_graph_elements_for_start  # noqa: E402
+from main import app  # noqa: E402
 
 
 @pytest.fixture
@@ -32,17 +54,25 @@ class _FakeTemplate:
     pass
 
 
+class _FakeColumn:
+    def __eq__(self, _other):
+        return self
+
+    def is_(self, _other):
+        return self
+
+
 class _FakeLineage:
-    parent_instance_uid = "parent_instance_uid"
-    child_instance_uid = "child_instance_uid"
-    relationship_type = "relationship_type"
-    is_deleted = "is_deleted"
+    parent_instance_uid = _FakeColumn()
+    child_instance_uid = _FakeColumn()
+    relationship_type = _FakeColumn()
+    is_deleted = _FakeColumn()
 
 
 class _FakeInstance:
-    euid = "euid"
-    is_deleted = "is_deleted"
-    uid = "uid"
+    euid = _FakeColumn()
+    is_deleted = _FakeColumn()
+    uid = _FakeColumn()
 
 
 class _FakeExternalRef:

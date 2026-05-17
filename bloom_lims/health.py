@@ -90,7 +90,7 @@ async def check_database_health() -> ComponentHealth:
     start = time.time()
 
     try:
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3(echo_sql=False)
 
@@ -283,7 +283,7 @@ async def health_check(
         status="ok",
         mode=user.auth_source,
         detail=request.url.path,
-        service_principal=user.auth_source == "legacy_api_key",
+        service_principal=user.auth_source == "token",
     )
     projection = request.app.state.observability.projection(
         observed_at=db_payload.get("observed_at")

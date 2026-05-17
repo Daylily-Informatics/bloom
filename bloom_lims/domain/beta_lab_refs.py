@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from bloom_lims.db import get_child_lineages, get_parent_lineages
+from bloom_lims.tapdb_adapter import get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import instance_semantic_category
 
 
@@ -570,7 +570,7 @@ class _BetaLabReferenceMixin:
                 continue
             seen_test_euids.add(candidate)
             atlas_test_euids.append(candidate)
-        fallback_tenant_id = (
+        atlas_tenant_id = (
             self._first_reachable_reference_value(
                 instance,
                 reference_type=self.TRF_REFERENCE_TYPE,
@@ -603,9 +603,13 @@ class _BetaLabReferenceMixin:
                 else ""
             )
         )
+        if not atlas_tenant_id and not fulfillment_items:
+            raise ValueError(
+                "Bloom Atlas context requires explicit atlas_tenant_id on a reachable reference"
+            )
         if not fulfillment_items:
             return {
-                "atlas_tenant_id": fallback_tenant_id,
+                "atlas_tenant_id": atlas_tenant_id,
                 "atlas_trf_euid": atlas_trf_euid,
                 "atlas_test_euid": atlas_test_euid,
                 "atlas_test_euids": atlas_test_euids,

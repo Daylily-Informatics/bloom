@@ -6,16 +6,12 @@ focused submodules.
 
 Submodules:
     - base_objects: BloomObj base class and common methods
-    - workflows: BloomWorkflow and BloomWorkflowStep classes
     - content: Content and sample management
     - validation: Input validation utilities
     - exceptions: Custom exception hierarchy
     - cache: Caching utilities
 
 Usage:
-    # Core imports
-    from bloom_lims.core import BloomObj, BloomWorkflow
-
     # Validation
     from bloom_lims.core.validation import validate_euid, validated
 
@@ -39,12 +35,7 @@ from .async_operations import (
     run_async,
     run_in_background,
 )
-from .base_objects import (
-    BloomObj,
-    BloomObjMixin,
-    create_bloom_obj,
-    get_bloom_obj_by_euid,
-)
+from .base_objects import BloomObjMixin, create_bloom_obj, get_bloom_obj_by_euid
 
 # Batch operations
 from .batch_operations import (
@@ -82,8 +73,6 @@ from .cache_backends import (
 # Cached repository
 from .cached_repository import CachedRepository
 from .content import (
-    BloomContent,
-    BloomSample,
     create_aliquot,
     create_sample,
     get_sample_by_euid,
@@ -108,15 +97,6 @@ from .exceptions import (
     BloomWorkflowTransitionError,
 )
 
-# Read replica support
-from .read_replicas import (
-    ReplicaConfig,
-    ReplicaRouter,
-    ReplicaStatus,
-    configure_replicas,
-    get_replica_router,
-)
-
 # Template validation
 from .template_validation import (
     TemplateDefinition,
@@ -135,33 +115,13 @@ from .validation import (
     validate_type,
     validated,
 )
-from .workflows import (
-    BloomWorkflow,
-    BloomWorkflowStep,
-    advance_workflow,
-    create_workflow,
-    create_workflow_step,
-    get_workflow_by_euid,
-    get_workflow_steps,
-)
 
 __all__ = [
     # Base objects
-    "BloomObj",
     "BloomObjMixin",
     "create_bloom_obj",
     "get_bloom_obj_by_euid",
-    # Workflows
-    "BloomWorkflow",
-    "BloomWorkflowStep",
-    "create_workflow",
-    "create_workflow_step",
-    "get_workflow_by_euid",
-    "get_workflow_steps",
-    "advance_workflow",
     # Content
-    "BloomContent",
-    "BloomSample",
     "create_sample",
     "get_sample_by_euid",
     "create_aliquot",
@@ -211,12 +171,6 @@ __all__ = [
     "RedisCache",
     "MemcachedCache",
     "get_cache_backend",
-    # Read replicas
-    "ReplicaRouter",
-    "ReplicaConfig",
-    "ReplicaStatus",
-    "get_replica_router",
-    "configure_replicas",
     # Async operations
     "AsyncDatabaseSession",
     "BackgroundTaskManager",

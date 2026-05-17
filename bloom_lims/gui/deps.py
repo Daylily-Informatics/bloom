@@ -47,7 +47,7 @@ def _load_shared_display_timezone(email: str) -> str:
     if not normalized_email:
         return DEFAULT_DISPLAY_TIMEZONE
     try:
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=normalized_email)
         try:
@@ -87,7 +87,7 @@ def persist_display_timezone(email: str, display_timezone: str | None) -> bool:
         return False
     normalized_timezone = normalize_display_timezone(display_timezone)
     try:
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=normalized_email)
         try:

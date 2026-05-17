@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
-from bloom_lims.db import get_child_lineages, get_parent_lineages
+from bloom_lims.tapdb_adapter import get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import (
     instance_category_filter,
     instance_semantic_category,

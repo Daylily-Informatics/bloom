@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from bloom_lims.db import get_parent_lineages
+from bloom_lims.tapdb_adapter import get_parent_lineages
 from bloom_lims.template_identity import (
     instance_category_filter,
     instance_semantic_category,
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/subjects", tags=["Subjects"])
 
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
 
     return BLOOMdb3(app_username=username)
 
@@ -145,7 +145,7 @@ async def create_subject(
         bdb = get_bdb(user.email)
         from sqlalchemy.orm.attributes import flag_modified
 
-        from bloom_lims.bobjs import BloomObj
+        from bloom_lims.domain import BloomObj
 
         bo = BloomObj(bdb)
         bo.set_actor_context(user_id=user.user_id, email=user.email)
@@ -203,7 +203,7 @@ async def update_subject(
         bdb = get_bdb(user.email)
         from sqlalchemy.orm.attributes import flag_modified
 
-        from bloom_lims.bobjs import BloomObj
+        from bloom_lims.domain import BloomObj
 
         bo = BloomObj(bdb)
         bo.set_actor_context(user_id=user.user_id, email=user.email)

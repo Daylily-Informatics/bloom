@@ -38,11 +38,18 @@ SYSTEM_GROUP_CODES = [
 ]
 
 
-def map_legacy_role(role_value: str | None) -> str:
+ROLE_GROUPS: dict[str, str] = {
+    BLOOM_READONLY_GROUP: Role.READ_ONLY.value,
+    BLOOM_READWRITE_GROUP: Role.READ_WRITE.value,
+    BLOOM_ADMIN_GROUP: Role.ADMIN.value,
+}
+
+
+def require_canonical_role(role_value: str | None) -> str:
     candidate = str(role_value or "").strip()
     if candidate in {role.value for role in Role}:
         return candidate
-    return Role.READ_WRITE.value
+    raise PermissionError(f"Bloom role must be explicit and canonical: {role_value!r}")
 
 
 @dataclass(frozen=True)
@@ -103,9 +110,15 @@ class GroupService:
         self,
         *,
         user_id: str | None,
-        fallback_role: str | None,
+        role_hint: str | None,
     ) -> GroupResolution:
-        fallback = map_legacy_role(fallback_role)
         groups = self.get_group_codes_for_user(user_id)
-        roles = normalize_roles([fallback], fallback=fallback)
+        roles = [ROLE_GROUPS[group] for group in groups if group in ROLE_GROUPS]
+        if role_hint:
+            roles.append(require_canonical_role(role_hint))
+        roles = normalize_roles(roles)
+        if not roles:
+            raise PermissionError(
+                f"Bloom user {user_id!r} has no explicit Bloom role or role group"
+            )
         return GroupResolution(roles=roles, groups=sorted(groups))

@@ -12,8 +12,7 @@ from typing import Any, Callable
 from sqlalchemy import func, or_
 from sqlalchemy.orm.attributes import flag_modified
 
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
+from bloom_lims.domain import BloomObj
 from bloom_lims.domain.execution_actions import ExecutionQueueActionRecorder
 from bloom_lims.schemas.execution_queue import (
     CancelSubjectExecutionRequest,
@@ -57,6 +56,7 @@ from bloom_lims.schemas.execution_queue import (
     WorkerSummary,
     WorkerType,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import (
     instance_category_filter,
     instance_semantic_category,

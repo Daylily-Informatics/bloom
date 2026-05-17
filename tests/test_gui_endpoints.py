@@ -236,7 +236,7 @@ class TestModernActionUI:
     """Tests for modern UI action wiring on object detail pages."""
 
     def test_euid_details_uses_modern_action_module(self, client, bdb):
-        from bloom_lims.bobjs import BloomObj
+        from bloom_lims.domain import BloomObj
 
         GI = bdb.Base.classes.generic_instance
         instance = bdb.session.query(GI).filter(GI.is_deleted.is_(False)).first()

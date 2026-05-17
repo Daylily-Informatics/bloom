@@ -15,7 +15,7 @@ def test_project_dependencies_pin_release_train_versions() -> None:
 
     assert "cli-core-yo==2.1.1" in dependencies
     assert "daylily-auth-cognito==2.1.5" in dependencies
-    assert "daylily-tapdb>=7.0.1,<8.0.0" in dependencies
+    assert "daylily-tapdb>=7.0.3,<8.0.0" in dependencies
     assert "IPython>=8.18.1" in dependencies
     assert "psycopg2==2.9.9" in dependencies
     assert not any(str(dep).startswith("zebra-day") for dep in dependencies)

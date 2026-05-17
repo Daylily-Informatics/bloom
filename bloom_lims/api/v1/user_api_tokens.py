@@ -9,8 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
-from bloom_lims.auth.services.user_api_tokens import TokenCreateInput, UserAPITokenService
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.auth.services.user_api_tokens import (
+    TokenCreateInput,
+    UserAPITokenService,
+)
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter(prefix="/user-tokens", tags=["User API Tokens"])
 
@@ -52,7 +55,9 @@ def _token_row_to_dict(
         "scope": token.scope,
         "status": revision.status,
         "expires_at": revision.expires_at.isoformat(),
-        "last_used_at": revision.last_used_at.isoformat() if revision.last_used_at else None,
+        "last_used_at": revision.last_used_at.isoformat()
+        if revision.last_used_at
+        else None,
         "revoked_at": revision.revoked_at.isoformat() if revision.revoked_at else None,
         "revocation_reason": revision.revocation_reason,
         "created_at": token.created_at.isoformat() if token.created_at else None,
@@ -180,7 +185,9 @@ async def get_user_token_usage(
                     "ip_address": row.ip_address,
                     "user_agent": row.user_agent,
                     "request_metadata": row.request_metadata,
-                    "request_timestamp": row.request_timestamp.isoformat() if row.request_timestamp else None,
+                    "request_timestamp": row.request_timestamp.isoformat()
+                    if row.request_timestamp
+                    else None,
                 }
                 for row in usage_rows
             ],

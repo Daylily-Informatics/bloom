@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
@@ -10,14 +12,28 @@ import pytest
 from daylily_auth_cognito.browser.session import SessionPrincipal
 from fastapi.testclient import TestClient
 
-os.environ.setdefault("BLOOM_DEV_AUTH_BYPASS", "true")
+_TEST_CONFIG_ROOT = Path(tempfile.mkdtemp(prefix="bloom-gui-auth-config-"))
+_TEST_UPLOAD_DIR = _TEST_CONFIG_ROOT / "uploads"
+_TEST_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+_TEST_CONFIG_PATH = _TEST_CONFIG_ROOT / "bloom-config.yaml"
+_TEST_CONFIG_PATH.write_text(
+    f"""
+storage:
+  upload_dir: "{_TEST_UPLOAD_DIR}"
+auth:
+  jwt_secret: "test-bloom-session-secret-explicit"
+""",
+    encoding="utf-8",
+)
+os.environ["BLOOM_CONFIG_PATH"] = str(_TEST_CONFIG_PATH)
+os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import main
-from auth.cognito.client import CognitoConfigurationError
-from bloom_lims.config import BloomSettings
-from bloom_lims.gui.routes.auth import SessionBootstrapError
-from bloom_lims.gui.web_session import _normalize_user_data
+import main  # noqa: E402
+from auth.cognito.client import CognitoConfigurationError  # noqa: E402
+from bloom_lims.config import BloomSettings  # noqa: E402
+from bloom_lims.gui.routes.auth import SessionBootstrapError  # noqa: E402
+from bloom_lims.gui.web_session import _normalize_user_data  # noqa: E402
 
 
 def _fake_cognito_config() -> SimpleNamespace:
@@ -108,7 +124,9 @@ def test_auth_callback_get_completes_login(
     )
     monkeypatch.setattr(
         "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
-        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
+        lambda **kwargs: asyncio.sleep(
+            0, result=fake_auth.exchange_authorization_code(kwargs["code"])
+        ),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
@@ -243,7 +261,9 @@ def test_auth_callback_get_requires_prior_login_state(
     )
     monkeypatch.setattr(
         "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
-        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
+        lambda **kwargs: asyncio.sleep(
+            0, result=fake_auth.exchange_authorization_code(kwargs["code"])
+        ),
     )
 
     response = client.get(
@@ -266,7 +286,9 @@ def test_auth_callback_get_redirects_when_session_bootstrap_fails(
     )
     monkeypatch.setattr(
         "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
-        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
+        lambda **kwargs: asyncio.sleep(
+            0, result=fake_auth.exchange_authorization_code(kwargs["code"])
+        ),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]
@@ -322,7 +344,9 @@ def test_auth_callback_get_unexpected_error_redirects_cleanly(
     )
     monkeypatch.setattr(
         "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
-        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
+        lambda **kwargs: asyncio.sleep(
+            0, result=fake_auth.exchange_authorization_code(kwargs["code"])
+        ),
     )
 
     def _explode(*_args, **_kwargs):
@@ -380,7 +404,9 @@ def test_auth_logout_redirects_to_local_auth_error_when_cognito_is_misconfigured
 ) -> None:
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.build_bloom_web_session_config",
-        lambda _request: SimpleNamespace(domain="", client_id="client-123", logout_uri="/"),
+        lambda _request: SimpleNamespace(
+            domain="", client_id="client-123", logout_uri="/"
+        ),
     )
 
     response = client.get("/auth/logout", follow_redirects=False)
@@ -460,8 +486,10 @@ def test_resolve_login_roles_and_groups_blocks_missing_user_outside_autoprovisio
         def ensure_system_groups(self):
             return None
 
-        def resolve_user_roles_and_groups(self, *, user_id, fallback_role):
-            return SimpleNamespace(roles=[fallback_role or "READ_WRITE"], groups=[])
+        def resolve_user_roles_and_groups(self, *, user_id, role_hint):
+            if not role_hint:
+                raise PermissionError("missing explicit role")
+            return SimpleNamespace(roles=[role_hint], groups=[])
 
     monkeypatch.setattr("bloom_lims.gui.routes.auth.GroupService", _FakeGroupService)
 
@@ -483,7 +511,7 @@ def test_resolve_login_roles_and_groups_blocks_missing_user_outside_autoprovisio
         _resolve_login_roles_and_groups(
             email="new@daylilyinformatics.com",
             cognito_sub="sub-123",
-            fallback_role=None,
+            role_hint=None,
         )
 
 
@@ -508,10 +536,10 @@ def test_resolve_login_roles_and_groups_allows_missing_user_on_autoprovision_dom
         def ensure_system_groups(self):
             return None
 
-        def resolve_user_roles_and_groups(self, *, user_id, fallback_role):
-            return SimpleNamespace(
-                roles=[fallback_role or "READ_WRITE"], groups=["API"]
-            )
+        def resolve_user_roles_and_groups(self, *, user_id, role_hint):
+            if not role_hint:
+                raise PermissionError("missing explicit role")
+            return SimpleNamespace(roles=[role_hint], groups=["API"])
 
     monkeypatch.setattr("bloom_lims.gui.routes.auth.GroupService", _FakeGroupService)
 
@@ -530,7 +558,7 @@ def test_resolve_login_roles_and_groups_allows_missing_user_on_autoprovision_dom
     roles, groups, user_id, persisted_role = _resolve_login_roles_and_groups(
         email="new@lsmc.com",
         cognito_sub="sub-123",
-        fallback_role=None,
+        role_hint="READ_WRITE",
     )
 
     assert roles == ["READ_WRITE"]
@@ -606,7 +634,9 @@ def test_multiple_gui_clients_keep_distinct_sessions(
     )
     monkeypatch.setattr(
         "daylily_auth_cognito.browser.session.exchange_authorization_code_async",
-        lambda **kwargs: asyncio.sleep(0, result=fake_auth.exchange_authorization_code(kwargs["code"])),
+        lambda **kwargs: asyncio.sleep(
+            0, result=fake_auth.exchange_authorization_code(kwargs["code"])
+        ),
     )
     monkeypatch.setattr(
         "bloom_lims.gui.routes.auth.get_allowed_domains", lambda: ["lsmc.com"]

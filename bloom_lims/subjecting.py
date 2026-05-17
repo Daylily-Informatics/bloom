@@ -16,7 +16,7 @@ Relationship types:
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +39,11 @@ SUBJECT_TEMPLATE_MAP = {
 def generate_subject_key(subject_kind: str, anchor_euid: str) -> str:
     """
     Generate a stable, deterministic subject key.
-    
+
     Args:
         subject_kind: The kind of subject (accession, analysis_bundle, report, generic)
         anchor_euid: The EUID of the anchor object
-        
+
     Returns:
         A stable subject key in format "{subject_kind}:{anchor_euid}"
     """
@@ -53,25 +53,29 @@ def generate_subject_key(subject_kind: str, anchor_euid: str) -> str:
 def find_subject_by_key(bob, subject_key: str):
     """
     Find a subject by its stable subject_key.
-    
+
     Args:
         bob: BloomObj instance
         subject_key: The subject_key to search for
-        
+
     Returns:
         The subject instance if found, None otherwise
     """
     try:
-        results = bob.session.query(bob.Base.classes.generic_instance).filter(
-            bob.Base.classes.generic_instance.category == "subject",
-            bob.Base.classes.generic_instance.is_deleted == False,
-        ).all()
-        
+        results = (
+            bob.session.query(bob.Base.classes.generic_instance)
+            .filter(
+                bob.Base.classes.generic_instance.category == "subject",
+                bob.Base.classes.generic_instance.is_deleted.is_(False),
+            )
+            .all()
+        )
+
         for result in results:
             props = result.json_addl.get("properties", {})
             if props.get("subject_key") == subject_key:
                 return result
-        
+
         return None
     except Exception as e:
         logger.error(f"Error finding subject by key {subject_key}: {e}")
@@ -81,28 +85,27 @@ def find_subject_by_key(bob, subject_key: str):
 def get_subject_template_euid(bob, subject_kind: str) -> Optional[str]:
     """
     Get the template EUID for a given subject kind.
-    
+
     Args:
         bob: BloomObj instance
         subject_kind: The kind of subject
-        
+
     Returns:
         The template EUID if found, None otherwise
     """
-    template_path = SUBJECT_TEMPLATE_MAP.get(subject_kind, SUBJECT_TEMPLATE_MAP["generic"])
+    template_path = SUBJECT_TEMPLATE_MAP.get(
+        subject_kind, SUBJECT_TEMPLATE_MAP["generic"]
+    )
     parts = template_path.split("/")
     if len(parts) != 4:
         logger.error(f"Invalid template path: {template_path}")
         return None
-    
+
     category, type_name, subtype, version = parts
 
     try:
         templates = bob.query_template_by_component_v2(
-            category=category,
-            type=type_name,
-            subtype=subtype,
-            version=version
+            category=category, type=type_name, subtype=subtype, version=version
         )
         if templates:
             return templates[0].euid
@@ -122,7 +125,7 @@ def create_subject(
 ) -> Optional[str]:
     """
     Create or find existing subject. Idempotent - returns existing if found.
-    
+
     Args:
         bob: BloomObj instance
         anchor_euid: EUID of the anchor object
@@ -130,31 +133,31 @@ def create_subject(
         subject_key: Optional custom subject key. Defaults to "{subject_kind}:{anchor_euid}"
         extra_props: Additional properties to set on the subject
         template_euid: Optional template EUID override
-        
+
     Returns:
         Subject EUID if successful, None otherwise
     """
     if extra_props is None:
         extra_props = {}
-    
+
     # Generate subject_key if not provided
     if subject_key is None:
         subject_key = generate_subject_key(subject_kind, anchor_euid)
-    
+
     # Check for existing subject (idempotency)
     existing = find_subject_by_key(bob, subject_key)
     if existing:
         logger.info(f"Subject already exists with key {subject_key}: {existing.euid}")
         return existing.euid
-    
+
     # Get or validate template
     if template_euid is None:
         template_euid = get_subject_template_euid(bob, subject_kind)
-    
+
     if template_euid is None:
         logger.error(f"No template found for subject kind: {subject_kind}")
         return None
-    
+
     try:
         # Create the subject instance
         result = bob.create_instances(template_euid)
@@ -179,6 +182,7 @@ def create_subject(
 
         subject.json_addl["properties"] = props
         from sqlalchemy.orm.attributes import flag_modified
+
         flag_modified(subject, "json_addl")
 
         bob.session.commit()
@@ -213,15 +217,17 @@ def link_subject_anchor(bob, subject_euid: str, anchor_euid: str) -> bool:
         for lineage in subject.parent_of_lineages:
             if lineage.is_deleted:
                 continue
-            if (lineage.child_instance.euid == anchor_euid and
-                lineage.relationship_type == RELATIONSHIP_SUBJECT_ANCHOR):
-                logger.info(f"Anchor relationship already exists: {subject_euid} -> {anchor_euid}")
+            if (
+                lineage.child_instance.euid == anchor_euid
+                and lineage.relationship_type == RELATIONSHIP_SUBJECT_ANCHOR
+            ):
+                logger.info(
+                    f"Anchor relationship already exists: {subject_euid} -> {anchor_euid}"
+                )
                 return True
 
         bob.create_generic_instance_lineage_by_euids(
-            subject_euid,
-            anchor_euid,
-            relationship_type=RELATIONSHIP_SUBJECT_ANCHOR
+            subject_euid, anchor_euid, relationship_type=RELATIONSHIP_SUBJECT_ANCHOR
         )
         bob.session.commit()
         logger.info(f"Created anchor relationship: {subject_euid} -> {anchor_euid}")
@@ -233,7 +239,9 @@ def link_subject_anchor(bob, subject_euid: str, anchor_euid: str) -> bool:
         return False
 
 
-def add_subject_members(bob, subject_euid: str, member_euids: List[str]) -> Dict[str, bool]:
+def add_subject_members(
+    bob, subject_euid: str, member_euids: List[str]
+) -> Dict[str, bool]:
     """
     Add subject → member relationship edges.
 
@@ -259,14 +267,14 @@ def add_subject_members(bob, subject_euid: str, member_euids: List[str]) -> Dict
     for member_euid in member_euids:
         try:
             if member_euid in existing_members:
-                logger.info(f"Member relationship already exists: {subject_euid} -> {member_euid}")
+                logger.info(
+                    f"Member relationship already exists: {subject_euid} -> {member_euid}"
+                )
                 results[member_euid] = True
                 continue
 
             bob.create_generic_instance_lineage_by_euids(
-                subject_euid,
-                member_euid,
-                relationship_type=RELATIONSHIP_SUBJECT_MEMBER
+                subject_euid, member_euid, relationship_type=RELATIONSHIP_SUBJECT_MEMBER
             )
             results[member_euid] = True
             logger.info(f"Created member relationship: {subject_euid} -> {member_euid}")
@@ -297,7 +305,7 @@ def list_subjects_for_object(bob, object_euid: str) -> List[Dict[str, Any]]:
         return subjects
 
     # Templates don't have lineage relationships - only instances do
-    if not hasattr(obj, 'child_of_lineages'):
+    if not hasattr(obj, "child_of_lineages"):
         return subjects
 
     # Check child_of_lineages to find subjects where this object is a child
@@ -316,14 +324,16 @@ def list_subjects_for_object(bob, object_euid: str) -> List[Dict[str, Any]]:
             role = "member"
 
         props = parent.json_addl.get("properties", {})
-        subjects.append({
-            "euid": parent.euid,
-            "kind": props.get("subject_kind", "unknown"),
-            "role": role,
-            "status": props.get("status", "unknown"),
-            "subject_key": props.get("subject_key", ""),
-            "name": props.get("name", parent.name),
-        })
+        subjects.append(
+            {
+                "euid": parent.euid,
+                "kind": props.get("subject_kind", "unknown"),
+                "role": role,
+                "status": props.get("status", "unknown"),
+                "subject_key": props.get("subject_key", ""),
+                "name": props.get("name", parent.name),
+            }
+        )
 
     return subjects
 
@@ -346,7 +356,7 @@ def list_members_for_subject(bob, subject_euid: str) -> Dict[str, List[Dict[str,
         return result
 
     # Templates don't have lineage relationships - only instances do
-    if not hasattr(subject, 'parent_of_lineages'):
+    if not hasattr(subject, "parent_of_lineages"):
         return result
 
     for lineage in subject.parent_of_lineages:
@@ -405,7 +415,9 @@ def create_workset(
     # Map workset_type to template key
     template_key = f"workset_{workset_type}"
     if template_key not in SUBJECT_TEMPLATE_MAP:
-        template_key = "workset"  # Fallback to default
+        raise ValueError(
+            f"Unknown workset_type {workset_type!r}; no subject template is configured"
+        )
 
     # Generate subject key
     subject_key = generate_subject_key("workset", anchor_euid)
@@ -451,6 +463,7 @@ def complete_workset(bob, workset_euid: str, status: str = "complete") -> bool:
         True if successful, False otherwise
     """
     from datetime import UTC, datetime
+
     from sqlalchemy.orm.attributes import flag_modified
 
     if status not in ("complete", "failed", "abandoned"):
@@ -545,7 +558,7 @@ def list_worksets(
         query = bob.session.query(bob.Base.classes.generic_instance).filter(
             bob.Base.classes.generic_instance.category == "subject",
             bob.Base.classes.generic_instance.type == "workset",
-            bob.Base.classes.generic_instance.is_deleted == False,
+            bob.Base.classes.generic_instance.is_deleted.is_(False),
         )
 
         results = query.limit(limit).all()
@@ -559,19 +572,21 @@ def list_worksets(
             if workflow_euid and props.get("workflow_euid") != workflow_euid:
                 continue
 
-            worksets.append({
-                "euid": workset.euid,
-                "subject_key": props.get("subject_key", ""),
-                "anchor_euid": props.get("anchor_euid", ""),
-                "workflow_euid": props.get("workflow_euid", ""),
-                "status": props.get("status", "unknown"),
-                "started_at": props.get("started_at", ""),
-                "completed_at": props.get("completed_at", ""),
-                "executed_by": props.get("executed_by", ""),
-                "name": props.get("name", workset.name),
-                "type": workset.type,
-                "subtype": workset.subtype,
-            })
+            worksets.append(
+                {
+                    "euid": workset.euid,
+                    "subject_key": props.get("subject_key", ""),
+                    "anchor_euid": props.get("anchor_euid", ""),
+                    "workflow_euid": props.get("workflow_euid", ""),
+                    "status": props.get("status", "unknown"),
+                    "started_at": props.get("started_at", ""),
+                    "completed_at": props.get("completed_at", ""),
+                    "executed_by": props.get("executed_by", ""),
+                    "name": props.get("name", workset.name),
+                    "type": workset.type,
+                    "subtype": workset.subtype,
+                }
+            )
 
         return worksets
 

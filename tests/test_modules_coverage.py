@@ -177,13 +177,13 @@ class TestSubjectingModule:
 
 
 class TestDomainWorkflows:
-    """Tests for bloom_lims/domain/workflows.py"""
+    """Tests for removed workflow domain module."""
 
     def test_domain_workflows_imports(self):
-        """Test that domain workflows module can be imported."""
-        import bloom_lims.domain.workflows
+        """Workflow domain imports should be hard-removed."""
+        import importlib.util
 
-        assert bloom_lims.domain.workflows is not None
+        assert importlib.util.find_spec("bloom_lims.domain.workflows") is None
 
 
 class TestCoreAsyncOperations:
@@ -257,23 +257,23 @@ class TestCoreLineage:
 
 
 class TestCoreReadReplicas:
-    """Tests for bloom_lims/core/read_replicas.py"""
+    """Tests for the removed Bloom-side read-replica module."""
 
-    def test_read_replicas_imports(self):
-        """Test that read_replicas module can be imported."""
-        import bloom_lims.core.read_replicas
+    def test_read_replicas_is_removed(self):
+        """Read-replica routing must not be exposed as a Bloom compatibility API."""
+        import importlib.util
 
-        assert bloom_lims.core.read_replicas is not None
+        assert importlib.util.find_spec("bloom_lims.core.read_replicas") is None
 
 
 class TestCoreWorkflows:
-    """Tests for bloom_lims/core/workflows.py"""
+    """Tests for removed workflow core module."""
 
     def test_core_workflows_imports(self):
-        """Test that core workflows module can be imported."""
-        import bloom_lims.core.workflows
+        """Workflow core imports should be hard-removed."""
+        import importlib.util
 
-        assert bloom_lims.core.workflows is not None
+        assert importlib.util.find_spec("bloom_lims.core.workflows") is None
 
 
 class TestApiVersioning:
@@ -327,13 +327,13 @@ class TestDomainObjectSets:
 
 
 class TestBobjs:
-    """Tests for bloom_lims/bobjs.py"""
+    """Tests for the removed bloom_lims.bobjs compatibility module."""
 
-    def test_bobjs_imports(self):
-        """Test that bobjs module can be imported."""
-        import bloom_lims.bobjs
+    def test_bobjs_is_removed(self):
+        """bloom_lims.bobjs must stay removed."""
+        import importlib.util
 
-        assert bloom_lims.bobjs is not None
+        assert importlib.util.find_spec("bloom_lims.bobjs") is None
 
 
 class TestBvars:

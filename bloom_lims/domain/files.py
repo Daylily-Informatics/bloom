@@ -7,39 +7,52 @@ data files, and file sets.
 Extracted from bloom_lims/bobjs.py for better code organization.
 """
 
-import os
-import json
 import logging
-import subprocess
+import os
+import random
+import re
+import shlex
+import shutil
 import socket
-import hashlib
+import subprocess
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import urllib.parse
 
 import boto3
 import requests
-from botocore.exceptions import NoCredentialsError, PartialCredentialsError
-
-from sqlalchemy import desc
+import yaml
+from botocore.exceptions import NoCredentialsError
+from sqlalchemy import and_, or_
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.domain.base import BloomObj
-from bloom_lims.domain.utils import get_datetime_string, generate_random_string, _update_recursive
-
-import re
+from bloom_lims.domain.utils import (
+    update_recursive,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class BloomFile(BloomObj):
-    
-    def __init__(self, bdb, bucket_prefix=None, is_deleted=False, cfg_printers=False, cfg_fedex=False):
-        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
-    
+    def __init__(
+        self,
+        bdb,
+        bucket_prefix=None,
+        is_deleted=False,
+        cfg_printers=False,
+        cfg_fedex=False,
+    ):
+        super().__init__(
+            bdb, is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex
+        )
+
         if bucket_prefix is None:
-            bucket_prefix = os.environ.get(
-                "BLOOM_DEWEY_S3_BUCKET_PREFIX", "set-a-bucket-prefix-in-the-dotenv-file"
+            bucket_prefix = os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX")
+        if not bucket_prefix:
+            raise RuntimeError(
+                "BloomFile requires explicit bucket_prefix or BLOOM_DEWEY_S3_BUCKET_PREFIX"
             )
 
         self.bucket_prefix = bucket_prefix
@@ -59,7 +72,8 @@ class BloomFile(BloomObj):
             #   SANDBOX:CATEGORY-BODYCHECK
             candidate = euid_str.split(":", 1)[-1]
             if "-" in candidate:
-                _, body_check = candidate.split("-", 1)
+                parts = candidate.split("-")
+                body_check = parts[-1]
                 if len(body_check) >= 2:
                     body = body_check[:-1]  # drop checksum char
                     alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -70,14 +84,7 @@ class BloomFile(BloomObj):
                         if value > 0:
                             return value
 
-        # Legacy fallback for historical non-Meridian IDs like GX123.
-        digits = re.sub("[^0-9]", "", euid_str)
-        if digits:
-            return int(digits)
-
-        # Final deterministic fallback for malformed/unexpected IDs.
-        digest = hashlib.sha1(euid_str.encode("utf-8")).digest()
-        return int.from_bytes(digest[:8], byteorder="big", signed=False)
+        raise ValueError(f"Expected canonical Meridian EUID, got {euid!r}")
 
     def _derive_bucket_name(self, euid):
         euid_int = self._euid_numeric_value(euid)
@@ -147,7 +154,7 @@ class BloomFile(BloomObj):
     def link_file_to_parent(self, child_euid, parent_euid):
         self.create_generic_instance_lineage_by_euids(child_euid, parent_euid)
         self.session.commit()
-        
+
     def create_file(
         self,
         file_metadata={},
@@ -176,27 +183,31 @@ class BloomFile(BloomObj):
             # Detect if S3 URI is a directory
             s3_parsed_uri = re.match(r"s3://([^/]+)/(.+)", s3_uri)
             if not s3_parsed_uri:
-                raise ValueError("Invalid s3_uri format. Expected format: s3://bucket_name/prefix")
-            
+                raise ValueError(
+                    "Invalid s3_uri format. Expected format: s3://bucket_name/prefix"
+                )
+
             bucket_name, prefix = s3_parsed_uri.groups()
 
             try:
-                response = self.s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, Delimiter='/')
-                files = response.get('Contents', [])
-                
+                response = self.s3_client.list_objects_v2(
+                    Bucket=bucket_name, Prefix=prefix, Delimiter="/"
+                )
+                files = response.get("Contents", [])
+
                 # If more than one object or the URI ends with '/', treat it as a directory
-                if len(files) > 1 or s3_uri.endswith('/'):
+                if len(files) > 1 or s3_uri.endswith("/"):
                     created_files = []
                     for file in files:
-                        file_key = file['Key']
-                        
+                        file_key = file["Key"]
+
                         # Skip directories
-                        if file_key.endswith('/'):
+                        if file_key.endswith("/"):
                             continue
-                        
-                        file_name = file_key.split('/')[-1]
+
+                        file_name = file_key.split("/")[-1]
                         current_s3_uri = f"s3://{bucket_name}/{file_key}"
-                        
+
                         # Create individual files for each item in the directory
                         created_file = self.create_file(
                             file_metadata=file_metadata,
@@ -205,21 +216,25 @@ class BloomFile(BloomObj):
                             addl_tags=addl_tags,
                         )
                         created_files.append(created_file)
-                    
+
                     return created_files
-                
+
                 # Otherwise, process as a single file
                 s3_uri = f"s3://{bucket_name}/{files[0]['Key']}" if files else s3_uri
-            
+
             except Exception as e:
-                raise Exception(f"Error detecting file or directory for S3 URI {s3_uri}: {e}")
+                raise Exception(
+                    f"Error detecting file or directory for S3 URI {s3_uri}: {e}"
+                )
 
         # Existing logic for processing a single file
         file_properties = {"properties": file_metadata}
-        import_or_remote = file_metadata.get('import_or_remote', 'import')
+        import_or_remote = file_metadata.get("import_or_remote", "import")
 
         # Query for file template with proper error handling
-        file_templates = self.query_template_by_component_v2("file", "file", "generic", "1.0")
+        file_templates = self.query_template_by_component_v2(
+            "file", "file", "generic", "1.0"
+        )
         if not file_templates:
             raise Exception(
                 "File template not found: file/file/generic/1.0. "
@@ -257,7 +272,9 @@ class BloomFile(BloomObj):
                 self.session.commit()
                 raise Exception(e)
         else:
-            logging.warning(f"No data provided for file creation or import skipped: {file_data, url}")
+            logging.warning(
+                f"No data provided for file creation or import skipped: {file_data, url}"
+            )
             new_file.bstatus = "awaiting file data"
             self.session.commit()
 
@@ -265,7 +282,6 @@ class BloomFile(BloomObj):
             self.lock_file(new_file.euid)
 
         return new_file
-
 
     def create_file_old(
         self,
@@ -280,7 +296,7 @@ class BloomFile(BloomObj):
     ):
         file_properties = {"properties": file_metadata}
 
-        import_or_remote = file_metadata['import_or_remote']
+        import_or_remote = file_metadata["import_or_remote"]
 
         new_file = self.create_instance(
             self.query_template_by_component_v2("file", "file", "generic", "1.0")[
@@ -291,9 +307,7 @@ class BloomFile(BloomObj):
         self.session.commit()
 
         # Special handling for patient_id
-        if (
-            "patient_id" in file_metadata
-        ):
+        if "patient_id" in file_metadata:
             patient_id = file_metadata["patient_id"]
             search_criteria = {"properties": {"patient_id": patient_id}}
             existing_euids = self.search_objs_by_addl_metadata(
@@ -301,7 +315,7 @@ class BloomFile(BloomObj):
                 True,
                 category="actor",
                 type="generic",
-                subtype="patient"
+                subtype="patient",
             )
 
             if existing_euids:
@@ -330,7 +344,14 @@ class BloomFile(BloomObj):
         if file_data or url or full_path_to_file or s3_uri:
             try:
                 new_file = self.add_file_data(
-                    new_file.euid, file_data, file_name, url, full_path_to_file, s3_uri, addl_tags=addl_tags, import_or_remote=import_or_remote
+                    new_file.euid,
+                    file_data,
+                    file_name,
+                    url,
+                    full_path_to_file,
+                    s3_uri,
+                    addl_tags=addl_tags,
+                    import_or_remote=import_or_remote,
                 )
             except Exception as e:
                 logging.exception(f"Error adding file data: {e}")
@@ -339,7 +360,9 @@ class BloomFile(BloomObj):
                 self.session.commit()
                 raise Exception(e)
         else:
-            logging.warning(f"No data provided for file creation, or import skipped ({import_or_remote}): {file_data, url}")
+            logging.warning(
+                f"No data provided for file creation, or import skipped ({import_or_remote}): {file_data, url}"
+            )
             new_file.bstatus = "awaiting file data"
             self.session.commit()
 
@@ -348,32 +371,31 @@ class BloomFile(BloomObj):
 
         return new_file
 
-
     def sanitize_tag(self, value, is_key=False):
         """
         Sanitize the tag key or value to conform to AWS tag requirements by replacing disallowed characters.
 
         Parameters:
         - value (str): The tag key or value to sanitize.
-        - is_key (bool): If True, sanitize as a tag key (128-character limit). 
+        - is_key (bool): If True, sanitize as a tag key (128-character limit).
                         If False, sanitize as a tag value (256-character limit).
 
         Returns:
         - str: Sanitized tag key or value.
         """
         # AWS tag key or value allowed characters
-        allowed_characters_regex = r'[^a-zA-Z0-9 _\.:/=+\-@]'
-        
+        allowed_characters_regex = r"[^a-zA-Z0-9 _\.:/=+\-@]"
+
         # Replace disallowed characters with '_'
-        sanitized_value = re.sub(allowed_characters_regex, '_', value)
-        
+        sanitized_value = re.sub(allowed_characters_regex, "_", value)
+
         # Trim leading and trailing spaces (not allowed by AWS)
         sanitized_value = sanitized_value.strip()
-        
+
         # Enforce maximum length
         max_length = 128 if is_key else 256
         sanitized_value = sanitized_value[:max_length]
-        
+
         return sanitized_value
 
     def format_addl_tags(self, add_tags):
@@ -389,7 +411,7 @@ class BloomFile(BloomObj):
             )
 
         return "&".join(formatted_tags)
-    
+
     def add_file_data(
         self,
         euid,
@@ -399,19 +421,23 @@ class BloomFile(BloomObj):
         full_path_to_file=None,
         s3_uri=None,
         addl_tags={},
-        import_or_remote=None
+        import_or_remote=None,
     ):
         file_instance = self.get_by_euid(euid)
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
         file_properties = {}
 
-        if import_or_remote in ["Remote", "remote"] and (file_data is not None or url is not None or full_path_to_file is not None):
-            raise ValueError("Remote file management is only supported with internal S3 URI.")
+        if import_or_remote in ["Remote", "remote"] and (
+            file_data is not None or url is not None or full_path_to_file is not None
+        ):
+            raise ValueError(
+                "Remote file management is only supported with internal S3 URI."
+            )
 
         addl_tag_string = self.format_addl_tags(addl_tags)
         if len(addl_tag_string) > 0:
             addl_tag_string = f"&{addl_tag_string}"
-        
+
         if file_name is None:
             if url:
                 file_name = url.split("/")[-1]
@@ -431,7 +457,6 @@ class BloomFile(BloomObj):
         s3_key_path = "/".join(s3_key.split("/")[:-1])
         s3_key_path = s3_key_path + "/" if len(s3_key_path) > 0 else ""
 
-
         existing_files = self.s3_client.list_objects_v2(
             Bucket=s3_bucket_name, Prefix=f"{s3_key_path}{euid}."
         )
@@ -448,13 +473,17 @@ class BloomFile(BloomObj):
             # Check if a remote file with the same metadata already exists
 
             search_criteria = {"properties": {"current_s3_uri": s3_uri}}
-            existing_euids = self.search_objs_by_addl_metadata(search_criteria, True, category="file", type="file", subtype="generic")
-            
-            if len(existing_euids) > 0:
-                raise Exception(f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}.")
+            existing_euids = self.search_objs_by_addl_metadata(
+                search_criteria, True, category="file", type="file", subtype="generic"
+            )
 
-            s3uri_bucket=s3_uri.split("/")[2]
-            s3uri_key="/".join(s3_uri.split("/")[3:])
+            if len(existing_euids) > 0:
+                raise Exception(
+                    f"Remote file with URI {s3_uri} already exists in the database as {existing_euids}."
+                )
+
+            s3uri_bucket = s3_uri.split("/")[2]
+            s3uri_key = "/".join(s3_uri.split("/")[3:])
             # Store metadata for the remote file
             file_properties = {
                 "remote_s3_uri": s3_uri,
@@ -465,52 +494,60 @@ class BloomFile(BloomObj):
                 "original_file_data_type": "s3uri",
                 "file_type": file_suffix,
                 "current_s3_uri": s3_uri,
-                "original_s3_uri": s3_uri,  
+                "original_s3_uri": s3_uri,
                 "current_s3_key": s3uri_key,
                 "current_s3_bucket_name": s3uri_bucket,
-                "import_or_remote": 'remote',
+                "import_or_remote": "remote",
             }
-                        # Check if the object has the 'dewey_euid' tag
+            # Check if the object has the 'dewey_euid' tag
             try:
                 existing_tags = self.s3_client.get_object_tagging(
-                    Bucket=s3uri_bucket,
-                    Key=s3uri_key
+                    Bucket=s3uri_bucket, Key=s3uri_key
                 )
 
                 # Check if 'dewey_euid' is already present in the tags
                 for tag in existing_tags.get("TagSet", []):
                     if tag["Key"] == "dewey_euid":
-                        raise Exception(f"Object {s3_uri} already has a 'dewey_euid' tag with value {tag['Value']}.")
+                        raise Exception(
+                            f"Object {s3_uri} already has a 'dewey_euid' tag with value {tag['Value']}."
+                        )
             except self.s3_client.exceptions.NoSuchKey:
                 raise Exception(f"S3 object {s3_uri} does not exist.")
             except Exception as e:
-                self.logger.exception(f"Error checking tags for S3 object {s3_uri}: {e}")
+                self.logger.exception(
+                    f"Error checking tags for S3 object {s3_uri}: {e}"
+                )
                 raise Exception(f"Failed to check tags for S3 object: {e}")
-            
-                    
+
             # Construct the tags
             tagging = {
-                'TagSet': [
-                    {'Key': 'dewey_original_file_name', 'Value': self.sanitize_tag(file_name)},
-                    {'Key': 'dewey_original_file_path', 'Value': 'N/A'},
-                    {'Key': 'dewey_original_file_suffix', 'Value': self.sanitize_tag(file_suffix)},
-                    {'Key': 'dewey_euid', 'Value': self.sanitize_tag(euid)},
+                "TagSet": [
+                    {
+                        "Key": "dewey_original_file_name",
+                        "Value": self.sanitize_tag(file_name),
+                    },
+                    {"Key": "dewey_original_file_path", "Value": "N/A"},
+                    {
+                        "Key": "dewey_original_file_suffix",
+                        "Value": self.sanitize_tag(file_suffix),
+                    },
+                    {"Key": "dewey_euid", "Value": self.sanitize_tag(euid)},
                 ]
             }
-                    
+
             # Apply the tags to the existing object
             try:
                 self.s3_client.put_object_tagging(
-                    Bucket=s3uri_bucket,
-                    Key=s3uri_key,
-                    Tagging=tagging
+                    Bucket=s3uri_bucket, Key=s3uri_key, Tagging=tagging
                 )
                 self.logger.info(f"Tags successfully applied to S3 object {s3_uri}")
             except Exception as e:
-                self.logger.exception(f"Error tagging existing S3 object {s3_uri}: {e}\n\n{tagging}")
+                self.logger.exception(
+                    f"Error tagging existing S3 object {s3_uri}: {e}\n\n{tagging}"
+                )
                 raise Exception(f"Failed to tag S3 object: {e}\n{tagging}")
 
-            _update_recursive(file_instance.json_addl["properties"], file_properties)
+            update_recursive(file_instance.json_addl["properties"], file_properties)
             flag_modified(file_instance, "json_addl")
             self.session.commit()
             return file_instance
@@ -520,17 +557,19 @@ class BloomFile(BloomObj):
                 file_data.seek(0)  # Ensure the file pointer is at the beginning
                 file_size = len(file_data.read())
                 file_data.seek(0)  # Reset the file pointer after reading
-                
+
                 try:
                     self.s3_client.put_object(
                         Bucket=s3_bucket_name,
                         Key=s3_key,
                         Body=file_data,
-                        Tagging=f"dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}"
+                        Tagging=f"dewey_original_file_name={self.sanitize_tag(file_name)}&dewey_original_file_path=N/A&&dewey_original_file_suffix={self.sanitize_tag(file_suffix)}&dewey_euid={self.sanitize_tag(euid)}{addl_tag_string}",
                     )
 
                 except Exception as e:
-                    self.logger.exception(f"Error uploading file data: {e}. Possibly tag related: {self.sanitize_tag(file_name)}, {self.sanitize_tag(str(file_size))}, {self.sanitize_tag(file_suffix)}, {self.sanitize_tag(euid)} ") 
+                    self.logger.exception(
+                        f"Error uploading file data: {e}. Possibly tag related: {self.sanitize_tag(file_name)}, {self.sanitize_tag(str(file_size))}, {self.sanitize_tag(file_suffix)}, {self.sanitize_tag(euid)} "
+                    )
                     raise Exception(e)
                 odirectory, ofilename = os.path.split(file_name)
 
@@ -548,7 +587,7 @@ class BloomFile(BloomObj):
                 }
 
             elif url:
-                response = requests.get(url)
+                response = requests.get(url, timeout=30)
                 file_size = len(response.content)
                 url_info = url.split("/")[-1]
                 file_suffix = url_info.split(".")[-1]
@@ -580,7 +619,7 @@ class BloomFile(BloomObj):
                 try:
                     local_ip = socket.gethostbyname(socket.gethostname())
                 except socket.gaierror:
-                    local_ip = "127.0.0.1"  # Fallback to localhost
+                    local_ip = None
 
                 self.s3_client.put_object(
                     Bucket=s3_bucket_name,
@@ -605,7 +644,7 @@ class BloomFile(BloomObj):
 
             elif s3_uri in ["deprecate this"]:
                 # I do not want to be in the business of moving files around here
-                #elif s3_uri:
+                # elif s3_uri:
                 # Validate and move the file from the provided s3_uri
                 s3_parsed_uri = re.match(r"s3://([^/]+)/(.+)", s3_uri)
                 if not s3_parsed_uri:
@@ -642,16 +681,17 @@ class BloomFile(BloomObj):
 
                 # Delete the old file and create a marker file
                 marker_key = f"{source_key}.dewey.{euid}.moved"
-                if len(marker_key)  >= 1024:
-                    raise Exception(f"Marker key length is too long, >1024chrar : {len(marker_key)},not deleting original file: {source_key}")
+                if len(marker_key) >= 1024:
+                    raise Exception(
+                        f"Marker key length is too long, >1024chrar : {len(marker_key)},not deleting original file: {source_key}"
+                    )
                 self.s3_client.put_object(
                     Bucket=source_bucket,
                     Key=marker_key,
                     Body=b"",
                     Tagging=f"dewey_import_or_remote={import_or_remote}&dewey_euid={euid}&dewey_original_s3_uri={self.sanitize_tag(s3_uri)}{addl_tag_string}",
                 )
-                #self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
-
+                # self.s3_client.delete_object(Bucket=source_bucket, Key=source_key)
 
             else:
                 self.logger.exception("No file data provided.")
@@ -669,7 +709,7 @@ class BloomFile(BloomObj):
             self.session.commit()
             raise (e)
 
-        _update_recursive(file_instance.json_addl["properties"], file_properties)
+        update_recursive(file_instance.json_addl["properties"], file_properties)
         flag_modified(file_instance, "json_addl")
         self.session.commit()
 
@@ -677,7 +717,7 @@ class BloomFile(BloomObj):
 
     def update_file_metadata(self, euid, file_metadata={}):
         file_instance = self.get_by_euid(euid)
-        _update_recursive(file_instance.json_addl["properties"], file_metadata)
+        update_recursive(file_instance.json_addl["properties"], file_metadata)
         flag_modified(file_instance, "json_addl")
         self.session.commit()
         return file_instance
@@ -702,15 +742,8 @@ class BloomFile(BloomObj):
         :param save_path: Directory where the file will be saved. Defaults to ./tmp/, which will be created if not present.
         :return: Path of the saved file.
         """
-        import random
-        random.randint(1,99999999)
-        save_path = os.path.join(save_path, str(random.randint(1,99999999)))
-        os.system(f"mkdir -p {save_path}")
-        
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        else:
-            self.logger.warn(f"Directory already exists: {save_path}")
+        save_path = os.path.join(save_path, str(random.randint(1, 99999999)))
+        Path(save_path).mkdir(parents=True, exist_ok=False)
 
         file_instance = self.get_by_euid(euid)
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
@@ -766,7 +799,13 @@ class BloomFile(BloomObj):
         except Exception as e:
             raise Exception(f"An error occurred while downloading the file: {e}")
 
-        os.system(f"(sleep 2000 && rm -rf {save_path}) &")
+        cleanup_path = Path(save_path)
+
+        def _cleanup_download_dir() -> None:
+            time.sleep(2000)
+            shutil.rmtree(cleanup_path, ignore_errors=True)
+
+        threading.Thread(target=_cleanup_download_dir, daemon=True).start()
         return local_file_path
 
     def get_s3_uris(self, euids, include_metadata=False):
@@ -842,27 +881,33 @@ class BloomFile(BloomObj):
         s3_key = file_instance.json_addl["properties"]["current_s3_key"]
 
         try:
-            if lock:                
+            if lock:
                 self.s3_client.put_object_retention(
                     Bucket=s3_bucket_name,
                     Key=s3_key,
                     Retention={
-                        'Mode': 'GOVERNANCE',
-                        'RetainUntilDate': (datetime.now(UTC) + timedelta(days=36500)).isoformat()
-                    }
+                        "Mode": "GOVERNANCE",
+                        "RetainUntilDate": (
+                            datetime.now(UTC) + timedelta(days=36500)
+                        ).isoformat(),
+                    },
                 )
 
             return True
         except Exception as e:
-            logging.exception(f"An error occurred while {'locking' if lock else 'unlocking'} the file: {e}")
+            logging.exception(
+                f"An error occurred while {'locking' if lock else 'unlocking'} the file: {e}"
+            )
             return False
-        
-    
-    def create_presigned_url(self, 
-                             file_euid,  
-                             valid_duration=3600, 
-                             comments="", status="active", 
-                             file_set_euid=None):
+
+    def create_presigned_url(
+        self,
+        file_euid,
+        valid_duration=3600,
+        comments="",
+        status="active",
+        file_set_euid=None,
+    ):
         """
         Create a presigned url and create a shared reference to track this.
 
@@ -872,19 +917,19 @@ class BloomFile(BloomObj):
         :param status: Status of the reference. Defaults to 'active'.
         :return: Created file reference instance.
         """
-        
+
         # change to allow setting the start_datetime in the future.
         start_datetime = datetime.now(UTC)
         end_datetime = start_datetime + timedelta(seconds=valid_duration)
-        
+
         file_instance = self.get_by_euid(file_euid)
         s3_bucket_name = file_instance.json_addl["properties"]["current_s3_bucket_name"]
         s3_key = file_instance.json_addl["properties"]["current_s3_key"]
 
         presigned_url = self.s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': s3_bucket_name, 'Key': s3_key},
-            ExpiresIn=valid_duration
+            "get_object",
+            Params={"Bucket": s3_bucket_name, "Key": s3_key},
+            ExpiresIn=valid_duration,
         )
 
         file_ref_obj = BloomFileReference(self._bdb)
@@ -897,17 +942,18 @@ class BloomFile(BloomObj):
             comments=comments,
             status=status,
             presigned_url=presigned_url,
-            file_set_euid=file_set_euid, 
-            visibility=None
+            file_set_euid=file_set_euid,
+            visibility=None,
         )
 
         return {"file_reference": file_reference, "presigned_url": presigned_url}
 
-
-    def import_files_from_s3_directory(self, s3_uri, file_metadata={}, create_locked=True):
+    def import_files_from_s3_directory(
+        self, s3_uri, file_metadata={}, create_locked=True
+    ):
         """
         Import all files from a specified S3 directory (not recursively).
-        
+
         :param s3_uri: The S3 URI of the directory (e.g., s3://bucket_name/folder/).
         :param file_metadata: Metadata to associate with each imported file.
         :param create_locked: Whether to lock the files upon creation. Defaults to True.
@@ -916,57 +962,73 @@ class BloomFile(BloomObj):
         # Parse S3 URI
         s3_parsed_uri = re.match(r"s3://([^/]+)/(.+)", s3_uri)
         if not s3_parsed_uri:
-            raise ValueError("Invalid s3_uri format. Expected format: s3://bucket_name/folder/")
-        
+            raise ValueError(
+                "Invalid s3_uri format. Expected format: s3://bucket_name/folder/"
+            )
+
         bucket_name, prefix = s3_parsed_uri.groups()
-        
+
         # List objects in the directory
         try:
-            response = self.s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix, Delimiter='/')
-            files = response.get('Contents', [])
+            response = self.s3_client.list_objects_v2(
+                Bucket=bucket_name, Prefix=prefix, Delimiter="/"
+            )
+            files = response.get("Contents", [])
         except Exception as e:
             raise Exception(f"Error listing S3 directory {s3_uri}: {e}")
-        
+
         created_files = []
         for file in files:
-            file_key = file['Key']
-            
+            file_key = file["Key"]
+
             # Skip directories
-            if file_key.endswith('/'):
+            if file_key.endswith("/"):
                 continue
-            
-            file_name = file_key.split('/')[-1]
+
+            file_name = file_key.split("/")[-1]
             current_s3_uri = f"s3://{bucket_name}/{file_key}"
-            
+
             # Add metadata specific to the file
             individual_file_metadata = file_metadata.copy()
-            individual_file_metadata['file_name'] = file_name
-            
+            individual_file_metadata["file_name"] = file_name
+
             try:
                 # Create and add the file
                 created_file = self.create_file(
                     file_metadata=individual_file_metadata,
                     s3_uri=current_s3_uri,
-                    create_locked=create_locked
+                    create_locked=create_locked,
                 )
                 created_files.append(created_file)
             except Exception as e:
                 logging.error(f"Error importing file {current_s3_uri}: {e}")
-        
+
         return created_files
-
-
 
 
 # As in expiring s3 links and so on. Potentially allow sharing of files with hosting protocols like SFTP, etc...
 
+
 class BloomFileReference(BloomObj):
-    
     def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
-        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
+        super().__init__(
+            bdb, is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex
+        )
 
-
-    def create_file_reference(self, file_euid=None, reference_type='presigned', visibility='public', valid_duration=0, start_datetime=None, end_datetime=None, comments="", status="active", presigned_url="", file_set_euid=None, rclone_config={}):
+    def create_file_reference(
+        self,
+        file_euid=None,
+        reference_type="presigned",
+        visibility="public",
+        valid_duration=0,
+        start_datetime=None,
+        end_datetime=None,
+        comments="",
+        status="active",
+        presigned_url="",
+        file_set_euid=None,
+        rclone_config={},
+    ):
         """
         Create a shared file reference.
 
@@ -981,10 +1043,12 @@ class BloomFileReference(BloomObj):
         :param rclone_config: Configuration for rclone http serve {'port': 8080, 'host': '0.0.0.0', 'user': 'user', 'passwd': 'passwd', 'bucket':'xxx-dewey-0'}.
         :return: Created file reference instance.
         """
-        
+
         start_datetime = start_datetime or datetime.now(UTC)
-        end_datetime = end_datetime or (start_datetime + timedelta(seconds=valid_duration))
-        
+        end_datetime = end_datetime or (
+            start_datetime + timedelta(seconds=valid_duration)
+        )
+
         file_reference_metadata = {
             "status": status,
             "comments": comments,
@@ -994,17 +1058,17 @@ class BloomFileReference(BloomObj):
             "start_datetime": start_datetime.isoformat(),
             "end_datetime": end_datetime.isoformat(),
             "presigned_url": presigned_url,
-            "rclone_config": rclone_config
+            "rclone_config": rclone_config,
         }
-        
+
         file_reference = self.create_instance(
-            self.query_template_by_component_v2(
-                "file", "shared_ref", "generic", "1.0"
-            )[0].euid,
+            self.query_template_by_component_v2("file", "shared_ref", "generic", "1.0")[
+                0
+            ].euid,
             {"properties": file_reference_metadata},
         )
-        
-        if reference_type.startswith('rclone'):
+
+        if reference_type.startswith("rclone"):
             # Start the rclone http serve
 
             filter_fn = f"logs/{file_reference.euid}_filter.txt"
@@ -1013,25 +1077,42 @@ class BloomFileReference(BloomObj):
             fs = self.get_by_euid(file_set_euid)
             for x in fs.parent_of_lineages:
                 print(x.child_instance.euid)
-                fh.write(f"+ {x.child_instance.json_addl['properties']['current_s3_key']}\n")
-            fh.write('- *\n')
+                fh.write(
+                    f"+ {x.child_instance.json_addl['properties']['current_s3_key']}\n"
+                )
+            fh.write("- *\n")
             fh.close()
 
-
-            cmd = f"timeout {valid_duration} {reference_type} blms3:{rclone_config['bucket']} --filter-from logs/{file_reference.euid}_filter.txt --addr {rclone_config['host']}:{rclone_config['port']} --user {rclone_config['user']} --pass {rclone_config['passwd']} 2>&1 > logs/{file_reference.euid}_rclone.log &"
+            log_path = Path("logs") / f"{file_reference.euid}_rclone.log"
+            command_args = [
+                "timeout",
+                str(valid_duration),
+                *shlex.split(reference_type),
+                f"blms3:{rclone_config['bucket']}",
+                "--filter-from",
+                f"logs/{file_reference.euid}_filter.txt",
+                "--addr",
+                f"{rclone_config['host']}:{rclone_config['port']}",
+                "--user",
+                rclone_config["user"],
+                "--pass",
+                rclone_config["passwd"],
+            ]
+            cmd = shlex.join(command_args)
             logging.info(f"Starting rclone http serve with command: {cmd}")
-            
-            file_reference.json_addl['properties']['rclone_cmd'] = cmd
+
+            file_reference.json_addl["properties"]["rclone_cmd"] = cmd
             flag_modified(file_reference, "json_addl")
-            
+
             try:
                 # Start the command in the background
-                process = subprocess.Popen(
-                    cmd,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+                with log_path.open("ab") as log_handle:
+                    process = subprocess.Popen(
+                        command_args,
+                        stdout=log_handle,
+                        stderr=subprocess.STDOUT,
+                        close_fds=True,
+                    )
 
                 # Log that the process has started
                 logging.info(f"rclone command started with PID: {process.pid}")
@@ -1039,50 +1120,51 @@ class BloomFileReference(BloomObj):
                 # Optionally, you can wait a moment and then check if the process is still running
                 process.communicate(timeout=5)
                 if process.poll() is None:
-                    logging.info(f"rclone is running successfully in the background.")
-                    file_reference.json_addl['properties']['rclone_pid'] = process.pid
-                    file_reference.json_addl['properties']['rclone_status'] = 'running'
+                    logging.info("rclone is running successfully in the background.")
+                    file_reference.json_addl["properties"]["rclone_pid"] = process.pid
+                    file_reference.json_addl["properties"]["rclone_status"] = "running"
                     flag_modified(file_reference, "json_addl")
                 else:
-                    file_reference.json_addl['properties']['rclone_status'] = 'error'
+                    file_reference.json_addl["properties"]["rclone_status"] = "error"
                     flag_modified(file_reference, "json_addl")
-                    logging.error(f"rclone command failed to start properly. Error: {process.stderr.read().decode().strip()}")
+                    logging.error(
+                        f"rclone command exited early with status {process.returncode}; see {log_path}"
+                    )
 
             except subprocess.TimeoutExpired:
-                logging.info(f"rclone command started and is running in the background.")
-                file_reference.json_addl['properties']['rclone_pid'] = process.pid
-                file_reference.json_addl['properties']['rclone_status'] = 'running bkgrnd'
+                logging.info("rclone command started and is running in the background.")
+                file_reference.json_addl["properties"]["rclone_pid"] = process.pid
+                file_reference.json_addl["properties"]["rclone_status"] = (
+                    "running bkgrnd"
+                )
                 flag_modified(file_reference, "json_addl")
             except Exception as e:
                 logging.error(f"An error occurred while starting rclone: {str(e)}")
-                file_reference.json_addl['properties']['rclone_status'] = 'error'
+                file_reference.json_addl["properties"]["rclone_status"] = "error"
                 flag_modified(file_reference, "json_addl")
 
             self.session.commit()
             logging.info(f"{cmd} was executed... see logs")
 
-            
-
-            
         if file_euid not in [None]:
             self.create_generic_instance_lineage_by_euids(
                 file_euid, file_reference.euid, reference_type
             )
-            
+
         if file_set_euid not in [None]:
             self.create_generic_instance_lineage_by_euids(
                 file_set_euid, file_reference.euid, "from_set"
             )
 
-
-
         self.session.commit()
         return file_reference
-    
+
 
 class BloomFileSet(BloomObj):
     def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
-        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
+        super().__init__(
+            bdb, is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex
+        )
 
     def create_file_set(self, file_uids=[], file_set_metadata={}):
         file_set = self.create_instance(
@@ -1190,7 +1272,6 @@ class BloomFileSet(BloomObj):
 
         results = query.all()
         return [result.euid for result in results]
- 
 
 
 __all__ = [

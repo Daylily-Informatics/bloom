@@ -5,12 +5,11 @@ from typing import Dict, List
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain import BloomObj
 from bloom_lims.gui.deps import _is_tapdb_reachable, require_auth
 from bloom_lims.gui.jinja import templates
 from bloom_lims.search import SearchRequest, SearchService
-
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter()
 
@@ -26,7 +25,9 @@ def _is_queue_runtime_record(instance, beta_kind: str) -> bool:
 
 
 def _parse_csv_param(raw_value: str) -> List[str]:
-    return [token.strip().lower() for token in (raw_value or "").split(",") if token.strip()]
+    return [
+        token.strip().lower() for token in (raw_value or "").split(",") if token.strip()
+    ]
 
 
 def _render_search_page(
@@ -92,23 +93,30 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
                 .all()
             )
             queue_definitions = [
-                row for row in generic_rows if _is_queue_runtime_record(row, "queue_definition")
+                row
+                for row in generic_rows
+                if _is_queue_runtime_record(row, "queue_definition")
             ]
             open_work_items = [
                 row
                 for row in generic_rows
                 if _is_queue_runtime_record(row, "beta_work_item")
-                and str(getattr(row, "bstatus", "") or "").strip().lower() in {"open", "active"}
+                and str(getattr(row, "bstatus", "") or "").strip().lower()
+                in {"open", "active"}
             ]
             stats = {
                 "queue_runtime_total": len(open_work_items),
                 "objects_total": len(generic_rows),
-                "equipment_total": bobdb.session.query(bobdb.Base.classes.equipment_instance)
+                "equipment_total": bobdb.session.query(
+                    bobdb.Base.classes.equipment_instance
+                )
                 .filter_by(is_deleted=False)
                 .count(),
-                "reagents_total": bobdb.session.query(bobdb.Base.classes.content_instance)
+                "reagents_total": bobdb.session.query(
+                    bobdb.Base.classes.content_instance
+                )
                 .filter(
-                    bobdb.Base.classes.content_instance.is_deleted == False,
+                    bobdb.Base.classes.content_instance.is_deleted.is_(False),
                     bobdb.Base.classes.content_instance.subtype.like("%reagent%"),
                 )
                 .count(),

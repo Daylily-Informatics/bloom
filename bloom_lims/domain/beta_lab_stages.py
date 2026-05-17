@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from bloom_lims.db import get_parent_lineages
 from bloom_lims.integrations.dewey.client import DeweyClientError
 from bloom_lims.schemas.beta_lab import (
     BetaExtractionCreateRequest,
@@ -22,6 +21,7 @@ from bloom_lims.schemas.beta_lab import (
     BetaRunResolutionResponse,
     BetaRunResponse,
 )
+from bloom_lims.tapdb_adapter import get_parent_lineages
 
 
 class _BetaLabStagesMixin:

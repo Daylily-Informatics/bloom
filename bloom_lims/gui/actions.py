@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 
-from bloom_lims.bobjs import BloomObj
+from bloom_lims.domain import BloomObj
 
 
 def _normalize_action_slug(action_data: dict) -> str:
@@ -84,7 +84,10 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
 
             ui_schema = action_data.get("ui_schema")
             if not isinstance(ui_schema, dict):
-                ui_schema = {"title": str(action_data.get("action_name") or "Action"), "fields": []}
+                ui_schema = {
+                    "title": str(action_data.get("action_name") or "Action"),
+                    "fields": [],
+                }
                 action_data["ui_schema"] = ui_schema
             fields = ui_schema.get("fields")
             if not isinstance(fields, list):

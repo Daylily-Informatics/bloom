@@ -3,8 +3,8 @@ BLOOM LIMS Configuration Management.
 
 Configuration precedence (highest to lowest):
 1. Environment variables (BLOOM_* prefix)
-2. User config file (~/.config/bloom-<deployment>/bloom-config-<deployment>.yaml)
-3. Template defaults
+2. Explicit generated config file
+3. Template values for non-secret UI defaults only
 """
 
 import colorsys
@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_BLOOM_WEB_PORT = 8912
 DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT = 5566
 DEFAULT_BLOOM_CONDA_ENV_BASE = "BLOOM"
-LEGACY_UPLOAD_DIR = "/var/lib/bloom/uploads"
 DEFAULT_TAPDB_OWNER_REPO_NAME = "bloom"
 DEFAULT_TAPDB_DOMAIN_CODE = "Z"
 _CONFIG_FILE_OVERRIDE_ENV = "BLOOM_CONFIG_PATH"
@@ -77,7 +76,9 @@ def _sanitize_deployment_code(value: str) -> str:
     cleaned = str(value or "").strip()
     cleaned = re.sub(r"[^A-Za-z0-9-]+", "-", cleaned)
     cleaned = cleaned.strip("-")
-    return cleaned or "local"
+    if not cleaned:
+        raise RuntimeError("Bloom deployment code is required")
+    return cleaned
 
 
 def _resolve_deployment_code() -> str:
@@ -88,27 +89,10 @@ def _resolve_deployment_code() -> str:
     )
     if env_candidates:
         return _sanitize_deployment_code(env_candidates)
-
-    conda_env = (os.environ.get("CONDA_DEFAULT_ENV") or "").strip()
-    if conda_env:
-        if conda_env.startswith(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-"):
-            return _sanitize_deployment_code(
-                conda_env.removeprefix(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-")
-            )
-        if conda_env != "base":
-            return _sanitize_deployment_code(conda_env)
-
-    conda_prefix = (os.environ.get("CONDA_PREFIX") or "").strip()
-    if conda_prefix:
-        env_name = Path(conda_prefix).name
-        if env_name.startswith(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-"):
-            return _sanitize_deployment_code(
-                env_name.removeprefix(f"{DEFAULT_BLOOM_CONDA_ENV_BASE}-")
-            )
-        if env_name and env_name != "base":
-            return _sanitize_deployment_code(env_name)
-
-    return "local"
+    raise RuntimeError(
+        "Bloom requires explicit BLOOM_DEPLOYMENT_CODE, DEPLOYMENT_CODE, "
+        "or LSMC_DEPLOYMENT_CODE"
+    )
 
 
 def _explicit_config_file_override() -> Path | None:
@@ -165,9 +149,16 @@ def _user_config_dir() -> Path:
     override = _explicit_config_file_override()
     if override is not None:
         return override.parent
-    xdg_config_home = Path(
-        os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
-    )
+    raw_xdg_config_home = str(os.environ.get("XDG_CONFIG_HOME") or "").strip()
+    if not raw_xdg_config_home:
+        raise RuntimeError(
+            "Bloom requires explicit XDG_CONFIG_HOME or BLOOM_CONFIG_PATH"
+        )
+    xdg_config_home = Path(raw_xdg_config_home)
+    if not xdg_config_home.is_absolute():
+        raise RuntimeError(
+            f"XDG_CONFIG_HOME must be an absolute path: {raw_xdg_config_home}"
+        )
     return xdg_config_home / f"bloom-{_resolve_deployment_code()}"
 
 
@@ -308,22 +299,17 @@ def build_default_config_template() -> bytes:
 
 def _load_template_config() -> Dict[str, Any]:
     """Load the packaged template configuration."""
-    try:
-        import yaml
-    except ImportError:
-        return {}
+    import yaml
 
     template_text = _load_template_text()
     if not template_text:
-        return {}
+        raise RuntimeError("Packaged Bloom config template is required")
 
-    try:
-        loaded = yaml.safe_load(template_text) or {}
-    except Exception as exc:
-        logger.debug("Failed to parse packaged template config: %s", exc)
-        return {}
+    loaded = yaml.safe_load(template_text)
+    if not isinstance(loaded, dict):
+        raise RuntimeError("Packaged Bloom config template must be a YAML mapping")
 
-    return loaded if isinstance(loaded, dict) else {}
+    return loaded
 
 
 def _rendered_template_config_file() -> Path:
@@ -423,16 +409,14 @@ def _resolve_deployment_chrome(
     *,
     name: str | None,
     color: str | None,
-    fallback_name: str | None = None,
+    deployment_code: str | None = None,
 ) -> dict[str, str | bool]:
-    resolved_name = str(name or "").strip() or str(fallback_name or "").strip()
+    resolved_name = str(name or "").strip() or str(deployment_code or "").strip()
+    if not resolved_name:
+        raise ValueError("deployment.name is required")
     resolved_color = str(color or "").strip()
     if not resolved_color:
-        resolved_color = (
-            _stable_deployment_color_hex(resolved_name)
-            if resolved_name
-            else DEFAULT_DEPLOYMENT_BANNER_COLOR
-        )
+        resolved_color = _stable_deployment_color_hex(resolved_name)
     return {
         "name": resolved_name,
         "color": resolved_color,
@@ -444,8 +428,8 @@ def _load_yaml_config() -> Dict[str, Any]:
     """Load and merge template + user YAML config files."""
     try:
         import yaml
-    except ImportError:
-        return {}
+    except ImportError as exc:
+        raise RuntimeError("PyYAML is required to load Bloom configuration") from exc
 
     config: Dict[str, Any] = {}
 
@@ -457,16 +441,13 @@ def _load_yaml_config() -> Dict[str, Any]:
 
     user_config_file = _user_config_file()
     if user_config_file.exists():
-        try:
-            with open(user_config_file, encoding="utf-8") as f:
-                user_config = yaml.safe_load(f) or {}
-                config = _deep_merge(config, user_config)
-        except Exception as exc:
-            logger.debug(
-                "Failed to load user config %s: %s",
-                user_config_file,
-                exc,
+        with open(user_config_file, encoding="utf-8") as f:
+            user_config = yaml.safe_load(f)
+        if not isinstance(user_config, dict):
+            raise RuntimeError(
+                f"Bloom user config must be a YAML mapping: {user_config_file}"
             )
+        config = _deep_merge(config, user_config)
 
     return config
 
@@ -738,7 +719,7 @@ class DeploymentSettings(BaseModel):
         deployment = _resolve_deployment_chrome(
             name=self.name,
             color=self.color,
-            fallback_name=_resolve_deployment_code(),
+            deployment_code=_resolve_deployment_code(),
         )
         self.name = str(deployment["name"])
         self.color = str(deployment["color"])
@@ -1175,15 +1156,8 @@ class BloomSettings(BaseSettings):
     @model_validator(mode="after")
     def normalize_local_storage_paths(self) -> "BloomSettings":
         configured_upload_dir = str(self.storage.upload_dir or "").strip()
-        if (
-            not configured_upload_dir or configured_upload_dir == LEGACY_UPLOAD_DIR
-        ) and str(self.tapdb.config_path or "").strip():
-            self.storage.upload_dir = _default_upload_dir_for_runtime(
-                client_id=self.tapdb.client_id.strip(),
-                namespace=self.tapdb.database_name.strip(),
-                target_label="target",
-                config_path=self.tapdb.config_path,
-            )
+        if not configured_upload_dir:
+            raise ValueError("storage.upload_dir is required")
 
         if str(self.storage.upload_dir or "").strip():
             _ensure_directory(self.storage.upload_dir)
@@ -1383,7 +1357,7 @@ def validate_config_content(content: str) -> List[str]:
         return ["PyYAML is required to validate configuration"]
 
     try:
-        parsed = yaml.safe_load(content) or {}
+        parsed = yaml.safe_load(content)
     except yaml.YAMLError as exc:
         return [f"YAML parse error: {exc}"]
 
@@ -1412,7 +1386,6 @@ def validate_config_content(content: str) -> List[str]:
     return []
 
 
-# Legacy compatibility
 def get_database_url() -> str:
     """Build runtime database URL from TapDB resolved configuration."""
     cfg = get_tapdb_db_config()

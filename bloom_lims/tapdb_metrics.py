@@ -62,7 +62,15 @@ def _resolved_bloom_runtime(
     env_name: str | None = None,
 ) -> tuple[str, Path, dict[str, object]]:
     ctx = apply_runtime_environment(get_settings())
-    resolved_env = str(env_name or ctx.target_label).strip().lower() or ctx.target_label
+    resolved_env = str(ctx.target_label or "").strip().lower()
+    if not resolved_env:
+        raise RuntimeError("Bloom TapDB metrics require an explicit TapDB target label")
+    requested_env = str(env_name or "").strip().lower()
+    if requested_env and requested_env != resolved_env:
+        raise RuntimeError(
+            f"Bloom TapDB metrics target mismatch: requested {requested_env!r}, "
+            f"configured {resolved_env!r}"
+        )
     config_path = Path(ctx.config_path).expanduser().resolve()
     admin_settings = get_admin_settings(
         config_path=config_path,
@@ -182,7 +190,9 @@ class MetricsRow:
 
 class TSVMetricsWriter:
     def __init__(self, env_name: str):
-        self._env_name = (env_name or "dev").strip().lower()
+        self._env_name = str(env_name or "").strip().lower()
+        if not self._env_name:
+            raise RuntimeError("Bloom TapDB metrics writer requires explicit env_name")
         admin_settings = _resolved_bloom_runtime(self._env_name)[2]
         self._queue_max = int(admin_settings.get("metrics_queue_max", 20000))
         self._flush_secs = float(admin_settings.get("metrics_flush_seconds", 1.0))
@@ -243,7 +253,9 @@ _writers_by_env: dict[str, TSVMetricsWriter] = {}
 def _get_writer(env_name: str) -> Optional[TSVMetricsWriter]:
     if not metrics_enabled():
         return None
-    env = (env_name or "dev").strip().lower()
+    env = str(env_name or "").strip().lower()
+    if not env:
+        raise RuntimeError("Bloom TapDB metrics writer requires explicit env_name")
     with _writer_lock:
         writer = _writers_by_env.get(env)
         if writer is None:
@@ -253,7 +265,9 @@ def _get_writer(env_name: str) -> Optional[TSVMetricsWriter]:
 
 
 def get_dropped_count(env_name: str) -> int:
-    env = (env_name or "dev").strip().lower()
+    env = str(env_name or "").strip().lower()
+    if not env:
+        raise RuntimeError("Bloom TapDB metrics env_name is required")
     with _writer_lock:
         writer = _writers_by_env.get(env)
     return writer.dropped_count() if writer else 0
@@ -295,7 +309,11 @@ def maybe_install_engine_metrics(engine: Engine, *, env_name: str) -> None:
         start = time.perf_counter()
         op = _extract_op(statement)
         table_hint = _extract_table_hint(statement, op)
-        conn.info.setdefault("_tapdb_metrics", {})[id(cursor)] = (start, op, table_hint)
+        metrics = conn.info.get("_tapdb_metrics")
+        if metrics is None:
+            metrics = {}
+            conn.info["_tapdb_metrics"] = metrics
+        metrics[id(cursor)] = (start, op, table_hint)
 
     def _after_cursor_execute(
         conn, cursor, statement, parameters, context, executemany
@@ -439,7 +457,11 @@ def summarize_metrics(rows: Iterable[dict]) -> dict:
         buckets: dict[str, list[float]] = {}
         for r in rows_list:
             k = str(r.get(key) or "")
-            buckets.setdefault(k, []).append(float(r.get("duration_ms") or 0.0))
+            vals = buckets.get(k)
+            if vals is None:
+                vals = []
+                buckets[k] = vals
+            vals.append(float(r.get("duration_ms") or 0.0))
         out = []
         for k, vals in buckets.items():
             s = sorted(vals)
@@ -473,7 +495,9 @@ def summarize_metrics(rows: Iterable[dict]) -> dict:
 
 
 def build_metrics_page_context(env_name: str, *, limit: int = 5000) -> dict:
-    env = (env_name or "dev").strip().lower()
+    env = str(env_name or "").strip().lower()
+    if not env:
+        raise RuntimeError("Bloom TapDB metrics env_name is required")
     clamped = max(1, min(int(limit), 20000))
     now = datetime.now(timezone.utc)
     period_start = two_week_period_start_utc(now)

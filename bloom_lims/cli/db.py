@@ -58,7 +58,7 @@ def _bloom_root() -> Path:
 
 
 def _ensure_schema_available_for_bloom_root() -> None:
-    """Require the repo-local TapDB schema file instead of discovering fallback copies."""
+    """Require the repo-local TapDB schema file instead of discovering alternate copies."""
     schema_path = (_bloom_root() / "schema" / "tapdb_schema.sql").resolve()
     if schema_path.is_file():
         return
@@ -318,7 +318,8 @@ def _load_prefix_ownership_registry(path: Path) -> dict[str, object]:
         raise ValueError(
             f"Prefix ownership registry must define object ownership: {path}"
         )
-    payload.setdefault("version", "0.4.0")
+    if "version" not in payload:
+        payload["version"] = "0.4.0"
     return payload
 
 
@@ -363,12 +364,18 @@ def _claim_client_template_prefixes(
         return
 
     registry = _load_prefix_ownership_registry(prefix_registry_path)
-    ownership = registry.setdefault("ownership", {})
+    ownership = registry.get("ownership")
+    if ownership is None:
+        ownership = {}
+        registry["ownership"] = ownership
     if not isinstance(ownership, dict):
         raise ValueError(
             f"Prefix ownership registry must define object ownership: {prefix_registry_path}"
         )
-    domain_claims = ownership.setdefault(normalized_domain_code, {})
+    domain_claims = ownership.get(normalized_domain_code)
+    if domain_claims is None:
+        domain_claims = {}
+        ownership[normalized_domain_code] = domain_claims
     if not isinstance(domain_claims, dict):
         raise ValueError(
             f"Prefix ownership registry must define object ownership for domain "
@@ -445,16 +452,16 @@ def db_build(
     if target_mode not in {"local", "aurora"}:
         raise typer.BadParameter("--target must be either local or aurora")
 
-    console.print(f"[cyan]Initializing BLOOM database via tapdb (target={target_mode})...[/cyan]")
+    console.print(
+        f"[cyan]Initializing BLOOM database via tapdb (target={target_mode})...[/cyan]"
+    )
     target_label = _current_target_label()
     _ensure_tapdb_namespace_config(target_label)
 
     if target_mode == "local":
         _ensure_schema_available_for_bloom_root()
         local_port = _local_pg_port(target_label)
-        console.print(
-            f"[cyan]Using local TapDB PostgreSQL port {local_port}[/cyan]"
-        )
+        console.print(f"[cyan]Using local TapDB PostgreSQL port {local_port}[/cyan]")
         _run_tapdb(["pg", "init"], check=False)
         _run_tapdb(["pg", "start-local", "--port", local_port])
         _run_tapdb(["db", "create"], check=False)

@@ -202,7 +202,7 @@ class TestWorkflowsAPI:
         )
         fake_workflow = SimpleNamespace(euid="WF_ADV", bstatus="in_progress")
 
-        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
+        with patch("bloom_lims.tapdb_adapter.BLOOMdb3", return_value=fake_db):
             with patch(
                 "bloom_lims.core.workflows.advance_workflow", return_value=fake_workflow
             ):
@@ -246,8 +246,8 @@ class TestWorkflowsAPI:
             session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace())
         )
 
-        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
-            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+        with patch("bloom_lims.tapdb_adapter.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.domain.BloomWorkflow", _BloomWorkflow):
                 response = client.post(
                     "/api/v1/workflows/?template_euid=TEMPLATE1&name=renamed"
                 )
@@ -289,8 +289,8 @@ class TestWorkflowsAPI:
             session=_Session(), Base=SimpleNamespace(classes=SimpleNamespace())
         )
 
-        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
-            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+        with patch("bloom_lims.tapdb_adapter.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.domain.BloomWorkflow", _BloomWorkflow):
                 with patch(
                     "sqlalchemy.orm.attributes.flag_modified",
                     lambda *_args, **_kwargs: None,
@@ -339,8 +339,8 @@ class TestWorkflowsAPI:
             session=SimpleNamespace(), Base=SimpleNamespace(classes=SimpleNamespace())
         )
 
-        with patch("bloom_lims.db.BLOOMdb3", return_value=fake_db):
-            with patch("bloom_lims.bobjs.BloomWorkflow", _BloomWorkflow):
+        with patch("bloom_lims.tapdb_adapter.BLOOMdb3", return_value=fake_db):
+            with patch("bloom_lims.domain.BloomWorkflow", _BloomWorkflow):
                 with patch(
                     "bloom_lims.api.v1.workflows.get_parent_lineages",
                     return_value=[lineage_step, lineage_queue],

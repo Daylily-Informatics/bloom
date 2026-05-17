@@ -100,7 +100,13 @@ def run_schema_drift_check(target_label: str = "target") -> dict[str, Any]:
         "checked_at": _utcnow(),
         "target": target_label,
         "tool_version": tapdb_tool_version(),
-        "summary": _schema_drift_summary(payload) if payload else ("schema drift check failed" if status == "check_failed" else "schema drift check completed"),
+        "summary": _schema_drift_summary(payload)
+        if payload
+        else (
+            "schema drift check failed"
+            if status == "check_failed"
+            else "schema drift check completed"
+        ),
         "report": payload,
         "stderr": _truncate_stderr(result.stderr) if status == "check_failed" else "",
     }
@@ -146,11 +152,18 @@ def read_schema_drift_report(*, target: str) -> dict[str, Any]:
             "report": {},
             "stderr": "",
         }
-    payload.setdefault("status", "check_failed")
-    payload.setdefault("checked_at", None)
-    payload.setdefault("target", target)
-    payload.setdefault("tool_version", tapdb_tool_version())
-    payload.setdefault("summary", "")
-    payload.setdefault("report", {})
-    payload.setdefault("stderr", "")
+    required = (
+        "status",
+        "checked_at",
+        "target",
+        "tool_version",
+        "summary",
+        "report",
+        "stderr",
+    )
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise RuntimeError(
+            "Stored schema drift report is missing required keys: " + ", ".join(missing)
+        )
     return payload

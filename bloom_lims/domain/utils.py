@@ -5,10 +5,10 @@ Shared utility functions used across domain modules.
 Extracted from bloom_lims/bobjs.py for better code organization.
 """
 
+import logging
 import os
 import random
 import string
-import logging
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 
@@ -23,10 +23,10 @@ def get_clean_timestamp() -> str:
 def generate_random_string(length: int = 10) -> str:
     """
     Generate a random alphanumeric string.
-    
+
     Args:
         length: Length of the string to generate
-        
+
     Returns:
         Random string of specified length
     """
@@ -38,9 +38,9 @@ def generate_random_string(length: int = 10) -> str:
 def get_datetime_string() -> str:
     """
     Get current datetime as formatted string with timezone.
-    
+
     Uses UTC timezone by default.
-    
+
     Returns:
         Formatted datetime string like "2024-01-15 10:30:00 UTC+0000"
     """
@@ -55,9 +55,9 @@ def get_datetime_string() -> str:
 def update_recursive(orig_dict: dict, update_with: dict) -> None:
     """
     Recursively update a dictionary with values from another dictionary.
-    
+
     Modifies orig_dict in place.
-    
+
     Args:
         orig_dict: Original dictionary to update
         update_with: Dictionary with values to merge
@@ -79,7 +79,7 @@ def unique_non_empty_strings(arr: list) -> list:
 
     Args:
         arr: List of strings
-        
+
     Returns:
         List of unique non-empty strings
     """
@@ -94,11 +94,11 @@ def unique_non_empty_strings(arr: list) -> list:
 def setup_domain_logging():
     """
     Set up logging for domain modules.
-    
+
     Creates rotating file handler for domain-specific logging.
     """
     os.makedirs("logs", exist_ok=True)
-    
+
     # Get the root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
@@ -126,16 +126,11 @@ def setup_domain_logging():
     root_logger.addHandler(f_handler)
 
 
-# For backward compatibility with bobjs.py imports
-_update_recursive = update_recursive
-
-
 __all__ = [
     "get_clean_timestamp",
-    "generate_random_string", 
+    "generate_random_string",
     "get_datetime_string",
     "update_recursive",
-    "_update_recursive",
     "unique_non_empty_strings",
     "setup_domain_logging",
 ]

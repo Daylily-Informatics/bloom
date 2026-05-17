@@ -59,8 +59,6 @@ SCOPE_ROLE_CAP: dict[str, Role] = {
     "admin": Role.ADMIN,
 }
 
-DEFAULT_ROLE = Role.READ_WRITE
-
 
 def _normalize_role(role_value: str | Role | None) -> Role | None:
     if role_value is None:
@@ -78,39 +76,33 @@ def _normalize_role(role_value: str | Role | None) -> Role | None:
 
 def normalize_roles(
     roles: Iterable[str | Role] | None,
-    *,
-    fallback: str | Role | None = DEFAULT_ROLE,
 ) -> list[str]:
     """Normalize role values to canonical role-name strings."""
     normalized: list[str] = []
     seen: set[str] = set()
     values = list(roles or [])
-    if not values and fallback is not None:
-        values = [fallback]
     for item in values:
         parsed = _normalize_role(item)
         if parsed is None:
-            continue
+            raise ValueError(f"Unsupported Bloom role: {item!r}")
         if parsed.value in seen:
             continue
         normalized.append(parsed.value)
         seen.add(parsed.value)
-    if not normalized and fallback is not None:
-        parsed = _normalize_role(fallback)
-        if parsed is not None:
-            normalized = [parsed.value]
     return normalized
 
 
 def effective_permissions(roles: Iterable[str | Role]) -> set[str]:
     """Return all effective permissions for a user role-set."""
-    role_values = normalize_roles(roles, fallback=None)
+    role_values = normalize_roles(roles)
     perms: set[str] = set()
     for role_value in role_values:
         role_obj = _normalize_role(role_value)
         if role_obj is None:
             continue
-        perms.update(permission.value for permission in ROLE_PERMISSIONS.get(role_obj, set()))
+        perms.update(
+            permission.value for permission in ROLE_PERMISSIONS.get(role_obj, set())
+        )
     return perms
 
 
@@ -119,7 +111,7 @@ def has_role(roles: Iterable[str | Role], required_role: Role | str) -> bool:
     required = _normalize_role(required_role)
     if required is None:
         return False
-    return required.value in normalize_roles(roles, fallback=None)
+    return required.value in normalize_roles(roles)
 
 
 def has_permission(roles: Iterable[str | Role], permission: Permission | str) -> bool:
@@ -141,9 +133,11 @@ def is_admin(roles: Iterable[str | Role]) -> bool:
     return has_role(roles, Role.ADMIN)
 
 
-def constrain_roles_by_scope(roles: Iterable[str | Role], scope: str | None) -> list[str]:
+def constrain_roles_by_scope(
+    roles: Iterable[str | Role], scope: str | None
+) -> list[str]:
     """Constrain effective roles to a token scope maximum privilege."""
-    normalized = normalize_roles(roles, fallback=None)
+    normalized = normalize_roles(roles)
     if scope is None:
         return normalized
 
@@ -160,6 +154,4 @@ def constrain_roles_by_scope(roles: Iterable[str | Role], scope: str | None) -> 
         if ROLE_RANK[role_obj] <= cap_rank:
             constrained.append(role_obj.value)
 
-    if not constrained:
-        constrained = [cap_role.value]
-    return normalize_roles(constrained, fallback=cap_role.value)
+    return normalize_roles(constrained)

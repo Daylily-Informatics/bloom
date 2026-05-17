@@ -26,9 +26,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.domain.utils import (
     get_datetime_string,
-)
-from bloom_lims.domain.utils import (
-    update_recursive as _update_recursive,
+    update_recursive,
 )
 from bloom_lims.template_identity import (
     instance_semantic_category,
@@ -506,7 +504,7 @@ class BloomObj:
         )
         try:
             json_addl_overrides["action_groups"] = ai
-            _update_recursive(parent_instance.json_addl, json_addl_overrides)
+            update_recursive(parent_instance.json_addl, json_addl_overrides)
             self._apply_default_graph_metadata(parent_instance)
             self.session.add(parent_instance)
             ##self.session.flush()
@@ -707,7 +705,7 @@ class BloomObj:
                     # in the matched group... so, when all core are imported for example, an override will match all
                     # I think...  for singleton imports should be ok.
                     # this is used for singleton action import overrides
-                    _update_recursive(
+                    update_recursive(
                         ret_ds[group]["actions"][action_key],
                         actions_cfg.get(ai, {}),
                     )
@@ -817,12 +815,6 @@ class BloomObj:
     def create_lineage(
         self, parent_instance, child_instance, relationship_type: str = "generic"
     ):
-        """
-        Backwards-compatible lineage creator.
-
-        Many API routes and legacy code paths refer to `create_lineage(parent, child)`.
-        TapDB/Bloom core implementation is `create_generic_instance_lineage_by_euids`.
-        """
         parent_euid = getattr(parent_instance, "euid", parent_instance)
         child_euid = getattr(child_instance, "euid", child_instance)
         if not parent_euid or not child_euid:
@@ -869,7 +861,7 @@ class BloomObj:
         template = templates[0]
 
         new_instance = self.create_instance(template.euid)
-        _update_recursive(new_instance.json_addl, defaults_ds)
+        update_recursive(new_instance.json_addl, defaults_ds)
         flag_modified(new_instance, "json_addl")
         ##self.session.flush()
         self.session.commit()
@@ -1398,8 +1390,8 @@ class BloomObj:
         self.session.commit()
 
     def do_action_add_file_to_file_set(self, file_set_euid, action_ds):
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.domain.files import BloomFileSet
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bfs = BloomFileSet(
             BLOOMdb3(app_username=getattr(self._bdb, "app_username", ""))
@@ -1409,8 +1401,8 @@ class BloomObj:
         )
 
     def do_action_remove_file_from_file_set(self, file_set_euid, action_ds):
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.domain.files import BloomFileSet
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bfs = BloomFileSet(
             BLOOMdb3(app_username=getattr(self._bdb, "app_username", ""))
@@ -1515,8 +1507,8 @@ class BloomObj:
         return plate_wells
 
     def do_action_download_file(self, euid, action_ds):
-        from bloom_lims.db import BLOOMdb3
         from bloom_lims.domain.files import BloomFile
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bf = BloomFile(BLOOMdb3(app_username=getattr(self._bdb, "app_username", "")))
         dl_file = bf.download_file(
@@ -1776,9 +1768,6 @@ class BloomObj:
             raise Exception("Must specify parent or child")
 
         return False
-
-    # Backward compatibility alias
-    check_lineages_for_btype = check_lineages_for_type
 
     def get_cost_of_euid_children(self, euid):
         tot_cost = 0

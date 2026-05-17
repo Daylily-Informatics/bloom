@@ -78,7 +78,7 @@ class UserAPITokenService:
 
     @staticmethod
     def allowed_scopes_for_roles(actor_roles: list[str]) -> set[str]:
-        roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
+        roles = normalize_roles(actor_roles)
         if is_admin(roles):
             return {"internal_ro", "internal_rw", "admin"}
         if Role.READ_WRITE.value in roles:
@@ -97,7 +97,11 @@ class UserAPITokenService:
         payload: TokenCreateInput,
     ) -> TokenCreateResult:
         self.groups.ensure_system_groups()
-        normalized_roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
+        normalized_roles = normalize_roles(actor_roles)
+        if not normalized_roles:
+            raise PermissionError(
+                "User API token creation requires explicit actor roles"
+            )
         group_set = {group.upper() for group in actor_groups}
         actor_is_admin = is_admin(normalized_roles)
         if not actor_is_admin and API_ACCESS_GROUP not in group_set:
@@ -164,7 +168,9 @@ class UserAPITokenService:
         if current is None:
             return None
         token, revision = current
-        roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
+        roles = normalize_roles(actor_roles)
+        if not roles:
+            raise PermissionError("Token revocation requires explicit actor roles")
         if token.user_id != actor_user_id and not is_admin(roles):
             raise PermissionError("Cannot revoke another user's token")
 
@@ -275,7 +281,9 @@ class UserAPITokenService:
         if token_result is None:
             return []
         token, _ = token_result
-        roles = normalize_roles(actor_roles, fallback=Role.READ_WRITE.value)
+        roles = normalize_roles(actor_roles)
+        if not roles:
+            raise PermissionError("Token usage lookup requires explicit actor roles")
         if token.user_id != actor_user_id and not is_admin(roles):
             raise PermissionError("Cannot view usage for another user's token")
         return self.repo.get_usage_logs(
@@ -290,13 +298,12 @@ class UserAPITokenService:
         owner_record = resolve_user_record(
             self.db, token.user_id, include_inactive=True
         )
-        fallback_role = (
-            owner_record.role
-            if owner_record and owner_record.role
-            else Role.READ_ONLY.value
-        )
+        if owner_record is None or not owner_record.role:
+            raise PermissionError(
+                f"Token owner {token.user_id!r} has no explicit Bloom role"
+            )
         owner = self.groups.resolve_user_roles_and_groups(
             user_id=token.user_id,
-            fallback_role=fallback_role,
+            role_hint=owner_record.role,
         )
         return constrain_roles_by_scope(owner.roles, token.scope), owner.groups

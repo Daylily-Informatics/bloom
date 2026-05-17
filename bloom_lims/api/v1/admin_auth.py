@@ -7,8 +7,11 @@ from pydantic import BaseModel, Field
 
 from bloom_lims.api.v1.dependencies import APIUser, require_admin
 from bloom_lims.auth.services.groups import GroupService
-from bloom_lims.auth.services.user_api_tokens import TokenCreateInput, UserAPITokenService
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.auth.services.user_api_tokens import (
+    TokenCreateInput,
+    UserAPITokenService,
+)
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter(prefix="/admin", tags=["Admin Auth"])
 
@@ -48,7 +51,9 @@ async def list_groups(user: APIUser = Depends(require_admin)):
                     "is_system_group": group.is_system_group,
                     "is_active": group.is_active,
                     "revision_no": group.revision_no,
-                    "created_at": group.created_at.isoformat() if group.created_at else None,
+                    "created_at": group.created_at.isoformat()
+                    if group.created_at
+                    else None,
                 }
                 for group in groups
             ],
@@ -72,10 +77,16 @@ async def list_group_members(group_code: str, user: APIUser = Depends(require_ad
                     "group_code": member.group_code,
                     "user_id": str(member.user_id),
                     "is_active": member.is_active,
-                    "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+                    "joined_at": member.joined_at.isoformat()
+                    if member.joined_at
+                    else None,
                     "added_by": str(member.added_by) if member.added_by else None,
-                    "deactivated_at": member.deactivated_at.isoformat() if member.deactivated_at else None,
-                    "deactivated_by": str(member.deactivated_by) if member.deactivated_by else None,
+                    "deactivated_at": member.deactivated_at.isoformat()
+                    if member.deactivated_at
+                    else None,
+                    "deactivated_by": str(member.deactivated_by)
+                    if member.deactivated_by
+                    else None,
                 }
                 for member in members
             ],
@@ -177,9 +188,15 @@ async def list_admin_user_tokens(user: APIUser = Depends(require_admin)):
                     "scope": token.scope,
                     "status": revision.status,
                     "expires_at": revision.expires_at.isoformat(),
-                    "last_used_at": revision.last_used_at.isoformat() if revision.last_used_at else None,
-                    "revoked_at": revision.revoked_at.isoformat() if revision.revoked_at else None,
-                    "created_at": token.created_at.isoformat() if token.created_at else None,
+                    "last_used_at": revision.last_used_at.isoformat()
+                    if revision.last_used_at
+                    else None,
+                    "revoked_at": revision.revoked_at.isoformat()
+                    if revision.revoked_at
+                    else None,
+                    "created_at": token.created_at.isoformat()
+                    if token.created_at
+                    else None,
                     "usage_count": service.repo.count_usage(token_id=token.id),
                 }
                 for token, revision in rows
@@ -222,7 +239,9 @@ async def issue_admin_user_token(
                 "scope": created.token.scope,
                 "status": created.revision.status,
                 "expires_at": created.revision.expires_at.isoformat(),
-                "created_at": created.token.created_at.isoformat() if created.token.created_at else None,
+                "created_at": created.token.created_at.isoformat()
+                if created.token.created_at
+                else None,
             },
             "plaintext_token": created.plaintext_token,
             "message": "Store this token now; it will not be shown again.",
@@ -256,7 +275,9 @@ async def revoke_admin_user_token(
             "user_id": str(token.user_id),
             "token_name": token.token_name,
             "status": revision.status,
-            "revoked_at": revision.revoked_at.isoformat() if revision.revoked_at else None,
+            "revoked_at": revision.revoked_at.isoformat()
+            if revision.revoked_at
+            else None,
         }
     finally:
         bdb.close()
@@ -272,7 +293,9 @@ async def get_admin_token_usage(
     bdb = BLOOMdb3(app_username=user.email)
     try:
         service = UserAPITokenService(bdb.session)
-        usage_rows = service.repo.get_usage_logs(token_id=normalized_token_id, limit=limit)
+        usage_rows = service.repo.get_usage_logs(
+            token_id=normalized_token_id, limit=limit
+        )
         return {
             "items": [
                 {
@@ -285,7 +308,9 @@ async def get_admin_token_usage(
                     "ip_address": row.ip_address,
                     "user_agent": row.user_agent,
                     "request_metadata": row.request_metadata,
-                    "request_timestamp": row.request_timestamp.isoformat() if row.request_timestamp else None,
+                    "request_timestamp": row.request_timestamp.isoformat()
+                    if row.request_timestamp
+                    else None,
                 }
                 for row in usage_rows
             ],

@@ -39,18 +39,15 @@ def test_storage_temp_dir_uses_system_tempdir():
     assert StorageSettings().temp_dir == str(Path(tempfile.gettempdir()) / "bloom")
 
 
-def test_storage_upload_dir_defaults_to_deployment_scoped_runtime(
-    monkeypatch, tmp_path: Path
-):
+def test_storage_upload_dir_is_required(monkeypatch, tmp_path: Path):
     config_path = tmp_path / "tapdb" / "bloom-local2" / "tapdb-config.yaml"
+    monkeypatch.delenv("BLOOM_CONFIG_PATH", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
     monkeypatch.setenv("BLOOM_TAPDB__CONFIG_PATH", str(config_path))
     get_settings.cache_clear()
 
-    settings = BloomSettings()
-    expected = config_path.parent / "target" / "uploads"
-
-    assert Path(settings.storage.upload_dir) == expected
-    assert expected.is_dir()
+    with pytest.raises(ValidationError, match="storage.upload_dir is required"):
+        BloomSettings()
 
 
 def test_expected_conda_env_name_uses_deployment_code(monkeypatch):
@@ -58,12 +55,13 @@ def test_expected_conda_env_name_uses_deployment_code(monkeypatch):
     assert expected_conda_env_name() == "BLOOM-bringup"
 
 
-def test_expected_conda_env_name_falls_back_to_active_conda_env(monkeypatch):
+def test_expected_conda_env_name_requires_explicit_deployment_code(monkeypatch):
     monkeypatch.delenv("BLOOM_DEPLOYMENT_CODE", raising=False)
     monkeypatch.delenv("DEPLOYMENT_CODE", raising=False)
     monkeypatch.delenv("LSMC_DEPLOYMENT_CODE", raising=False)
     monkeypatch.setenv("CONDA_DEFAULT_ENV", "BLOOM-smoke")
-    assert expected_conda_env_name() == "BLOOM-smoke"
+    with pytest.raises(RuntimeError, match="Bloom requires explicit"):
+        expected_conda_env_name()
 
 
 def test_user_config_path_prefers_explicit_bloom_config_path(
@@ -92,7 +90,10 @@ def test_explicit_bloom_config_path_overrides_deployment_guess(
     explicit_config.write_text(
         "deployment:\n"
         "  name: explicit-deploy\n"
+        "storage:\n"
+        f"  upload_dir: {tmp_path / 'uploads'}\n"
         "auth:\n"
+        "  jwt_secret: explicit-test-session-secret\n"
         "  cognito_domain: explicit.auth.us-west-2.amazoncognito.com\n",
         encoding="utf-8",
     )
@@ -261,10 +262,7 @@ def test_runtime_context_requires_explicit_tapdb_paths(monkeypatch):
     monkeypatch.delenv("BLOOM_TAPDB__PREFIX_OWNERSHIP_REGISTRY_PATH", raising=False)
     get_settings.cache_clear()
 
-    with pytest.raises(
-        RuntimeError,
-        match="tapdb.config_path is required and must be passed as a full absolute path",
-    ):
+    with pytest.raises(RuntimeError, match="Bloom requires explicit"):
         get_tapdb_runtime_context(BloomSettings())
 
 
@@ -414,13 +412,14 @@ def test_runtime_context_preserves_explicit_tapdb_paths(tmp_path: Path):
     assert ctx.prefix_ownership_registry_path == str(prefix_registry_path)
 
 
-def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
+def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: Path):
     temp_home = Path(tempfile.mkdtemp())
     monkeypatch.setenv("HOME", str(temp_home))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(temp_home / ".config"))
-    monkeypatch.delenv("BLOOM_DEPLOYMENT_CODE", raising=False)
-    monkeypatch.delenv("DEPLOYMENT_CODE", raising=False)
-    monkeypatch.delenv("LSMC_DEPLOYMENT_CODE", raising=False)
+    monkeypatch.setenv("BLOOM_DEPLOYMENT_CODE", "template-check")
+    monkeypatch.setenv("DEPLOYMENT_CODE", "template-check")
+    monkeypatch.setenv("LSMC_DEPLOYMENT_CODE", "template-check")
+    monkeypatch.delenv("BLOOM_CONFIG_PATH", raising=False)
     for key in (
         "MERIDIAN_DOMAIN_CODE",
         "TAPDB_OWNER_REPO",
@@ -436,10 +435,10 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch):
     ):
         monkeypatch.delenv(key, raising=False)
 
-    settings = BloomSettings()
+    settings = BloomSettings(storage={"upload_dir": str(tmp_path / "uploads")})
     expected_tapdb_spec = read_pyproject_dependency_spec("daylily-tapdb")
 
-    assert expected_tapdb_spec == "<8.0.0,>=7.0.1"
+    assert expected_tapdb_spec == "<8.0.0,>=7.0.3"
     assert assert_tapdb_version()
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE

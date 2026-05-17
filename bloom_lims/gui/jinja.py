@@ -174,15 +174,16 @@ def _resolve_deployment_metadata() -> Dict[str, str | bool]:
         resolved = _resolve_deployment_chrome(
             name=settings.deployment.name,
             color=settings.deployment.color,
-            fallback_name=settings.deployment.name,
         )
         deployment = {
             "name": str(resolved["name"]),
             "color": str(resolved["color"]),
             "is_production": bool(resolved["is_production"]),
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(
+            "Bloom deployment metadata must be configured explicitly"
+        ) from exc
     return deployment
 
 

@@ -18,7 +18,6 @@ from fastapi import FastAPI, Request
 from bloom_lims.config import get_settings
 
 _SERVER_INSTANCE_ID = secrets.token_urlsafe(16)
-_SESSION_SECRET_FALLBACK = secrets.token_urlsafe(32)
 
 
 def get_server_instance_id() -> str:
@@ -36,7 +35,11 @@ def build_bloom_web_session_config(
     auth_settings = settings.auth
     if auth_settings.mode == "external_broker":
         broker = auth_settings.external_broker
-        public_base_url = _origin(broker.callback_url or "https://localhost:8912")
+        if not broker.callback_url:
+            raise RuntimeError(
+                "Bloom external_broker.callback_url must be configured explicitly"
+            )
+        public_base_url = _origin(broker.callback_url)
         return CognitoWebSessionConfig(
             domain=urlparse(broker.login_url).netloc,
             client_id=broker.service_id,
@@ -45,13 +48,19 @@ def build_bloom_web_session_config(
             public_base_url=public_base_url,
             session_secret_key=_session_secret(auth_settings),
             session_cookie_name="bloom_session",
-            session_max_age=max(int(auth_settings.session_timeout_minutes or 30) * 60, 300),
+            session_max_age=max(
+                int(auth_settings.session_timeout_minutes or 30) * 60, 300
+            ),
             allow_insecure_http=public_base_url.startswith("http://"),
             server_instance_id=get_server_instance_id(),
             auth_mode="external_broker",
         )
 
-    public_base_url = _origin(auth_settings.cognito_redirect_uri or "https://localhost:8912")
+    if not auth_settings.cognito_redirect_uri:
+        raise RuntimeError(
+            "Bloom auth.cognito_redirect_uri must be configured explicitly"
+        )
+    public_base_url = _origin(auth_settings.cognito_redirect_uri)
     base_secret = _session_secret(auth_settings)
     scopes = auth_settings.cognito_scopes or ["openid", "email", "profile"]
 
@@ -59,7 +68,8 @@ def build_bloom_web_session_config(
         domain=auth_settings.cognito_domain,
         client_id=auth_settings.cognito_client_id,
         redirect_uri=auth_settings.cognito_redirect_uri,
-        logout_uri=auth_settings.cognito_logout_redirect_uri or f"{public_base_url}/auth/logout",
+        logout_uri=auth_settings.cognito_logout_redirect_uri
+        or f"{public_base_url}/auth/logout",
         public_base_url=public_base_url,
         session_secret_key=base_secret,
         session_cookie_name="bloom_session",
@@ -73,12 +83,17 @@ def build_bloom_web_session_config(
 
 def _session_secret(auth_settings: Any) -> str:
     explicit_secret = str(os.environ.get("BLOOM_SESSION_SECRET") or "").strip()
-    return (
+    resolved = (
         explicit_secret
         or auth_settings.jwt_secret
         or auth_settings.cognito_client_secret
-        or _SESSION_SECRET_FALLBACK
     )
+    if not resolved:
+        raise RuntimeError(
+            "Bloom session secret must be configured explicitly via BLOOM_SESSION_SECRET, "
+            "auth.jwt_secret, or auth.cognito_client_secret"
+        )
+    return resolved
 
 
 def store_bloom_session(

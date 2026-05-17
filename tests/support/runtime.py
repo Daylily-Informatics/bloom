@@ -181,7 +181,7 @@ def create_temp_tapdb_config(
         or os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT")
         or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
     ).strip()
-    resolved_user = str(user or os.environ.get("USER") or "postgres").strip()
+    resolved_user = str(user or "postgres").strip()
     tmp_path = (
         Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
     )
@@ -231,13 +231,79 @@ def create_temp_tapdb_config(
     return tmp_path
 
 
+def create_temp_bloom_config(*, tapdb_config_path: Path) -> Path:
+    """Create a complete explicit Bloom deployment config for tests."""
+    deployment = str(
+        os.environ.get("BLOOM_DEPLOYMENT_CODE")
+        or os.environ.get("DEPLOYMENT_CODE")
+        or os.environ.get("LSMC_DEPLOYMENT_CODE")
+        or "bloom-tests"
+    ).strip()
+    config_dir = Path(tempfile.gettempdir()) / f"bloom_config_{secrets.token_hex(8)}"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    upload_dir = config_dir / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / f"bloom-config-{deployment}.yaml"
+    domain_registry_path = Path(os.environ["TAPDB_DOMAIN_REGISTRY_PATH"])
+    prefix_registry_path = Path(os.environ["TAPDB_PREFIX_OWNERSHIP_REGISTRY_PATH"])
+    config_path.write_text(
+        "\n".join(
+            [
+                "aws:",
+                "  profile: lsmc",
+                "  region: us-west-2",
+                "environment: testing",
+                "tapdb:",
+                "  client_id: bloom",
+                "  database_name: bloom",
+                "  schema_name: tapdb_bloom_tests_dev",
+                "  physical_database: tapdb_bloom_dev",
+                "  owner_repo_name: bloom",
+                "  domain_code: Z",
+                f"  domain_registry_path: {domain_registry_path}",
+                f"  prefix_ownership_registry_path: {prefix_registry_path}",
+                "  strict_namespace: true",
+                f"  config_path: {tapdb_config_path}",
+                f"  local_pg_port: {DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT}",
+                "storage:",
+                f"  upload_dir: {upload_dir}",
+                "auth:",
+                "  mode: cognito",
+                "  jwt_secret: test-bloom-session-secret-explicit",
+                "  cognito_user_pool_id: us-west-2_test-pool",
+                "  cognito_client_id: bloom-test-client",
+                "  cognito_region: us-west-2",
+                "  cognito_domain: bloom-test.auth.us-west-2.amazoncognito.com",
+                f"  cognito_redirect_uri: https://localhost:{DEFAULT_BLOOM_WEB_PORT}/auth/callback",
+                f"  cognito_logout_redirect_uri: https://localhost:{DEFAULT_BLOOM_WEB_PORT}/",
+                "deployment:",
+                f"  name: {deployment}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    os.chmod(config_path, 0o600)
+    return config_path
+
+
 def ensure_test_runtime_environment() -> Path:
     """Prepare deterministic Bloom config needed for strict app startup in tests."""
+    deployment = (
+        os.environ.get("BLOOM_DEPLOYMENT_CODE")
+        or os.environ.get("DEPLOYMENT_CODE")
+        or os.environ.get("LSMC_DEPLOYMENT_CODE")
+        or "bloom-tests"
+    )
+    os.environ["BLOOM_DEPLOYMENT_CODE"] = deployment
+    os.environ["DEPLOYMENT_CODE"] = deployment
+    os.environ["LSMC_DEPLOYMENT_CODE"] = deployment
     os.environ["MERIDIAN_ENVIRONMENT"] = "production"
     os.environ["MERIDIAN_SANDBOX_PREFIX"] = ""
     os.environ["MERIDIAN_DOMAIN_CODE"] = "Z"
     os.environ["TAPDB_OWNER_REPO"] = "bloom"
     os.environ["TAPDB_DOMAIN_CODE"] = "Z"
+    os.environ["BLOOM_DEWEY_S3_BUCKET_PREFIX"] = "daylily-dewey-"
     os.environ["BLOOM_TAPDB__CLIENT_ID"] = "bloom"
     os.environ["BLOOM_TAPDB__DATABASE_NAME"] = "bloom"
     os.environ["BLOOM_TAPDB__SCHEMA_NAME"] = "tapdb_bloom_tests_dev"
@@ -251,8 +317,12 @@ def ensure_test_runtime_environment() -> Path:
 
     config_path = create_temp_tapdb_config()
     os.environ["BLOOM_TAPDB__CONFIG_PATH"] = str(config_path)
+    os.environ["BLOOM_CONFIG_PATH"] = str(
+        create_temp_bloom_config(tapdb_config_path=config_path)
+    )
 
     os.environ.setdefault("ECHO_SQL", "False")
+    os.environ["BLOOM_SESSION_SECRET"] = "test-bloom-session-secret-explicit"
     os.environ["BLOOM_DISABLE_RATE_LIMITING"] = "1"
     os.environ["BLOOM_RATE_LIMIT"] = "no"
 
@@ -297,24 +367,17 @@ def tapdb_local_available(*, env_name: str = "dev") -> bool:
 def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     """Bootstrap local TapDB via the Bloom CLI when DB-backed integration suites need it."""
     ensure_test_runtime_environment()
-    started_local = False
-    if tapdb_local_available(env_name=env_name):
-        started_local = False
-    else:
-        from bloom_lims.cli import db as db_commands
+    from bloom_lims.cli import db as db_commands
 
-        try:
-            db_commands.db_build(force=False, target="local")
-        except SystemExit as exc:
-            raise RuntimeError(
-                f"`bloom db build --target local` exited with status {exc.code}"
-            ) from exc
-        except Exception as exc:
-            raise RuntimeError(
-                f"`bloom db build --target local` failed: {exc}"
-            ) from exc
-
-        started_local = True
+    was_available = tapdb_local_available(env_name=env_name)
+    try:
+        db_commands.db_build(force=False, target="local")
+    except SystemExit as exc:
+        raise RuntimeError(
+            f"`bloom db build --target local` exited with status {exc.code}"
+        ) from exc
+    except Exception as exc:
+        raise RuntimeError(f"`bloom db build --target local` failed: {exc}") from exc
 
     if not tapdb_local_available(env_name=env_name):
         raise RuntimeError(
@@ -331,4 +394,4 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     except Exception as exc:
         raise RuntimeError(f"`bloom db seed` failed: {exc}") from exc
 
-    return started_local
+    return not was_available

@@ -70,7 +70,7 @@ def bdb():
     Yields:
         BLOOMdb3: Database connection instance
     """
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
 
     logger.info("Creating test database connection")
     db = BLOOMdb3()
@@ -92,7 +92,7 @@ def bdb_function():
     Yields:
         BLOOMdb3: Database connection instance
     """
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
 
     db = BLOOMdb3()
     yield db
@@ -112,7 +112,7 @@ def bloom_obj(bdb):
     Yields:
         BloomObj: BloomObj instance
     """
-    from bloom_lims.bobjs import BloomObj
+    from bloom_lims.domain import BloomObj
 
     return BloomObj(bdb)
 
@@ -120,23 +120,15 @@ def bloom_obj(bdb):
 @pytest.fixture(scope="function")
 def bloom_container(bdb):
     """BloomContainer instance fixture."""
-    from bloom_lims.bobjs import BloomContainer
+    from bloom_lims.domain import BloomContainer
 
     return BloomContainer(bdb)
 
 
 @pytest.fixture(scope="function")
-def bloom_workflow(bdb):
-    """BloomWorkflow instance fixture."""
-    from bloom_lims.bobjs import BloomWorkflow
-
-    return BloomWorkflow(bdb)
-
-
-@pytest.fixture(scope="function")
 def bloom_content(bdb):
     """BloomContent instance fixture."""
-    from bloom_lims.bobjs import BloomContent
+    from bloom_lims.domain import BloomContent
 
     return BloomContent(bdb)
 

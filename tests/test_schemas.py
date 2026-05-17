@@ -436,26 +436,25 @@ class TestExceptionImports:
 
 
 class TestDomainWorkflows:
-    """Tests for workflow domain module imports and utilities."""
+    """Tests for removed workflow domain module."""
 
     def test_import_bloom_workflow(self):
-        """Test BloomWorkflow import."""
-        from bloom_lims.domain.workflows import BloomWorkflow
+        """BloomWorkflow import is removed."""
+        import importlib.util
 
-        assert BloomWorkflow is not None
+        assert importlib.util.find_spec("bloom_lims.domain.workflows") is None
 
     def test_import_bloom_workflow_step(self):
-        """Test BloomWorkflowStep import."""
-        from bloom_lims.domain.workflows import BloomWorkflowStep
+        """BloomWorkflowStep import is removed."""
+        import importlib.util
 
-        assert BloomWorkflowStep is not None
+        assert importlib.util.find_spec("bloom_lims.domain.workflows") is None
 
     def test_workflow_inherits_from_bloom_obj(self):
-        """Test BloomWorkflow inherits from BloomObj."""
-        from bloom_lims.domain.base import BloomObj
-        from bloom_lims.domain.workflows import BloomWorkflow
+        """Bloom domain package no longer exports workflow objects."""
+        import bloom_lims.domain as domain
 
-        assert issubclass(BloomWorkflow, BloomObj)
+        assert not hasattr(domain, "BloomWorkflow")
 
 
 class TestDomainFiles:
@@ -637,7 +636,7 @@ class TestDomainBaseImports:
 
     def test_import_db_class(self):
         """Test BLOOMdb3 import."""
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         assert BLOOMdb3 is not None
 
@@ -712,7 +711,7 @@ class TestDomainBaseImportsExtended:
 
     def test_import_bloomdb3_class(self):
         """Test BLOOMdb3 class import."""
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         assert BLOOMdb3 is not None
 
@@ -822,13 +821,13 @@ class TestCacheBackendsImports:
 
 
 class TestReadReplicasImports:
-    """Tests for read replicas imports."""
+    """Tests for removed read replica compatibility imports."""
 
-    def test_import_read_replicas(self):
-        """Test read replicas module import."""
-        from bloom_lims.core import read_replicas
+    def test_read_replicas_import_removed(self):
+        """Read replica routing must not be exposed by Bloom core."""
+        import importlib.util
 
-        assert read_replicas is not None
+        assert importlib.util.find_spec("bloom_lims.core.read_replicas") is None
 
 
 class TestLineageImports:
@@ -872,13 +871,13 @@ class TestContentImports:
 
 
 class TestCoreWorkflowsImports:
-    """Tests for core workflows imports."""
+    """Tests for removed core workflow imports."""
 
     def test_import_core_workflows(self):
-        """Test core workflows module import."""
-        from bloom_lims.core import workflows
+        """Core workflows module is removed."""
+        import importlib.util
 
-        assert workflows is not None
+        assert importlib.util.find_spec("bloom_lims.core.workflows") is None
 
 
 class TestBaseObjectsImports:

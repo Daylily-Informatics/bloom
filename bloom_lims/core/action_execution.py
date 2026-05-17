@@ -10,8 +10,8 @@ from typing import Any
 
 from bloom_lims.core.exceptions import BloomValidationError
 from bloom_lims.core.tapdb_action_dispatcher import BloomTapDBActionDispatcher
-from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
+from bloom_lims.tapdb_adapter import BLOOMdb3
 from bloom_lims.template_identity import template_category_filter
 
 logger = logging.getLogger(__name__)
@@ -240,7 +240,7 @@ def _upgrade_active_action_definition(
             status_code=409,
             detail=(
                 f"Action {matched_action_key} is missing TapDB template metadata "
-                "and cannot be upgraded from a retired legacy definition."
+                "and cannot be upgraded from a retired definition."
             ),
         )
 

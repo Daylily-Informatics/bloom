@@ -7,12 +7,11 @@ Endpoints for bulk processing operations.
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from bloom_lims.core.batch_operations import (
     BatchProcessor,
-    BatchJob,
     JobStatus,
     get_batch_processor,
 )
@@ -25,20 +24,20 @@ router = APIRouter(prefix="/batch", tags=["Batch Operations"])
 # Request/Response schemas
 class BulkCreateRequest(BaseModel):
     """Request for bulk object creation."""
+
     template_euid: str = Field(..., description="Template EUID to instantiate")
     count: int = Field(..., ge=1, le=10000, description="Number of objects to create")
     name_pattern: str = Field(
-        default="Object_{index}",
-        description="Name pattern with {index} placeholder"
+        default="Object_{index}", description="Name pattern with {index} placeholder"
     )
     json_addl_template: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Template for json_addl (applied to all objects)"
+        None, description="Template for json_addl (applied to all objects)"
     )
 
 
 class BulkUpdateRequest(BaseModel):
     """Request for bulk object updates."""
+
     updates: List[Dict[str, Any]] = Field(
         ...,
         description="List of updates with 'euid' and fields to update",
@@ -48,19 +47,20 @@ class BulkUpdateRequest(BaseModel):
 
 class BulkDeleteRequest(BaseModel):
     """Request for bulk object deletion."""
+
     euids: List[str] = Field(
         ...,
         description="List of EUIDs to delete",
         max_length=10000,
     )
     soft_delete: bool = Field(
-        default=True,
-        description="Soft delete (set is_deleted=True) vs hard delete"
+        default=True, description="Soft delete (set is_deleted=True) vs hard delete"
     )
 
 
 class JobResponse(BaseModel):
     """Response for batch job operations."""
+
     job_id: str
     operation: str
     status: str
@@ -70,7 +70,8 @@ class JobResponse(BaseModel):
 
 def get_bdb():
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
+
     return BLOOMdb3()
 
 
@@ -81,22 +82,23 @@ async def bulk_create_objects(
 ):
     """
     Create multiple objects from a template.
-    
+
     Returns immediately with a job ID for tracking progress.
     """
     try:
         bdb = get_bdb()
         processor = BatchProcessor(bdb)
-        
+
         # Create data generator if template provided
         data_gen = None
         if request.json_addl_template:
+
             def data_gen(i):
                 return dict(request.json_addl_template)
-        
+
         # Start job in background
         job = processor.create_job("bulk_create", request.count)
-        
+
         async def run_job():
             await processor.bulk_create_objects(
                 template_euid=request.template_euid,
@@ -104,9 +106,9 @@ async def bulk_create_objects(
                 data_generator=data_gen,
                 name_pattern=request.name_pattern,
             )
-        
+
         background_tasks.add_task(run_job)
-        
+
         return JobResponse(
             job_id=job.job_id,
             operation="bulk_create",
@@ -118,7 +120,7 @@ async def bulk_create_objects(
             },
             message=f"Batch create job started for {request.count} objects",
         )
-        
+
     except Exception as e:
         logger.error(f"Error starting bulk create: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -131,20 +133,20 @@ async def bulk_update_objects(
 ):
     """
     Update multiple objects by EUID.
-    
+
     Each update dict must contain 'euid' plus fields to update.
     """
     try:
         bdb = get_bdb()
         processor = BatchProcessor(bdb)
-        
+
         job = processor.create_job("bulk_update", len(request.updates))
-        
+
         async def run_job():
             await processor.bulk_update_objects(request.updates)
-        
+
         background_tasks.add_task(run_job)
-        
+
         return JobResponse(
             job_id=job.job_id,
             operation="bulk_update",
@@ -156,7 +158,7 @@ async def bulk_update_objects(
             },
             message=f"Batch update job started for {len(request.updates)} objects",
         )
-        
+
     except Exception as e:
         logger.error(f"Error starting bulk update: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -259,7 +261,10 @@ async def cancel_batch_job(job_id: str):
         processor = get_batch_processor()
 
         if processor.cancel_job(job_id):
-            return {"success": True, "message": f"Cancellation requested for job {job_id}"}
+            return {
+                "success": True,
+                "message": f"Cancellation requested for job {job_id}",
+            }
         else:
             raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
 
@@ -268,4 +273,3 @@ async def cancel_batch_job(job_id: str):
     except Exception as e:
         logger.error(f"Error cancelling job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

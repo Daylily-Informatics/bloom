@@ -59,12 +59,9 @@ class LogService(str, Enum):
 
 def _state_dir() -> Path:
     """Return the Bloom XDG state directory."""
-    try:
-        from cli_core_yo.runtime import get_context
+    from cli_core_yo.runtime import get_context
 
-        return get_context().xdg_paths.state
-    except Exception:
-        return Path.home() / ".local" / "state" / "bloom"
+    return get_context().xdg_paths.state
 
 
 def _log_dir() -> Path:
@@ -189,7 +186,7 @@ def start(
             cert_path=cert,
             key_path=key,
             shared_certs_dir=_deployment_shared_certs_dir(),
-            fallback_certs_dir=PROJECT_ROOT / "certs",
+            generate_if_missing=False,
         )
         cert_file = resolved.cert_path
         key_file = resolved.key_path

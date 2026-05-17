@@ -173,8 +173,7 @@ class AtlasService:
                 sleep_seconds = self._retry_sleep_seconds(attempt)
                 time.sleep(sleep_seconds)
 
-        # Defensive fallback; loop above either returns or raises.
-        raise AtlasDependencyError("Failed to push Atlas status event")
+        raise AtlasDependencyError("Atlas status event loop exited without a result")
 
     def _cached_lookup(
         self,
