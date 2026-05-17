@@ -144,26 +144,26 @@
       <form id="issue-token-form">
         <div class="form-group">
           <label class="form-label">Token Owner (API user)</label>
-          <select id="issue-token-user-id" class="form-select" required>
+          <select id="issue-token-user-id" class="form-select" data-testid="bloom-issue-token-owner" required>
             <option value="">Select API user</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Token Name</label>
-          <input type="text" id="issue-token-name" class="form-input" required placeholder="e.g. bloom-admin-cli">
+          <input type="text" id="issue-token-name" class="form-input" data-testid="bloom-issue-token-name" required placeholder="e.g. bloom-admin-cli">
         </div>
         <div class="form-group">
           <label class="form-label">Scope</label>
-          <select id="issue-token-scope" class="form-select">
+          <select id="issue-token-scope" class="form-select" data-testid="bloom-issue-token-scope">
             <option value="internal_ro">internal_ro</option>
             <option value="internal_rw">internal_rw</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Expires In (days)</label>
-          <input type="number" id="issue-token-days" class="form-input" value="30" min="1" max="3650">
+          <input type="number" id="issue-token-days" class="form-input" data-testid="bloom-issue-token-days" value="30" min="1" max="3650">
         </div>
-        <button type="submit" class="btn btn-primary btn-sm">Issue Token</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="bloom-issue-token-submit">Issue Token</button>
       </form>
       <div id="issue-token-result" class="text-sm text-muted" style="margin-top: var(--spacing-md);"></div>
     </div>
@@ -867,6 +867,7 @@ function renderIssuedTokenResult(container, userId, plaintextToken) {
 
   const token = document.createElement('span');
   token.className = 'issued-token-value';
+  token.dataset.testid = 'bloom-issued-token-value';
   token.textContent = plaintextToken || '';
   row.appendChild(token);
 
