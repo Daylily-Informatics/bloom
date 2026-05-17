@@ -41,7 +41,10 @@ def build_bloom_web_session_config(
             )
         public_base_url = _origin(broker.callback_url)
         return CognitoWebSessionConfig(
-            domain=urlparse(broker.login_url).netloc,
+            domain=_required_url_hostname(
+                broker.login_url,
+                field_name="auth.external_broker.login_url",
+            ),
             client_id=broker.service_id,
             redirect_uri=broker.callback_url,
             logout_uri=broker.logout_url,
@@ -79,6 +82,13 @@ def build_bloom_web_session_config(
         allow_insecure_http=public_base_url.startswith("http://"),
         server_instance_id=get_server_instance_id(),
     )
+
+
+def _required_url_hostname(value: str, *, field_name: str) -> str:
+    parsed = urlparse(str(value or "").strip())
+    if not parsed.scheme or not parsed.netloc or not parsed.hostname:
+        raise RuntimeError(f"Bloom {field_name} must be an absolute URL with host")
+    return parsed.hostname
 
 
 def _session_secret(auth_settings: Any) -> str:

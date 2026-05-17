@@ -158,10 +158,10 @@ def _external_broker_settings() -> BloomSettings:
             "jwt_secret": "test-session-secret",
             "external_broker": {
                 "service_id": "bloom",
-                "login_url": "https://dev.login.lsmc.com/auth/login",
-                "handoff_exchange_url": "https://dev.login.lsmc.com/auth/handoff/consume",
+                "login_url": "https://dev.login.lsmc.com:8916/auth/login",
+                "handoff_exchange_url": "https://dev.login.lsmc.com:8916/auth/handoff/consume",
                 "callback_url": "https://localhost:8912/auth/lsmc/callback",
-                "logout_url": "https://dev.login.lsmc.com/auth/logout",
+                "logout_url": "https://dev.login.lsmc.com:8916/auth/logout",
             },
         }
     )
@@ -212,7 +212,7 @@ def test_external_broker_login_and_callback_create_session(
     location = login.headers["location"]
     parsed = urlparse(location)
     assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == (
-        "https://dev.login.lsmc.com/auth/login"
+        "https://dev.login.lsmc.com:8916/auth/login"
     )
     params = parse_qs(parsed.query)
     assert params["service"] == ["bloom"]
