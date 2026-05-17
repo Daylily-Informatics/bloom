@@ -202,6 +202,12 @@ class TestAssaysEndpoint:
         assert "API Token Administration" in response.text
         assert "API Access Users" in response.text
         assert "Issued Tokens" in response.text
+        assert 'data-testid="bloom-issue-token-owner"' in response.text
+        assert 'data-testid="bloom-issue-token-name"' in response.text
+        assert 'data-testid="bloom-issue-token-scope"' in response.text
+        assert 'data-testid="bloom-issue-token-days"' in response.text
+        assert 'data-testid="bloom-issue-token-submit"' in response.text
+        assert "bloom-issued-token-value" in response.text
 
     def test_admin_has_atlas_and_ursa_enablement_panels(self, client):
         """Admin page renders Atlas/Ursa API enablement controls."""
