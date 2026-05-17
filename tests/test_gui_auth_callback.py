@@ -182,6 +182,46 @@ def test_external_broker_session_config_uses_service_local_logout_uri(
     assert session_config.logout_uri == "https://localhost:8912/auth/logout"
 
 
+def test_external_broker_handoff_uses_configured_ca_bundle(monkeypatch: pytest.MonkeyPatch):
+    from bloom_lims.gui.routes import auth as auth_routes
+
+    settings = _external_broker_settings()
+    settings.auth.external_broker.ca_bundle = "/tmp/bloom-ca.pem"
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json() -> dict[str, object]:
+            return {"user": {"email": "johnm@lsmc.com"}}
+
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: float, verify: object):
+            captured["timeout"] = timeout
+            captured["verify"] = verify
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def post(self, url: str, *, json: dict[str, object]):
+            captured["url"] = url
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("bloom_lims.gui.routes.auth.get_settings", lambda: settings)
+    monkeypatch.setattr(auth_routes.httpx, "AsyncClient", FakeAsyncClient)
+
+    result = asyncio.run(auth_routes._exchange_external_broker_handoff("handoff-code"))
+
+    assert result["user"]["email"] == "johnm@lsmc.com"
+    assert captured["verify"] == "/tmp/bloom-ca.pem"
+    assert captured["json"] == {"code": "handoff-code"}
+
+
 def test_external_broker_login_and_callback_create_session(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
