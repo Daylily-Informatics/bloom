@@ -8,9 +8,8 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
-from bloom_lims.bobjs import BloomObj
 from bloom_lims.config import get_settings
-from bloom_lims.db import BLOOMdb3, get_child_lineages, get_parent_lineages
+from bloom_lims.domain import BloomObj
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 from bloom_lims.schemas.external_specimens import (
     AtlasReferences,
@@ -18,6 +17,7 @@ from bloom_lims.schemas.external_specimens import (
     ExternalSpecimenResponse,
     ExternalSpecimenUpdateRequest,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3, get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import (
     instance_category_filter,
     instance_semantic_category,

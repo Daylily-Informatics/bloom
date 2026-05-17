@@ -19,7 +19,6 @@ from bloom_lims.observability import (
 )
 from bloom_lims.tapdb_adapter import BLOOMdb3
 
-
 router = APIRouter(tags=["Health"])
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ def _record_auth(request: Request, user: APIUser) -> None:
         status="ok",
         mode=user.auth_source,
         detail=request.url.path,
-        service_principal=user.auth_source == "legacy_api_key",
+        service_principal=user.auth_source == "token",
         principal_email=getattr(user, "email", "") or "",
     )
 
@@ -67,7 +66,9 @@ async def endpoint_health(
     limit: int = Query(25, ge=1, le=200),
 ) -> dict:
     _record_auth(request, user)
-    projection, payload = request.app.state.observability.endpoint_health(offset=offset, limit=limit)
+    projection, payload = request.app.state.observability.endpoint_health(
+        offset=offset, limit=limit
+    )
     return build_endpoint_health_payload(
         request,
         projection=projection,
@@ -94,11 +95,15 @@ async def db_health(
     )
     if db_component.status != "healthy":
         try:
-            bdb, repository = _anomaly_repository(getattr(user, "email", "") or "observability")
+            bdb, repository = _anomaly_repository(
+                getattr(user, "email", "") or "observability"
+            )
             try:
                 repository.record_db_probe_failure(
                     detail=str(db_component.message or ""),
-                    latency_ms=float(db_component.latency_ms or ((monotonic() - started) * 1000)),
+                    latency_ms=float(
+                        db_component.latency_ms or ((monotonic() - started) * 1000)
+                    ),
                 )
             finally:
                 bdb.close()
@@ -120,7 +125,9 @@ async def list_anomalies(
     _record_auth(request, user)
     bdb, repository = _anomaly_repository(getattr(user, "email", "") or "api-anomalies")
     try:
-        items = [record.__dict__ for record in repository.list(skip=offset, limit=limit)]
+        items = [
+            record.__dict__ for record in repository.list(skip=offset, limit=limit)
+        ]
         projection = repository.projection()
     finally:
         bdb.close()
@@ -163,7 +170,7 @@ async def my_health(
     request: Request,
     user: Annotated[APIUser, Depends(get_api_user)],
 ) -> dict:
-    if user.auth_source == "legacy_api_key":
+    if user.auth_source == "token":
         raise HTTPException(status_code=401, detail="Not authenticated")
     _record_auth(request, user)
     return build_my_health_payload(request, user)
@@ -176,4 +183,6 @@ async def auth_health(
 ) -> dict:
     _record_auth(request, user)
     projection, payload = request.app.state.observability.auth_health()
-    return build_auth_health_payload(request, projection=projection, auth_rollup=payload)
+    return build_auth_health_payload(
+        request, projection=projection, auth_rollup=payload
+    )

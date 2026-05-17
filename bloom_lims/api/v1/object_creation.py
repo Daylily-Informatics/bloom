@@ -87,7 +87,7 @@ class CreateObjectResponse(BaseModel):
 
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
 
     return BLOOMdb3(app_username=username)
 

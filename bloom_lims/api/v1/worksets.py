@@ -11,8 +11,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from .dependencies import require_api_auth, APIUser
-
+from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +21,27 @@ router = APIRouter(prefix="/worksets", tags=["Worksets"])
 
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
+
     return BLOOMdb3(app_username=username)
 
 
 def get_bob(bdb):
     """Get BloomObj instance."""
-    from bloom_lims.bobjs import BloomObj
+    from bloom_lims.domain import BloomObj
+
     return BloomObj(bdb)
 
 
 class WorksetCreateSchema(BaseModel):
     """Schema for creating a workset."""
-    anchor_euid: str = Field(..., description="EUID of the anchor object (first workflow step)")
-    workset_type: str = Field("generic", description="Type: generic, extraction, sequencing")
+
+    anchor_euid: str = Field(
+        ..., description="EUID of the anchor object (first workflow step)"
+    )
+    workset_type: str = Field(
+        "generic", description="Type: generic, extraction, sequencing"
+    )
     workflow_euid: Optional[str] = Field(None, description="Parent workflow EUID")
     executed_by: Optional[str] = Field(None, description="Username of executor")
     name: Optional[str] = Field(None, description="Custom workset name")
@@ -43,12 +49,16 @@ class WorksetCreateSchema(BaseModel):
 
 class WorksetMembersSchema(BaseModel):
     """Schema for adding members to a workset."""
+
     member_euids: List[str] = Field(..., description="List of member EUIDs to add")
 
 
 class WorksetCompleteSchema(BaseModel):
     """Schema for completing a workset."""
-    status: str = Field("complete", description="Final status: complete, failed, abandoned")
+
+    status: str = Field(
+        "complete", description="Final status: complete, failed, abandoned"
+    )
 
 
 @router.get("/", response_model=Dict[str, Any])
@@ -310,8 +320,7 @@ async def get_workset_by_anchor(
 
         if not workset_info:
             raise HTTPException(
-                status_code=404,
-                detail=f"No workset found with anchor: {anchor_euid}"
+                status_code=404, detail=f"No workset found with anchor: {anchor_euid}"
             )
 
         return workset_info

@@ -24,7 +24,7 @@ from bloom_lims.auth.services.user_api_tokens import (
     UserAPITokenService,
 )
 from bloom_lims.cli._registry_v2 import EXEMPT_MUTATING, register_group_commands
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 users_app = typer.Typer(help="Bloom-specific user commands.", no_args_is_help=True)
 

@@ -5,7 +5,7 @@ Provides automated validation for JSON templates including:
 - Schema compliance checking
 - Action reference validation
 - Circular dependency detection
-- Version compatibility verification
+- Version contract verification
 
 Usage:
     from bloom_lims.core.template_validation import TemplateValidator
@@ -263,10 +263,10 @@ class TemplateValidator:
                 continue
 
             if not isinstance(template_code, str):
-                # Explicitly reject legacy grouped format like {"core": {"actions": {...}}}.
+                # Explicitly reject grouped format like {"core": {"actions": {...}}}.
                 result.errors.append(
                     f"{file_path}: {template_id} action_imports must be a flat dict "
-                    "{action_key: template_code}; legacy grouped format is not supported"
+                    "{action_key: template_code}; grouped format is not supported"
                 )
                 continue
 

@@ -10,11 +10,11 @@ Usage:
         async_bulk_insert,
         BackgroundTaskManager,
     )
-    
+
     # Async database operations
     async with AsyncDatabaseSession() as session:
         results = await async_query(session, Model, filters={...})
-    
+
     # Background tasks
     task_manager = BackgroundTaskManager()
     task_id = await task_manager.submit(my_async_func, arg1, arg2)
@@ -42,7 +42,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from bloom_lims.config import get_settings
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,7 @@ T = TypeVar("T")
 
 class TaskStatus(str, Enum):
     """Status of a background task."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -61,13 +62,14 @@ class TaskStatus(str, Enum):
 @dataclass
 class TaskResult(Generic[T]):
     """Result of a background task."""
+
     task_id: str
     status: TaskStatus
     result: Optional[T] = None
     error: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    
+
     @property
     def duration_seconds(self) -> Optional[float]:
         """Get task duration in seconds."""
@@ -80,32 +82,14 @@ class AsyncDatabaseSession:
     """
     Async database session manager for non-blocking operations.
 
-    This is a compatibility wrapper around TapDB-managed sync sessions. It
-    preserves async call-sites without Bloom owning async engine creation.
+    Async call sites are backed by TapDB-managed sync sessions. Bloom does not
+    own async engine creation.
     """
 
-    def __init__(
-        self,
-        connection_string: Optional[str] = None,
-        pool_size: int = 5,
-        max_overflow: int = 10,
-        echo: bool = False,
-        app_username: str = "bloom-async",
-    ):
+    def __init__(self, *, app_username: str = "bloom-async"):
         self.app_username = app_username
         self._bdb: Optional[BLOOMdb3] = None
         self._session: Optional[Session] = None
-
-        # Legacy args are accepted for compatibility but ignored in tapdb mode.
-        if connection_string:
-            logger.warning(
-                "AsyncDatabaseSession.connection_string is ignored; "
-                "TapDB runtime config is authoritative."
-            )
-        if pool_size != 5 or max_overflow != 10 or echo:
-            logger.warning(
-                "AsyncDatabaseSession pool/echo options are ignored in tapdb mode."
-            )
 
     async def __aenter__(self) -> "AsyncSessionProxy":
         self._bdb = BLOOMdb3(app_username=self.app_username)
@@ -141,7 +125,7 @@ class AsyncDatabaseSession:
 
     @staticmethod
     async def close():
-        """Compatibility no-op (sessions are scoped per context)."""
+        """No-op; sessions are scoped per context."""
         return
 
 
@@ -184,6 +168,7 @@ class AsyncSessionProxy:
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self._session, name)
         if callable(attr):
+
             async def _async_call(*args, **kwargs):
                 return await asyncio.to_thread(attr, *args, **kwargs)
 
@@ -391,8 +376,10 @@ class BackgroundTaskManager:
         if len(self._tasks) >= self.max_tasks:
             # Remove oldest completed tasks
             completed = [
-                (tid, t) for tid, t in self._tasks.items()
-                if t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
+                (tid, t)
+                for tid, t in self._tasks.items()
+                if t.status
+                in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
             ]
             completed.sort(
                 key=lambda x: x[1].completed_at or datetime.min.replace(tzinfo=UTC)
@@ -505,8 +492,8 @@ def get_task_manager() -> BackgroundTaskManager:
     if _task_manager is None:
         settings = get_settings()
         _task_manager = BackgroundTaskManager(
-            max_workers=getattr(settings.api, 'async_max_workers', 10),
-            max_tasks=getattr(settings.api, 'async_max_tasks', 1000),
+            max_workers=getattr(settings.api, "async_max_workers", 10),
+            max_tasks=getattr(settings.api, "async_max_tasks", 1000),
         )
     return _task_manager
 

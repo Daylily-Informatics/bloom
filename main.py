@@ -36,28 +36,23 @@ def setup_logging() -> None:
 
 def _init_runtime_context() -> None:
     """Apply AWS/TAPDB runtime context and validate tapdb version policy."""
-    try:
-        from bloom_lims.config import apply_runtime_environment, assert_tapdb_version, get_settings
+    from bloom_lims.config import (
+        apply_runtime_environment,
+        assert_tapdb_version,
+        get_settings,
+    )
 
-        settings = get_settings()
-        apply_runtime_environment(settings)
-        assert_tapdb_version()
-    except Exception as exc:
-        logging.warning("Runtime context initialization warning: %s", exc)
+    settings = get_settings()
+    apply_runtime_environment(settings)
+    assert_tapdb_version()
 
 
 setup_logging()
 _init_runtime_context()
 
 
-# Import after runtime context so any TapDB/AWS env defaults are applied first.
+# Import after runtime context so TapDB/AWS env is explicit before app creation.
 from bloom_lims.app import create_app  # noqa: E402
-
 
 # FastAPI app used by uvicorn and by tests.
 app = create_app()
-
-
-# Back-compat re-exports for tests and legacy import paths.
-from bloom_lims.gui.deps import require_auth  # noqa: E402
-from bloom_lims.gui.routes.graph import _build_graph_elements_for_start  # noqa: E402

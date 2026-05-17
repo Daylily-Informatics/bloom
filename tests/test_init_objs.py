@@ -1,13 +1,11 @@
-from bloom_lims.bobjs import (
+from bloom_lims.domain import (
     BloomContainer,
     BloomContainerPlate,
     BloomContent,
     BloomEquipment,
     BloomObj,
-    BloomWorkflow,
-    BloomWorkflowStep,
 )
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 ###
 #
@@ -45,12 +43,6 @@ def test_intantiating_bloom_objects():
 
     ct = BloomContent(bdb)
     assert ct.__class__.__name__ == "BloomContent"
-
-    wf = BloomWorkflow(bdb)
-    assert wf.__class__.__name__ == "BloomWorkflow"
-
-    ws = BloomWorkflowStep(bdb)
-    assert ws.__class__.__name__ == "BloomWorkflowStep"
 
     eq = BloomEquipment(bdb)
     assert eq.__class__.__name__ == "BloomEquipment"

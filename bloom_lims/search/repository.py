@@ -9,12 +9,12 @@ from typing import Any, Dict, Iterable, List, Tuple
 from sqlalchemy import and_, cast, func, or_
 from sqlalchemy.sql.sqltypes import String
 
-from bloom_lims.db import BLOOMdb3
 from bloom_lims.search.contracts import (
     SearchJSONFilter,
     SearchRequest,
     SearchResultItem,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 from bloom_lims.template_identity import template_semantic_category
 
 _KNOWN_LINEAGE_IDENTITIES = (

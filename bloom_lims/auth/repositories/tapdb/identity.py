@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 import secrets
 from typing import Any
@@ -44,22 +43,6 @@ def ensure_public_id_property(
     return created
 
 
-def fallback_public_id(instance: generic_instance, *, prefix: str = "auth") -> str:
-    seed = (
-        f"{normalize_public_id(getattr(instance, 'uid', None)) or ''}|"
-        f"{normalize_public_id(getattr(instance, 'euid', None)) or ''}|"
-        f"{normalize_public_id(getattr(instance, 'template_uid', None)) or ''}|"
-        f"{normalize_public_id(getattr(instance, 'tenant_id', None)) or ''}|"
-        f"{normalize_public_id(getattr(instance, 'name', None)) or ''}|"
-        f"{getattr(instance, 'category', '')}/"
-        f"{getattr(instance, 'type', '')}/"
-        f"{getattr(instance, 'subtype', '')}/"
-        f"{getattr(instance, 'version', '')}"
-    )
-    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]
-    return f"{_normalize_prefix(prefix)}_{digest}"
-
-
 def resolve_public_id(
     instance: generic_instance,
     properties: dict[str, Any],
@@ -72,5 +55,6 @@ def resolve_public_id(
         resolved = normalize_public_id(properties.get(candidate))
         if resolved is not None:
             return resolved
-    return fallback_public_id(instance, prefix=prefix)
-
+    raise ValueError(
+        f"TapDB auth instance {getattr(instance, 'euid', None)!r} is missing explicit public id"
+    )

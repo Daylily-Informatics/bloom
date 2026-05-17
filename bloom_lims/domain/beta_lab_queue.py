@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from bloom_lims.db import get_child_lineages, get_parent_lineages
 from bloom_lims.schemas.beta_lab import (
     BetaClaimResponse,
     BetaConsumeMaterialResponse,
@@ -19,6 +18,7 @@ from bloom_lims.schemas.execution_queue import (
     RequeueSubjectRequest,
     WorkerType,
 )
+from bloom_lims.tapdb_adapter import get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import instance_semantic_category
 
 

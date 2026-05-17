@@ -11,13 +11,13 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException
 
 from bloom_lims.schemas import (
+    DashboardResponseSchema,
     DashboardStatsSchema,
     RecentActivityItem,
     RecentActivitySchema,
-    DashboardResponseSchema,
 )
-from .dependencies import require_api_auth, APIUser
 
+from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _beta_kind(instance: Any) -> str:
 
 def get_bdb(username: str = "anonymous"):
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
 
     return BLOOMdb3(app_username=username)
 
@@ -71,7 +71,8 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
             open_work_items = [
                 row
                 for row in work_items
-                if str(getattr(row, "bstatus", "") or "").strip().lower() in {"open", "active"}
+                if str(getattr(row, "bstatus", "") or "").strip().lower()
+                in {"open", "active"}
             ]
 
             queue_statuses = [
@@ -81,13 +82,25 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
 
             stats.queue_runtime_total = len(queue_definitions)
             stats.queue_runtime_in_progress = len(
-                [status for status in queue_statuses if status in {"active", "open", "in_progress"}]
+                [
+                    status
+                    for status in queue_statuses
+                    if status in {"active", "open", "in_progress"}
+                ]
             )
             stats.queue_runtime_complete = len(
-                [status for status in queue_statuses if status in {"complete", "completed"}]
+                [
+                    status
+                    for status in queue_statuses
+                    if status in {"complete", "completed"}
+                ]
             )
             stats.queue_runtime_exception = len(
-                [status for status in queue_statuses if status in {"exception", "failed", "error"}]
+                [
+                    status
+                    for status in queue_statuses
+                    if status in {"exception", "failed", "error"}
+                ]
             )
             stats.workflows_total = len(work_items)
             stats.workflows_active = len(open_work_items)
@@ -104,7 +117,7 @@ async def get_dashboard_stats(user: APIUser = Depends(require_api_auth)):
             stats.reagents_total = (
                 bdb.session.query(content_class)
                 .filter(
-                    content_class.is_deleted == False,
+                    content_class.is_deleted.is_(False),
                     content_class.subtype.like("%reagent%"),
                 )
                 .count()

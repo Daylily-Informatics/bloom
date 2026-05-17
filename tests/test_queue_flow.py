@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3, get_parent_lineages
+from bloom_lims.domain import BloomObj
+from bloom_lims.tapdb_adapter import BLOOMdb3, get_parent_lineages
 from bloom_lims.template_identity import (
     instance_category_filter,
     template_category_filter,

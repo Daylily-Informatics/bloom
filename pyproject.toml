@@ -28,7 +28,7 @@ license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
     "cli-core-yo==2.1.1",
-    "daylily-tapdb>=7.0.1,<8.0.0",
+    "daylily-tapdb>=7.0.3,<8.0.0",
     "daylily-auth-cognito==2.1.5",
     "IPython>=8.18.1",
     "bandit[toml]>=1.8.0",
@@ -88,7 +88,6 @@ bloom = "bloom_lims.cli:main"
 
 [tool.setuptools_scm]
 version_file = "bloom_lims/_scm_version.py"
-fallback_version = "0.0.0.dev0"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -201,13 +200,13 @@ exclude_dirs = ["tests", "bloom_lims/database", "stage_to_delete"]
 skips = [
     "B101",  # allow assert in non-test code (used extensively)
     "B105",  # false positives on token/status/template constants
-    "B106",  # false positives on placeholder middleware/config values in legacy paths
+    "B106",  # false positives on placeholder middleware/config values in retired paths
     "B110",  # intentional best-effort config/session cleanup paths
-    "B311",  # non-cryptographic randomness in legacy workflows/UI naming
+    "B311",  # non-cryptographic randomness in retired workflows/UI naming
     "B404",  # CLI/admin subprocess usage is intentional
     "B603",  # subprocess calls execute trusted local tools
     "B607",  # subprocess calls rely on known PATH tools in operator environments
-    "B608",  # legacy SQL fragments are operator-authored/static
+    "B608",  # retained SQL fragments are operator-authored/static
 ]
 
 [tool.mypy]

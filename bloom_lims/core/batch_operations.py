@@ -11,7 +11,7 @@ Usage:
         bulk_update,
         bulk_delete,
     )
-    
+
     # Batch processing with progress tracking
     processor = BatchProcessor(bdb)
     job = await processor.create_objects(
@@ -19,10 +19,10 @@ Usage:
         count=1000,
         data_generator=lambda i: {"name": f"Sample_{i}"},
     )
-    
+
     # Check progress
     status = processor.get_job_status(job.job_id)
-    
+
     # Bulk operations
     results = await bulk_create(session, objects_data)
     updated = await bulk_update(session, updates)
@@ -35,15 +35,13 @@ Features:
     - Parallel processing options
 """
 
-import asyncio
 import logging
 import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
 
-from sqlalchemy import text, update, delete
 from sqlalchemy.orm import Session
 
 from bloom_lims.config import get_settings
@@ -55,6 +53,7 @@ T = TypeVar("T")
 
 class JobStatus(str, Enum):
     """Status of a batch job."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -66,18 +65,19 @@ class JobStatus(str, Enum):
 @dataclass
 class BatchProgress:
     """Progress tracking for batch operations."""
+
     total: int = 0
     processed: int = 0
     succeeded: int = 0
     failed: int = 0
     skipped: int = 0
-    
+
     @property
     def percent_complete(self) -> float:
         if self.total == 0:
             return 0.0
         return (self.processed / self.total) * 100
-    
+
     @property
     def remaining(self) -> int:
         return self.total - self.processed
@@ -86,6 +86,7 @@ class BatchProgress:
 @dataclass
 class BatchJob:
     """Represents a batch processing job."""
+
     job_id: str
     operation: str
     status: JobStatus = JobStatus.PENDING
@@ -96,7 +97,7 @@ class BatchJob:
     error: Optional[str] = None
     results: List[Dict[str, Any]] = field(default_factory=list)
     errors: List[Dict[str, Any]] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -113,7 +114,9 @@ class BatchJob:
             },
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": self.completed_at.isoformat()
+            if self.completed_at
+            else None,
             "error": self.error,
             "result_count": len(self.results),
             "error_count": len(self.errors),
@@ -123,10 +126,10 @@ class BatchJob:
 class BatchProcessor:
     """
     Processor for batch database operations.
-    
+
     Handles bulk creates, updates, and deletes with progress tracking.
     """
-    
+
     def __init__(
         self,
         bdb,
@@ -135,7 +138,7 @@ class BatchProcessor:
     ):
         """
         Initialize batch processor.
-        
+
         Args:
             bdb: BLOOMdb3 database instance
             chunk_size: Number of items per batch
@@ -148,11 +151,11 @@ class BatchProcessor:
         self.max_concurrent = max_concurrent
         self._jobs: Dict[str, BatchJob] = {}
         self._cancel_flags: Dict[str, bool] = {}
-    
+
     def _chunks(self, items: List[T], size: int) -> Generator[List[T], None, None]:
         """Split list into chunks."""
         for i in range(0, len(items), size):
-            yield items[i:i + size]
+            yield items[i : i + size]
 
     def create_job(self, operation: str, total: int) -> BatchJob:
         """Create a new batch job."""
@@ -229,7 +232,7 @@ class BatchProcessor:
                         json_addl = data_generator(i) if data_generator else {}
 
                         # Create instance
-                        instance_class = getattr(self._Base.classes, 'generic_instance')
+                        instance_class = getattr(self._Base.classes, "generic_instance")
                         instance = instance_class(
                             name=name,
                             type=template.type,
@@ -289,7 +292,7 @@ class BatchProcessor:
                     break
 
                 for item in chunk:
-                    euid = item.get('euid')
+                    euid = item.get("euid")
                     if not euid:
                         job.progress.skipped += 1
                         job.progress.processed += 1
@@ -304,7 +307,7 @@ class BatchProcessor:
 
                         if obj:
                             for key, value in item.items():
-                                if key != 'euid' and hasattr(obj, key):
+                                if key != "euid" and hasattr(obj, key):
                                     setattr(obj, key, value)
 
                             job.progress.succeeded += 1
@@ -404,7 +407,11 @@ class BatchProcessor:
 
         to_remove = []
         for job_id, job in self._jobs.items():
-            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+            if job.status in (
+                JobStatus.COMPLETED,
+                JobStatus.FAILED,
+                JobStatus.CANCELLED,
+            ):
                 if job.completed_at:
                     age_hours = (cutoff - job.completed_at).total_seconds() / 3600
                     if age_hours > max_age_hours:
@@ -441,7 +448,7 @@ async def bulk_create(
     results = {"created": 0, "failed": 0, "errors": []}
 
     for i in range(0, len(items), chunk_size):
-        chunk = items[i:i + chunk_size]
+        chunk = items[i : i + chunk_size]
 
         try:
             for item in chunk:
@@ -481,7 +488,7 @@ async def bulk_update(
     results = {"updated": 0, "not_found": 0, "failed": 0, "errors": []}
 
     for i in range(0, len(updates), chunk_size):
-        chunk = updates[i:i + chunk_size]
+        chunk = updates[i : i + chunk_size]
 
         try:
             for item in chunk:
@@ -489,9 +496,11 @@ async def bulk_update(
                 if not id_value:
                     continue
 
-                obj = session.query(model_class).filter(
-                    getattr(model_class, id_field) == id_value
-                ).first()
+                obj = (
+                    session.query(model_class)
+                    .filter(getattr(model_class, id_field) == id_value)
+                    .first()
+                )
 
                 if obj:
                     for key, value in item.items():
@@ -535,16 +544,18 @@ async def bulk_delete(
     results = {"deleted": 0, "not_found": 0, "failed": 0, "errors": []}
 
     for i in range(0, len(ids), chunk_size):
-        chunk = ids[i:i + chunk_size]
+        chunk = ids[i : i + chunk_size]
 
         try:
             for id_value in chunk:
-                obj = session.query(model_class).filter(
-                    getattr(model_class, id_field) == id_value
-                ).first()
+                obj = (
+                    session.query(model_class)
+                    .filter(getattr(model_class, id_field) == id_value)
+                    .first()
+                )
 
                 if obj:
-                    if soft_delete and hasattr(obj, 'is_deleted'):
+                    if soft_delete and hasattr(obj, "is_deleted"):
                         obj.is_deleted = True
                     else:
                         session.delete(obj)
@@ -576,14 +587,15 @@ def get_batch_processor(bdb=None) -> BatchProcessor:
 
     if _batch_processor is None or bdb is not None:
         if bdb is None:
-            from bloom_lims.db import BLOOMdb3
+            from bloom_lims.tapdb_adapter import BLOOMdb3
+
             bdb = BLOOMdb3()
 
         settings = get_settings()
         _batch_processor = BatchProcessor(
             bdb,
-            chunk_size=getattr(settings.api, 'batch_chunk_size', 100),
-            max_concurrent=getattr(settings.api, 'batch_max_concurrent', 5),
+            chunk_size=getattr(settings.api, "batch_chunk_size", 100),
+            max_concurrent=getattr(settings.api, "batch_max_concurrent", 5),
         )
 
     return _batch_processor

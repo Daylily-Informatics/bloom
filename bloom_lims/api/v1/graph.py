@@ -5,14 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain import BloomObj
 from bloom_lims.graph_support import (
     build_graph_elements_for_start,
     build_graph_meta_for_nodes,
     build_graph_object_payload,
     normalize_graph_request_params,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 

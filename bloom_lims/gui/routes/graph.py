@@ -8,8 +8,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain import BloomObj
 from bloom_lims.graph_support import (
     build_graph_elements_for_start as _shared_build_graph_elements_for_start,
 )
@@ -31,6 +30,7 @@ from bloom_lims.gui.deps import (
 from bloom_lims.gui.jinja import templates
 from bloom_lims.integrations.atlas.client import AtlasClientError
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter()
 

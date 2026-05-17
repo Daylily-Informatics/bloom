@@ -276,7 +276,7 @@ def _safe_redacted_context(value: Any) -> dict[str, Any]:
 
 
 def open_anomaly_repository(*, app_username: str):
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
 
     bdb = BLOOMdb3(app_username=app_username)
     return TapdbAnomalyRepository(bdb.session), bdb

@@ -1,7 +1,9 @@
-import pytest
-from bloom_lims.db import BLOOMdb3
-from bloom_lims.bobjs import BloomObj
 import sys
+
+import pytest
+
+from bloom_lims.domain import BloomObj
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 class BaseTest:
@@ -12,7 +14,7 @@ class BaseTest:
     def check_instance_creation(self, template, bob):
         try:
             bob.create_instances(template.euid)
-        except Exception as e:
+        except Exception:
             if template.type == "assay":
                 pass  # Expected to fail if already instantiated
             else:

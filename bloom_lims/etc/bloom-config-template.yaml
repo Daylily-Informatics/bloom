@@ -50,7 +50,7 @@ tapdb:
 # Storage Configuration
 # -----------------------------------------------------------------------------
 storage:
-  upload_dir: ""               # Defaults to the deployment-scoped local TapDB runtime uploads dir
+  upload_dir: ""               # REQUIRED explicit runtime upload directory
   temp_dir: "/tmp/bloom"
   max_file_size_mb: 100
   allowed_extensions:

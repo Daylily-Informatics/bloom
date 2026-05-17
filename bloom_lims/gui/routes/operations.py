@@ -36,9 +36,9 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from auth.cognito.client import CognitoConfigurationError
 from bloom_lims.anomalies import TapdbAnomalyRepository
-from bloom_lims.bobjs import BloomFile, BloomFileReference, BloomFileSet, BloomObj
+from bloom_lims.domain import BloomFile, BloomFileReference, BloomFileSet, BloomObj
 from bloom_lims.bvars import BloomVars
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 from bloom_lims.core.action_execution import (
     ActionExecutionError,
     execute_action_for_instance,
@@ -65,6 +65,13 @@ router = APIRouter()
 
 BVARS = BloomVars()
 BASE_DIR = Path("./served_data").resolve()
+
+
+def _required_dewey_s3_bucket_prefix() -> str:
+    bucket_prefix = os.environ.get("BLOOM_DEWEY_S3_BUCKET_PREFIX")
+    if not bucket_prefix:
+        raise RuntimeError("BLOOM_DEWEY_S3_BUCKET_PREFIX is required")
+    return bucket_prefix
 
 
 class FormField(BaseModel):
@@ -656,14 +663,6 @@ async def execute_ui_action(request: Request, _auth=Depends(require_auth)):
         ) from exc
 
 
-@router.get("/workflows")
-async def workflows_redirect():
-    raise HTTPException(
-        status_code=410,
-        detail="Workflow pages are retired in queue-centric Bloom beta.",
-    )
-
-
 @router.get("/equipment")
 async def equipment_redirect():
     return RedirectResponse(url="/equipment_overview", status_code=307)
@@ -1086,43 +1085,6 @@ def delete_by_euid(request: Request, euid, _auth=Depends(require_auth)):
     return RedirectResponse(url=referer, status_code=303)
 
 
-@router.post("/delete_object")
-async def delete_object(request: Request, _auth=Depends(require_auth)):
-    logging.warning(
-        "Deprecated endpoint /delete_object used; prefer DELETE /api/object/{euid}"
-    )
-    data = await request.json()
-    euid = data.get("euid")
-    bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
-    try:
-        obj = bobdb.get_by_euid(euid)
-        bobdb.delete_obj(obj)
-        bobdb.session.flush()
-        bobdb.session.commit()
-        return {
-            "status": "success",
-            "message": f"Delete object performed for EUID {euid}",
-            "deprecated": True,
-        }
-    except Exception as e:
-        try:
-            bobdb_deleted = BloomObj(
-                BLOOMdb3(app_username=request.session["user_data"]["email"]),
-                is_deleted=True,
-            )
-            obj = bobdb_deleted.get_by_euid(euid)
-            if obj and obj.is_deleted:
-                return {
-                    "status": "success",
-                    "message": f"Object {euid} was already soft-deleted",
-                    "deprecated": True,
-                }
-        except Exception:
-            pass
-        logging.error("Error deleting object %s: %s", euid, e)
-        raise HTTPException(status_code=404, detail=f"Object not found: {euid}")
-
-
 @router.get("/user_audit_logs", response_class=HTMLResponse)
 async def user_audit_logs(request: Request, username: str, _auth=Depends(require_auth)):
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
@@ -1224,10 +1186,7 @@ async def user_home(request: Request):
         "css_files": css_files,
         "dest_section": dest_section,
         "whitelisted_domains": " , ".join(get_allowed_domains()) or "all",
-        "s3_bucket_prefix": os.environ.get(
-            "BLOOM_DEWEY_S3_BUCKET_PREFIX", "NEEDS TO BE SET!"
-        )
-        + "0",
+        "s3_bucket_prefix": _required_dewey_s3_bucket_prefix() + "0",
         "cognito_details": cognito_details,
         "printer_info": printer_info,
         "bloom_version": bloom_version,

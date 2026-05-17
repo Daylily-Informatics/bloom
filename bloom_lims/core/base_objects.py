@@ -4,23 +4,18 @@ BLOOM LIMS Base Objects Module
 This module contains the BloomObj base class and common utility functions
 for working with BLOOM LIMS objects.
 
-For backward compatibility, this module re-exports functionality that was
-originally in bloom_lims/bobjs.py.
+This module contains core mixins and helpers for Bloom object operations.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Type, Union
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session
 
 from bloom_lims.exceptions import (
-    NotFoundError,
-    ValidationError,
     DatabaseError,
+    ValidationError,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,60 +23,64 @@ logger = logging.getLogger(__name__)
 class BloomObjMixin:
     """
     Mixin class providing common functionality for BLOOM objects.
-    
+
     This mixin can be used to add standard BLOOM object methods to
     any SQLAlchemy model class.
     """
-    
+
     @property
     def is_template(self) -> bool:
         """Check if this object is a template."""
-        return hasattr(self, 'polymorphic_discriminator') and \
-               self.polymorphic_discriminator and \
-               '_template' in self.polymorphic_discriminator
-    
+        return (
+            hasattr(self, "polymorphic_discriminator")
+            and self.polymorphic_discriminator
+            and "_template" in self.polymorphic_discriminator
+        )
+
     @property
     def is_instance(self) -> bool:
         """Check if this object is an instance."""
-        return hasattr(self, 'polymorphic_discriminator') and \
-               self.polymorphic_discriminator and \
-               '_instance' in self.polymorphic_discriminator
-    
+        return (
+            hasattr(self, "polymorphic_discriminator")
+            and self.polymorphic_discriminator
+            and "_instance" in self.polymorphic_discriminator
+        )
+
     def get_json_addl_value(self, key: str, default: Any = None) -> Any:
         """
         Safely get a value from json_addl.
-        
+
         Args:
             key: The key to look up
             default: Default value if key not found
-            
+
         Returns:
             The value or default
         """
-        if hasattr(self, 'json_addl') and self.json_addl:
+        if hasattr(self, "json_addl") and self.json_addl:
             return self.json_addl.get(key, default)
         return default
-    
+
     def set_json_addl_value(self, key: str, value: Any) -> None:
         """
         Set a value in json_addl.
-        
+
         Args:
             key: The key to set
             value: The value to set
         """
-        if not hasattr(self, 'json_addl') or self.json_addl is None:
+        if not hasattr(self, "json_addl") or self.json_addl is None:
             self.json_addl = {}
         self.json_addl[key] = value
-    
+
     def merge_json_addl(self, data: Dict[str, Any]) -> None:
         """
         Merge data into json_addl recursively.
-        
+
         Args:
             data: Dictionary to merge into json_addl
         """
-        if not hasattr(self, 'json_addl') or self.json_addl is None:
+        if not hasattr(self, "json_addl") or self.json_addl is None:
             self.json_addl = {}
         _update_recursive(self.json_addl, data)
 
@@ -89,7 +88,7 @@ class BloomObjMixin:
 def _update_recursive(orig_dict: Dict, update_with: Dict) -> None:
     """
     Recursively update a dictionary.
-    
+
     Args:
         orig_dict: Original dictionary to update
         update_with: Dictionary with updates
@@ -155,7 +154,7 @@ def create_bloom_obj(
         session.add(obj)
         session.flush()
         return obj
-    except AttributeError as e:
+    except AttributeError:
         raise ValidationError(f"Invalid object class: {obj_class}", field="obj_class")
     except Exception as e:
         logger.error(f"Error creating {obj_class}: {e}")
@@ -195,9 +194,7 @@ def get_bloom_obj_by_euid(
         )
 
         if not include_deleted:
-            query = query.filter(
-                base.classes.generic_instance.is_deleted == False
-            )
+            query = query.filter(base.classes.generic_instance.is_deleted.is_(False))
 
         return query.first()
     except Exception as e:
@@ -242,7 +239,9 @@ def query_objects(
             query = query.filter(base.classes.generic_instance.type == type.lower())
 
         if subtype:
-            query = query.filter(base.classes.generic_instance.subtype == subtype.lower())
+            query = query.filter(
+                base.classes.generic_instance.subtype == subtype.lower()
+            )
 
         if category:
             query = query.filter(base.classes.generic_instance.category == category)
@@ -251,20 +250,9 @@ def query_objects(
             query = query.filter(base.classes.generic_instance.bstatus == status)
 
         if not include_deleted:
-            query = query.filter(base.classes.generic_instance.is_deleted == False)
+            query = query.filter(base.classes.generic_instance.is_deleted.is_(False))
 
         return query.limit(limit).offset(offset).all()
     except Exception as e:
         logger.error(f"Error querying objects: {e}")
         return []
-
-
-# Re-export BloomObj for backward compatibility
-# The actual BloomObj class is still in bobjs.py for now
-# This reference will be updated when full migration is complete
-try:
-    from bloom_lims.bobjs import BloomObj
-except ImportError:
-    # During initial import, bobjs may not be available yet
-    BloomObj = None
-

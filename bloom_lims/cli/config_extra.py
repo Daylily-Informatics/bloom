@@ -24,12 +24,12 @@ from bloom_lims.config import (
     get_user_config_path,
     validate_settings,
 )
-from bloom_lims.db import BLOOMdb3
 from bloom_lims.domain.base import BloomObj
 from bloom_lims.schema_drift import (
     run_schema_drift_check,
     write_schema_drift_report,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 console = Console()
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

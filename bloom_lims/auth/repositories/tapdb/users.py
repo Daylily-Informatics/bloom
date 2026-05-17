@@ -59,18 +59,7 @@ def _normalize_stored_role(
         candidate = str(value or "").strip()
         if not candidate:
             return None
-        legacy = {
-            "admin": Role.ADMIN.value,
-            "user": Role.READ_WRITE.value,
-            "readonly": Role.READ_ONLY.value,
-            "read_only": Role.READ_ONLY.value,
-            "readwrite": Role.READ_WRITE.value,
-            "read_write": Role.READ_WRITE.value,
-        }
-        mapped = legacy.get(candidate.lower())
-        if mapped is not None:
-            return mapped
-        values = normalize_roles([candidate], fallback=None)
+        values = normalize_roles([candidate])
         return values[0] if values else None
 
     normalized = _coerce(role_value)

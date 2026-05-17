@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
-from bloom_lims.db import BLOOMdb3
 from bloom_lims.search.contracts import (
     ALL_RECORD_TYPES,
     SearchJSONFilter,
@@ -16,7 +15,7 @@ from bloom_lims.search.contracts import (
     SearchResultItem,
 )
 from bloom_lims.search.repository import SearchRepository
-
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,9 @@ class SearchService:
         finally:
             bdb.close()
 
-        sorted_items = self._sort_items(items, normalized.sort_by, normalized.sort_order)
+        sorted_items = self._sort_items(
+            items, normalized.sort_by, normalized.sort_order
+        )
         total = len(sorted_items)
         offset = (normalized.page - 1) * normalized.page_size
         paged_items = sorted_items[offset : offset + normalized.page_size]
@@ -70,7 +71,9 @@ class SearchService:
             items=paged_items,
         )
 
-    def build_dewey_request(self, form_data: Dict[str, Any], target: str) -> SearchRequest:
+    def build_dewey_request(
+        self, form_data: Dict[str, Any], target: str
+    ) -> SearchRequest:
         """Convert Dewey metadata form payload into SearchRequest."""
         target_clean = (target or "file").strip().lower()
         type_name = "file_set" if target_clean == "file_set" else "file"
@@ -109,7 +112,9 @@ class SearchService:
                     SearchJSONFilter(path=f"properties.{key}", op="in", values=values)
                 )
 
-        record_start = self._parse_date_or_datetime(form_data.get("record_datetime_start"))
+        record_start = self._parse_date_or_datetime(
+            form_data.get("record_datetime_start")
+        )
         record_end = self._parse_date_or_datetime(form_data.get("record_datetime_end"))
         if record_start or record_end:
             json_filters.append(
@@ -121,8 +126,12 @@ class SearchService:
                 )
             )
 
-        created_start = self._parse_date_or_datetime(form_data.get("created_datetime_start"))
-        created_end = self._parse_date_or_datetime(form_data.get("created_datetime_end"))
+        created_start = self._parse_date_or_datetime(
+            form_data.get("created_datetime_start")
+        )
+        created_end = self._parse_date_or_datetime(
+            form_data.get("created_datetime_end")
+        )
 
         return SearchRequest(
             query=" ".join(text_query_parts).strip(),
@@ -150,9 +159,15 @@ class SearchService:
         if not record_types:
             payload["record_types"] = list(ALL_RECORD_TYPES)
 
-        payload["categories"] = [value.lower() for value in payload.get("categories", [])]
-        payload["type_names"] = [value.lower() for value in payload.get("type_names", [])]
-        payload["subtype_names"] = [value.lower() for value in payload.get("subtype_names", [])]
+        payload["categories"] = [
+            value.lower() for value in payload.get("categories", [])
+        ]
+        payload["type_names"] = [
+            value.lower() for value in payload.get("type_names", [])
+        ]
+        payload["subtype_names"] = [
+            value.lower() for value in payload.get("subtype_names", [])
+        ]
         payload["statuses"] = [value.lower() for value in payload.get("statuses", [])]
 
         created_start = payload.get("created_dt_start")
@@ -163,17 +178,27 @@ class SearchService:
 
         return SearchRequest.model_validate(payload)
 
-    def _sort_items(self, items: Iterable[SearchResultItem], sort_by: str, sort_order: str) -> List[SearchResultItem]:
+    def _sort_items(
+        self, items: Iterable[SearchResultItem], sort_by: str, sort_order: str
+    ) -> List[SearchResultItem]:
         reverse = sort_order == "desc"
 
         if sort_by == "euid":
-            key_fn = lambda item: (item.euid or "")
+
+            def key_fn(item: SearchResultItem) -> str:
+                return item.euid or ""
         elif sort_by == "name":
-            key_fn = lambda item: (item.name or "")
+
+            def key_fn(item: SearchResultItem) -> str:
+                return item.name or ""
         elif sort_by == "record_type":
-            key_fn = lambda item: (item.record_type, item.timestamp or datetime.min)
+
+            def key_fn(item: SearchResultItem) -> tuple[str, datetime]:
+                return item.record_type, item.timestamp or datetime.min
         else:
-            key_fn = lambda item: (item.timestamp or datetime.min, item.euid or "")
+
+            def key_fn(item: SearchResultItem) -> tuple[datetime, str]:
+                return item.timestamp or datetime.min, item.euid or ""
 
         return sorted(items, key=key_fn, reverse=reverse)
 
@@ -186,9 +211,13 @@ class SearchService:
         else:
             value_str = str(raw_value).strip()
             if "\n" in value_str:
-                values = [token.strip() for token in value_str.splitlines() if token.strip()]
+                values = [
+                    token.strip() for token in value_str.splitlines() if token.strip()
+                ]
             elif "," in value_str:
-                values = [token.strip() for token in value_str.split(",") if token.strip()]
+                values = [
+                    token.strip() for token in value_str.split(",") if token.strip()
+                ]
             else:
                 values = [value_str] if value_str else []
 

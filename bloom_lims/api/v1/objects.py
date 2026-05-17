@@ -38,8 +38,8 @@ async def list_objects(
     Returns paginated list of BloomObj instances.
     """
     try:
-        from bloom_lims.bobjs import BloomObj
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain import BloomObj
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3()
         BloomObj(bdb)
@@ -98,8 +98,8 @@ async def get_object(euid: str, user: APIUser = Depends(require_read)):
     Get a single object by EUID.
     """
     try:
-        from bloom_lims.bobjs import BloomObj
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain import BloomObj
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3()
         bo = BloomObj(bdb)
@@ -137,8 +137,8 @@ async def create_object(
     Create a new object.
     """
     try:
-        from bloom_lims.bobjs import BloomObj
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain import BloomObj
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)
@@ -212,8 +212,8 @@ async def update_object(
     try:
         from sqlalchemy.orm.attributes import flag_modified
 
-        from bloom_lims.bobjs import BloomObj
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain import BloomObj
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)
@@ -293,8 +293,8 @@ async def delete_object(
                 status_code=403, detail="Admin privileges required for hard delete"
             )
 
-        from bloom_lims.bobjs import BloomObj
-        from bloom_lims.db import BLOOMdb3
+        from bloom_lims.domain import BloomObj
+        from bloom_lims.tapdb_adapter import BLOOMdb3
 
         bdb = BLOOMdb3(app_username=user.email)
         bo = BloomObj(bdb)

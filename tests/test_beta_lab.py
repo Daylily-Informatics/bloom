@@ -18,8 +18,8 @@ from bloom_lims.api.v1.dependencies import (
     require_external_ursa_api_enabled,
 )
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import get_parent_lineages
+from bloom_lims.domain import BloomObj
+from bloom_lims.tapdb_adapter import get_parent_lineages
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

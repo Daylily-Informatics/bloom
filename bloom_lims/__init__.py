@@ -17,39 +17,21 @@ Main modules:
 from bloom_lims._version import __version__, get_version
 
 # Core imports for convenience
-from bloom_lims.config import get_settings, BloomSettings
-
-# Import exceptions - handle both old and new exception modules
-try:
-    from bloom_lims.exceptions import (
-        BloomError,
-        ValidationError,
-        NotFoundError,
-        AuthenticationError,
-        AuthorizationError,
-        DatabaseError,
-        WorkflowError,
-    )
-except ImportError:
-    # Fall back to core exceptions if old module doesn't exist
-    from bloom_lims.core.exceptions import (
-        BloomError,
-        BloomValidationError as ValidationError,
-        BloomNotFoundError as NotFoundError,
-        BloomPermissionError as AuthenticationError,
-        BloomPermissionError as AuthorizationError,
-        BloomDatabaseError as DatabaseError,
-        BloomWorkflowError as WorkflowError,
-    )
-
-# Alias for backward compatibility
-Settings = BloomSettings
+from bloom_lims.config import BloomSettings, get_settings
+from bloom_lims.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    BloomError,
+    DatabaseError,
+    NotFoundError,
+    ValidationError,
+    WorkflowError,
+)
 
 __all__ = [
     "__version__",
     "get_version",
     "get_settings",
-    "Settings",
     "BloomSettings",
     "BloomError",
     "ValidationError",

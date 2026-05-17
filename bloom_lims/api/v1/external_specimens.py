@@ -7,8 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_atlas_api_enabled
-from bloom_lims.bobjs import BloomObj
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.domain import BloomObj
 from bloom_lims.domain.external_specimens import ExternalSpecimenService
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas.external_specimens import (
@@ -18,6 +17,7 @@ from bloom_lims.schemas.external_specimens import (
     ExternalSpecimenResponse,
     ExternalSpecimenUpdateRequest,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 logger = logging.getLogger(__name__)
 

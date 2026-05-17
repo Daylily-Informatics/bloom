@@ -1,18 +1,14 @@
-import sys
 import os
-import pytest
+from io import BytesIO
+from pathlib import Path
+
 import boto3
+import pytest
 import requests_mock
 from moto import mock_aws
-from pathlib import Path
-from sqlalchemy.orm import sessionmaker
 
-from bloom_lims.db import BLOOMdb3
-from bloom_lims.bobjs import BloomWorkflow, BloomFile
-
-from io import BytesIO
-
-import re
+from bloom_lims.domain import BloomFile
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 @pytest.fixture
@@ -24,26 +20,34 @@ def s3_bucket(monkeypatch):
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
     with mock_aws():
-        s3 = boto3.client('s3', region_name='us-east-1')
-        bucket_name = 'daylily-dewey-0'
+        s3 = boto3.client("s3", region_name="us-east-1")
+        bucket_name = "daylily-dewey-0"
         s3.create_bucket(Bucket=bucket_name)
         yield bucket_name
 
+
 @pytest.fixture
 def db_session():
-    bdb=BLOOMdb3()    
+    bdb = BLOOMdb3()
     yield bdb
+
 
 @pytest.fixture
 def bloom_file_instance(db_session, s3_bucket):
     return BloomFile(db_session, bucket_prefix="daylily-dewey-")
 
+
 def test_create_file_no_data(bloom_file_instance):
-    new_file = bloom_file_instance.create_file(file_metadata={"description": "No data test", "import_or_remote": "import"})
+    new_file = bloom_file_instance.create_file(
+        file_metadata={"description": "No data test", "import_or_remote": "import"}
+    )
     assert new_file is not None
-    assert new_file.json_addl['properties']['description'] == "No data test"
-    assert new_file.json_addl['properties']['current_s3_bucket_name'] == "daylily-dewey-0"
-    
+    assert new_file.json_addl["properties"]["description"] == "No data test"
+    assert (
+        new_file.json_addl["properties"]["current_s3_bucket_name"] == "daylily-dewey-0"
+    )
+
+
 def test_create_file_with_data(bloom_file_instance):
     data_path = Path("tests/test_pdf.pdf")
     with open(data_path, "rb") as f:
@@ -53,30 +57,46 @@ def test_create_file_with_data(bloom_file_instance):
     new_file = bloom_file_instance.create_file(
         file_metadata={"description": "Data test", "import_or_remote": "import"},
         file_data=file_data,
-        file_name=file_name
+        file_name=file_name,
     )
 
     assert new_file is not None
-    assert new_file.json_addl['properties']['description'] == "Data test"
-    assert new_file.json_addl['properties']['original_file_size_bytes'] == file_data.getbuffer().nbytes
+    assert new_file.json_addl["properties"]["description"] == "Data test"
+    assert (
+        new_file.json_addl["properties"]["original_file_size_bytes"]
+        == file_data.getbuffer().nbytes
+    )
+
 
 def test_create_file_with_local_path(bloom_file_instance):
     fn = "tests/test_png.png"
-    data_path = Path(fn)
-    new_file = bloom_file_instance.create_file(file_metadata={"description": "Local path test", "import_or_remote": "import"}, full_path_to_file=fn)
+    new_file = bloom_file_instance.create_file(
+        file_metadata={"description": "Local path test", "import_or_remote": "import"},
+        full_path_to_file=fn,
+    )
     assert new_file is not None
-    assert new_file.json_addl['properties']['description'] == "Local path test"
-    assert new_file.json_addl['properties']['original_file_size_bytes'] == os.path.getsize(fn)
+    assert new_file.json_addl["properties"]["description"] == "Local path test"
+    assert new_file.json_addl["properties"][
+        "original_file_size_bytes"
+    ] == os.path.getsize(fn)
 
 
 def test_create_file_with_url(bloom_file_instance):
-    url = "https://github.com/Daylily-Informatics/bloom/blob/20240603b/tests/test_png.png"
+    url = (
+        "https://github.com/Daylily-Informatics/bloom/blob/20240603b/tests/test_png.png"
+    )
     with requests_mock.Mocker() as m:
         m.get(url, content=b"test content")
-        new_file = bloom_file_instance.create_file(file_metadata={"description": "URL test", "import_or_remote": "import"}, url=url)
+        new_file = bloom_file_instance.create_file(
+            file_metadata={"description": "URL test", "import_or_remote": "import"},
+            url=url,
+        )
         assert new_file is not None
-        assert new_file.json_addl['properties']['description'] == "URL test"
-        assert new_file.json_addl['properties']['original_file_size_bytes'] == len(b"test content")
+        assert new_file.json_addl["properties"]["description"] == "URL test"
+        assert new_file.json_addl["properties"]["original_file_size_bytes"] == len(
+            b"test content"
+        )
+
 
 if __name__ == "__main__":
     pytest.main()

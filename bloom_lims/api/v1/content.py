@@ -5,23 +5,19 @@ CRUD endpoints for content management (samples, specimens, reagents, etc.).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from bloom_lims.integrations.atlas.events import emit_bloom_event
 from bloom_lims.schemas import (
+    ContentUpdateSchema,
+    ReagentCreateSchema,
     SampleCreateSchema,
     SpecimenCreateSchema,
-    ReagentCreateSchema,
-    ContentUpdateSchema,
-    ContentResponseSchema,
-    PaginatedResponse,
-    SuccessResponse,
 )
-from bloom_lims.exceptions import NotFoundError, ValidationError
-from .dependencies import APIUser, require_read, require_write
 
+from .dependencies import APIUser, require_read, require_write
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +26,8 @@ router = APIRouter(prefix="/content", tags=["Content"])
 
 def get_bdb(username: str = "api-user"):
     """Get database connection."""
-    from bloom_lims.db import BLOOMdb3
+    from bloom_lims.tapdb_adapter import BLOOMdb3
+
     return BLOOMdb3(app_username=username)
 
 
@@ -53,7 +50,9 @@ def _specimen_content_event_payload(content, extra: dict | None = None) -> dict:
 
 @router.get("/", response_model=Dict[str, Any])
 async def list_content(
-    content_type: Optional[str] = Query(None, description="Filter by type (sample, specimen, reagent)"),
+    content_type: Optional[str] = Query(
+        None, description="Filter by type (sample, specimen, reagent)"
+    ),
     subtype: Optional[str] = Query(None, description="Filter by subtype"),
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
@@ -68,18 +67,22 @@ async def list_content(
         query = query.filter(bdb.Base.classes.generic_instance.category == "content")
 
         if content_type:
-            query = query.filter(bdb.Base.classes.generic_instance.type == content_type.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_instance.type == content_type.lower()
+            )
         if subtype:
-            query = query.filter(bdb.Base.classes.generic_instance.subtype == subtype.lower())
+            query = query.filter(
+                bdb.Base.classes.generic_instance.subtype == subtype.lower()
+            )
         if status:
             query = query.filter(bdb.Base.classes.generic_instance.bstatus == status)
-        
-        query = query.filter(bdb.Base.classes.generic_instance.is_deleted == False)
-        
+
+        query = query.filter(bdb.Base.classes.generic_instance.is_deleted.is_(False))
+
         total = query.count()
         offset = (page - 1) * page_size
         items = query.limit(page_size).offset(offset).all()
-        
+
         return {
             "items": [
                 {
@@ -105,14 +108,14 @@ async def get_content(euid: str, user: APIUser = Depends(require_read)):
     """Get content by EUID."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContent
-        
+        from bloom_lims.domain import BloomContent
+
         bc = BloomContent(bdb)
         content = bc.get_by_euid(euid)
-        
+
         if not content:
             raise HTTPException(status_code=404, detail=f"Content not found: {euid}")
-        
+
         return {
             "euid": content.euid,
             "name": content.name,
@@ -133,11 +136,13 @@ async def get_content(euid: str, user: APIUser = Depends(require_read)):
 
 
 @router.post("/samples", response_model=Dict[str, Any])
-async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(require_write)):
+async def create_sample(
+    data: SampleCreateSchema, user: APIUser = Depends(require_write)
+):
     """Create a new sample."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContent
+        from bloom_lims.domain import BloomContent
 
         bc = BloomContent(bdb)
         bc.set_actor_context(user_id=user.user_id, email=user.email)
@@ -167,11 +172,13 @@ async def create_sample(data: SampleCreateSchema, user: APIUser = Depends(requir
 
 
 @router.post("/specimens", response_model=Dict[str, Any])
-async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(require_write)):
+async def create_specimen(
+    data: SpecimenCreateSchema, user: APIUser = Depends(require_write)
+):
     """Create a new specimen."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContent
+        from bloom_lims.domain import BloomContent
 
         bc = BloomContent(bdb)
         bc.set_actor_context(user_id=user.user_id, email=user.email)
@@ -201,11 +208,13 @@ async def create_specimen(data: SpecimenCreateSchema, user: APIUser = Depends(re
 
 
 @router.post("/reagents", response_model=Dict[str, Any])
-async def create_reagent(data: ReagentCreateSchema, user: APIUser = Depends(require_write)):
+async def create_reagent(
+    data: ReagentCreateSchema, user: APIUser = Depends(require_write)
+):
     """Create a new reagent."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContent
+        from bloom_lims.domain import BloomContent
 
         bc = BloomContent(bdb)
         bc.set_actor_context(user_id=user.user_id, email=user.email)
@@ -243,8 +252,9 @@ async def update_content(
     """Update content."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContent
         from sqlalchemy.orm.attributes import flag_modified
+
+        from bloom_lims.domain import BloomContent
 
         bc = BloomContent(bdb)
         bc.set_actor_context(user_id=user.user_id, email=user.email)
@@ -276,7 +286,9 @@ async def update_content(
             email=user.email,
         )
         if content.type == "specimen":
-            emit_bloom_event("specimen.updated", _specimen_content_event_payload(content))
+            emit_bloom_event(
+                "specimen.updated", _specimen_content_event_payload(content)
+            )
             if prev_status != content.bstatus:
                 emit_bloom_event(
                     "specimen.status_changed",
@@ -310,7 +322,7 @@ async def delete_content(
     """Delete content (soft delete by default)."""
     try:
         bdb = get_bdb(user.email)
-        from bloom_lims.bobjs import BloomContent
+        from bloom_lims.domain import BloomContent
 
         bc = BloomContent(bdb)
         content = bc.get_by_euid(euid)

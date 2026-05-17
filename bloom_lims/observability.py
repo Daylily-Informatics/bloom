@@ -656,7 +656,7 @@ def build_auth_health_payload(
 
 
 def _is_service_principal(user: APIUser) -> bool:
-    return user.auth_source in {"legacy_api_key"}
+    return user.auth_source in {"token"}
 
 
 def build_my_health_payload(request: Request, user: APIUser) -> dict[str, Any]:

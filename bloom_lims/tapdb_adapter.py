@@ -2,7 +2,7 @@
 BLOOM ↔ TapDB Adapter Module.
 
 This adapter delegates connection resolution and runtime behavior to
-daylily-tapdb while exposing BLOOM-compatible ORM class wiring.
+daylily-tapdb while exposing BLOOM ORM class wiring.
 """
 
 from __future__ import annotations
@@ -228,7 +228,7 @@ Base = SimpleNamespace(classes=_COMPAT_BASE_CLASSES, metadata=TapDBBase.metadata
 
 
 class _TransactionContext:
-    """Compatibility transaction context manager."""
+    """Transaction context manager."""
 
     def __init__(self, session: Session):
         self.session = session
@@ -257,7 +257,7 @@ class BLOOMdb3:
     def __init__(
         self,
         app_username: str = "bloomdborm",
-        echo_sql: Optional[bool] = None,
+        echo_sql: Optional[bool] = False,
         pool_size: int = 5,
         max_overflow: int = 10,
         pool_timeout: int = 30,
@@ -290,12 +290,12 @@ class BLOOMdb3:
             db_name=cfg["database"],
             schema_name=cfg["schema_name"],
             app_username=app_username,
-            echo_sql=echo_sql,
+            echo_sql=bool(echo_sql),
             pool_size=pool_size,
             max_overflow=max_overflow,
             pool_timeout=pool_timeout,
             pool_recycle=pool_recycle,
-            engine_type="aurora" if engine_type == "aurora" else None,
+            engine_type="aurora" if engine_type == "aurora" else "local",
             region=region,
             iam_auth=iam_auth,
             domain_code=self.domain_code,
