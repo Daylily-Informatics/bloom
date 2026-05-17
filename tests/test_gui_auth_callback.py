@@ -33,7 +33,10 @@ import main  # noqa: E402
 from auth.cognito.client import CognitoConfigurationError  # noqa: E402
 from bloom_lims.config import BloomSettings  # noqa: E402
 from bloom_lims.gui.routes.auth import SessionBootstrapError  # noqa: E402
-from bloom_lims.gui.web_session import _normalize_user_data  # noqa: E402
+from bloom_lims.gui.web_session import (  # noqa: E402
+    _normalize_user_data,
+    build_bloom_web_session_config,
+)
 
 
 def _fake_cognito_config() -> SimpleNamespace:
@@ -165,6 +168,18 @@ def _external_broker_settings() -> BloomSettings:
             },
         }
     )
+
+
+def test_external_broker_session_config_uses_service_local_logout_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _external_broker_settings()
+    monkeypatch.setattr("bloom_lims.gui.web_session.get_settings", lambda: settings)
+
+    session_config = build_bloom_web_session_config()
+
+    assert session_config.public_base_url == "https://localhost:8912"
+    assert session_config.logout_uri == "https://localhost:8912/auth/logout"
 
 
 def test_external_broker_login_and_callback_create_session(

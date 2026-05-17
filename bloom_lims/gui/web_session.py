@@ -47,7 +47,7 @@ def build_bloom_web_session_config(
             ),
             client_id=broker.service_id,
             redirect_uri=broker.callback_url,
-            logout_uri=broker.logout_url,
+            logout_uri=f"{public_base_url}/auth/logout",
             public_base_url=public_base_url,
             session_secret_key=_session_secret(auth_settings),
             session_cookie_name="bloom_session",
