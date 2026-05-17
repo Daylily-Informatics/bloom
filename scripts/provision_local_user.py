@@ -13,7 +13,7 @@ from bloom_lims.auth.repositories.tapdb.users import (
     set_user_role,
 )
 from bloom_lims.auth.services.groups import GroupService
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 def main() -> int:
@@ -21,14 +21,20 @@ def main() -> int:
     parser.add_argument("--username", required=True)
     parser.add_argument("--email", default="")
     parser.add_argument("--name", required=True)
-    parser.add_argument("--role", default="admin")
+    parser.add_argument(
+        "--role",
+        required=True,
+        choices=["READ_ONLY", "READ_WRITE", "ADMIN"],
+    )
     parser.add_argument("--group", action="append", default=[])
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
     username = str(args.username).strip().lower()
     email = str(args.email or args.username).strip().lower()
-    role = normalize_persisted_role(args.role, default="ADMIN") or "ADMIN"
+    role = normalize_persisted_role(args.role, default=None)
+    if role is None:
+        raise RuntimeError("--role must be READ_ONLY, READ_WRITE, or ADMIN")
     groups = [str(group).strip().upper() for group in args.group if str(group).strip()]
 
     bdb = BLOOMdb3(app_username="local-provision")

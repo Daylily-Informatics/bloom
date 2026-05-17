@@ -18,7 +18,7 @@ from bloom_lims.auth.repositories.tapdb.users import (
     set_user_role,
 )
 from bloom_lims.auth.services.groups import GroupService
-from bloom_lims.db import BLOOMdb3
+from bloom_lims.tapdb_adapter import BLOOMdb3
 
 LEGACY_ROLE_GROUP_PRIORITY = (
     (BLOOM_ADMIN_GROUP.upper(), Role.ADMIN.value),

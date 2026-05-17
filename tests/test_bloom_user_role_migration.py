@@ -32,7 +32,7 @@ def test_infer_role_from_groups_prefers_admin_over_other_groups():
     assert MIGRATION._infer_role_from_groups(["bloom-readonly"]) == "READ_ONLY"
 
 
-def test_migrate_roles_uppercases_and_infers_missing_roles(monkeypatch):
+def test_migrate_roles_accepts_canonical_roles_and_infers_missing_roles(monkeypatch):
     calls: list[tuple[str, str]] = []
 
     class FakeSession:
@@ -51,7 +51,7 @@ def test_migrate_roles_uppercases_and_infers_missing_roles(monkeypatch):
 
     users = [
         SimpleNamespace(
-            uid=1, username="one@example.com", email="one@example.com", role="admin"
+            uid=1, username="one@example.com", email="one@example.com", role="ADMIN"
         ),
         SimpleNamespace(
             uid=2, username="two@example.com", email="two@example.com", role=""
@@ -96,9 +96,8 @@ def test_migrate_roles_uppercases_and_infers_missing_roles(monkeypatch):
 
     result = MIGRATION.migrate_roles(dry_run=False)
 
-    assert result["count"] == 3
+    assert result["count"] == 2
     assert result["removed_count"] == 2
-    assert ("one@example.com", "ADMIN") in calls
     assert ("two@example.com", "READ_WRITE") in calls
     assert ("three@example.com", "ADMIN") in calls
     assert ("remove:2", "bloom-readwrite") in calls
