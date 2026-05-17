@@ -87,7 +87,7 @@ def test_main_persists_canonical_role_with_uid(monkeypatch, capsys):
             "--name",
             "dayhoff@lsmc.bio",
             "--role",
-            "admin",
+            "ADMIN",
             "--group",
             "ENABLE_ATLAS_API",
             "--json",
