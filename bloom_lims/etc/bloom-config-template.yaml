@@ -125,6 +125,7 @@ auth:
     handoff_exchange_url: ""
     callback_url: ""
     logout_url: ""
+    ca_bundle: ""
 
   # JWT settings
   jwt_secret: ""                # REQUIRED for production

@@ -737,6 +737,7 @@ class ExternalBrokerSettings(BaseModel):
     )
     callback_url: str = Field(default="", description="Bloom broker callback URL")
     logout_url: str = Field(default="", description="External broker logout URL")
+    ca_bundle: str = Field(default="", description="CA bundle for broker HTTPS")
 
     @field_validator("service_id")
     @classmethod
@@ -830,6 +831,7 @@ class AuthSettings(BaseModel):
             ),
             "callback_url": _read_first_env("LSMC_AUTH_BROKER_CALLBACK_URL"),
             "logout_url": _read_first_env("LSMC_AUTH_BROKER_LOGOUT_URL"),
+            "ca_bundle": _read_first_env("LSMC_AUTH_BROKER_CA_BUNDLE"),
         }
         current = self.external_broker.model_dump()
         updated = {
@@ -838,16 +840,26 @@ class AuthSettings(BaseModel):
         }
         self.external_broker = ExternalBrokerSettings.model_validate(updated)
         if self.mode == "external_broker":
+            required = {
+                "service_id",
+                "login_url",
+                "handoff_exchange_url",
+                "callback_url",
+                "logout_url",
+            }
             missing = [
                 f"auth.external_broker.{key}"
                 for key, value in self.external_broker.model_dump().items()
-                if not str(value or "").strip()
+                if key in required and not str(value or "").strip()
             ]
             if missing:
                 raise ValueError(
                     "external broker auth requires explicit settings: "
                     + ", ".join(missing)
                 )
+            ca_bundle = str(self.external_broker.ca_bundle or "").strip()
+            if ca_bundle and not Path(ca_bundle).is_file():
+                raise ValueError("auth.external_broker.ca_bundle does not exist")
         return self
 
 

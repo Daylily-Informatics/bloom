@@ -128,7 +128,9 @@ def test_nested_env_overrides_template_defaults(monkeypatch):
     assert settings.auth.cognito_redirect_uri == "https://example.test/auth/callback"
 
 
-def test_external_broker_configuration_from_shared_env(monkeypatch):
+def test_external_broker_configuration_from_shared_env(monkeypatch, tmp_path: Path):
+    ca_bundle = tmp_path / "ca-bundle.pem"
+    ca_bundle.write_text("TEST CA\n", encoding="utf-8")
     monkeypatch.setenv("LSMC_AUTH_MODE", "external_broker")
     monkeypatch.setenv("LSMC_AUTH_BROKER_SERVICE_ID", "bloom")
     monkeypatch.setenv(
@@ -145,6 +147,7 @@ def test_external_broker_configuration_from_shared_env(monkeypatch):
     monkeypatch.setenv(
         "LSMC_AUTH_BROKER_LOGOUT_URL", "https://dev.login.lsmc.com/auth/logout"
     )
+    monkeypatch.setenv("LSMC_AUTH_BROKER_CA_BUNDLE", str(ca_bundle))
     get_settings.cache_clear()
 
     settings = BloomSettings()
@@ -154,6 +157,7 @@ def test_external_broker_configuration_from_shared_env(monkeypatch):
     assert settings.auth.external_broker.handoff_exchange_url.endswith(
         "/auth/handoff/consume"
     )
+    assert settings.auth.external_broker.ca_bundle == str(ca_bundle)
 
 
 def test_external_broker_mode_requires_explicit_settings():
