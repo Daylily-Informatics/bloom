@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import typer
+import yaml
 from daylily_tapdb.euid import (
     AUDIT_LOG_PREFIX,
     GENERIC_INSTANCE_LINEAGE_PREFIX,
@@ -172,11 +173,41 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
     return result.returncode
 
 
-def _ensure_tapdb_namespace_config(target_label: str) -> None:
-    """Initialize TapDB namespaced config so first-run bootstrap works in clean homes."""
+def _ensure_tapdb_namespace_config(target_label: str, *, target_mode: str = "local") -> None:
+    """Initialize or validate the explicit TapDB config for the requested target."""
     _ = target_label
     ctx = apply_runtime_environment(get_settings())
     _ensure_runtime_config_parent()
+    config_path = Path(str(ctx.config_path)).expanduser().resolve()
+
+    if target_mode == "aurora":
+        if not config_path.is_file():
+            raise RuntimeError(
+                "Bloom Aurora db build requires an explicit pre-existing TapDB config at "
+                f"{config_path}. Dayhoff or `bloom config init` must materialize this file; "
+                "Bloom will not synthesize an Aurora target from local defaults."
+            )
+        root = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        if not isinstance(root, dict):
+            raise RuntimeError(f"Bloom TapDB config must be a YAML mapping: {config_path}")
+        target = root.get("target")
+        if not isinstance(target, dict):
+            raise RuntimeError(f"Bloom TapDB config is missing target mapping: {config_path}")
+        if str(target.get("engine_type") or "").strip().lower() != "aurora":
+            raise RuntimeError(
+                "Bloom Aurora db build requires target.engine_type=aurora in "
+                f"{config_path}"
+            )
+        for key in ("host", "port", "user", "database", "schema_name"):
+            if not str(target.get(key) or "").strip():
+                raise RuntimeError(
+                    f"Bloom Aurora db build requires target.{key} in {config_path}"
+                )
+        if "password" not in target:
+            raise RuntimeError(
+                f"Bloom Aurora db build requires explicit target.password in {config_path}"
+            )
+        return
 
     args = [
         "db-config",
@@ -456,7 +487,7 @@ def db_build(
         f"[cyan]Initializing BLOOM database via tapdb (target={target_mode})...[/cyan]"
     )
     target_label = _current_target_label()
-    _ensure_tapdb_namespace_config(target_label)
+    _ensure_tapdb_namespace_config(target_label, target_mode=target_mode)
 
     if target_mode == "local":
         _ensure_schema_available_for_bloom_root()
@@ -473,13 +504,13 @@ def db_build(
         _seed_tapdb_templates(target_label, overwrite=force)
         return
 
-    _run_tapdb(["db", "create"], check=False)
-
-    setup_args = ["db", "setup"]
     _ensure_schema_available_for_bloom_root()
+    _run_tapdb(["db", "create"], check=False)
+    schema_args = ["db", "schema", "apply"]
     if force:
-        setup_args.extend(["--recreate", "--confirm-target", _confirm_target_label()])
-    _run_tapdb(setup_args)
+        schema_args.append("--reinitialize")
+    _run_tapdb(schema_args)
+    _run_tapdb(["db", "schema", "migrate"])
     _seed_tapdb_templates(target_label, overwrite=force)
 
 

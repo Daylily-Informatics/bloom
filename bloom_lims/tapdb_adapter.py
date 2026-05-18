@@ -285,6 +285,7 @@ class BLOOMdb3:
 
         self._conn = TAPDBConnection(
             db_hostname=f"{host}:{port}",
+            db_hostaddr=cfg.get("hostaddr") or None,
             db_user=cfg["user"],
             db_pass=cfg.get("password") or "",
             db_name=cfg["database"],

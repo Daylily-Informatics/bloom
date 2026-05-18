@@ -287,6 +287,64 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
     ]
 
 
+def test_ensure_tapdb_namespace_config_requires_explicit_aurora_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "missing-tapdb.yaml"
+    monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            config_path=str(config_path),
+            target_label="target",
+        ),
+    )
+    monkeypatch.setattr(db_commands, "get_settings", lambda: object())
+
+    with pytest.raises(RuntimeError, match="requires an explicit pre-existing TapDB config"):
+        db_commands._ensure_tapdb_namespace_config("target", target_mode="aurora")
+
+
+def test_ensure_tapdb_namespace_config_accepts_explicit_aurora_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "tapdb.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "target:",
+                "  engine_type: aurora",
+                "  host: db.example.us-west-2.rds.amazonaws.com",
+                "  hostaddr: 127.0.0.1",
+                "  port: '15432'",
+                "  user: dayhoff",
+                "  password: secret",
+                "  database: tapdb_bloom_prod",
+                "  schema_name: tapdb_bloom_unidbtst_local",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        db_commands,
+        "apply_runtime_environment",
+        lambda _settings: SimpleNamespace(
+            config_path=str(config_path),
+            target_label="target",
+        ),
+    )
+    monkeypatch.setattr(db_commands, "get_settings", lambda: object())
+    monkeypatch.setattr(db_commands, "_run_tapdb", lambda args, check=True: calls.append(args) or 0)
+
+    db_commands._ensure_tapdb_namespace_config("target", target_mode="aurora")
+
+    assert calls == []
+
+
 def test_ensure_tapdb_namespace_config_creates_scoped_parent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -651,7 +709,7 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
     seeded: list[tuple[str, bool]] = []
     monkeypatch.setattr(db_commands, "_current_target_label", lambda: "target")
     monkeypatch.setattr(
-        db_commands, "_ensure_tapdb_namespace_config", lambda _env: None
+        db_commands, "_ensure_tapdb_namespace_config", lambda _env, **_kwargs: None
     )
     monkeypatch.setattr(
         db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
@@ -687,23 +745,16 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
             False,
             [
                 (["db", "create"], False),
-                (["db", "setup"], True),
+                (["db", "schema", "apply"], True),
+                (["db", "schema", "migrate"], True),
             ],
         ),
         (
             True,
             [
                 (["db", "create"], False),
-                (
-                    [
-                        "db",
-                        "setup",
-                        "--recreate",
-                        "--confirm-target",
-                        "bloom/bloom/tapdb_bloom_dev@bloom",
-                    ],
-                    True,
-                ),
+                (["db", "schema", "apply", "--reinitialize"], True),
+                (["db", "schema", "migrate"], True),
             ],
         ),
     ],
@@ -722,7 +773,7 @@ def test_db_build_aurora_skips_local_pg_bootstrap(
         lambda: "bloom/bloom/tapdb_bloom_dev@bloom",
     )
     monkeypatch.setattr(
-        db_commands, "_ensure_tapdb_namespace_config", lambda _env: None
+        db_commands, "_ensure_tapdb_namespace_config", lambda _env, **_kwargs: None
     )
     monkeypatch.setattr(
         db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
