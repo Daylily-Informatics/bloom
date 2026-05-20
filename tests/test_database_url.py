@@ -17,7 +17,10 @@ def test_get_database_url_preserves_local_postgres_target(monkeypatch) -> None:
         },
     )
 
-    assert config.get_database_url() == "postgresql://bloom_user@localhost:5533/tapdb_unidbtst_local"
+    assert (
+        config.get_database_url()
+        == "postgresql://bloom_user@localhost:5533/tapdb_unidbtst_local"
+    )
 
 
 def test_get_database_url_supports_explicit_aurora_hostaddr(monkeypatch) -> None:

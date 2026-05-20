@@ -173,7 +173,9 @@ def _run_tapdb(args: list[str], check: bool = True) -> int:
     return result.returncode
 
 
-def _ensure_tapdb_namespace_config(target_label: str, *, target_mode: str = "local") -> None:
+def _ensure_tapdb_namespace_config(
+    target_label: str, *, target_mode: str = "local"
+) -> None:
     """Initialize or validate the explicit TapDB config for the requested target."""
     _ = target_label
     ctx = apply_runtime_environment(get_settings())
@@ -189,10 +191,14 @@ def _ensure_tapdb_namespace_config(target_label: str, *, target_mode: str = "loc
             )
         root = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         if not isinstance(root, dict):
-            raise RuntimeError(f"Bloom TapDB config must be a YAML mapping: {config_path}")
+            raise RuntimeError(
+                f"Bloom TapDB config must be a YAML mapping: {config_path}"
+            )
         target = root.get("target")
         if not isinstance(target, dict):
-            raise RuntimeError(f"Bloom TapDB config is missing target mapping: {config_path}")
+            raise RuntimeError(
+                f"Bloom TapDB config is missing target mapping: {config_path}"
+            )
         if str(target.get("engine_type") or "").strip().lower() != "aurora":
             raise RuntimeError(
                 "Bloom Aurora db build requires target.engine_type=aurora in "

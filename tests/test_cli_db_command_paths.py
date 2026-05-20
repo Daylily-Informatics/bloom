@@ -302,7 +302,9 @@ def test_ensure_tapdb_namespace_config_requires_explicit_aurora_config(
     )
     monkeypatch.setattr(db_commands, "get_settings", lambda: object())
 
-    with pytest.raises(RuntimeError, match="requires an explicit pre-existing TapDB config"):
+    with pytest.raises(
+        RuntimeError, match="requires an explicit pre-existing TapDB config"
+    ):
         db_commands._ensure_tapdb_namespace_config("target", target_mode="aurora")
 
 
@@ -338,7 +340,9 @@ def test_ensure_tapdb_namespace_config_accepts_explicit_aurora_config(
         ),
     )
     monkeypatch.setattr(db_commands, "get_settings", lambda: object())
-    monkeypatch.setattr(db_commands, "_run_tapdb", lambda args, check=True: calls.append(args) or 0)
+    monkeypatch.setattr(
+        db_commands, "_run_tapdb", lambda args, check=True: calls.append(args) or 0
+    )
 
     db_commands._ensure_tapdb_namespace_config("target", target_mode="aurora")
 
