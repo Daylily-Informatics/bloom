@@ -1126,11 +1126,22 @@ class _BetaLabStagesMixin:
                 return BetaRunResponse(
                     run_euid=existing.euid,
                     pool_euid=self._pool_euid_for_run(existing) or "",
+                    run_subtype=str(
+                        existing_props.get("run_subtype") or existing.subtype or ""
+                    ),
                     flowcell_id=str(existing_props.get("flowcell_id") or ""),
                     run_folder=str(
                         existing_props.get("run_folder") or f"{existing.euid}/"
                     ),
                     status=str(existing_props.get("status") or ""),
+                    operator_start_datetime=existing_props.get(
+                        "operator_start_datetime"
+                    ),
+                    sequencing_end_datetime=existing_props.get(
+                        "sequencing_end_datetime"
+                    ),
+                    instrument_euid=str(existing_props.get("instrument_euid") or "")
+                    or None,
                     artifact_count=self._count_children(existing, "beta_run_artifact"),
                     assignment_count=self._count_children(
                         existing, "beta_sequenced_library_assignment"
@@ -1138,7 +1149,20 @@ class _BetaLabStagesMixin:
                     idempotent_replay=True,
                 )
 
-        normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
+        raw_metadata = dict(payload.metadata or {})
+        if payload.instrument_euid:
+            metadata_instrument_euid = str(
+                raw_metadata.get("instrument_euid") or ""
+            ).strip()
+            if (
+                metadata_instrument_euid
+                and metadata_instrument_euid != payload.instrument_euid.strip()
+            ):
+                raise ValueError(
+                    "instrument_euid conflicts with metadata.instrument_euid"
+                )
+            raw_metadata["instrument_euid"] = payload.instrument_euid.strip()
+        normalized_metadata = self.normalize_execution_metadata(raw_metadata)
         pool = self._require_instance(payload.pool_euid)
         self._assert_not_reserved(pool)
         self._assert_not_consumed(pool, stage_label="start_run")
@@ -1150,16 +1174,26 @@ class _BetaLabStagesMixin:
             stage_label="start_run",
         )
 
+        run_template_code = self.SEQUENCING_RUN_TEMPLATE_BY_SUBTYPE[payload.run_subtype]
         run = self._create_data_record(
             beta_kind="sequencing_run",
             name=payload.run_name or f"{payload.platform.lower()}-run",
             properties={
                 "platform": payload.platform,
+                "run_subtype": payload.run_subtype,
                 "flowcell_id": payload.flowcell_id,
                 "status": payload.status,
+                "operator_start_datetime": payload.operator_start_datetime.isoformat()
+                if payload.operator_start_datetime is not None
+                else None,
+                "sequencing_end_datetime": payload.sequencing_end_datetime.isoformat()
+                if payload.sequencing_end_datetime is not None
+                else None,
+                "instrument_euid": normalized_metadata.get("instrument_euid") or "",
                 "idempotency_key": idempotency_key or "",
                 "metadata": normalized_metadata,
             },
+            template_code=run_template_code,
         )
         run_props = self._props(run)
         run_props["run_folder"] = f"{run.euid}/"
@@ -1324,9 +1358,17 @@ class _BetaLabStagesMixin:
             captured_data={
                 "pool_euid": payload.pool_euid,
                 "platform": payload.platform,
+                "run_subtype": payload.run_subtype,
                 "flowcell_id": payload.flowcell_id,
                 "run_name": payload.run_name,
                 "status": payload.status,
+                "operator_start_datetime": payload.operator_start_datetime.isoformat()
+                if payload.operator_start_datetime is not None
+                else None,
+                "sequencing_end_datetime": payload.sequencing_end_datetime.isoformat()
+                if payload.sequencing_end_datetime is not None
+                else None,
+                "instrument_euid": normalized_metadata.get("instrument_euid") or "",
                 "metadata": normalized_metadata,
                 "claim_euid": payload.claim_euid,
                 "consume_pool": bool(payload.consume_pool),
@@ -1340,6 +1382,7 @@ class _BetaLabStagesMixin:
                 "status": "success",
                 "run_euid": run.euid,
                 "pool_euid": pool.euid,
+                "run_subtype": payload.run_subtype,
                 "assignment_count": len(payload.assignments),
                 "artifact_count": len(payload.artifacts),
             },
@@ -1348,9 +1391,14 @@ class _BetaLabStagesMixin:
         return BetaRunResponse(
             run_euid=run.euid,
             pool_euid=pool.euid,
+            run_subtype=payload.run_subtype,
             flowcell_id=payload.flowcell_id,
             run_folder=str(run_props["run_folder"]),
             status=payload.status,
+            operator_start_datetime=payload.operator_start_datetime,
+            sequencing_end_datetime=payload.sequencing_end_datetime,
+            instrument_euid=str(normalized_metadata.get("instrument_euid") or "")
+            or None,
             artifact_count=len(payload.artifacts),
             assignment_count=len(payload.assignments),
             idempotent_replay=False,

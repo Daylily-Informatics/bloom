@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -303,7 +304,7 @@ class BetaLibraryQCResponse(BaseModel):
 
 class BetaPoolCreateRequest(BaseModel):
     member_euids: list[str]
-    platform: Literal["ILMN"]
+    platform: Literal["ILMN", "ONT"]
     pool_name: str | None = None
     claim_euid: str | None = None
     consume_members: bool = False
@@ -346,10 +347,14 @@ class BetaRunArtifactInput(BaseModel):
 
 class BetaRunCreateRequest(BaseModel):
     pool_euid: str
-    platform: Literal["ILMN"]
+    platform: Literal["ILMN", "ONT"]
+    run_subtype: Literal["illumina", "ont", "novaseq"] = Field(default="illumina")
     flowcell_id: str
     run_name: str | None = None
     status: Literal["started", "completed"] = Field(default="completed")
+    operator_start_datetime: datetime | None = None
+    sequencing_end_datetime: datetime | None = None
+    instrument_euid: str | None = None
     claim_euid: str | None = None
     consume_pool: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -362,15 +367,40 @@ class BetaRunCreateRequest(BaseModel):
             raise ValueError("flowcell_id must not be empty")
         if not self.assignments:
             raise ValueError("assignments must not be empty")
+        if self.platform == "ONT" and self.run_subtype != "ont":
+            raise ValueError("platform=ONT requires run_subtype=ont")
+        if self.platform == "ILMN" and self.run_subtype not in {
+            "illumina",
+            "novaseq",
+        }:
+            raise ValueError("platform=ILMN requires run_subtype=illumina or novaseq")
+        if self.instrument_euid is not None and not self.instrument_euid.strip():
+            raise ValueError("instrument_euid must not be empty when provided")
+        for field_name in ("operator_start_datetime", "sequencing_end_datetime"):
+            value = getattr(self, field_name)
+            if value is not None and value.tzinfo is None:
+                raise ValueError(f"{field_name} must include a timezone")
+        if (
+            self.operator_start_datetime is not None
+            and self.sequencing_end_datetime is not None
+            and self.sequencing_end_datetime < self.operator_start_datetime
+        ):
+            raise ValueError(
+                "sequencing_end_datetime must not be before operator_start_datetime"
+            )
         return self
 
 
 class BetaRunResponse(BaseModel):
     run_euid: str
     pool_euid: str
+    run_subtype: str
     flowcell_id: str
     run_folder: str
     status: str
+    operator_start_datetime: datetime | None = None
+    sequencing_end_datetime: datetime | None = None
+    instrument_euid: str | None = None
     artifact_count: int
     assignment_count: int
     idempotent_replay: bool = False

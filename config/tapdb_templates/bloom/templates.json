@@ -6416,6 +6416,120 @@
       }
     },
     {
+      "name": "Illumina Sequencing Run",
+      "polymorphic_discriminator": "data_template",
+      "category": "BDT",
+      "type": "sequencing_run",
+      "subtype": "illumina",
+      "version": "1.0",
+      "instance_prefix": "BDT",
+      "instance_polymorphic_identity": "data_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
+        },
+        "description": "Sequencing run executed on an Illumina instrument.",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "beta_kind": "sequencing_run",
+          "platform": "ILMN",
+          "run_subtype": "illumina",
+          "flowcell_id": "",
+          "operator_start_datetime": null,
+          "sequencing_end_datetime": null,
+          "instrument_euid": "",
+          "metadata": {},
+          "name": "Illumina Sequencing Run",
+          "idempotency_key": ""
+        },
+        "singleton": "0",
+        "semantic_category": "data"
+      }
+    },
+    {
+      "name": "ONT Sequencing Run",
+      "polymorphic_discriminator": "data_template",
+      "category": "BDT",
+      "type": "sequencing_run",
+      "subtype": "ont",
+      "version": "1.0",
+      "instance_prefix": "BDT",
+      "instance_polymorphic_identity": "data_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
+        },
+        "description": "Sequencing run executed on an Oxford Nanopore instrument.",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "beta_kind": "sequencing_run",
+          "platform": "ONT",
+          "run_subtype": "ont",
+          "flowcell_id": "",
+          "operator_start_datetime": null,
+          "sequencing_end_datetime": null,
+          "instrument_euid": "",
+          "metadata": {},
+          "name": "ONT Sequencing Run",
+          "idempotency_key": ""
+        },
+        "singleton": "0",
+        "semantic_category": "data"
+      }
+    },
+    {
+      "name": "NovaSeq Sequencing Run",
+      "polymorphic_discriminator": "data_template",
+      "category": "BDT",
+      "type": "sequencing_run",
+      "subtype": "novaseq",
+      "version": "1.0",
+      "instance_prefix": "BDT",
+      "instance_polymorphic_identity": "data_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
+        },
+        "description": "Sequencing run executed on an Illumina NovaSeq instrument.",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "beta_kind": "sequencing_run",
+          "platform": "ILMN",
+          "run_subtype": "novaseq",
+          "flowcell_id": "",
+          "operator_start_datetime": null,
+          "sequencing_end_datetime": null,
+          "instrument_euid": "",
+          "metadata": {},
+          "name": "NovaSeq Sequencing Run",
+          "idempotency_key": ""
+        },
+        "singleton": "0",
+        "semantic_category": "data"
+      }
+    },
+    {
       "name": "-20C Freezer",
       "polymorphic_discriminator": "equipment_template",
       "category": "BEQ",

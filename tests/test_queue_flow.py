@@ -360,15 +360,20 @@ def test_beta_queue_flow_end_to_end():
         barcode_reagent_euid = _ensure_reference_instance(
             category="content", type_name="reagent"
         )
+        instrument_euid = _ensure_reference_instance(category="equipment")
         run = client.post(
             "/api/v1/external/atlas/beta/runs",
             headers={"Idempotency-Key": _opaque("idem-run")},
             json={
                 "pool_euid": pool_euid,
                 "platform": "ILMN",
+                "run_subtype": "novaseq",
                 "flowcell_id": flowcell_id,
                 "run_name": "beta-ilmn-run",
                 "status": "completed",
+                "operator_start_datetime": "2026-05-20T06:00:00+00:00",
+                "sequencing_end_datetime": "2026-05-20T14:30:00+00:00",
+                "instrument_euid": instrument_euid,
                 "assignments": [
                     {
                         "lane": lane,
@@ -397,7 +402,39 @@ def test_beta_queue_flow_end_to_end():
         assert run_body["artifact_count"] == 1
         assert run_body["assignment_count"] == 1
         assert run_body["flowcell_id"] == flowcell_id
+        assert run_body["run_subtype"] == "novaseq"
+        assert run_body["operator_start_datetime"] == "2026-05-20T06:00:00Z"
+        assert run_body["sequencing_end_datetime"] == "2026-05-20T14:30:00Z"
+        assert run_body["instrument_euid"] == instrument_euid
         assert run_body["run_folder"] == f"{run_body['run_euid']}/"
+
+        bdb = BLOOMdb3(app_username="pytest-beta-queue")
+        try:
+            GI = bdb.Base.classes.generic_instance
+            run_instance = (
+                bdb.session.query(GI)
+                .filter(
+                    GI.euid == run_body["run_euid"],
+                    GI.is_deleted.is_(False),
+                )
+                .one()
+            )
+            run_props = (run_instance.json_addl or {}).get("properties", {})
+            assert run_instance.type == "sequencing_run"
+            assert run_instance.subtype == "novaseq"
+            assert run_props["beta_kind"] == "sequencing_run"
+            assert run_props["run_subtype"] == "novaseq"
+            assert run_props["operator_start_datetime"] == "2026-05-20T06:00:00+00:00"
+            assert run_props["sequencing_end_datetime"] == "2026-05-20T14:30:00+00:00"
+            assert run_props["instrument_euid"] == instrument_euid
+            lineage_targets = {
+                (lineage.relationship_type, lineage.child_instance.euid)
+                for lineage in get_parent_lineages(run_instance)
+                if not lineage.is_deleted and lineage.child_instance is not None
+            }
+            assert ("beta_used_instrument", instrument_euid) in lineage_targets
+        finally:
+            bdb.close()
 
         resolved = client.get(
             f"/api/v1/external/atlas/beta/runs/{run_body['run_euid']}/resolve",
