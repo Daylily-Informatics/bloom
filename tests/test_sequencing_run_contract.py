@@ -1,0 +1,96 @@
+"""Sequencing-run template and schema contract tests."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from bloom_lims.schemas.beta_lab import BetaRunCreateRequest
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _minimal_run_payload(**overrides):
+    payload = {
+        "pool_euid": "BCT-POOL-1",
+        "platform": "ILMN",
+        "run_subtype": "illumina",
+        "flowcell_id": "FLOW-1",
+        "operator_start_datetime": "2026-05-20T06:00:00+00:00",
+        "sequencing_end_datetime": "2026-05-20T14:00:00+00:00",
+        "assignments": [
+            {
+                "lane": "1",
+                "library_barcode": "IDX-1",
+                "library_prep_output_euid": "BDT-LIB-1",
+            }
+        ],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_sequencing_run_templates_are_shipped_for_tapdb_seed():
+    template_pack = json.loads(
+        (
+            PROJECT_ROOT / "config" / "tapdb_templates" / "bloom" / "templates.json"
+        ).read_text(encoding="utf-8")
+    )
+    templates = {
+        (
+            template["json_addl"].get("semantic_category"),
+            template["type"],
+            template["subtype"],
+            template["version"],
+        ): template
+        for template in template_pack["templates"]
+    }
+
+    expected = {
+        ("data", "sequencing_run", "illumina", "1.0"): "ILMN",
+        ("data", "sequencing_run", "ont", "1.0"): "ONT",
+        ("data", "sequencing_run", "novaseq", "1.0"): "ILMN",
+    }
+    for template_key, platform in expected.items():
+        template = templates[template_key]
+        props = template["json_addl"]["properties"]
+        assert template["category"] == "BDT"
+        assert template["instance_prefix"] == "BDT"
+        assert props["beta_kind"] == "sequencing_run"
+        assert props["platform"] == platform
+        assert props["run_subtype"] == template_key[2]
+        assert "operator_start_datetime" in props
+        assert "sequencing_end_datetime" in props
+        assert "instrument_euid" in props
+
+
+def test_run_schema_validates_subtype_platform_and_datetime_contract():
+    novaseq = BetaRunCreateRequest.model_validate(
+        _minimal_run_payload(run_subtype="novaseq")
+    )
+    assert novaseq.run_subtype == "novaseq"
+
+    ont = BetaRunCreateRequest.model_validate(
+        _minimal_run_payload(platform="ONT", run_subtype="ont")
+    )
+    assert ont.platform == "ONT"
+
+    with pytest.raises(ValidationError, match="platform=ONT requires run_subtype=ont"):
+        BetaRunCreateRequest.model_validate(_minimal_run_payload(platform="ONT"))
+
+    with pytest.raises(ValidationError, match="must include a timezone"):
+        BetaRunCreateRequest.model_validate(
+            _minimal_run_payload(operator_start_datetime="2026-05-20T06:00:00")
+        )
+
+    with pytest.raises(ValidationError, match="must not be before"):
+        BetaRunCreateRequest.model_validate(
+            _minimal_run_payload(
+                operator_start_datetime="2026-05-20T15:00:00+00:00",
+                sequencing_end_datetime="2026-05-20T14:00:00+00:00",
+            )
+        )
