@@ -22,7 +22,7 @@ from functools import lru_cache
 from importlib import resources as importlib_resources
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.version import Version
@@ -1407,7 +1407,15 @@ def get_database_url() -> str:
 
     url = f"postgresql://{auth}@{cfg['host']}:{cfg['port']}/{cfg['database']}"
     if cfg.get("engine_type") == "aurora":
-        return f"{url}?sslmode=verify-full"
+        sslrootcert = str(cfg.get("sslrootcert") or "").strip()
+        if not sslrootcert:
+            raise RuntimeError("Bloom Aurora TapDB config is missing sslrootcert")
+        query = {"sslmode": "verify-full"}
+        query["sslrootcert"] = sslrootcert
+        hostaddr = str(cfg.get("hostaddr") or "").strip()
+        if hostaddr:
+            query["hostaddr"] = hostaddr
+        return f"{url}?{urlencode(query)}"
     return url
 
 

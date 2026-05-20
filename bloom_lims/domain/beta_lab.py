@@ -54,6 +54,11 @@ class BetaLabService(
     POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
     LIBRARY_PREP_OUTPUT_TEMPLATE_CODE = "data/wetlab/library_prep_output/1.0"
+    SEQUENCING_RUN_TEMPLATE_BY_SUBTYPE = {
+        "illumina": "data/sequencing_run/illumina/1.0",
+        "ont": "data/sequencing_run/ont/1.0",
+        "novaseq": "data/sequencing_run/novaseq/1.0",
+    }
     LIBRARY_PLATE_TEMPLATE_CODE = "container/plate/fixed-plate-96/1.0"
     EXTRACTION_TEMPLATE_BY_TYPE = {
         "cfdna": "content/sample/cfdna/1.0",

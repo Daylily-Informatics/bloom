@@ -30,6 +30,7 @@ INTEGRATION_TEST_FILES = frozenset(
         "test_api_auth_rbac.py",
         "test_beta_cross_repo_smoke.py",
         "test_beta_lab.py",
+        "test_queue_flow.py",
         "test_gui_endpoints.py",
         "test_route_coverage_gaps_api.py",
         "test_route_coverage_gaps_gui.py",

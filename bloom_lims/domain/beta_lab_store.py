@@ -213,8 +213,6 @@ class _BetaLabStoreMixin:
                 instance_category_filter(
                     self.bdb.Base.classes.generic_instance, "data"
                 ),
-                self.bdb.Base.classes.generic_instance.type == "generic",
-                self.bdb.Base.classes.generic_instance.subtype == "generic",
                 self.bdb.Base.classes.generic_instance.is_deleted.is_(False),
                 func.jsonb_extract_path_text(
                     self.bdb.Base.classes.generic_instance.json_addl["properties"],
@@ -236,10 +234,11 @@ class _BetaLabStoreMixin:
         beta_kind: str,
         name: str,
         properties: dict[str, Any],
+        template_code: str | None = None,
     ):
         payload = {"beta_kind": beta_kind, **(properties or {})}
         record = self.bobj.create_instance_by_code(
-            self.GENERIC_DATA_TEMPLATE_CODE,
+            template_code or self.GENERIC_DATA_TEMPLATE_CODE,
             {"json_addl": {"properties": payload}},
         )
         props = self._props(record)
