@@ -5373,6 +5373,66 @@
       }
     },
     {
+      "name": "Mawi DNA Technologies - ISD-T-250 - iSWAB DNA Collection Tube - Buccal",
+      "polymorphic_discriminator": "container_template",
+      "category": "BCN",
+      "type": "tube",
+      "subtype": "mawi-isd-t-250-iswab-dna-collection-tube-buccal",
+      "version": "1.0",
+      "instance_prefix": "BCN",
+      "instance_polymorphic_identity": "container_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "BAC/core/add-relationships/1.0",
+          "create_subject_and_anchor": "BAC/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "active"
+        },
+        "cont_address": {
+          "col_idx": "0",
+          "col_name": "",
+          "name": "",
+          "row_idx": "0",
+          "row_name": ""
+        },
+        "description": "Mawi DNA Technologies ISD-T-250 iSWAB DNA Collection Tube for buccal collection",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "catalog_number": "ISD-T-250",
+          "collection_site": "buccal",
+          "comments": "",
+          "lab_code": "",
+          "lot_expiration_date": "",
+          "lot_number": "",
+          "manufacturer": "Mawi DNA Technologies",
+          "manufacturer_other": "",
+          "name": "Mawi DNA Technologies - ISD-T-250 - iSWAB DNA Collection Tube - Buccal",
+          "product_name": "iSWAB DNA Collection Tube"
+        },
+        "singleton": "0",
+        "valid_content": [
+          "content/.*"
+        ],
+        "valid_parents": [],
+        "semantic_category": "container"
+      }
+    },
+    {
       "name": "plate well - fixed",
       "polymorphic_discriminator": "container_template",
       "category": "BCN",
