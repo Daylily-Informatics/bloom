@@ -123,6 +123,7 @@ auth:
     service_id: "bloom"
     login_url: ""
     handoff_exchange_url: ""
+    service_token: ""
     callback_url: ""
     logout_url: ""
     ca_bundle: ""

@@ -161,6 +161,7 @@ def _external_broker_settings() -> BloomSettings:
             "jwt_secret": "test-session-secret",
             "external_broker": {
                 "service_id": "bloom",
+                "service_token": "bloom-service-token",
                 "login_url": "https://dev.login.lsmc.com:8916/auth/login",
                 "handoff_exchange_url": "https://dev.login.lsmc.com:8916/auth/handoff/consume",
                 "callback_url": "https://localhost:8912/auth/lsmc/callback",
@@ -207,9 +208,10 @@ def test_external_broker_handoff_uses_configured_ca_bundle(monkeypatch: pytest.M
         async def __aexit__(self, *_args):
             return None
 
-        async def post(self, url: str, *, json: dict[str, object]):
+        async def post(self, url: str, *, json: dict[str, object], headers: dict[str, str]):
             captured["url"] = url
             captured["json"] = json
+            captured["headers"] = headers
             return FakeResponse()
 
     monkeypatch.setattr("bloom_lims.gui.routes.auth.get_settings", lambda: settings)
@@ -220,6 +222,10 @@ def test_external_broker_handoff_uses_configured_ca_bundle(monkeypatch: pytest.M
     assert result["user"]["email"] == "johnm@lsmc.com"
     assert captured["verify"] == "/tmp/bloom-ca.pem"
     assert captured["json"] == {"code": "handoff-code"}
+    assert captured["headers"] == {
+        "Authorization": "Bearer bloom-service-token",
+        "X-LSMC-Service-ID": "bloom",
+    }
 
 
 def test_external_broker_login_and_callback_create_session(

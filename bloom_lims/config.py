@@ -735,6 +735,9 @@ class ExternalBrokerSettings(BaseModel):
     handoff_exchange_url: str = Field(
         default="", description="External broker handoff exchange URL"
     )
+    service_token: str = Field(
+        default="", description="External broker registered-service token"
+    )
     callback_url: str = Field(default="", description="Bloom broker callback URL")
     logout_url: str = Field(default="", description="External broker logout URL")
     ca_bundle: str = Field(default="", description="CA bundle for broker HTTPS")
@@ -829,6 +832,7 @@ class AuthSettings(BaseModel):
             "handoff_exchange_url": _read_first_env(
                 "LSMC_AUTH_BROKER_HANDOFF_EXCHANGE_URL"
             ),
+            "service_token": _read_first_env("LSMC_AUTH_BROKER_SERVICE_TOKEN"),
             "callback_url": _read_first_env("LSMC_AUTH_BROKER_CALLBACK_URL"),
             "logout_url": _read_first_env("LSMC_AUTH_BROKER_LOGOUT_URL"),
             "ca_bundle": _read_first_env("LSMC_AUTH_BROKER_CA_BUNDLE"),
@@ -842,6 +846,7 @@ class AuthSettings(BaseModel):
         if self.mode == "external_broker":
             required = {
                 "service_id",
+                "service_token",
                 "login_url",
                 "handoff_exchange_url",
                 "callback_url",
