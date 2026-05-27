@@ -140,6 +140,7 @@ def test_external_broker_configuration_from_shared_env(monkeypatch, tmp_path: Pa
         "LSMC_AUTH_BROKER_HANDOFF_EXCHANGE_URL",
         "https://dev.login.lsmc.com/auth/handoff/consume",
     )
+    monkeypatch.setenv("LSMC_AUTH_BROKER_SERVICE_TOKEN", "test-bloom-service-token")
     monkeypatch.setenv(
         "LSMC_AUTH_BROKER_CALLBACK_URL",
         "https://localhost:8912/auth/lsmc/callback",
@@ -217,6 +218,7 @@ def test_build_default_config_template_injects_fresh_jwt_secret():
             "service_id": "bloom",
             "login_url": "",
             "handoff_exchange_url": "",
+            "service_token": "",
             "callback_url": "",
             "logout_url": "",
             "ca_bundle": "",
@@ -443,7 +445,7 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: 
     settings = BloomSettings(storage={"upload_dir": str(tmp_path / "uploads")})
     expected_tapdb_spec = read_pyproject_dependency_spec("daylily-tapdb")
 
-    assert expected_tapdb_spec == "<8.0.0,>=7.0.5"
+    assert expected_tapdb_spec == "<8.0.0,>=7.0.7"
     assert assert_tapdb_version()
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
