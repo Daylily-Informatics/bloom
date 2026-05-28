@@ -335,7 +335,7 @@ def _seed_tapdb_templates(
                 prefix_registry_path=prefix_registry_path,
             )
             if overwrite:
-                retired = _retire_obsolete_sequencing_run_templates(
+                retired = _retire_obsolete_template_variants(
                     bdb.session,
                     bdb.Base.classes.generic_template,
                     client_templates,
@@ -343,7 +343,7 @@ def _seed_tapdb_templates(
                 )
                 if retired:
                     console.print(
-                        "[cyan]Retired obsolete Bloom sequencing-run templates:[/cyan] "
+                        "[cyan]Retired obsolete Bloom template variants:[/cyan] "
                         f"{retired}"
                     )
         bdb.session.commit()
@@ -355,34 +355,34 @@ def _seed_tapdb_templates(
         bdb.engine.dispose()
 
 
-def _active_sequencing_run_template_categories(
+def _active_template_categories_by_semantic_key(
     templates: list[dict[str, object]],
-) -> dict[tuple[str, str], str]:
-    current: dict[tuple[str, str], str] = {}
+) -> dict[tuple[str, str, str, str], str]:
+    current: dict[tuple[str, str, str, str], str] = {}
     for template in templates:
         payload = template.get("json_addl")
         if not isinstance(payload, dict):
             payload = {}
         semantic_category = str(payload.get("semantic_category") or "").strip().lower()
         type_name = str(template.get("type") or "").strip()
-        if semantic_category != "data" or type_name != "sequencing_run":
+        if not semantic_category or not type_name:
             continue
         subtype = str(template.get("subtype") or "").strip()
         version = str(template.get("version") or "").strip()
         category = str(template.get("category") or "").strip().upper()
         if subtype and version and category:
-            current[(subtype, version)] = category
+            current[(semantic_category, type_name, subtype, version)] = category
     return current
 
 
-def _retire_obsolete_sequencing_run_templates(
+def _retire_obsolete_template_variants(
     session,
     template_model,
     templates: list[dict[str, object]],
     *,
     domain_code: str,
 ) -> int:
-    current = _active_sequencing_run_template_categories(templates)
+    current = _active_template_categories_by_semantic_key(templates)
     if not current:
         return 0
 
@@ -390,7 +390,6 @@ def _retire_obsolete_sequencing_run_templates(
         session.query(template_model)
         .filter(
             template_model.domain_code == str(domain_code or "").strip().upper(),
-            template_model.type == "sequencing_run",
             template_model.is_deleted == False,  # noqa: E712
         )
         .all()
@@ -399,12 +398,17 @@ def _retire_obsolete_sequencing_run_templates(
     retired = 0
     with allow_template_mutations():
         for row in rows:
-            if template_semantic_category(row).strip().lower() != "data":
-                continue
-            key = (str(row.subtype or "").strip(), str(row.version or "").strip())
+            key = (
+                template_semantic_category(row).strip().lower(),
+                str(row.type or "").strip(),
+                str(row.subtype or "").strip(),
+                str(row.version or "").strip(),
+            )
             expected_category = current.get(key)
+            if expected_category is None:
+                continue
             actual_category = str(row.category or "").strip().upper()
-            if expected_category is not None and actual_category == expected_category:
+            if actual_category == expected_category:
                 continue
             row.is_deleted = True
             row.bstatus = "retired"

@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def _minimal_run_payload(**overrides):
     payload = {
-        "pool_euid": "BCT-POOL-1",
+        "pool_euid": "BNP-POOL-1",
         "platform": "ILMN",
         "run_subtype": "illumina",
         "flowcell_id": "FLOW-1",
@@ -26,7 +26,7 @@ def _minimal_run_payload(**overrides):
             {
                 "lane": "1",
                 "library_barcode": "IDX-1",
-                "library_prep_output_euid": "BDT-LIB-1",
+                "library_prep_output_euid": "BDP-LIB-1",
             }
         ],
     }

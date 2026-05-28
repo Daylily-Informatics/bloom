@@ -1,7 +1,10 @@
 {
   "euid_prefixes": {
-    "default": "BCT",
-    "reagent": "BCT",
-    "control": "BCT"
+    "default": "BN",
+    "specimen": "BN",
+    "sample": "BN",
+    "reagent": "BNR",
+    "control": "BNK",
+    "pool": "BNP"
   }
 }

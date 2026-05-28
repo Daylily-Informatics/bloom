@@ -593,7 +593,7 @@ def test_seed_templates_split_core_and_client_ownership(
     assert fake_engine.disposed == 1
 
 
-def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() -> None:
+def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None:
     templates = [
         {
             "category": "BRM",
@@ -608,6 +608,13 @@ def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() 
             "subtype": "ont",
             "version": "1.0",
             "json_addl": {"semantic_category": "data"},
+        },
+        {
+            "category": "BCT",
+            "type": "tube",
+            "subtype": "tube-generic-10ml",
+            "version": "1.0",
+            "json_addl": {"semantic_category": "container"},
         },
     ]
     current = SimpleNamespace(
@@ -640,6 +647,16 @@ def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() 
         bstatus="active",
         json_addl={"semantic_category": "data"},
     )
+    stale_container_prefix = SimpleNamespace(
+        domain_code="Z",
+        type="tube",
+        category="BCN",
+        subtype="tube-generic-10ml",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "container"},
+    )
     non_data = SimpleNamespace(
         domain_code="Z",
         type="sequencing_run",
@@ -665,7 +682,13 @@ def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() 
             return self
 
         def all(self):
-            return [current, stale_prefix, stale_subtype, non_data]
+            return [
+                current,
+                stale_prefix,
+                stale_subtype,
+                stale_container_prefix,
+                non_data,
+            ]
 
     class FakeSession:
         flushed = 0
@@ -679,7 +702,7 @@ def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() 
 
     fake_session = FakeSession()
 
-    retired = db_commands._retire_obsolete_sequencing_run_templates(
+    retired = db_commands._retire_obsolete_template_variants(
         fake_session,
         FakeTemplateModel,
         templates,
@@ -690,8 +713,9 @@ def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() 
     assert current.is_deleted is False
     assert stale_prefix.is_deleted is True
     assert stale_prefix.bstatus == "retired"
-    assert stale_subtype.is_deleted is True
-    assert stale_subtype.bstatus == "retired"
+    assert stale_subtype.is_deleted is False
+    assert stale_container_prefix.is_deleted is True
+    assert stale_container_prefix.bstatus == "retired"
     assert non_data.is_deleted is False
     assert fake_session.flushed == 1
 

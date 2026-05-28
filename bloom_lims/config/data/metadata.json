@@ -1,5 +1,9 @@
 {
   "euid_prefixes": {
-    "default": "BDT"
+    "default": "BD",
+    "execution": "BDT",
+    "operation": "BDX",
+    "quantification": "BDQ",
+    "library-index-assignment": "BDA"
   }
 }

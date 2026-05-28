@@ -445,7 +445,7 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: 
     settings = BloomSettings(storage={"upload_dir": str(tmp_path / "uploads")})
     expected_tapdb_spec = read_pyproject_dependency_spec("daylily-tapdb")
 
-    assert expected_tapdb_spec == "<8.0.0,>=7.0.7"
+    assert expected_tapdb_spec == "==7.0.9"
     assert assert_tapdb_version()
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
@@ -501,29 +501,64 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: 
     ]
     assert packaged_domain_registry["domains"] == {"Z": {"name": "bloom"}}
     assert set(packaged_prefix_registry["ownership"]["Z"]) == {
+        "ADT",
         "BAC",
         "BAR",
         "BBX",
+        "BC",
+        "BCB",
+        "BCE",
+        "BCF",
         "BCN",
+        "BCP",
+        "BCR",
         "BCT",
+        "BCW",
+        "BD",
+        "BDA",
+        "BDC",
+        "BDN",
+        "BDP",
+        "BDQ",
         "BDT",
-        "ADT",
+        "BDX",
+        "BDY",
         "BEQ",
         "BFX",
+        "BG",
+        "BGM",
+        "BGP",
+        "BGR",
+        "BGS",
         "BGT",
+        "BGV",
+        "BGX",
         "BHE",
+        "BN",
+        "BNA",
+        "BNB",
+        "BNC",
+        "BNF",
+        "BNG",
+        "BNK",
+        "BNP",
+        "BNQ",
+        "BNR",
+        "BNS",
+        "BNX",
+        "BR",
         "BRC",
         "BRM",
         "BRN",
         "BRP",
         "BRT",
+        "BSJ",
+        "BWF",
+        "BWS",
         "EDG",
         "MSG",
         "SYS",
         "TPX",
-        "BSJ",
-        "BWF",
-        "BWS",
     }
     assert {
         claim["issuer_app_code"]

@@ -845,7 +845,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
         library_material_euid = library_prep_body["library_material_euid"]
         library_plate_euid = library_prep_body["library_plate_euid"]
         library_well_euid = library_prep_body["library_well_euid"]
-        _assert_domain_scoped_euid(library_material_euid, "BCT-")
+        _assert_domain_scoped_euid(library_material_euid, "BNQ-")
 
         library_qc = client.post(
             "/api/v1/external/atlas/beta/library-qc",
@@ -939,7 +939,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
     specimen_graph = _props(instance(specimen_euid))["graph"]
     assert plate_graph["node_role"] == "fixed-plate-24"
     assert plate_graph["expected_fanout"][0]["max_child_count"] == 24
-    assert library_plate_graph["node_role"] == "fixed-plate-96"
+    assert library_plate_graph["node_role"] == "sequencing-library-plate-96"
     assert library_plate_graph["expected_fanout"][0]["max_child_count"] == 96
     assert well_graph["expected_fanout"][0]["max_child_count"] == 1
     assert library_well_graph["expected_fanout"][0]["max_child_count"] == 1

@@ -1,6 +1,13 @@
 {
   "euid_prefixes": {
-    "default": "BCN",
-    "well": "BCN"
+    "default": "BC",
+    "tube": "BCT",
+    "plate": "BCP",
+    "well": "BCW",
+    "bottle": "BCB",
+    "flowcell": "BCF",
+    "flowcell_lane": "BCE",
+    "rack": "BCR",
+    "shelf": "BCR"
   }
 }
