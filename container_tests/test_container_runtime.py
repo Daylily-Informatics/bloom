@@ -17,6 +17,7 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
     assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
     assert "uv sync --frozen --no-dev" in dockerfile
     assert "COPY auth ./auth" in dockerfile
+    assert "COPY config ./config" in dockerfile
     assert "COPY static ./static" in dockerfile
     assert "COPY templates ./templates" in dockerfile
     assert "USER lsmc" in dockerfile

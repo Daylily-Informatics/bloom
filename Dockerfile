@@ -19,6 +19,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY bloom_lims ./bloom_lims
 COPY auth ./auth
+COPY config ./config
 COPY main.py ./main.py
 COPY static ./static
 COPY templates ./templates
