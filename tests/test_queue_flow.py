@@ -367,7 +367,7 @@ def test_beta_queue_flow_end_to_end():
             json={
                 "pool_euid": pool_euid,
                 "platform": "ILMN",
-                "run_subtype": "novaseq",
+                "run_subtype": "illumina",
                 "flowcell_id": flowcell_id,
                 "run_name": "beta-ilmn-run",
                 "status": "completed",
@@ -402,7 +402,7 @@ def test_beta_queue_flow_end_to_end():
         assert run_body["artifact_count"] == 1
         assert run_body["assignment_count"] == 1
         assert run_body["flowcell_id"] == flowcell_id
-        assert run_body["run_subtype"] == "novaseq"
+        assert run_body["run_subtype"] == "illumina"
         assert run_body["operator_start_datetime"] == "2026-05-20T06:00:00Z"
         assert run_body["sequencing_end_datetime"] == "2026-05-20T14:30:00Z"
         assert run_body["instrument_euid"] == instrument_euid
@@ -421,9 +421,9 @@ def test_beta_queue_flow_end_to_end():
             )
             run_props = (run_instance.json_addl or {}).get("properties", {})
             assert run_instance.type == "sequencing_run"
-            assert run_instance.subtype == "novaseq"
+            assert run_instance.subtype == "illumina"
             assert run_props["beta_kind"] == "sequencing_run"
-            assert run_props["run_subtype"] == "novaseq"
+            assert run_props["run_subtype"] == "illumina"
             assert run_props["operator_start_datetime"] == "2026-05-20T06:00:00+00:00"
             assert run_props["sequencing_end_datetime"] == "2026-05-20T14:30:00+00:00"
             assert run_props["instrument_euid"] == instrument_euid

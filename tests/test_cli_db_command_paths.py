@@ -426,6 +426,36 @@ def test_db_seed_calls_tapdb_template_loader(
     assert tapdb_seed == [("target", False, False)]
 
 
+def test_db_refresh_templates_overwrites_templates_without_schema_reset(
+    runner: CliRunner,
+    cli_app,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tapdb_seed: list[tuple[str, bool, bool]] = []
+    schema_reset_calls: list[list[str]] = []
+    monkeypatch.setattr(db_commands, "_current_target_label", lambda: "target")
+    monkeypatch.setattr(
+        db_commands, "_ensure_schema_available_for_bloom_root", lambda: None
+    )
+    monkeypatch.setattr(
+        db_commands,
+        "_seed_tapdb_templates",
+        lambda env_name, include_workflow, overwrite: tapdb_seed.append(
+            (env_name, include_workflow, overwrite)
+        ),
+    )
+    monkeypatch.setattr(
+        db_commands,
+        "_run_tapdb",
+        lambda args, check=True: schema_reset_calls.append(args) or 0,
+    )
+
+    result = runner.invoke(cli_app, ["db", "refresh-templates"])
+    assert result.exit_code == 0
+    assert tapdb_seed == [("target", False, True)]
+    assert schema_reset_calls == []
+
+
 def test_seed_templates_split_core_and_client_ownership(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -561,6 +591,109 @@ def test_seed_templates_split_core_and_client_ownership(
     assert fake_session.rolled_back == 0
     assert fake_session.closed == 1
     assert fake_engine.disposed == 1
+
+
+def test_retire_obsolete_sequencing_run_templates_only_deletes_stale_variants() -> None:
+    templates = [
+        {
+            "category": "BRM",
+            "type": "sequencing_run",
+            "subtype": "illumina",
+            "version": "1.0",
+            "json_addl": {"semantic_category": "data"},
+        },
+        {
+            "category": "BRN",
+            "type": "sequencing_run",
+            "subtype": "ont",
+            "version": "1.0",
+            "json_addl": {"semantic_category": "data"},
+        },
+    ]
+    current = SimpleNamespace(
+        domain_code="Z",
+        type="sequencing_run",
+        category="BRM",
+        subtype="illumina",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "data"},
+    )
+    stale_prefix = SimpleNamespace(
+        domain_code="Z",
+        type="sequencing_run",
+        category="BDT",
+        subtype="illumina",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "data"},
+    )
+    stale_subtype = SimpleNamespace(
+        domain_code="Z",
+        type="sequencing_run",
+        category="BDT",
+        subtype="novaseq",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "data"},
+    )
+    non_data = SimpleNamespace(
+        domain_code="Z",
+        type="sequencing_run",
+        category="BDT",
+        subtype="illumina",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "workflow"},
+    )
+
+    class FakeColumn:
+        def __eq__(self, _other):  # noqa: ANN001 - test expression placeholder
+            return True
+
+    class FakeTemplateModel:
+        domain_code = FakeColumn()
+        type = FakeColumn()
+        is_deleted = FakeColumn()
+
+    class FakeQuery:
+        def filter(self, *_args):  # noqa: ANN002 - SQLAlchemy expression placeholder
+            return self
+
+        def all(self):
+            return [current, stale_prefix, stale_subtype, non_data]
+
+    class FakeSession:
+        flushed = 0
+
+        def query(self, model):  # noqa: ANN001 - test double
+            assert model is FakeTemplateModel
+            return FakeQuery()
+
+        def flush(self):
+            self.flushed += 1
+
+    fake_session = FakeSession()
+
+    retired = db_commands._retire_obsolete_sequencing_run_templates(
+        fake_session,
+        FakeTemplateModel,
+        templates,
+        domain_code="Z",
+    )
+
+    assert retired == 2
+    assert current.is_deleted is False
+    assert stale_prefix.is_deleted is True
+    assert stale_prefix.bstatus == "retired"
+    assert stale_subtype.is_deleted is True
+    assert stale_subtype.bstatus == "retired"
+    assert non_data.is_deleted is False
+    assert fake_session.flushed == 1
 
 
 def test_claim_client_template_prefixes_writes_registry(

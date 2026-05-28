@@ -22,6 +22,7 @@ from daylily_tapdb.euid import (
     GENERIC_TEMPLATE_PREFIX,
 )
 from daylily_tapdb.templates.loader import (
+    allow_template_mutations,
     find_tapdb_core_config_dir,
     seed_templates,
     validate_template_configs,
@@ -42,6 +43,7 @@ from bloom_lims.config import (
     get_settings,
 )
 from bloom_lims.tapdb_adapter import BLOOMdb3
+from bloom_lims.template_identity import template_semantic_category
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
@@ -332,6 +334,18 @@ def _seed_tapdb_templates(
                 domain_registry_path=domain_registry_path,
                 prefix_registry_path=prefix_registry_path,
             )
+            if overwrite:
+                retired = _retire_obsolete_sequencing_run_templates(
+                    bdb.session,
+                    bdb.Base.classes.generic_template,
+                    client_templates,
+                    domain_code=ctx.domain_code,
+                )
+                if retired:
+                    console.print(
+                        "[cyan]Retired obsolete Bloom sequencing-run templates:[/cyan] "
+                        f"{retired}"
+                    )
         bdb.session.commit()
     except Exception:
         bdb.session.rollback()
@@ -339,6 +353,65 @@ def _seed_tapdb_templates(
     finally:
         bdb.session.close()
         bdb.engine.dispose()
+
+
+def _active_sequencing_run_template_categories(
+    templates: list[dict[str, object]],
+) -> dict[tuple[str, str], str]:
+    current: dict[tuple[str, str], str] = {}
+    for template in templates:
+        payload = template.get("json_addl")
+        if not isinstance(payload, dict):
+            payload = {}
+        semantic_category = str(payload.get("semantic_category") or "").strip().lower()
+        type_name = str(template.get("type") or "").strip()
+        if semantic_category != "data" or type_name != "sequencing_run":
+            continue
+        subtype = str(template.get("subtype") or "").strip()
+        version = str(template.get("version") or "").strip()
+        category = str(template.get("category") or "").strip().upper()
+        if subtype and version and category:
+            current[(subtype, version)] = category
+    return current
+
+
+def _retire_obsolete_sequencing_run_templates(
+    session,
+    template_model,
+    templates: list[dict[str, object]],
+    *,
+    domain_code: str,
+) -> int:
+    current = _active_sequencing_run_template_categories(templates)
+    if not current:
+        return 0
+
+    rows = (
+        session.query(template_model)
+        .filter(
+            template_model.domain_code == str(domain_code or "").strip().upper(),
+            template_model.type == "sequencing_run",
+            template_model.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    retired = 0
+    with allow_template_mutations():
+        for row in rows:
+            if template_semantic_category(row).strip().lower() != "data":
+                continue
+            key = (str(row.subtype or "").strip(), str(row.version or "").strip())
+            expected_category = current.get(key)
+            actual_category = str(row.category or "").strip().upper()
+            if expected_category is not None and actual_category == expected_category:
+                continue
+            row.is_deleted = True
+            row.bstatus = "retired"
+            retired += 1
+        if retired:
+            session.flush()
+    return retired
 
 
 def _load_prefix_ownership_registry(path: Path) -> dict[str, object]:
@@ -527,6 +600,14 @@ def db_seed() -> None:
     _seed_tapdb_templates(target_label, include_workflow=False, overwrite=False)
 
 
+@db_app.command("refresh-templates")
+def db_refresh_templates() -> None:
+    """Refresh active Bloom templates without resetting schema or objects."""
+    target_label = _current_target_label()
+    _ensure_schema_available_for_bloom_root()
+    _seed_tapdb_templates(target_label, include_workflow=False, overwrite=True)
+
+
 @db_app.command("reset")
 def db_reset(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
@@ -572,6 +653,7 @@ def register(registry: CommandRegistry, spec: CliSpec) -> None:
         [
             ("build", db_build, EXEMPT_MUTATING),
             ("seed", db_seed, EXEMPT_MUTATING),
+            ("refresh-templates", db_refresh_templates, EXEMPT_MUTATING),
             ("reset", db_reset, EXEMPT_MUTATING_INTERACTIVE),
             ("nuke", db_nuke, EXEMPT_MUTATING_INTERACTIVE),
         ],

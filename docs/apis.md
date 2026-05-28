@@ -354,7 +354,7 @@ Current error mapping:
 - runs and run resolution
 
 Sequencing runs are template-backed TapDB data instances. `POST /runs` creates
-`data/sequencing_run/{illumina,ont,novaseq}/1.0` records, assigns a Bloom EUID
+`data/sequencing_run/{illumina,ont,ultima,completegenomics,pacbio}/1.0` records, assigns a Bloom EUID
 from the selected template, links the run to its sequencing pool and library
 assignments, and can capture operator start time, sequencing end time, and an
 instrument EUID.

@@ -81,6 +81,38 @@ def _create_instance_via_object_creation(
     return resp.json()
 
 
+def test_object_creation_creates_all_sequencing_run_platform_prefixes(
+    client: TestClient,
+) -> None:
+    expected = {
+        "illumina": "BRM",
+        "ont": "BRN",
+        "ultima": "BRT",
+        "completegenomics": "BRC",
+        "pacbio": "BRP",
+    }
+
+    subtypes = client.get(
+        "/api/v1/object-creation/subtypes",
+        params={"category": "data", "type": "sequencing_run"},
+    )
+    assert subtypes.status_code == 200, subtypes.text
+    available = {item["name"] for item in subtypes.json()["subtypes"]}
+    assert available == set(expected)
+
+    domain_code = (os.environ.get("MERIDIAN_DOMAIN_CODE") or "Z").strip().upper()
+    for subtype, prefix in expected.items():
+        created = _create_instance_via_object_creation(
+            client,
+            category="data",
+            type_name="sequencing_run",
+            subtype=subtype,
+            version="1.0",
+            name=f"pytest-{subtype}-run",
+        )
+        assert created["euid"].startswith(f"{domain_code}-{prefix}-")
+
+
 def test_actions_endpoints_execute_handler_body(client: TestClient) -> None:
     resp = client.post(
         "/api/v1/actions/aliquot",

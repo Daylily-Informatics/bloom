@@ -389,10 +389,12 @@ def ensure_local_tapdb_ready(*, env_name: str = "dev") -> bool:
     from bloom_lims.cli import db as db_commands
 
     try:
-        db_commands.db_seed()
+        db_commands.db_refresh_templates()
     except SystemExit as exc:
-        raise RuntimeError(f"`bloom db seed` exited with status {exc.code}") from exc
+        raise RuntimeError(
+            f"`bloom db refresh-templates` exited with status {exc.code}"
+        ) from exc
     except Exception as exc:
-        raise RuntimeError(f"`bloom db seed` failed: {exc}") from exc
+        raise RuntimeError(f"`bloom db refresh-templates` failed: {exc}") from exc
 
     return not was_available

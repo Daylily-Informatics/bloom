@@ -57,7 +57,9 @@ class BetaLabService(
     SEQUENCING_RUN_TEMPLATE_BY_SUBTYPE = {
         "illumina": "data/sequencing_run/illumina/1.0",
         "ont": "data/sequencing_run/ont/1.0",
-        "novaseq": "data/sequencing_run/novaseq/1.0",
+        "ultima": "data/sequencing_run/ultima/1.0",
+        "pacbio": "data/sequencing_run/pacbio/1.0",
+        "completegenomics": "data/sequencing_run/completegenomics/1.0",
     }
     LIBRARY_PLATE_TEMPLATE_CODE = "container/plate/fixed-plate-96/1.0"
     EXTRACTION_TEMPLATE_BY_TYPE = {

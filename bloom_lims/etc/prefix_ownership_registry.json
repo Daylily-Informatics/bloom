@@ -34,6 +34,21 @@
       "BHE": {
         "issuer_app_code": "bloom"
       },
+      "BRC": {
+        "issuer_app_code": "bloom"
+      },
+      "BRM": {
+        "issuer_app_code": "bloom"
+      },
+      "BRN": {
+        "issuer_app_code": "bloom"
+      },
+      "BRP": {
+        "issuer_app_code": "bloom"
+      },
+      "BRT": {
+        "issuer_app_code": "bloom"
+      },
       "BSJ": {
         "issuer_app_code": "bloom"
       },
