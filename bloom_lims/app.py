@@ -196,11 +196,11 @@ def create_app() -> FastAPI:
     try:
         from bloom_lims.gui.router import router as gui_router
     except ModuleNotFoundError as exc:
-        logging.warning(
-            "Skipping GUI router due to missing optional dependency: %s", exc.name
-        )
-    else:
-        app.include_router(gui_router)
+        raise RuntimeError(
+            "Bloom GUI router could not be loaded; the runtime image must include "
+            "the top-level auth package and all GUI dependencies."
+        ) from exc
+    app.include_router(gui_router)
 
     register_exception_handlers(app)
     return app

@@ -16,6 +16,9 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
 
     assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
     assert "uv sync --frozen --no-dev" in dockerfile
+    assert "COPY auth ./auth" in dockerfile
+    assert "COPY static ./static" in dockerfile
+    assert "COPY templates ./templates" in dockerfile
     assert "USER lsmc" in dockerfile
     assert "python\", \"-m\", \"bloom_lims.container_entry" in dockerfile
     assert ":latest" not in dockerfile
@@ -23,6 +26,14 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
     assert "tmux" not in entrypoint
     assert "background" not in entrypoint
     assert "${BLOOM_CONFIG_PATH:?BLOOM_CONFIG_PATH is required}" in entrypoint
+
+
+def test_bloom_gui_is_required_in_container_runtime() -> None:
+    app_source = (PROJECT_ROOT / "bloom_lims" / "app.py").read_text(encoding="utf-8")
+
+    assert "from bloom_lims.gui.router import router as gui_router" in app_source
+    assert "Skipping GUI router" not in app_source
+    assert "Bloom GUI router could not be loaded" in app_source
 
 
 def test_container_entry_requires_absolute_config_path(monkeypatch: pytest.MonkeyPatch) -> None:
