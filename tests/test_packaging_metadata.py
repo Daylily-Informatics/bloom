@@ -29,3 +29,5 @@ def test_dockerfile_copies_tapdb_template_config() -> None:
     )
 
     assert "COPY config ./config" in dockerfile
+    assert "COPY static ./static" in dockerfile
+    assert "COPY templates ./templates" in dockerfile
