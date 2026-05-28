@@ -19,6 +19,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY bloom_lims ./bloom_lims
 COPY main.py ./main.py
+COPY static ./static
+COPY templates ./templates
 RUN uv sync --frozen --no-dev
 
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
