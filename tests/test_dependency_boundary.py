@@ -36,7 +36,7 @@ def test_pyproject_owns_python_dependencies() -> None:
     dependencies = project["dependencies"]
 
     assert "IPython>=8.18.1" in dependencies
-    assert "psycopg2==2.9.9" in dependencies
+    assert "psycopg2-binary==2.9.12" in dependencies
     assert "djlint" in dependencies
     assert "pytest>=8.0" in dependencies
     assert not any(str(dep).startswith("zebra-day") for dep in dependencies)
