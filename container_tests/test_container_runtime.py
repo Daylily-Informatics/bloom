@@ -7,7 +7,6 @@ import pytest
 
 from bloom_lims import container_entry
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -42,9 +41,13 @@ def test_container_entry_runs_foreground_http_server(
     monkeypatch.setenv("HOST", "127.0.0.1")
     monkeypatch.setenv("PORT", "8912")
 
-    with patch("bloom_lims.container_entry._start_server") as start:
+    with (
+        patch("bloom_lims.container_entry._initialize_cli_runtime") as init_runtime,
+        patch("bloom_lims.container_entry._start_server") as start,
+    ):
         container_entry.main()
 
+    init_runtime.assert_called_once_with(config_path)
     assert start.call_args.kwargs == {
         "port": 8912,
         "host": "127.0.0.1",
