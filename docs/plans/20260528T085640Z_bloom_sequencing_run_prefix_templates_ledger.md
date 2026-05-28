@@ -30,6 +30,19 @@ run EUID prefixes:
   - `source ./activate codex && python -m pytest tests/test_sequencing_run_contract.py tests/test_api_v1.py tests/test_route_coverage_gaps_api.py tests/test_cli_db_command_paths.py -q --no-cov` -> `172 passed, 23 skipped`.
   - Same focused suite without `--no-cov` had all functional tests pass but exited nonzero because repo-wide coverage was `34.55%`, below the configured `39%` focused-run threshold.
   - `source ./activate codex && python -m build` passed after installing the local packaging helper module `build` into `BLOOM-codex`.
+- Release evidence:
+  - Commit: `b51b00d362bb7a159e1822a168dfa5380210e940` (`Add sequencing run platform prefixes`)
+  - Push: `origin/main` fast-forwarded from `37f4b0d` to `b51b00d`.
+  - Tag: annotated Bloom tag `5.0.35`, tag object `76edae01209415788f8cb9ff1cc43859cbd8eb1d`, pushed to origin.
+- Production evidence:
+  - AWS Bloom running checkout `/home/ubuntu/.cache/dayhoff/local/lsmcok1/repos/bloom` was fast-forwarded to `5.0.35`.
+  - Live config validation initially failed because `auth.external_broker.service_token` was empty; it was populated from the existing Dayhoff runtime secret file without printing the secret.
+  - `BLOOM_DEPLOYMENT_CODE=lsmcok1 XDG_CONFIG_HOME=/home/ubuntu/.config bloom config validate` passed.
+  - `BLOOM_DEPLOYMENT_CODE=lsmcok1 XDG_CONFIG_HOME=/home/ubuntu/.config bloom db refresh-templates` completed and reported `Retired obsolete Bloom sequencing-run templates: 3`.
+  - Production API subtype listing returned `completegenomics,illumina,ont,pacbio,ultima`.
+  - Production API create verification minted: `M-BRM-15`, `M-BRN-14`, `M-BRT-1Z`, `M-BRC-1D`, and `M-BRP-13`.
+  - After updating the Bloom conda env from the `5.0.35` checkout, runtime packages are `bloom-lims 5.0.35` and `daylily-tapdb 7.0.8`.
+  - Restart evidence: PID `481061`; `curl -sk https://localhost:8912/healthz` returned `health_http=200`; checkout reports `git describe --tags --always --dirty` -> `5.0.35`.
 
 ## Ledger Rows
 
@@ -43,7 +56,7 @@ run EUID prefixes:
 | GUI-001 | 5 | Verify create GUI lists all five under data/sequencing_run | SUCCESS | Gate 2 | `tests/test_route_coverage_gaps_api.py`; focused suite `172 passed, 23 skipped` | Object creation subtype endpoint returns exactly the five requested sequencing-run subtypes after template refresh. |
 | API-001 | 6 | Verify API create flow can create all five template-backed run objects | SUCCESS | Gate 2 | `tests/test_route_coverage_gaps_api.py`; focused suite `172 passed, 23 skipped` | API creation mints `Z-BRM`, `Z-BRN`, `Z-BRT`, `Z-BRC`, and `Z-BRP` in local DB-backed tests. |
 | TEST-001 | 7 | Add/update contract tests for template codes, prefixes, platform properties, and schema validation | SUCCESS | Gate 3 | `tests/test_sequencing_run_contract.py`, `tests/test_route_coverage_gaps_api.py`, `tests/test_cli_db_command_paths.py`, `tests/support/runtime.py` | Tests cover template content, beta schema validation, refresh command behavior, stale-template retirement, and API minting. |
-| RELEASE-001 | 8 | Commit, push, tag next Bloom version, and push tag | OPEN | Gate 4 |  |  |
-| AWS-001 | 9 | Load templates into production Bloom using supported Bloom CLI/API, no raw DB edits | OPEN | Gate 5 |  |  |
-| AWS-002 | 9 | Verify production GUI/API creation and actual minted prefixes for all five | OPEN | Gate 5 |  |  |
-| FINAL-001 | 1 | Record commit, tag, production evidence, tests, and any blocked Dayhoff pin follow-up | OPEN | Gate 6 |  |  |
+| RELEASE-001 | 8 | Commit, push, tag next Bloom version, and push tag | SUCCESS | Gate 4 | Commit `b51b00d362bb7a159e1822a168dfa5380210e940`; annotated tag `5.0.35` / tag object `76edae01209415788f8cb9ff1cc43859cbd8eb1d`; `origin/main` updated | Bloom `5.0.35` released from the clean release worktree. |
+| AWS-001 | 9 | Load templates into production Bloom using supported Bloom CLI/API, no raw DB edits | SUCCESS | Gate 5 | `bloom db refresh-templates`; `Retired obsolete Bloom sequencing-run templates: 3` | Production templates were loaded through the Bloom CLI. No raw DB edits were used. |
+| AWS-002 | 9 | Verify production GUI/API creation and actual minted prefixes for all five | SUCCESS | Gate 5 | API listing returned all five subtypes; production API create minted `M-BRM-15`, `M-BRN-14`, `M-BRT-1Z`, `M-BRC-1D`, `M-BRP-13` | Verified actual production minting for every requested sequencing-run platform prefix. |
+| FINAL-001 | 1 | Record commit, tag, production evidence, tests, and any blocked Dayhoff pin follow-up | SUCCESS | Gate 6 | This ledger; local tests/build; AWS `health_http=200`; runtime package check `bloom-lims 5.0.35`, `daylily-tapdb 7.0.8` | All rows terminal. Dayhoff pin/release-train follow-up remains out of scope for this Bloom-only plan. |
