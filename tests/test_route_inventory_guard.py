@@ -89,6 +89,10 @@ def _iter_runtime_routes() -> set[tuple[str, str]]:
 
 
 def test_docs_routes_remain_enabled_and_render(client: TestClient) -> None:
+    root = client.get("/", follow_redirects=False)
+    assert root.status_code in {200, 302, 303, 307, 308}
+    assert root.status_code != 404
+
     openapi = client.get("/openapi.json")
     assert openapi.status_code == 200
     assert openapi.json()["openapi"].startswith("3.")

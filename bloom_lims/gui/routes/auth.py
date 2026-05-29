@@ -788,5 +788,5 @@ async def auth_logout_post(request: Request, response: Response):
 
 
 @router.get("/logout")
-async def logout(request: Request, response: Response):
-    return await _logout_response(request, response)
+async def logout():
+    return RedirectResponse(url="/auth/logout", status_code=status.HTTP_303_SEE_OTHER)

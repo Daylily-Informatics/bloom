@@ -91,7 +91,7 @@ version_file = "bloom_lims/_scm_version.py"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["bloom_lims*"]
+include = ["auth*", "bloom_lims*"]
 
 [tool.setuptools.package-data]
 bloom_lims = ["etc/*.yaml", "etc/*.json"]
