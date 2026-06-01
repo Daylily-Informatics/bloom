@@ -249,8 +249,8 @@ def test_beta_queue_flow_end_to_end():
             extraction_body["atlas_test_fulfillment_item_euid"]
             == atlas_context["fulfillment_items"][0]["atlas_test_fulfillment_item_euid"]
         )
-        _assert_domain_scoped_euid(extraction_body["extraction_batch_euid"], "BDT-")
-        _assert_domain_scoped_euid(extraction_body["extraction_run_euid"], "BDT-")
+        _assert_domain_scoped_euid(extraction_body["extraction_batch_euid"], "BDX-")
+        _assert_domain_scoped_euid(extraction_body["extraction_run_euid"], "BDX-")
         extraction_output_euid = extraction_body["extraction_output_euid"]
         extraction_batch_euid = extraction_body["extraction_batch_euid"]
         extraction_run_euid = extraction_body["extraction_run_euid"]
@@ -281,7 +281,7 @@ def test_beta_queue_flow_end_to_end():
         qc_body = qc.json()
         assert qc_body["current_queue"] == "ilmn_lib_prep"
         assert qc_body["next_queue"] == "ilmn_lib_prep"
-        _assert_domain_scoped_euid(qc_body["qc_record_euid"], "BDT-")
+        _assert_domain_scoped_euid(qc_body["qc_record_euid"], "BDY-")
 
         ont_library_prep = client.post(
             "/api/v1/external/atlas/beta/library-prep",
@@ -316,10 +316,10 @@ def test_beta_queue_flow_end_to_end():
         library_container_euid = library_body["library_container_euid"]
         library_plate_euid = library_body["library_plate_euid"]
         library_well_euid = library_body["library_well_euid"]
-        _assert_domain_scoped_euid(library_material_euid, "BCT-")
-        _assert_domain_scoped_euid(library_container_euid, "BCN-")
-        _assert_domain_scoped_euid(library_plate_euid, "BCN-")
-        _assert_domain_scoped_euid(library_well_euid, "BCN-")
+        _assert_domain_scoped_euid(library_material_euid, "BNQ-")
+        _assert_domain_scoped_euid(library_container_euid, "BCP-")
+        _assert_domain_scoped_euid(library_plate_euid, "BCP-")
+        _assert_domain_scoped_euid(library_well_euid, "BCW-")
 
         library_qc = client.post(
             "/api/v1/external/atlas/beta/library-qc",
@@ -337,7 +337,7 @@ def test_beta_queue_flow_end_to_end():
         assert library_qc_body["qc_passed"] is True
         assert library_qc_body["next_queue"] == "ilmn_seq_pool"
         assert library_qc_body["current_queue"] == "ilmn_seq_pool"
-        _assert_domain_scoped_euid(library_qc_body["qc_record_euid"], "BDT-")
+        _assert_domain_scoped_euid(library_qc_body["qc_record_euid"], "BDP-")
 
         pool = client.post(
             "/api/v1/external/atlas/beta/pools",
@@ -367,7 +367,7 @@ def test_beta_queue_flow_end_to_end():
             json={
                 "pool_euid": pool_euid,
                 "platform": "ILMN",
-                "run_subtype": "novaseq",
+                "run_subtype": "illumina",
                 "flowcell_id": flowcell_id,
                 "run_name": "beta-ilmn-run",
                 "status": "completed",
@@ -402,7 +402,7 @@ def test_beta_queue_flow_end_to_end():
         assert run_body["artifact_count"] == 1
         assert run_body["assignment_count"] == 1
         assert run_body["flowcell_id"] == flowcell_id
-        assert run_body["run_subtype"] == "novaseq"
+        assert run_body["run_subtype"] == "illumina"
         assert run_body["operator_start_datetime"] == "2026-05-20T06:00:00Z"
         assert run_body["sequencing_end_datetime"] == "2026-05-20T14:30:00Z"
         assert run_body["instrument_euid"] == instrument_euid
@@ -421,9 +421,9 @@ def test_beta_queue_flow_end_to_end():
             )
             run_props = (run_instance.json_addl or {}).get("properties", {})
             assert run_instance.type == "sequencing_run"
-            assert run_instance.subtype == "novaseq"
+            assert run_instance.subtype == "illumina"
             assert run_props["beta_kind"] == "sequencing_run"
-            assert run_props["run_subtype"] == "novaseq"
+            assert run_props["run_subtype"] == "illumina"
             assert run_props["operator_start_datetime"] == "2026-05-20T06:00:00+00:00"
             assert run_props["sequencing_end_datetime"] == "2026-05-20T14:30:00+00:00"
             assert run_props["instrument_euid"] == instrument_euid

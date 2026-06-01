@@ -226,6 +226,65 @@ curl -k https://localhost:8912/api/v1/external/specimens \
 
 Deep dive: [docs/apis.md](docs/apis.md)
 
+## Prefix Taxonomy
+
+Bloom EUID prefixes are governed display labels for operators and downstream
+records. Prefixes are governance and display labels only; they do not drive
+behavior, authorization, routing, template lookup, or workflow dispatch. Code
+should use explicit template codes and semantic properties for behavior.
+
+| Family | Meaning |
+| --- | --- |
+| `BC*` | Containers |
+| `BN*` | Contents, materials, and reagents |
+| `BD*` | Data and evidence objects |
+| `BR*` | Runs and executions |
+| `BG*` | Generic helpers and external-object mappings |
+
+Concrete template kinds use three-letter prefixes. Two-letter prefixes are
+generic class reserves only: `BC`, `BN`, `BD`, `BR`, and `BG`. New Bloom-owned
+prefixes must not contain `I`, `L`, `O`, or `U`, and explicit numeric EUID
+input must not use leading zeros.
+
+Current concrete wet-lab prefixes:
+
+| Template kind | Category | Prefix |
+| --- | --- | --- |
+| tube container | `container` | `BCT` |
+| plate container | `container` | `BCP` |
+| well container | `container` | `BCW` |
+| bottle container | `container` | `BCB` |
+| flowcell container | `container` | `BCF` |
+| flowcell lane container | `container` | `BCE` |
+| rack, box, or storage container | `container` | `BCR` |
+| blood specimen/content | `content` | `BNB` |
+| buccal specimen content | `content` | `BNS` |
+| saliva specimen content | `content` | `BNA` |
+| gDNA content | `content` | `BNG` |
+| cfDNA content | `content` | `BNC` |
+| sequencing library content | `content` | `BNQ` |
+| sequencing library pool content | `content` | `BNP` |
+| generic reagent content | `content` | `BNR` |
+| sequencing index reagent content | `content` | `BNX` |
+| control material content | `content` | `BNK` |
+| gDNA quantification data | `data` | `BDQ` |
+| extraction run evidence/data | `data` | `BDX` |
+| extraction QC run evidence/data | `data` | `BDY` |
+| library prep run evidence/data | `data` | `BDP` |
+| pooling run evidence/data | `data` | `BDN` |
+| library-index assignment data | `data` | `BDA` |
+| transfer execution data | `data` | `BDT` |
+| Illumina sequencing run | `run` | `BRM` |
+| ONT sequencing run | `run` | `BRN` |
+| Ultima sequencing run | `run` | `BRT` |
+| PacBio sequencing run | `run` | `BRP` |
+| Complete Genomics sequencing run | `run` | `BRC` |
+| external object mapping | `generic` | `BGX` |
+
+Invalid historical proposals are explicitly replaced: `BCL` becomes `BCE`,
+`BRI` becomes `BRM`, `BRO` becomes `BRN`, `BRU` becomes `BRT`, `BNL` becomes
+`BNQ`, and `BDL` becomes `BDP`. Existing historical objects keep their already minted EUIDs; template prefix changes only affect future object creation.
+
 ## GUI Overview
 
 Bloom's GUI is an operator and developer surface, not just a demo shell. The main current routes are:

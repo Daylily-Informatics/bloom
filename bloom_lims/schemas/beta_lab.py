@@ -347,8 +347,10 @@ class BetaRunArtifactInput(BaseModel):
 
 class BetaRunCreateRequest(BaseModel):
     pool_euid: str
-    platform: Literal["ILMN", "ONT"]
-    run_subtype: Literal["illumina", "ont", "novaseq"] = Field(default="illumina")
+    platform: Literal["ILMN", "ONT", "Ultima", "PacBio", "CompleteGenomics"]
+    run_subtype: Literal[
+        "illumina", "ont", "ultima", "pacbio", "completegenomics"
+    ] = Field(default="illumina")
     flowcell_id: str
     run_name: str | None = None
     status: Literal["started", "completed"] = Field(default="completed")
@@ -367,13 +369,18 @@ class BetaRunCreateRequest(BaseModel):
             raise ValueError("flowcell_id must not be empty")
         if not self.assignments:
             raise ValueError("assignments must not be empty")
-        if self.platform == "ONT" and self.run_subtype != "ont":
-            raise ValueError("platform=ONT requires run_subtype=ont")
-        if self.platform == "ILMN" and self.run_subtype not in {
-            "illumina",
-            "novaseq",
-        }:
-            raise ValueError("platform=ILMN requires run_subtype=illumina or novaseq")
+        expected_subtype_by_platform = {
+            "ILMN": "illumina",
+            "ONT": "ont",
+            "Ultima": "ultima",
+            "PacBio": "pacbio",
+            "CompleteGenomics": "completegenomics",
+        }
+        expected_subtype = expected_subtype_by_platform[self.platform]
+        if self.run_subtype != expected_subtype:
+            raise ValueError(
+                f"platform={self.platform} requires run_subtype={expected_subtype}"
+            )
         if self.instrument_euid is not None and not self.instrument_euid.strip():
             raise ValueError("instrument_euid must not be empty when provided")
         for field_name in ("operator_start_datetime", "sequencing_end_datetime"):

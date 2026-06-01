@@ -35,6 +35,15 @@ class BetaLabService(
     ORGANIZATION_SITE_REFERENCE_TYPE = "atlas_organization_site"
     COLLECTION_EVENT_REFERENCE_TYPE = "atlas_collection_event"
     GENERIC_DATA_TEMPLATE_CODE = "data/generic/generic/1.0"
+    DATA_TEMPLATE_BY_BETA_KIND = {
+        "extraction_batch": "data/operation/extraction/1.0",
+        "extraction_run": "data/operation/extraction/1.0",
+        "post_extract_qc_result": "data/operation/extraction-qc/1.0",
+        "library_qc_result": "data/operation/library-prep/1.0",
+        "pooling_run": "data/operation/pooling/1.0",
+        "sequenced_library_assignment": "data/library-index-assignment/sequencing-library/1.0",
+        "run_artifact": "data/execution/transfer/1.0",
+    }
     BETA_KIND_QUEUE_DEFINITION = "queue_definition"
     BETA_KIND_QUEUE_EVENT = "queue_event"
     BETA_KIND_WORK_ITEM = "beta_work_item"
@@ -51,15 +60,18 @@ class BetaLabService(
     REL_MATERIAL_CONSUMPTION = "beta_material_consumption"
     REL_USED_INSTRUMENT = "beta_used_instrument"
     REL_USED_REAGENT = "beta_used_reagent"
-    POOL_TEMPLATE_CODE = "content/pool/generic/1.0"
+    POOL_TEMPLATE_CODE = "content/pool/sequencing-library/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
-    LIBRARY_PREP_OUTPUT_TEMPLATE_CODE = "data/wetlab/library_prep_output/1.0"
+    LIBRARY_PREP_OUTPUT_TEMPLATE_CODE = "data/operation/library-prep/1.0"
+    LIBRARY_MATERIAL_TEMPLATE_CODE = "content/sample/sequencing-library/1.0"
     SEQUENCING_RUN_TEMPLATE_BY_SUBTYPE = {
         "illumina": "data/sequencing_run/illumina/1.0",
         "ont": "data/sequencing_run/ont/1.0",
-        "novaseq": "data/sequencing_run/novaseq/1.0",
+        "ultima": "data/sequencing_run/ultima/1.0",
+        "pacbio": "data/sequencing_run/pacbio/1.0",
+        "completegenomics": "data/sequencing_run/completegenomics/1.0",
     }
-    LIBRARY_PLATE_TEMPLATE_CODE = "container/plate/fixed-plate-96/1.0"
+    LIBRARY_PLATE_TEMPLATE_CODE = "container/plate/sequencing-library-plate-96/1.0"
     EXTRACTION_TEMPLATE_BY_TYPE = {
         "cfdna": "content/sample/cfdna/1.0",
         "gdna": "content/sample/gdna/1.0",

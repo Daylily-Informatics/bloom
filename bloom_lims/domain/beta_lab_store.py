@@ -293,8 +293,14 @@ class _BetaLabStoreMixin:
             return
         type_name = str(instance.type or "").strip()
         subtype = str(instance.subtype or "").strip()
-        if type_name == "plate" and subtype in {"fixed-plate-96", "fixed-plate-24"}:
-            max_wells = 96 if subtype == "fixed-plate-96" else 24
+        plate_well_counts = {
+            "fixed-plate-24": 24,
+            "fixed-plate-96": 96,
+            "index-plate-96": 96,
+            "sequencing-library-plate-96": 96,
+        }
+        if type_name == "plate" and subtype in plate_well_counts:
+            max_wells = plate_well_counts[subtype]
             self._write_graph_metadata(
                 instance,
                 node_role=subtype,

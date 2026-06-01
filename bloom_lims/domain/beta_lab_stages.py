@@ -61,6 +61,7 @@ class _BetaLabStagesMixin:
                 "idempotency_key": record_idempotency_key,
                 "occurred_at": self._timestamp(),
             },
+            template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get(beta_kind),
         )
 
     def create_extraction(
@@ -388,6 +389,9 @@ class _BetaLabStagesMixin:
                 "idempotency_key": idempotency_key or "",
                 "occurred_at": self._timestamp(),
             },
+            template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get(
+                "post_extract_qc_result"
+            ),
         )
         if payload.quant_artifact_euid:
             qc_props = self._props(qc_record)
@@ -627,14 +631,13 @@ class _BetaLabStagesMixin:
             str(self._props(source).get("extraction_type") or "gdna").strip().lower()
         )
         library_material = self.bobj.create_instance_by_code(
-            self.EXTRACTION_TEMPLATE_BY_TYPE.get(
-                extraction_type, "content/sample/gdna/1.0"
-            ),
+            self.LIBRARY_MATERIAL_TEMPLATE_CODE,
             {
                 "json_addl": {
                     "properties": {
                         "beta_kind": "library_material",
                         "platform": payload.platform,
+                        "source_extraction_type": extraction_type,
                         "idempotency_key": idempotency_key or "",
                         "metadata": normalized_metadata,
                     }
@@ -843,6 +846,7 @@ class _BetaLabStagesMixin:
                 "idempotency_key": idempotency_key or "",
                 "occurred_at": self._timestamp(),
             },
+            template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("library_qc_result"),
         )
         self.bobj.create_generic_instance_lineage_by_euids(
             library_material.euid,
@@ -980,6 +984,24 @@ class _BetaLabStagesMixin:
         pool.name = pool_name
         pool_props["name"] = pool_name
         self._write_props(pool, pool_props)
+        pooling_run = self._create_data_record(
+            beta_kind="pooling_run",
+            name=f"pooling:{pool.euid}",
+            properties={
+                "platform": payload.platform,
+                "member_euids": [member.euid for member in members],
+                "pool_euid": pool.euid,
+                "metadata": normalized_metadata,
+                "idempotency_key": idempotency_key or "",
+                "occurred_at": self._timestamp(),
+            },
+            template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("pooling_run"),
+        )
+        self.bobj.create_generic_instance_lineage_by_euids(
+            pooling_run.euid,
+            pool.euid,
+            relationship_type="beta_pooling_run_output",
+        )
 
         pool_container = self.bobj.create_instance_by_code(
             payload.pool_container_template_code or self.POOL_CONTAINER_TEMPLATE_CODE,
@@ -995,6 +1017,11 @@ class _BetaLabStagesMixin:
                 member.euid,
                 pool.euid,
                 relationship_type="beta_pool_member",
+            )
+            self.bobj.create_generic_instance_lineage_by_euids(
+                member.euid,
+                pooling_run.euid,
+                relationship_type="beta_pooling_run_input",
             )
         self._write_graph_metadata(
             pool,
@@ -1065,6 +1092,7 @@ class _BetaLabStagesMixin:
             result={
                 "status": "success",
                 "pool_euid": pool.euid,
+                "pooling_run_euid": pooling_run.euid,
                 "pool_container_euid": pool_container.euid,
                 "current_queue": self.START_RUN_QUEUE_BY_PLATFORM[payload.platform],
                 "member_count": len(members),
@@ -1229,6 +1257,9 @@ class _BetaLabStagesMixin:
                     "library_material_euid": assignment.library_material_euid or "",
                     "barcode_reagent_euid": assignment.barcode_reagent_euid or "",
                 },
+                template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get(
+                    "sequenced_library_assignment"
+                ),
             )
             self.bobj.create_generic_instance_lineage_by_euids(
                 run.euid,
@@ -1310,6 +1341,7 @@ class _BetaLabStagesMixin:
                     "s3_uri": s3_uri,
                     "dewey_artifact_euid": dewey_artifact_euid or "",
                 },
+                template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("run_artifact"),
             )
             self.bobj.create_generic_instance_lineage_by_euids(
                 run.euid,

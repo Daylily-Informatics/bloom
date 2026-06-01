@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def _minimal_run_payload(**overrides):
     payload = {
-        "pool_euid": "BCT-POOL-1",
+        "pool_euid": "BNP-POOL-1",
         "platform": "ILMN",
         "run_subtype": "illumina",
         "flowcell_id": "FLOW-1",
@@ -26,7 +26,7 @@ def _minimal_run_payload(**overrides):
             {
                 "lane": "1",
                 "library_barcode": "IDX-1",
-                "library_prep_output_euid": "BDT-LIB-1",
+                "library_prep_output_euid": "BDP-LIB-1",
             }
         ],
     }
@@ -51,15 +51,21 @@ def test_sequencing_run_templates_are_shipped_for_tapdb_seed():
     }
 
     expected = {
-        ("data", "sequencing_run", "illumina", "1.0"): "ILMN",
-        ("data", "sequencing_run", "ont", "1.0"): "ONT",
-        ("data", "sequencing_run", "novaseq", "1.0"): "ILMN",
+        ("data", "sequencing_run", "illumina", "1.0"): ("ILMN", "BRM"),
+        ("data", "sequencing_run", "ont", "1.0"): ("ONT", "BRN"),
+        ("data", "sequencing_run", "ultima", "1.0"): ("Ultima", "BRT"),
+        ("data", "sequencing_run", "completegenomics", "1.0"): (
+            "CompleteGenomics",
+            "BRC",
+        ),
+        ("data", "sequencing_run", "pacbio", "1.0"): ("PacBio", "BRP"),
     }
-    for template_key, platform in expected.items():
+    for template_key, (platform, instance_prefix) in expected.items():
         template = templates[template_key]
         props = template["json_addl"]["properties"]
-        assert template["category"] == "BDT"
-        assert template["instance_prefix"] == "BDT"
+        assert template["category"] == instance_prefix
+        assert template["instance_prefix"] == instance_prefix
+        assert template["json_addl"]["semantic_category"] == "data"
         assert props["beta_kind"] == "sequencing_run"
         assert props["platform"] == platform
         assert props["run_subtype"] == template_key[2]
@@ -69,18 +75,24 @@ def test_sequencing_run_templates_are_shipped_for_tapdb_seed():
 
 
 def test_run_schema_validates_subtype_platform_and_datetime_contract():
-    novaseq = BetaRunCreateRequest.model_validate(
-        _minimal_run_payload(run_subtype="novaseq")
-    )
-    assert novaseq.run_subtype == "novaseq"
-
-    ont = BetaRunCreateRequest.model_validate(
-        _minimal_run_payload(platform="ONT", run_subtype="ont")
-    )
-    assert ont.platform == "ONT"
+    expected = {
+        "ILMN": "illumina",
+        "ONT": "ont",
+        "Ultima": "ultima",
+        "PacBio": "pacbio",
+        "CompleteGenomics": "completegenomics",
+    }
+    for platform, run_subtype in expected.items():
+        run = BetaRunCreateRequest.model_validate(
+            _minimal_run_payload(platform=platform, run_subtype=run_subtype)
+        )
+        assert run.platform == platform
+        assert run.run_subtype == run_subtype
 
     with pytest.raises(ValidationError, match="platform=ONT requires run_subtype=ont"):
-        BetaRunCreateRequest.model_validate(_minimal_run_payload(platform="ONT"))
+        BetaRunCreateRequest.model_validate(
+            _minimal_run_payload(platform="ONT", run_subtype="illumina")
+        )
 
     with pytest.raises(ValidationError, match="must include a timezone"):
         BetaRunCreateRequest.model_validate(
