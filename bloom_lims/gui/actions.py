@@ -4,6 +4,34 @@ import copy
 
 from bloom_lims.domain import BloomObj
 
+RELATIONSHIP_TYPE_OPTIONS = [
+    {"value": "contains", "label": "contains"},
+    {"value": "derived_from", "label": "derived_from"},
+    {"value": "aliquot_of", "label": "aliquot_of"},
+    {"value": "prepared_from", "label": "prepared_from"},
+    {"value": "member_of", "label": "member_of"},
+    {"value": "has_external_reference", "label": "has_external_reference"},
+    {"value": "beta_extraction_batch_run", "label": "beta_extraction_batch_run"},
+    {"value": "beta_extraction_run_input", "label": "beta_extraction_run_input"},
+    {"value": "beta_extraction_plate", "label": "beta_extraction_plate"},
+    {"value": "beta_extraction_well", "label": "beta_extraction_well"},
+    {"value": "beta_extraction_output", "label": "beta_extraction_output"},
+    {"value": "beta_extraction_run_output", "label": "beta_extraction_run_output"},
+    {"value": "beta_post_extract_qc", "label": "beta_post_extract_qc"},
+    {"value": "beta_library_prep_output", "label": "beta_library_prep_output"},
+    {"value": "beta_library_material_output", "label": "beta_library_material_output"},
+    {"value": "beta_library_qc", "label": "beta_library_qc"},
+    {"value": "beta_pooling_run_output", "label": "beta_pooling_run_output"},
+    {"value": "beta_pool_member", "label": "beta_pool_member"},
+    {"value": "beta_pooling_run_input", "label": "beta_pooling_run_input"},
+    {"value": "beta_sequencing_run", "label": "beta_sequencing_run"},
+    {"value": "beta_sequenced_library_assignment", "label": "beta_sequenced_library_assignment"},
+    {"value": "beta_assignment_source", "label": "beta_assignment_source"},
+    {"value": "beta_assignment_library_material", "label": "beta_assignment_library_material"},
+    {"value": "beta_assignment_barcode_reagent", "label": "beta_assignment_barcode_reagent"},
+    {"value": "beta_run_artifact", "label": "beta_run_artifact"},
+]
+
 
 def _normalize_action_slug(action_data: dict) -> str:
     method_name = str(action_data.get("method_name") or "").strip()
@@ -46,8 +74,9 @@ def _default_ui_fields_for_action(action_data: dict) -> list[dict]:
             {
                 "name": "relationship_type",
                 "label": "Relationship Type",
-                "type": "text",
+                "type": "select",
                 "required": True,
+                "options": RELATIONSHIP_TYPE_OPTIONS,
             },
             {
                 "name": "euids",
@@ -74,8 +103,14 @@ def hydrate_dynamic_action_groups(action_groups: dict, bobdb: BloomObj) -> dict:
         actions = group_data.get("actions", {})
         if not isinstance(actions, dict):
             continue
-        for action_data in actions.values():
+        for action_key, action_data in list(actions.items()):
             if not isinstance(action_data, dict):
+                continue
+            if (
+                action_data.get("action_visible") == "0"
+                or _normalize_action_slug(action_data) == "create_subject_and_anchor"
+            ):
+                actions.pop(action_key, None)
                 continue
             captured = action_data.get("captured_data")
             if not isinstance(captured, dict):

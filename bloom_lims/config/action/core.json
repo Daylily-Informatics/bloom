@@ -47,7 +47,7 @@
           "label_style": ""
         },
         "curr_user": "",
-        "description": "Print Label2",
+        "description": "Print Label",
         "ui_schema": {
           "title": "Print Label",
           "fields": []
@@ -78,7 +78,58 @@
         "description": "Add Parent or Child Relationships (aka lineages).",
         "ui_schema": {
           "title": "Add Parent or Child Relationship(s)",
-          "fields": []
+          "fields": [
+            {
+              "name": "lineage_type_to_create",
+              "label": "Create Relationship As",
+              "type": "select",
+              "required": true,
+              "options": [
+                {"value": "parent", "label": "parent"},
+                {"value": "child", "label": "child"}
+              ]
+            },
+            {
+              "name": "relationship_type",
+              "label": "Relationship Type",
+              "type": "select",
+              "required": true,
+              "options": [
+                {"value": "contains", "label": "contains"},
+                {"value": "derived_from", "label": "derived_from"},
+                {"value": "aliquot_of", "label": "aliquot_of"},
+                {"value": "prepared_from", "label": "prepared_from"},
+                {"value": "member_of", "label": "member_of"},
+                {"value": "has_external_reference", "label": "has_external_reference"},
+                {"value": "beta_extraction_batch_run", "label": "beta_extraction_batch_run"},
+                {"value": "beta_extraction_run_input", "label": "beta_extraction_run_input"},
+                {"value": "beta_extraction_plate", "label": "beta_extraction_plate"},
+                {"value": "beta_extraction_well", "label": "beta_extraction_well"},
+                {"value": "beta_extraction_output", "label": "beta_extraction_output"},
+                {"value": "beta_extraction_run_output", "label": "beta_extraction_run_output"},
+                {"value": "beta_post_extract_qc", "label": "beta_post_extract_qc"},
+                {"value": "beta_library_prep_output", "label": "beta_library_prep_output"},
+                {"value": "beta_library_material_output", "label": "beta_library_material_output"},
+                {"value": "beta_library_qc", "label": "beta_library_qc"},
+                {"value": "beta_pooling_run_output", "label": "beta_pooling_run_output"},
+                {"value": "beta_pool_member", "label": "beta_pool_member"},
+                {"value": "beta_pooling_run_input", "label": "beta_pooling_run_input"},
+                {"value": "beta_sequencing_run", "label": "beta_sequencing_run"},
+                {"value": "beta_sequenced_library_assignment", "label": "beta_sequenced_library_assignment"},
+                {"value": "beta_assignment_source", "label": "beta_assignment_source"},
+                {"value": "beta_assignment_library_material", "label": "beta_assignment_library_material"},
+                {"value": "beta_assignment_barcode_reagent", "label": "beta_assignment_barcode_reagent"},
+                {"value": "beta_run_artifact", "label": "beta_run_artifact"}
+              ]
+            },
+            {
+              "name": "euids",
+              "label": "EUIDs (one per line)",
+              "type": "textarea",
+              "required": true,
+              "rows": 6
+            }
+          ]
         }
       }
     }
@@ -90,7 +141,8 @@
         "method_name": "do_action_create_subject_and_anchor",
         "action_executed": "0",
         "max_executions": "-1",
-        "action_enabled": "1",
+        "action_enabled": "0",
+        "action_visible": "0",
         "capture_data": "yes",
         "captured_data": {},
         "deactivate_actions_when_executed": [],
