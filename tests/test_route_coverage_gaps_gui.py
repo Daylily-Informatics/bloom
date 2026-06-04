@@ -349,7 +349,4 @@ def test_logout_alias_routes_execute_handler_body(client: TestClient) -> None:
 
         logout = client.get("/logout", follow_redirects=False)
         assert logout.status_code == 303
-        assert (
-            logout.headers["location"]
-            == "https://example.auth.us-west-2.amazoncognito.com/logout"
-        )
+        assert logout.headers["location"] == "/auth/logout"

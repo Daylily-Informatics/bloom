@@ -160,9 +160,6 @@
         <a href="/search?q={{ obj.euid }}" class="btn btn-outline btn-block">
           <i class="fas fa-search"></i> Related Objects
         </a>
-        <button class="btn btn-outline btn-block" onclick="printLabel('{{ obj.euid }}')">
-          <i class="fas fa-print"></i> Print Label
-        </button>
       </div>
     </div>
   </div>
@@ -779,23 +776,27 @@ if (typeof window.showCapturedDataFormFromDataAttributes !== 'function') {
 var editorProperties = null;
 var editorTemplate = null;
 
-// Collapsible section toggle
-document.querySelectorAll('.collapsible-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var targetId = this.getAttribute('data-target');
-    var targetEl = document.getElementById(targetId);
-
-    // Toggle active class on button
-    this.classList.toggle('active');
-
-    // Toggle visibility of content
-    if (targetEl.style.display === 'none') {
-      targetEl.style.display = 'block';
-    } else {
-      targetEl.style.display = 'none';
-    }
+function bindCollapsibleSections() {
+  document.querySelectorAll('.collapsible-btn').forEach(function(btn) {
+    if (btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function() {
+      var targetId = this.getAttribute('data-target');
+      var targetEl = document.getElementById(targetId);
+      if (!targetEl) {
+        if (typeof window.BloomToast !== 'undefined' && typeof window.BloomToast.error === 'function') {
+          window.BloomToast.error('Section Missing', 'Unable to find section ' + targetId);
+        }
+        return;
+      }
+      this.classList.toggle('active');
+      targetEl.style.display = targetEl.style.display === 'none' || targetEl.style.display === '' ? 'block' : 'none';
+    });
   });
-});
+}
+
+bindCollapsibleSections();
+document.addEventListener('DOMContentLoaded', bindCollapsibleSections);
 
 // Format JSON on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -955,11 +956,6 @@ function saveTemplateProperties() {
   } catch (e) {
     BloomToast.error('Invalid JSON', e.message);
   }
-}
-
-// Print label
-function printLabel(euid) {
-  BloomToast.info('Print Label', 'Printing label for ' + euid);
 }
 
 // Edit mode state

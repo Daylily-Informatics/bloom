@@ -27,6 +27,7 @@ const keyState = {
     c: false,
     n: false,
     i: false,
+    z: false,
 };
 
 const DEFAULT_CONTROL_STATE = {
@@ -160,13 +161,13 @@ const cytoscapeStyle = [
             "width": 2,
             "line-color": "#666",
             "curve-style": "bezier",
-            "source-arrow-shape": "none",
-            "target-arrow-shape": "triangle",
-            "target-arrow-fill": "filled",
-            "target-arrow-color": "#666",
+            "source-arrow-shape": "triangle",
+            "source-arrow-fill": "filled",
+            "source-arrow-color": "#666",
+            "target-arrow-shape": "none",
             "source-endpoint": "outside-to-node",
             "target-endpoint": "outside-to-node",
-            "target-distance-from-node": 6,
+            "source-distance-from-node": 6,
             "arrow-scale": 1.6,
             "opacity": 1,
         },
@@ -176,7 +177,7 @@ const cytoscapeStyle = [
         style: {
             "line-style": "dashed",
             "line-color": "#c1a967",
-            "target-arrow-color": "#c1a967",
+            "source-arrow-color": "#c1a967",
         },
     },
     {
@@ -184,7 +185,7 @@ const cytoscapeStyle = [
         style: {
             "line-style": "dotted",
             "line-color": "#f7c948",
-            "target-arrow-color": "#f7c948",
+            "source-arrow-color": "#f7c948",
             "width": 3,
         },
     },
@@ -192,7 +193,7 @@ const cytoscapeStyle = [
         selector: "edge:selected",
         style: {
             "line-color": "#e74c3c",
-            "target-arrow-color": "#e74c3c",
+            "source-arrow-color": "#e74c3c",
             "width": 3,
         },
     },
@@ -385,6 +386,9 @@ function installKeyboardHandlers() {
         if (key === "i") {
             keyState.i = true;
         }
+        if (key === "z") {
+            keyState.z = true;
+        }
         if (key === "escape") {
             clearPendingLineageSelection();
             setStatus("Cleared selection.", "warn");
@@ -411,7 +415,28 @@ function installKeyboardHandlers() {
         if (key === "i") {
             keyState.i = false;
         }
+        if (key === "z") {
+            keyState.z = false;
+        }
     });
+}
+
+function configureCytoscapeInteractions(container) {
+    if (container.dataset.cytoscapeWheelGate === "installed") {
+        return;
+    }
+    container.dataset.cytoscapeWheelGate = "installed";
+    container.addEventListener(
+        "wheel",
+        (evt) => {
+            const isPinchZoom = evt.ctrlKey || evt.metaKey;
+            if (isPinchZoom || keyState.z) {
+                return;
+            }
+            evt.stopImmediatePropagation();
+        },
+        { capture: true, passive: true },
+    );
 }
 
 function registerTapSequence(nodeId, button) {
@@ -1081,6 +1106,7 @@ function initCytoscape(container, elements) {
         evt.preventDefault();
     });
 
+    configureCytoscapeInteractions(container);
     cy = cytoscape({
         container: container,
         elements: elements,

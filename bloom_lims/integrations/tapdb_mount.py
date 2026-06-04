@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable
+from urllib.parse import quote
 
 from fastapi import FastAPI
 from starlette.datastructures import Headers
@@ -143,7 +144,14 @@ class BloomAdminGuardedASGI:
                     content={"detail": "Authentication required"},
                 )
             else:
-                response = RedirectResponse(url="/login", status_code=303)
+                next_path = str(scope.get("path") or "/")
+                query_string = scope.get("query_string") or b""
+                if query_string:
+                    next_path = f"{next_path}?{query_string.decode('utf-8', errors='ignore')}"
+                response = RedirectResponse(
+                    url=f"/login?next={quote(next_path, safe='/')}",
+                    status_code=303,
+                )
             await response(scope, receive, send)
             return
 

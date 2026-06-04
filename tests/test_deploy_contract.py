@@ -43,3 +43,11 @@ def test_db_build_help_mentions_target_option() -> None:
     result = runner.invoke(build_app(), ["db", "build", "--help"])
     assert result.exit_code == 0
     assert "--target" in result.output
+
+
+def test_container_packages_gui_auth_module() -> None:
+    dockerfile = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "COPY auth ./auth" in dockerfile
+    assert '"auth*"' in pyproject

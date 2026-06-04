@@ -22,7 +22,13 @@ def _required_absolute_file(name: str) -> Path:
     return path
 
 
-def _initialize_cli_runtime(config_path: Path) -> None:
+def _start_server(**kwargs: object) -> None:
+    from bloom_lims.cli.server import start
+
+    start(**kwargs)
+
+
+def _initialize_runtime_context(config_path: Path) -> None:
     from cli_core_yo.errors import ContextNotInitializedError
     from cli_core_yo.runtime import get_context, initialize
     from cli_core_yo.xdg import resolve_paths
@@ -31,19 +37,25 @@ def _initialize_cli_runtime(config_path: Path) -> None:
 
     try:
         get_context()
+        return
     except ContextNotInitializedError:
-        initialize(spec, resolve_paths(spec.xdg), config_path=config_path)
+        pass
 
-
-def _start_server(**kwargs: object) -> None:
-    from bloom_lims.cli.server import start
-
-    start(**kwargs)
+    initialize(
+        spec,
+        resolve_paths(spec.xdg),
+        config_path=config_path,
+        invocation={"entrypoint": "container"},
+        backend_name="container",
+        backend_kind="container",
+        runtime_guard_mode="off",
+        runtime_check_skipped=True,
+    )
 
 
 def main() -> None:
     config_path = _required_absolute_file("BLOOM_CONFIG_PATH")
-    _initialize_cli_runtime(config_path)
+    _initialize_runtime_context(config_path)
     _start_server(
         port=int(_required_env("PORT")),
         host=_required_env("HOST"),

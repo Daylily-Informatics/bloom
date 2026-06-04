@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lsmc-service="bloom" data-theme="original">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,9 +62,6 @@
         <nav class="header-nav" aria-label="Main navigation">
             <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
                 <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="/queue_details" class="{% if '/queue_details' in request.url.path %}active{% endif %}">
-                <i class="fas fa-list-check"></i> Queue Runtime
             </a>
             <a href="/equipment" class="{% if '/equipment' in request.url.path %}active{% endif %}">
                 <i class="fas fa-microscope"></i> Equipment
@@ -159,6 +156,7 @@
     <!-- BLOOM Modern JS -->
     <script src="/static/modern/js/timezone.js"></script>
     <script src="/static/modern/js/bloom_modern.js"></script>
+    <script src="/static/modern/js/lsmc_ui.js"></script>
 
     <!-- Global configuration -->
     <script>

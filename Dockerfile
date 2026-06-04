@@ -17,6 +17,8 @@ RUN apt-get update \
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 
+COPY config ./config
+COPY auth ./auth
 COPY bloom_lims ./bloom_lims
 COPY main.py ./main.py
 COPY static ./static

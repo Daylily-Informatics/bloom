@@ -18,6 +18,13 @@ def test_modern_euid_details_uses_data_attribute_action_handler():
     assert "onclick=\"showCapturedDataForm(this, {{ action_value | tojson }}" not in template
 
 
+def test_modern_euid_details_has_no_toast_only_print_button():
+    template = _read("templates/modern/euid_details.html")
+
+    assert "onclick=\"printLabel('{{ obj.euid }}')\"" not in template
+    assert "Printing label for " not in template
+
+
 def test_modern_workflow_details_uses_data_attribute_action_handler():
     template = _read("templates/modern/workflow_details.html")
 

@@ -193,14 +193,9 @@ def create_app() -> FastAPI:
     app.include_router(probe_router)
     app.include_router(observability_router)
     app.include_router(api_v1_router)
-    try:
-        from bloom_lims.gui.router import router as gui_router
-    except ModuleNotFoundError as exc:
-        logging.warning(
-            "Skipping GUI router due to missing optional dependency: %s", exc.name
-        )
-    else:
-        app.include_router(gui_router)
+    from bloom_lims.gui.router import router as gui_router
+
+    app.include_router(gui_router)
 
     register_exception_handlers(app)
     return app

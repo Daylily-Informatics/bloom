@@ -28,7 +28,7 @@ license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
     "cli-core-yo==2.1.1",
-    "daylily-tapdb==7.0.9",
+    "daylily-tapdb==8.0.1",
     "daylily-auth-cognito==2.1.5",
     "IPython>=8.18.1",
     "bandit[toml]>=1.8.0",
@@ -91,7 +91,7 @@ version_file = "bloom_lims/_scm_version.py"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["bloom_lims*"]
+include = ["auth*", "bloom_lims*"]
 
 [tool.setuptools.package-data]
 bloom_lims = ["etc/*.yaml", "etc/*.json"]

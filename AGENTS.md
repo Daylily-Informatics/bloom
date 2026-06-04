@@ -1,3 +1,10 @@
+# Shell Session Defaults
+
+- Default to an interactive shell for shell work. On this Mac, use the user's default shell unless the user explicitly asks for another shell.
+- For AWS EC2, ParallelCluster, and other remote Linux hosts, default to an interactive `bash` login shell as `ubuntu`. Do not use `root` unless the user explicitly grants permission for that specific work; use targeted `sudo` from `ubuntu` when escalation is required.
+- For Daylily/DayOA/DAY-EC headnode workflow work, use an interactive `ubuntu` tmux/login-shell pane for controllers and workflow commands. Run setup as separate commands in that pane (`source dyoainit`, then `dy-a ...`, then `dy-r ...`) so aliases/functions are defined before use.
+- SSM Run Command is for simple inspection or for writing helper scripts through the supported helpers. Do not launch workflow controllers or rely on `dy-*` aliases from non-interactive SSM scripts.
+
 # Bloom CLI Policy
 
 ## Session Setup
@@ -57,6 +64,16 @@ source ./activate <deploy-name>
 - Service-host certs use DNS-01 renewal; do not depend on HTTP-01 public reachability for Bloom service hosts.
 - Future dev, test, and stage deployments must use their own approved-source lists, credentials, certificates, TapDB schemas, and tenant data, separate from production.
 
+## Version Tags
+
+- Use non-v semver tags for package releases, e.g. `2.0.19` or `5.0.21`, not `v2.0.19`.
+- Commit first, then tag the exact clean release commit.
+- Use annotated tags for release provenance: `git tag -a 2.0.19 -m "Release 2.0.19"`.
+- Lightweight tags are acceptable only for scratch/internal marks, not package releases.
+- Do not move or overwrite pushed version tags. If a pushed tag is wrong, cut the next patch version.
+- If signing is configured and expected, use signed annotated tags: `git tag -s 2.0.19 -m "Release 2.0.19"`.
+- Verify tag type with `git cat-file -t 2.0.18`; `tag` means annotated and `commit` means lightweight.
+
 ## Bloom Examples
 
 - Start with `source ./activate <deploy-name>`
@@ -64,3 +81,9 @@ source ./activate <deploy-name>
 - Use `bloom db seed`
 - Use `bloom server start --port 8912`
 - Use `tapdb ...` and `daycog ...` only where Bloom docs or Bloom CLI explicitly delegate to them
+# DEPLOYED SERVICE GUI AUTH EVIDENCE
+
+- For deployed service acceptance, API health checks and HTTP `302` redirects are not sufficient. Also use Playwright or the bundled Playwright CLI workflow to open each deployed GUI login page, snapshot the page, click through to the Google OAuth option, and capture screenshots.
+- Store screenshots and records under `output/playwright/` or the deployment ledger evidence directory. Record service name, deploy name, URL, timestamp, screenshot paths, and status as `confirmed_success` or `confirmed_fail`.
+- If the Google OAuth click reaches an expected external blocker, such as `redirect_uri_mismatch`, record the exact callback URI and mark the row blocked instead of treating the service as healthy.
+- Debug and fix failures that are in repository/deployment scope. If the failure requires external configuration or human credentials, annotate the reason precisely. Do not enter real user credentials unless the user explicitly authorizes that in the current turn.

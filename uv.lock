@@ -173,7 +173,7 @@ dependencies = [
     { name = "playwright" },
     { name = "pre-commit" },
     { name = "psutil" },
-    { name = "psycopg2-binary" },
+    { name = "psycopg2" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -200,7 +200,7 @@ requires-dist = [
     { name = "cli-core-yo", specifier = "==2.1.1" },
     { name = "daylily-auth-cognito", specifier = "==2.1.5" },
     { name = "daylily-carrier-tracking", specifier = "==0.5.1" },
-    { name = "daylily-tapdb", specifier = "==7.0.9" },
+    { name = "daylily-tapdb", specifier = "==8.0.1" },
     { name = "djlint" },
     { name = "fastapi", specifier = ">=0.110.0" },
     { name = "httpx", specifier = ">=0.27.2" },
@@ -214,7 +214,7 @@ requires-dist = [
     { name = "playwright", specifier = ">=1.42.0" },
     { name = "pre-commit", specifier = ">=3.8.0" },
     { name = "psutil", specifier = ">=5.9.0" },
-    { name = "psycopg2-binary", specifier = "==2.9.12" },
+    { name = "psycopg2", specifier = "==2.9.9" },
     { name = "pydantic", specifier = ">=2.6.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
@@ -704,7 +704,7 @@ wheels = [
 
 [[package]]
 name = "daylily-tapdb"
-version = "7.0.9"
+version = "8.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cli-core-yo" },
@@ -718,9 +718,9 @@ dependencies = [
     { name = "typer" },
     { name = "uuid6" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/80/8e/e719791ed396e6dd54fef7fa095ad02926d7747b819831def09a4e828b78/daylily_tapdb-7.0.9.tar.gz", hash = "sha256:b0cb9a731ae9bde37369dcad38c427a4ed565e0c8bd676accfabd3fc5eddca17", size = 476038, upload-time = "2026-05-28T09:47:33.84Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/02/e41559749c8f261ffc48117dd5f42dc9a3a13e351e58a56ed46dfb4f9a5b/daylily_tapdb-8.0.1.tar.gz", hash = "sha256:a6c5ba5f27e628834a222fd964c61fb34e29c4d5b6cc71aa0235c6d8cdae4036", size = 510268, upload-time = "2026-06-04T10:47:35.229Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/a6/2bfbfd9321e012e254dae4be7d1bb95dab536eac1f93dc6161e41e4e5f80/daylily_tapdb-7.0.9-py3-none-any.whl", hash = "sha256:c0d86106d417cb693a8046fc1fb236091930b348df65d4f619f76b3ede9cf2b1", size = 258536, upload-time = "2026-05-28T09:47:32.47Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/48/7ab4bc1cffd8a88500814bb854d7c947099926e44d6ff242de514a26fe0a/daylily_tapdb-8.0.1-py3-none-any.whl", hash = "sha256:1d52dae6bf57d2237dbe16e50dd01767c7c00be294a7f8379637f6d6ade3851a", size = 281818, upload-time = "2026-06-04T10:47:31.949Z" },
 ]
 
 [[package]]
@@ -1419,11 +1419,11 @@ wheels = [
 
 [[package]]
 name = "meridian-euid"
-version = "0.4.5"
+version = "0.4.7"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9e/ae/2e51a25fd422f39d0b8cc7b65ad9f32309efad6cadaaa15ab16f29585a98/meridian_euid-0.4.5.tar.gz", hash = "sha256:5423d40c4a200d86dc1e0b5df47d3d1aecdf5a30f9668849e4f857deb956e218", size = 15247, upload-time = "2026-05-16T11:47:36.548Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/ea/eff4b7b442f20fa5aa968735ee17f43f9d8e9621da89230426a43203ef5b/meridian_euid-0.4.7.tar.gz", hash = "sha256:27b65eba282a904a876c7df16b48a8329900190cf5830a5fd61776f89d98a62a", size = 19238, upload-time = "2026-06-04T09:47:05.716Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/8d/02dc20a37f126beca0ca197796be8ee44db463c9417efa350715046915d0/meridian_euid-0.4.5-py3-none-any.whl", hash = "sha256:c07d760f26d47a7cee489b71fe11a4df69a9ba094cde57aad2fca8415a05bee8", size = 12073, upload-time = "2026-05-16T11:47:35.645Z" },
+    { url = "https://files.pythonhosted.org/packages/21/53/8c9b0dd4f9ec901b0289e6f7fc20163d588d20019edd6f437233cf834c91/meridian_euid-0.4.7-py3-none-any.whl", hash = "sha256:a369a21b4bc7835848ea424bc0a9b1f8273afb13e7ab0c9e83bdd9111a7dd1c8", size = 15316, upload-time = "2026-06-04T09:47:04.808Z" },
 ]
 
 [[package]]
@@ -1818,6 +1818,16 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/04/78/0acd37ca84ce3ddffaa92ef0f571e073faa6d8ff1f0559ab1272188ea2be/psutil-7.2.2-cp36-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b58fabe35e80b264a4e3bb23e6b96f9e45a3df7fb7eed419ac0e5947c61e47cc", size = 148266, upload-time = "2026-01-28T18:15:31.597Z" },
     { url = "https://files.pythonhosted.org/packages/b4/90/e2159492b5426be0c1fef7acba807a03511f97c5f86b3caeda6ad92351a7/psutil-7.2.2-cp37-abi3-win_amd64.whl", hash = "sha256:eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988", size = 137737, upload-time = "2026-01-28T18:15:33.849Z" },
     { url = "https://files.pythonhosted.org/packages/8c/c7/7bb2e321574b10df20cbde462a94e2b71d05f9bbda251ef27d104668306a/psutil-7.2.2-cp37-abi3-win_arm64.whl", hash = "sha256:8c233660f575a5a89e6d4cb65d9f938126312bca76d8fe087b947b3a1aaac9ee", size = 134617, upload-time = "2026-01-28T18:15:36.514Z" },
+]
+
+[[package]]
+name = "psycopg2"
+version = "2.9.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/5e/dc6acaf46d78979d6b03458b7a1618a68e152a6776fce95daac5e0f0301b/psycopg2-2.9.9.tar.gz", hash = "sha256:d1454bde93fb1e224166811694d600e746430c006fbb031ea06ecc2ea41bf156", size = 384926, upload-time = "2023-10-03T12:48:53.323Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/13/f74ffe6b6f58822e807c70391dc5679a53feb92ce119ccb8a6546c3fb893/psycopg2-2.9.9-cp312-cp312-win32.whl", hash = "sha256:d735786acc7dd25815e89cc4ad529a43af779db2e25aa7c626de864127e5a024", size = 1024634, upload-time = "2023-10-28T09:37:19.078Z" },
+    { url = "https://files.pythonhosted.org/packages/58/4b/c4a26e191882b60150bfcb639e416524ae7f8249ab7ee854fb5247f16c40/psycopg2-2.9.9-cp312-cp312-win_amd64.whl", hash = "sha256:a7653d00b732afb6fc597e29c50ad28087dcb4fbfb28e86092277a559ae4e693", size = 1163789, upload-time = "2023-10-28T09:37:22.214Z" },
 ]
 
 [[package]]

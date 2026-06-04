@@ -15,9 +15,19 @@ def test_project_dependencies_pin_release_train_versions() -> None:
 
     assert "cli-core-yo==2.1.1" in dependencies
     assert "daylily-auth-cognito==2.1.5" in dependencies
-    assert "daylily-tapdb>=7.0.7,<8.0.0" in dependencies
+    assert "daylily-tapdb==8.0.1" in dependencies
     assert "IPython>=8.18.1" in dependencies
     assert "psycopg2-binary==2.9.12" in dependencies
     assert not any(str(dep).startswith("zebra-day") for dep in dependencies)
     assert "djlint" in dependencies
     assert "optional-dependencies" not in data["project"]
+
+
+def test_dockerfile_copies_tapdb_template_config() -> None:
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "COPY config ./config" in dockerfile
+    assert "COPY static ./static" in dockerfile
+    assert "COPY templates ./templates" in dockerfile

@@ -29,7 +29,7 @@ def test_unauthenticated_request_redirects_to_bloom_login():
     with _client() as client:
         response = client.get("/admin/tapdb/login", follow_redirects=False)
         assert response.status_code == 303
-        assert response.headers.get("location") == "/login"
+        assert response.headers.get("location") == "/login?next=/admin/tapdb/login"
 
         json_response = client.get(
             "/admin/tapdb/login",
