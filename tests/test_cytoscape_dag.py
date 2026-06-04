@@ -802,3 +802,15 @@ class TestGraphViewerClientContract:
         assert 'runCogsForEuid("children", node.id()' in graph_js
         assert "runNeighborhoodFromNode(node)" in graph_js
         assert "openNodeActionDialog(node.data())" in graph_js
+
+    def test_graph_js_requires_z_for_mouse_wheel_zoom_and_points_arrows_to_parents(self):
+        graph_js = Path("static/js/graph.js").read_text(encoding="utf-8")
+        template = Path("templates/modern/dag_explorer.html").read_text(encoding="utf-8")
+
+        assert "configureCytoscapeInteractions(container);" in graph_js
+        assert 'key === "z"' in graph_js
+        assert '"wheel"' in graph_js
+        assert "stopImmediatePropagation()" in graph_js
+        assert '"source-arrow-shape": "triangle"' in graph_js
+        assert '"target-arrow-shape": "none"' in graph_js
+        assert "Arrowheads point to parent nodes." in template
