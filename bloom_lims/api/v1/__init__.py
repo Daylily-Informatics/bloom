@@ -16,7 +16,7 @@ from bloom_lims import __version__
 from .admin_auth import router as admin_auth_router
 from .async_tasks import router as async_tasks_router
 from .atlas_bridge import router as atlas_bridge_router
-from .auth import router as auth_router
+from .auth import preferences_router, router as auth_router
 from .batch import router as batch_router
 from .beta_lab import router as beta_lab_router
 from .containers import router as containers_router
@@ -41,6 +41,7 @@ router = APIRouter(prefix="/api/v1", tags=["API v1"])
 # Include sub-routers
 router.include_router(objects_router)
 router.include_router(auth_router)
+router.include_router(preferences_router)
 router.include_router(containers_router)
 router.include_router(content_router)
 router.include_router(equipment_router)

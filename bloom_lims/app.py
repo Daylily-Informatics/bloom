@@ -116,23 +116,59 @@ def create_app() -> FastAPI:
         except Exception:
             route = request.scope.get("route")
             route_template = getattr(route, "path", "")
+            duration_ms = (monotonic() - started) * 1000
             if route_template:
                 app.state.observability.record_http_request(
                     method=request.method,
                     route_template=route_template,
                     status_code=500,
-                    duration_ms=(monotonic() - started) * 1000,
+                    duration_ms=duration_ms,
                 )
+            logging.getLogger("lsmc.access").exception(
+                "request_completed",
+                extra={
+                    "request_id": getattr(request.state, "request_id", ""),
+                    "correlation_id": getattr(request.state, "correlation_id", ""),
+                    "service_id": "bloom",
+                    "actor": getattr(request.state, "authorized_by_email", None),
+                    "agent_id": getattr(request.state, "agent_id", None),
+                    "ip": request.client.host if request.client else None,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "route": route_template or request.url.path,
+                    "status": 500,
+                    "duration_ms": round(duration_ms, 2),
+                    "auth_mode": getattr(request.state, "auth_mode", None),
+                },
+            )
             raise
         route = request.scope.get("route")
         route_template = getattr(route, "path", "")
+        duration_ms = (monotonic() - started) * 1000
         if route_template:
             app.state.observability.record_http_request(
                 method=request.method,
                 route_template=route_template,
                 status_code=response.status_code,
-                duration_ms=(monotonic() - started) * 1000,
+                duration_ms=duration_ms,
             )
+        logging.getLogger("lsmc.access").info(
+            "request_completed",
+            extra={
+                "request_id": getattr(request.state, "request_id", ""),
+                "correlation_id": getattr(request.state, "correlation_id", ""),
+                "service_id": "bloom",
+                "actor": getattr(request.state, "authorized_by_email", None),
+                "agent_id": getattr(request.state, "agent_id", None),
+                "ip": request.client.host if request.client else None,
+                "method": request.method,
+                "path": request.url.path,
+                "route": route_template or request.url.path,
+                "status": response.status_code,
+                "duration_ms": round(duration_ms, 2),
+                "auth_mode": getattr(request.state, "auth_mode", None),
+            },
+        )
         return response
 
     # Request attribution context for TapDB-style DB metrics.

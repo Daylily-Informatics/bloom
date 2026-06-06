@@ -13,6 +13,25 @@
     window.localStorage.setItem(storageKey, value);
   }
 
+  async function syncThemeFromBroker(select) {
+    const response = await fetch("/api/v1/me/preferences", { credentials: "same-origin" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    const theme = payload && payload.preferences && payload.preferences.theme;
+    if (!themes.includes(theme)) return;
+    applyTheme(theme);
+    if (select) select.value = theme;
+  }
+
+  async function persistThemeToBroker(theme) {
+    await fetch("/api/v1/me/preferences", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme }),
+    });
+  }
+
   function commandForPage() {
     const explicit = document.body.dataset.actionHelpCommand || "";
     if (explicit) return explicit;
@@ -36,10 +55,14 @@
       select.appendChild(option);
     }
     select.value = currentTheme();
-    select.addEventListener("change", () => applyTheme(select.value));
+    select.addEventListener("change", () => {
+      applyTheme(select.value);
+      persistThemeToBroker(select.value).catch(() => {});
+    });
     label.appendChild(select);
     wrap.appendChild(label);
     document.body.appendChild(wrap);
+    syncThemeFromBroker(select).catch(() => {});
   }
 
   function initActionHelp() {
