@@ -497,6 +497,14 @@ def test_seed_templates_split_core_and_client_ownership(
                     "_source_file": str(core_template_path),
                 },
                 {
+                    "category": "XRF",
+                    "type": "reference",
+                    "subtype": "external_object",
+                    "version": "1.0",
+                    "instance_prefix": "XRF",
+                    "_source_file": str(core_template_path),
+                },
+                {
                     "category": "BAC",
                     "type": "beta_lab",
                     "subtype": "claim_material_in_queue",
@@ -579,7 +587,7 @@ def test_seed_templates_split_core_and_client_ownership(
     db_commands._seed_tapdb_templates("target", overwrite=False)
 
     assert events == [
-        ("seed", {"owner_repo_name": "daylily-tapdb", "templates": ["SYS"]}),
+        ("seed", {"owner_repo_name": "daylily-tapdb", "templates": ["SYS", "XRF"]}),
         (
             "claim",
             {"owner_repo_name": "bloom", "domain_code": "Z", "templates": ["BAC"]},
@@ -753,6 +761,7 @@ def test_claim_client_template_prefixes_ignores_reserved_core_prefixes(
         templates=[
             {"instance_prefix": "SYS"},
             {"instance_prefix": "MSG"},
+            {"instance_prefix": "XRF"},
             {"instance_prefix": "BAC"},
         ],
     )

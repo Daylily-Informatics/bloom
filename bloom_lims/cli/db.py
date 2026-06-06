@@ -48,7 +48,7 @@ from bloom_lims.template_identity import template_semantic_category
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_TAPDB_CORE_TEMPLATE_PREFIXES = {"SYS", "MSG"}
+_TAPDB_CORE_TEMPLATE_PREFIXES = {"ADT", "EDG", "MSG", "SYS", "TPX", "XRF"}
 _IDENTITY_PREFIXES: dict[str, str] = {
     "generic_template": GENERIC_TEMPLATE_PREFIX,
     "generic_instance_lineage": GENERIC_INSTANCE_LINEAGE_PREFIX,

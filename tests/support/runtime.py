@@ -57,6 +57,7 @@ _TAPDB_CORE_PREFIX_OWNERSHIP = {
     "TPX",
     "EDG",
     "ADT",
+    "XRF",
     "SYS",
     "MSG",
 }
