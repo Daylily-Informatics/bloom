@@ -4,7 +4,14 @@ Created: 2026-06-04T11:07:00Z
 
 ## Status
 
-Bloom needs a follow-up implementation pass before Kahlo-issued AI-agent tokens can safely read Bloom search endpoints directly.
+SUPERSEDED for local `jem-dev` source by commit `2e53e0c` and release tag
+`6.0.2`. Bloom now has the local source pieces for Kahlo-issued read-only
+AI-agent validation, broker-backed theme preferences, and common access logging.
+
+Remaining acceptance moved to the Dayhoff final beta ledger:
+`/Users/jmajor/projects/mega_dayhoff/dayhoff/docs/plans/20260606T080000Z_final_beta_release_consolidation_ledger.md`.
+That acceptance requires the future `jemdev` deployment and must not use
+production `day` services.
 
 ## Required Contract
 
@@ -13,9 +20,12 @@ Bloom needs a follow-up implementation pass before Kahlo-issued AI-agent tokens 
 - Record every endpoint access with request ID, correlation ID, route template, status, duration, client IP, auth mode, human user, service ID, AI-agent ID, authorizing human, token ID prefix/hash, scopes, and denial reason.
 - Never log bearer tokens, cookies, raw presigned URLs, PHI-bearing query strings, object keys, or raw request/response bodies.
 
-## Current Gap
+## Historical Gap
 
-Current source does not prove uniform all-endpoint structured access logs with actor/IP/AI-agent provenance, and it does not validate Kahlo-issued AI-agent tokens on Bloom search/read APIs.
+At creation time, source did not prove uniform all-endpoint structured access
+logs with actor/IP/AI-agent provenance, and it did not validate Kahlo-issued
+AI-agent tokens on Bloom search/read APIs. That is no longer the current local
+`jem-dev` source state.
 
 ## Acceptance
 
