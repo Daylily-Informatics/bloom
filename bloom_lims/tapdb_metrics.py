@@ -47,7 +47,7 @@ _HEADER = (
 )
 
 
-def _parse_bool(value: object, *, default: bool) -> bool:
+def _parse_bool(value: object, *, default: bool | None) -> bool | None:
     if value is None:
         return default
     raw = str(value).strip().lower()
@@ -84,9 +84,17 @@ def metrics_enabled(env_name: str | None = None) -> bool:
     enabled = _resolved_bloom_runtime(env_name)[2].get("metrics_enabled")
     if isinstance(enabled, bool):
         return enabled
-    if "pytest" in sys.modules:
-        return False
-    return True
+    if enabled is None:
+        if "pytest" in sys.modules:
+            return False
+        return True
+    parsed = _parse_bool(enabled, default=None)
+    if parsed is None:
+        raise RuntimeError(
+            "Bloom TapDB metrics config value target.metrics_enabled must be "
+            f"a boolean or boolean string, got {enabled!r}"
+        )
+    return parsed
 
 
 def _sanitize_tsv(value: object) -> str:
@@ -251,11 +259,11 @@ _writers_by_env: dict[str, TSVMetricsWriter] = {}
 
 
 def _get_writer(env_name: str) -> Optional[TSVMetricsWriter]:
-    if not metrics_enabled():
-        return None
     env = str(env_name or "").strip().lower()
     if not env:
         raise RuntimeError("Bloom TapDB metrics writer requires explicit env_name")
+    if not metrics_enabled(env):
+        return None
     with _writer_lock:
         writer = _writers_by_env.get(env)
         if writer is None:
