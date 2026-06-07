@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
+import yaml
 from daylily_tapdb.cli.db_config import get_admin_settings
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -80,8 +81,32 @@ def _resolved_bloom_runtime(
     return resolved_env, config_path, admin_settings
 
 
+def _explicit_config_metrics_enabled(config_path: Path) -> bool | None:
+    try:
+        loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"Failed to parse Bloom TapDB metrics config: {exc}") from exc
+    if not isinstance(loaded, dict):
+        return None
+    target = loaded.get("target")
+    if not isinstance(target, dict) or "metrics_enabled" not in target:
+        return None
+    raw = target.get("metrics_enabled")
+    parsed = _parse_bool(raw, default=None)
+    if parsed is None:
+        raise RuntimeError(
+            "Bloom TapDB metrics config value target.metrics_enabled must be "
+            f"a boolean or boolean string, got {raw!r}"
+        )
+    return parsed
+
+
 def metrics_enabled(env_name: str | None = None) -> bool:
-    enabled = _resolved_bloom_runtime(env_name)[2].get("metrics_enabled")
+    _resolved_env, config_path, admin_settings = _resolved_bloom_runtime(env_name)
+    explicit = _explicit_config_metrics_enabled(config_path)
+    if explicit is not None:
+        return explicit
+    enabled = admin_settings.get("metrics_enabled")
     if isinstance(enabled, bool):
         return enabled
     if enabled is None:
