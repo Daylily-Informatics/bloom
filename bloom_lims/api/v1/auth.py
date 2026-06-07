@@ -81,6 +81,8 @@ async def update_current_user_preferences(
     url, headers = _broker_preferences_contract(user.email)
     with httpx.Client(timeout=5.0) as client:
         response = client.put(url, headers=headers, json={"theme": theme or None})
+        if response.status_code < 400:
+            response = client.get(url, headers=headers)
     if response.status_code >= 400:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     return response.json()
