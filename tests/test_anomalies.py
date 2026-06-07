@@ -213,7 +213,7 @@ def test_anomaly_api_tolerates_malformed_stored_properties(monkeypatch) -> None:
                 }
             },
             created_dt=datetime.now(UTC),
-            category="bloom",
+            category="BAN",
             type="ops",
             subtype="anomaly-record",
             version="1.0",

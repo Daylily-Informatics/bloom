@@ -14322,6 +14322,39 @@
         "singleton": "0",
         "semantic_category": "data"
       }
+    },
+    {
+      "name": "Bloom Anomaly Record",
+      "polymorphic_discriminator": "generic_template",
+      "category": "BAN",
+      "type": "ops",
+      "subtype": "anomaly-record",
+      "version": "1.0",
+      "instance_prefix": "BAN",
+      "instance_polymorphic_identity": "generic_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "managed_by": "bloom",
+        "domain": "observability",
+        "description": "Sanitized Bloom operational anomaly record for Kahlo observability.",
+        "semantic_category": "observability_anomaly",
+        "required_properties": [
+          "service",
+          "environment",
+          "category",
+          "severity",
+          "fingerprint",
+          "summary",
+          "first_seen_at",
+          "last_seen_at",
+          "occurrence_count",
+          "redacted_context"
+        ],
+        "sensitive_fields": [
+          "redacted_context"
+        ]
+      }
     }
   ]
 }

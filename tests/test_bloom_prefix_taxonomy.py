@@ -9,7 +9,6 @@ import pytest
 
 from bloom_lims.core.validation import ValidationError, validate_euid
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PREFIX_CHARS = set("ILOU")
 
@@ -71,6 +70,25 @@ def test_wet_lab_templates_use_bloom_prefix_taxonomy() -> None:
         assert template["instance_prefix"] == expected_prefix
 
 
+def test_anomaly_template_is_packaged_for_observability() -> None:
+    templates = _template_pack()["templates"]
+    anomaly = next(
+        template
+        for template in templates
+        if (
+            template["category"],
+            template["type"],
+            template["subtype"],
+            template["version"],
+        )
+        == ("BAN", "ops", "anomaly-record", "1.0")
+    )
+
+    assert anomaly["instance_prefix"] == "BAN"
+    assert anomaly["json_addl"]["managed_by"] == "bloom"
+    assert anomaly["json_addl"]["semantic_category"] == "observability_anomaly"
+
+
 def test_prefix_taxonomy_rejects_forbidden_letters_and_leading_zero_examples() -> None:
     prefixes = {
         template["instance_prefix"]
@@ -103,6 +121,7 @@ def test_prefixes_are_declared_in_packaged_ownership_registry() -> None:
     claims = registry["ownership"]["Z"]
 
     for prefix in {
+        "BAN",
         "BC",
         "BCT",
         "BCP",
