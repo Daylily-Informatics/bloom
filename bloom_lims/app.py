@@ -5,6 +5,7 @@ This keeps `main.py` as a thin entrypoint while preserving `uvicorn main:app`.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -38,6 +39,52 @@ from bloom_lims.tapdb_metrics import (
     request_path_var,
     stop_all_writers,
 )
+
+
+def _access_log_payload(
+    *,
+    request,
+    service_id: str,
+    status_code: int,
+    duration_ms: float,
+    route_template: str,
+) -> dict[str, object]:
+    actor = (
+        getattr(request.state, "authorized_by_email", None)
+        or getattr(request.state, "authorizing_human", None)
+        or getattr(request.state, "actor", None)
+    )
+    ai_agent_id = getattr(request.state, "ai_agent_id", None) or getattr(
+        request.state, "agent_id", None
+    )
+    return {
+        "event": "request_completed",
+        "request_id": getattr(request.state, "request_id", ""),
+        "correlation_id": getattr(request.state, "correlation_id", ""),
+        "service_id": service_id,
+        "actor": actor,
+        "ai_agent_id": ai_agent_id,
+        "authorizing_human": getattr(request.state, "authorizing_human", None)
+        or getattr(request.state, "authorized_by_email", None),
+        "ip": request.client.host if request.client else None,
+        "method": request.method,
+        "path": request.url.path,
+        "route": route_template or request.url.path,
+        "route_template": route_template or request.url.path,
+        "status": status_code,
+        "duration_ms": round(duration_ms, 2),
+        "denial_reason": getattr(request.state, "denial_reason", None)
+        or (f"http_{status_code}" if status_code in {401, 403} else None),
+        "auth_mode": getattr(request.state, "auth_mode", None),
+    }
+
+
+def _emit_access_log(payload: dict[str, object], *, level: int = logging.INFO) -> None:
+    logging.getLogger("lsmc.access").log(
+        level,
+        json.dumps(payload, sort_keys=True, separators=(",", ":")),
+        extra=payload,
+    )
 
 
 def _validate_required_config(settings) -> None:
@@ -124,22 +171,15 @@ def create_app() -> FastAPI:
                     status_code=500,
                     duration_ms=duration_ms,
                 )
-            logging.getLogger("lsmc.access").exception(
-                "request_completed",
-                extra={
-                    "request_id": getattr(request.state, "request_id", ""),
-                    "correlation_id": getattr(request.state, "correlation_id", ""),
-                    "service_id": "bloom",
-                    "actor": getattr(request.state, "authorized_by_email", None),
-                    "agent_id": getattr(request.state, "agent_id", None),
-                    "ip": request.client.host if request.client else None,
-                    "method": request.method,
-                    "path": request.url.path,
-                    "route": route_template or request.url.path,
-                    "status": 500,
-                    "duration_ms": round(duration_ms, 2),
-                    "auth_mode": getattr(request.state, "auth_mode", None),
-                },
+            _emit_access_log(
+                _access_log_payload(
+                    request=request,
+                    service_id="bloom",
+                    status_code=500,
+                    duration_ms=duration_ms,
+                    route_template=route_template,
+                ),
+                level=logging.ERROR,
             )
             raise
         route = request.scope.get("route")
@@ -152,22 +192,19 @@ def create_app() -> FastAPI:
                 status_code=response.status_code,
                 duration_ms=duration_ms,
             )
-        logging.getLogger("lsmc.access").info(
-            "request_completed",
-            extra={
-                "request_id": getattr(request.state, "request_id", ""),
-                "correlation_id": getattr(request.state, "correlation_id", ""),
-                "service_id": "bloom",
-                "actor": getattr(request.state, "authorized_by_email", None),
-                "agent_id": getattr(request.state, "agent_id", None),
-                "ip": request.client.host if request.client else None,
-                "method": request.method,
-                "path": request.url.path,
-                "route": route_template or request.url.path,
-                "status": response.status_code,
-                "duration_ms": round(duration_ms, 2),
-                "auth_mode": getattr(request.state, "auth_mode", None),
-            },
+        _emit_access_log(
+            _access_log_payload(
+                request=request,
+                service_id="bloom",
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+                route_template=route_template,
+            ),
+            level=logging.ERROR
+            if response.status_code >= 500
+            else logging.WARNING
+            if response.status_code >= 400
+            else logging.INFO,
         )
         return response
 
