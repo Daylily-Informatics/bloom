@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 from time import monotonic
 from uuid import uuid4
@@ -80,11 +81,14 @@ def _access_log_payload(
 
 
 def _emit_access_log(payload: dict[str, object], *, level: int = logging.INFO) -> None:
+    message = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     logging.getLogger("lsmc.access").log(
         level,
-        json.dumps(payload, sort_keys=True, separators=(",", ":")),
+        message,
         extra=payload,
     )
+    sys.stdout.write(f"{message}\n")
+    sys.stdout.flush()
 
 
 def _validate_required_config(settings) -> None:
