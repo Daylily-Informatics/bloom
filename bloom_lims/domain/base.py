@@ -562,9 +562,9 @@ class BloomObj:
                 "fanout_reason": "plate well contains at most one material",
                 "expected_fanout": [
                     self._expected_fanout_entry(
-                        relationship_types=["contains"],
+                        relationship_types=["HOLDS_MATERIAL"],
                         max_child_count=1,
-                        reason="plate well contains at most one material",
+                        reason="plate well holds at most one material",
                     )
                 ],
             }

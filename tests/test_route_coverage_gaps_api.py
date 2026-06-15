@@ -248,6 +248,23 @@ def test_containers_content_link_layout_and_delete(client: TestClient, bdb) -> N
         },
     )
     assert link_resp.status_code == 200, link_resp.text
+    lineage_cls = bdb.Base.classes.generic_instance_lineage
+    parent = bdb.session.query(bdb.Base.classes.generic_instance).filter_by(euid=container_euid).first()
+    child = bdb.session.query(bdb.Base.classes.generic_instance).filter_by(euid=content_euid).first()
+    lineage = (
+        bdb.session.query(lineage_cls)
+        .filter(
+            lineage_cls.parent_instance_uid == parent.uid,
+            lineage_cls.child_instance_uid == child.uid,
+            lineage_cls.relationship_type == "HOLDS_MATERIAL",
+            lineage_cls.is_deleted.is_(False),
+        )
+        .one()
+    )
+    v0_edge = lineage.json_addl["properties"]["v0_edge"]
+    assert v0_edge["edge_type"] == "HOLDS_MATERIAL"
+    assert v0_edge["source_euid"] == container_euid
+    assert v0_edge["target_euid"] == content_euid
 
     # Remove content from container
     unlink_resp = client.delete(

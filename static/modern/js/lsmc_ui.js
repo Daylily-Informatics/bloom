@@ -1,5 +1,6 @@
 (function () {
-  const themes = ["original", "lsmc", "dark", "light", "tacky"];
+  const themes = ["original", "light", "dark", "cbf"];
+  const themeLabels = { cbf: "CBF" };
   const storageKey = "lsmc.ui.theme";
 
   function currentTheme() {
@@ -51,7 +52,7 @@
     for (const theme of themes) {
       const option = document.createElement("option");
       option.value = theme;
-      option.textContent = theme;
+      option.textContent = themeLabels[theme] || theme;
       select.appendChild(option);
     }
     select.value = currentTheme();

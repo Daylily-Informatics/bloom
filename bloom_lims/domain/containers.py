@@ -7,9 +7,11 @@ like plates, tubes, racks, etc.
 Extracted from bloom_lims/bobjs.py for better code organization.
 """
 
+import json
 import logging
 
 from bloom_lims.domain.base import BloomObj
+from bloom_lims.domain.v0_graph import attach_bloom_v0_edge, object_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,22 @@ class BloomContainer(BloomObj):
     def link_content(self, container_euid, content_euid):
         # TapDB models container membership via lineage rows (container as parent,
         # contained instance/content as child), not an ORM "contents" relationship.
-        self.create_generic_instance_lineage_by_euids(
+        lineage = self.create_generic_instance_lineage_by_euids(
             parent_instance_euid=container_euid,
             child_instance_euid=content_euid,
-            relationship_type="contains",
+            relationship_type="HOLDS_MATERIAL",
+        )
+        attach_bloom_v0_edge(
+            lineage,
+            edge_type="HOLDS_MATERIAL",
+            source_euid=container_euid,
+            target_euid=content_euid,
+            evidence_refs=[
+                object_evidence(container_euid, role="container"),
+                object_evidence(content_euid, role="material"),
+            ],
+            correlation_id=f"bloom:{container_euid}:holds:{content_euid}",
+            causation_id=f"bloom:{container_euid}:link-content",
         )
         self.session.commit()
 
@@ -70,7 +84,7 @@ class BloomContainerPlate(BloomContainer):
 
         try:
             layout = parent_container.json_addl["instantiation_layouts"]
-        except Exception as e:
+        except Exception:
             layout = json.loads(parent_container.json_addl)["instantiation_layouts"]
         num_rows = len(layout)
         num_cols = len(layout[0]) if num_rows > 0 else 0
@@ -82,12 +96,12 @@ class BloomContainerPlate(BloomContainer):
         for well in wells:
             row_idx = (
                 int(json.loads(well.json_addl)["cont_address"]["row_idx"])
-                if type(well.json_addl) == str()
+                if isinstance(well.json_addl, str)
                 else int(well.json_addl["cont_address"]["row_idx"])
             )
             col_idx = (
                 int(json.loads(well.json_addl)["cont_address"]["col_idx"])
-                if type(well.json_addl) == str()
+                if isinstance(well.json_addl, str)
                 else int(well.json_addl["cont_address"]["col_idx"])
             )
 

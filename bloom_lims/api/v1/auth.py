@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
-THEME_NAMES = {"original", "lsmc", "dark", "light", "tacky"}
+THEME_NAMES = {"original", "light", "dark", "cbf"}
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 preferences_router = APIRouter(tags=["Preferences"])

@@ -4,7 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="Workflow helper surface is retired in queue-centric Bloom beta.")
+pytest.skip(
+    "Workflow helper surface is retired in queue-centric Bloom beta.",
+    allow_module_level=True,
+)
 
 import bloom_lims.domain.workflows as workflows_mod
 from bloom_lims.domain.workflows import BloomWorkflowStep

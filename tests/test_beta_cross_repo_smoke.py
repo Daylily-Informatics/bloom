@@ -19,6 +19,14 @@ from fastapi.testclient import TestClient
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+SMOKE_STATE_ROOT = WORKSPACE_ROOT / "_refactor" / "beta_cross_repo_smoke"
+os.environ.setdefault("XDG_CONFIG_HOME", str(SMOKE_STATE_ROOT / "config"))
+os.environ.setdefault("XDG_DATA_HOME", str(SMOKE_STATE_ROOT / "data"))
+os.environ.setdefault("XDG_STATE_HOME", str(SMOKE_STATE_ROOT / "state"))
+os.environ.setdefault("XDG_CACHE_HOME", str(SMOKE_STATE_ROOT / "cache"))
+os.environ.setdefault("ATLAS_DEPLOYMENT_CODE", "jemdev5")
+os.environ.setdefault("AWS_PROFILE", "beta-smoke-profile")
+os.environ.setdefault("AWS_REGION", "us-west-2")
 
 
 def _resolve_repo_root(*candidates: Path) -> Path | None:
@@ -44,6 +52,95 @@ if ATLAS_ROOT is None or URSA_ROOT is None:
         "Cross-repo beta smoke requires local Atlas and Ursa checkouts.",
         allow_module_level=True,
     )
+
+atlas_registry_dir = ATLAS_ROOT / "app" / "etc"
+tapdb_registry_dir = SMOKE_STATE_ROOT / "config" / "tapdb" / "registries"
+tapdb_registry_dir.mkdir(parents=True, exist_ok=True)
+for filename in ("domain_code_registry.json", "prefix_ownership_registry.json"):
+    (tapdb_registry_dir / filename).write_text(
+        (atlas_registry_dir / filename).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+tapdb_config_file = (
+    SMOKE_STATE_ROOT
+    / "config"
+    / "tapdb"
+    / "atlas"
+    / "lsmc-atlas-jemdev5"
+    / "tapdb-config.yaml"
+)
+tapdb_config_file.parent.mkdir(parents=True, exist_ok=True)
+tapdb_config_file.write_text(
+    f"""meta:
+  config_version: 4
+  client_id: atlas
+  database_name: lsmc-atlas
+  owner_repo_name: lsmc-atlas
+  domain_registry_path: {tapdb_registry_dir / "domain_code_registry.json"}
+  prefix_ownership_registry_path: {tapdb_registry_dir / "prefix_ownership_registry.json"}
+target:
+  engine_type: local
+  host: localhost
+  port: '5533'
+  ui_port: '8911'
+  user: postgres
+  password: ''
+  database: lsmc_atlas_beta_smoke
+  schema_name: tapdb_atlas_beta_smoke
+  domain_code: Z
+  support_email: support@lsmc.bio
+  cognito_user_pool_id: ''
+safety:
+  safety_tier: local
+  destructive_operations: allowed
+""",
+    encoding="utf-8",
+)
+atlas_config_file = (
+    SMOKE_STATE_ROOT
+    / "config"
+    / "lsmc-atlas-jemdev5"
+    / "lsmc-atlas-config-jemdev5.yaml"
+)
+atlas_config_file.parent.mkdir(parents=True, exist_ok=True)
+atlas_config_file.write_text(
+    f"""application:
+  debug: true
+  secret_key: atlas-beta-smoke-secret-key-0123456789abcd
+database:
+  backend: tapdb
+  target: local
+  namespace: lsmc-atlas
+  meridian_domain_code: Z
+  owner_repo_name: lsmc-atlas
+  client_id: atlas
+  database_name: lsmc-atlas
+  config_path: {tapdb_config_file}
+  domain_registry_path: {tapdb_registry_dir / "domain_code_registry.json"}
+  prefix_ownership_registry_path: {tapdb_registry_dir / "prefix_ownership_registry.json"}
+internal_api:
+  key: atlas-beta-smoke-internal-api-key
+deployment:
+  name: jemdev5
+  color: "#123456"
+  is_production: false
+authentication:
+  mode: cognito
+  session_max_age: 28800
+  session_cookie_name: lsmc_atlas_session
+  cognito:
+    region: us-west-2
+    user_pool_id: atlas-beta-smoke-pool
+    domain: atlas.auth.us-west-2.amazoncognito.com
+    app_client_id: atlas-client-id
+    app_client_secret: ""
+    redirect_uri: https://localhost:8911/auth/callback
+    logout_url: https://localhost:8911/auth/logout
+""",
+    encoding="utf-8",
+)
+os.environ.setdefault("LSMC_ATLAS_CONFIG_FILE", str(atlas_config_file))
+os.environ.setdefault("TAPDB_CONFIG_PATH", str(tapdb_config_file))
 
 os.environ.setdefault(
     "DATABASE_URL",
@@ -324,8 +421,8 @@ def _build_atlas_result_app() -> FastAPI:
 
 def test_cross_repo_beta_smoke(monkeypatch):
     tenant_id = uuid.uuid4()
-    atlas_trf_euid = _opaque("trf")
-    atlas_test_accept = _opaque("test")
+    atlas_order_euid = _opaque("order")
+    atlas_order_test_accept = _opaque("order-test")
     patient_euid = _opaque("patient")
     shipment_euid = _opaque("shipment")
     captured_return: dict[str, object] = {}
@@ -336,8 +433,8 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
         def register_accepted_material(self, data, actor_id=None):
             assert actor_id is not None
-            assert data.trf_euid == atlas_trf_euid
-            assert data.test_euids == [atlas_test_accept]
+            assert data.order_euid == atlas_order_euid
+            assert data.order_test_euids == [atlas_order_test_accept]
             assert data.patient_euid == patient_euid
             assert data.shipment_euid == shipment_euid
             assert data.starting_queue == "extraction_prod"
@@ -350,7 +447,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 current_queue=data.starting_queue,
                 created=True,
                 queue_idempotent_replay=False,
-                fulfillment_item_euids=[_opaque("tpc")],
+                fulfillment_slot_euids=[_opaque("slot")],
             )
 
     class FakeUrsaResultReturnService:
@@ -360,7 +457,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
         def apply(self, data):
             captured_return["request"] = data
             return SimpleNamespace(
-                fulfillment_run_euid="ASR-SMOKE",
+                fulfillment_instance_euid="ASR-SMOKE",
                 fulfillment_output_euid="RES-SMOKE",
                 artifact_euids=["ART-SMOKE-1"],
                 results_set_euid="RSET-SMOKE",
@@ -393,8 +490,8 @@ def test_cross_repo_beta_smoke(monkeypatch):
             "/api/integrations/bloom/v1/materials/accepted",
             headers={"Idempotency-Key": _opaque("idem-atlas-accepted")},
             json={
-                "trf_euid": atlas_trf_euid,
-                "test_euids": [atlas_test_accept],
+                "order_euid": atlas_order_euid,
+                "order_test_euids": [atlas_order_test_accept],
                 "patient_euid": patient_euid,
                 "shipment_euid": shipment_euid,
                 "starting_queue": "extraction_prod",
@@ -405,16 +502,16 @@ def test_cross_repo_beta_smoke(monkeypatch):
         _assert_no_uuid_keys(accepted_body)
         assert accepted_body["accepted"] is True
         assert accepted_body["current_queue"] == "extraction_prod"
-        assert accepted_body["fulfillment_item_euids"]
-        fulfillment_item_accept = accepted_body["fulfillment_item_euids"][0]
+        assert accepted_body["fulfillment_slot_euids"]
+        fulfillment_slot_accept = accepted_body["fulfillment_slot_euids"][0]
 
         atlas_context = {
             "atlas_tenant_id": str(tenant_id),
-            "atlas_trf_euid": atlas_trf_euid,
+            "atlas_trf_euid": atlas_order_euid,
             "fulfillment_items": [
                 {
-                    "atlas_test_euid": atlas_test_accept,
-                    "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
+                    "atlas_test_euid": atlas_order_test_accept,
+                    "atlas_test_fulfillment_item_euid": fulfillment_slot_accept,
                 }
             ],
         }
@@ -447,7 +544,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
                 "source_specimen_euid": specimen_euid,
                 "well_name": "A1",
                 "extraction_type": "gdna",
-                "atlas_test_fulfillment_item_euid": fulfillment_item_accept,
+                "atlas_test_fulfillment_item_euid": fulfillment_slot_accept,
             },
         )
         assert extraction.status_code == 200, extraction.text
@@ -545,7 +642,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
         resolved_body = resolved.json()
         _assert_no_uuid_keys(resolved_body)
         assert (
-            resolved_body["atlas_test_fulfillment_item_euid"] == fulfillment_item_accept
+            resolved_body["atlas_test_fulfillment_item_euid"] == fulfillment_slot_accept
         )
 
         store = SmokeAnalysisStore()
@@ -569,11 +666,16 @@ def test_cross_repo_beta_smoke(monkeypatch):
             ),
             dewey_client=dewey_client,
             auth_provider=SmokeUrsaAuthProvider(tenant_id),
+            s3_client=object(),
             settings=Settings(
                 aws_profile="",
                 cors_origins="*",
+                deployment_name="jemdev5",
+                allowed_hosts="testserver,localhost,127.0.0.1",
                 session_secret_key="test-session-secret",
-                ursa_internal_api_key="ursa-smoke-key",
+                ursa_observability_service_token="ursa-smoke-observability-token",
+                ursa_write_service_token="ursa-smoke-key",
+                ursa_tapdb_admin_service_token="ursa-smoke-tapdb-token",
                 ursa_internal_output_bucket="beta-analysis-artifacts",
                 bloom_base_url="https://testserver",
                 bloom_api_token="bloom-smoke-token",
@@ -614,7 +716,7 @@ def test_cross_repo_beta_smoke(monkeypatch):
             analysis_euid = ingest_payload["analysis_euid"]
             assert (
                 ingest_payload["atlas_test_fulfillment_item_euid"]
-                == fulfillment_item_accept
+                == fulfillment_slot_accept
             )
             assert (
                 ingest_payload["sequenced_library_assignment_euid"]
@@ -669,9 +771,9 @@ def test_cross_repo_beta_smoke(monkeypatch):
 
     recorded_request = captured_return["request"]
     assert recorded_request.atlas_tenant_id == str(tenant_id)
-    assert recorded_request.atlas_trf_euid == atlas_trf_euid
-    assert recorded_request.atlas_test_euid == atlas_test_accept
-    assert recorded_request.atlas_test_fulfillment_item_euid == fulfillment_item_accept
+    assert recorded_request.atlas_order_euid == atlas_order_euid
+    assert recorded_request.atlas_order_test_euid == atlas_order_test_accept
+    assert recorded_request.atlas_fulfillment_slot_euid == fulfillment_slot_accept
     assert recorded_request.flowcell_id == flowcell_id
     assert recorded_request.lane == lane
     assert recorded_request.library_barcode == library_barcode

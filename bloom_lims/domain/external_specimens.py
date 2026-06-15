@@ -10,6 +10,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.config import get_settings
 from bloom_lims.domain import BloomObj
+from bloom_lims.domain.v0_graph import attach_bloom_v0_edge, object_evidence
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 from bloom_lims.schemas.external_specimens import (
     AtlasReferences,
@@ -301,10 +302,22 @@ class ExternalSpecimenService:
                 continue
             if lineage.child_instance_uid == specimen.uid:
                 return
-        self.bobj.create_generic_instance_lineage_by_euids(
+        lineage = self.bobj.create_generic_instance_lineage_by_euids(
             container_euid,
             specimen_euid,
-            relationship_type="contains",
+            relationship_type="HOLDS_MATERIAL",
+        )
+        attach_bloom_v0_edge(
+            lineage,
+            edge_type="HOLDS_MATERIAL",
+            source_euid=container_euid,
+            target_euid=specimen_euid,
+            evidence_refs=[
+                object_evidence(container_euid, role="container"),
+                object_evidence(specimen_euid, role="material"),
+            ],
+            correlation_id=f"bloom:{container_euid}:holds:{specimen_euid}",
+            causation_id=f"bloom:{specimen_euid}:external-specimen-container",
         )
 
     def _find_by_idempotency_key(self, key: str):
@@ -594,7 +607,7 @@ class ExternalSpecimenService:
                 .filter(
                     lineage_cls.is_deleted.is_(False),
                     lineage_cls.parent_instance_uid.in_(sorted(parent_uids)),
-                    lineage_cls.relationship_type == "contains",
+                    lineage_cls.relationship_type.in_(["contains", "HOLDS_MATERIAL"]),
                     instance_cls.domain_code == self.domain_code,
                     instance_cls.is_deleted.is_(False),
                     instance_category_filter(instance_cls, "content"),
@@ -753,3 +766,21 @@ class ExternalSpecimenService:
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
             )
+            if reference_type in {"patient_id", "atlas_patient", "atlas_patient_euid"}:
+                subject_lineage = self.bobj.create_generic_instance_lineage_by_euids(
+                    specimen.euid,
+                    ref_obj.euid,
+                    relationship_type="MATERIAL_FROM_SUBJECT",
+                )
+                attach_bloom_v0_edge(
+                    subject_lineage,
+                    edge_type="MATERIAL_FROM_SUBJECT",
+                    source_euid=specimen.euid,
+                    target_euid=ref_obj.euid,
+                    evidence_refs=[
+                        object_evidence(specimen.euid, role="material"),
+                        object_evidence(ref_obj.euid, role="subject_ref"),
+                    ],
+                    correlation_id=f"bloom:{specimen.euid}:subject:{value}",
+                    causation_id=f"bloom:{specimen.euid}:atlas-ref:{reference_type}",
+                )
