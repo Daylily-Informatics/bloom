@@ -38,7 +38,7 @@ def test_dockerfile_installs_git_before_git_pinned_dependencies() -> None:
         encoding="utf-8"
     )
 
-    first_uv_sync = dockerfile.index("RUN uv sync")
+    first_uv_sync = dockerfile.index("uv sync")
     git_install = dockerfile.index("git")
     assert git_install < first_uv_sync
 
@@ -53,3 +53,4 @@ def test_dockerfile_uses_package_specific_scm_version() -> None:
         "ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BLOOM_LIMS=${SETUPTOOLS_SCM_PRETEND_VERSION}"
         in dockerfile
     )
+    assert dockerfile.count("unset SETUPTOOLS_SCM_PRETEND_VERSION && uv sync") == 2
