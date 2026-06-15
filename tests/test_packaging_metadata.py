@@ -41,3 +41,15 @@ def test_dockerfile_installs_git_before_git_pinned_dependencies() -> None:
     first_uv_sync = dockerfile.index("RUN uv sync")
     git_install = dockerfile.index("git")
     assert git_install < first_uv_sync
+
+
+def test_dockerfile_uses_package_specific_scm_version() -> None:
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}" not in dockerfile
+    assert (
+        "ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BLOOM_LIMS=${SETUPTOOLS_SCM_PRETEND_VERSION}"
+        in dockerfile
+    )
