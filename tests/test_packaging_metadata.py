@@ -31,3 +31,13 @@ def test_dockerfile_copies_tapdb_template_config() -> None:
     assert "COPY config ./config" in dockerfile
     assert "COPY static ./static" in dockerfile
     assert "COPY templates ./templates" in dockerfile
+
+
+def test_dockerfile_installs_git_before_git_pinned_dependencies() -> None:
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    first_uv_sync = dockerfile.index("RUN uv sync")
+    git_install = dockerfile.index("git")
+    assert git_install < first_uv_sync
