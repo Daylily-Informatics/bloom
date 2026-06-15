@@ -299,7 +299,7 @@ def _seed_tapdb_templates(
             seed_templates(
                 bdb.session,
                 core_templates,
-                overwrite=overwrite,
+                overwrite=True,
                 core_config_dir=core_config_dir,
                 domain_code=ctx.domain_code,
                 owner_repo_name="daylily-tapdb",

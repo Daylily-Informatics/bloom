@@ -528,6 +528,7 @@ def test_seed_templates_split_core_and_client_ownership(
                     "templates": [
                         template["instance_prefix"] for template in templates
                     ],
+                    "overwrite": kwargs["overwrite"],
                 },
             )
         )
@@ -587,12 +588,22 @@ def test_seed_templates_split_core_and_client_ownership(
     db_commands._seed_tapdb_templates("target", overwrite=False)
 
     assert events == [
-        ("seed", {"owner_repo_name": "daylily-tapdb", "templates": ["SYS", "XRF"]}),
+        (
+            "seed",
+            {
+                "owner_repo_name": "daylily-tapdb",
+                "templates": ["SYS", "XRF"],
+                "overwrite": True,
+            },
+        ),
         (
             "claim",
             {"owner_repo_name": "bloom", "domain_code": "Z", "templates": ["BAC"]},
         ),
-        ("seed", {"owner_repo_name": "bloom", "templates": ["BAC"]}),
+        (
+            "seed",
+            {"owner_repo_name": "bloom", "templates": ["BAC"], "overwrite": False},
+        ),
     ]
     assert any("tapdb_identity_prefix_config" in sql for sql in fake_session.executed)
     assert fake_session.committed == 1
