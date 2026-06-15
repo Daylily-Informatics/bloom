@@ -54,12 +54,13 @@ _BLOOM_TEMPLATE_CONFIG = (
     / "templates.json"
 )
 _TAPDB_CORE_PREFIX_OWNERSHIP = {
-    "TPX",
-    "EDG",
     "ADT",
-    "XRF",
-    "SYS",
+    "EDG",
+    "GVR",
     "MSG",
+    "SYS",
+    "TPX",
+    "XRF",
 }
 _PREFIX_OWNERSHIP_OWNER_FIELD = "".join(("issuer", "_app_code"))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
