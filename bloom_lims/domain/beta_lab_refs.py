@@ -330,9 +330,28 @@ class _BetaLabReferenceMixin:
         atlas_context: dict[str, Any],
     ) -> None:
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        atlas_order_euid = str(
+            atlas_context.get("atlas_order_euid") or atlas_context.get("order_euid") or ""
+        ).strip()
+        atlas_order_test_euid = str(
+            atlas_context.get("atlas_order_test_euid")
+            or atlas_context.get("order_test_euid")
+            or ""
+        ).strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
         atlas_test_euid = str(atlas_context.get("atlas_test_euid") or "").strip()
         atlas_test_euids: list[str] = []
+        atlas_order_test_euids: list[str] = []
+        seen_order_tests: set[str] = set()
+        if atlas_order_test_euid:
+            seen_order_tests.add(atlas_order_test_euid)
+            atlas_order_test_euids.append(atlas_order_test_euid)
+        for value in list(atlas_context.get("atlas_order_test_euids") or []):
+            clean_value = str(value or "").strip()
+            if not clean_value or clean_value in seen_order_tests:
+                continue
+            seen_order_tests.add(clean_value)
+            atlas_order_test_euids.append(clean_value)
         seen_tests: set[str] = set()
         if atlas_test_euid:
             seen_tests.add(atlas_test_euid)
@@ -345,6 +364,14 @@ class _BetaLabReferenceMixin:
             atlas_test_euids.append(clean_value)
         fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
         for fulfillment_item in fulfillment_items:
+            candidate_order_test = str(
+                fulfillment_item.get("atlas_order_test_euid")
+                or fulfillment_item.get("order_test_euid")
+                or ""
+            ).strip()
+            if candidate_order_test and candidate_order_test not in seen_order_tests:
+                seen_order_tests.add(candidate_order_test)
+                atlas_order_test_euids.append(candidate_order_test)
             candidate = str(fulfillment_item.get("atlas_test_euid") or "").strip()
             if not candidate or candidate in seen_tests:
                 continue
@@ -359,6 +386,54 @@ class _BetaLabReferenceMixin:
             (self.ORGANIZATION_SITE_REFERENCE_TYPE, "atlas_organization_site_euid"),
         )
         created_payloads: list[dict[str, Any]] = []
+        self._delete_reference_type(instance, reference_type="order_test_euid")
+        self._delete_reference_type(instance, reference_type="order_euid")
+        if atlas_tenant_id and atlas_order_euid:
+            properties = {
+                "provider": "atlas",
+                "reference_type": "order_euid",
+                "reference_value": atlas_order_euid,
+                "foreign_reference": atlas_order_euid,
+                "atlas_tenant_id": atlas_tenant_id,
+                "order_euid": atlas_order_euid,
+                "atlas_order_euid": atlas_order_euid,
+                "validation": {},
+            }
+            created_payloads.append(properties)
+            ref_obj = self.bobj.create_instance_by_code(
+                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
+                {"json_addl": {"properties": properties}},
+            )
+            self.bobj.create_generic_instance_lineage_by_euids(
+                instance.euid,
+                ref_obj.euid,
+                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+            )
+        if atlas_tenant_id:
+            for reference_value in atlas_order_test_euids:
+                properties = {
+                    "provider": "atlas",
+                    "reference_type": "order_test_euid",
+                    "reference_value": reference_value,
+                    "foreign_reference": reference_value,
+                    "atlas_tenant_id": atlas_tenant_id,
+                    "order_test_euid": reference_value,
+                    "atlas_order_test_euid": reference_value,
+                    "validation": {},
+                }
+                if atlas_order_euid:
+                    properties["order_euid"] = atlas_order_euid
+                    properties["atlas_order_euid"] = atlas_order_euid
+                created_payloads.append(properties)
+                ref_obj = self.bobj.create_instance_by_code(
+                    self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
+                    {"json_addl": {"properties": properties}},
+                )
+                self.bobj.create_generic_instance_lineage_by_euids(
+                    instance.euid,
+                    ref_obj.euid,
+                    relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+                )
         self._delete_reference_type(instance, reference_type=self.TEST_REFERENCE_TYPE)
         if atlas_tenant_id:
             for reference_value in atlas_test_euids:

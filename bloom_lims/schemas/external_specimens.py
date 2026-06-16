@@ -11,6 +11,7 @@ class AtlasReferences(BaseModel):
     trf_euid: str | None = None
     patient_id: str | None = None
     order_euid: str | None = None
+    order_test_euid: str | None = None
     shipment_euid: str | None = None
     kit_barcode: str | None = None
     atlas_tenant_id: str | None = None
@@ -33,6 +34,7 @@ class ExternalSpecimenCreateRequest(BaseModel):
         if not any(
             [
                 refs.order_euid,
+                refs.order_test_euid,
                 refs.patient_id,
                 refs.shipment_euid,
                 refs.kit_barcode,

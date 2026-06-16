@@ -121,6 +121,43 @@ def test_external_specimen_lookup_does_not_require_atlas_client(monkeypatch):
     assert service._atlas is None
 
 
+def test_external_specimen_lookup_uses_order_test_reference_filter(monkeypatch):
+    def _unexpected_atlas_service():
+        raise AssertionError(
+            "AtlasService should not be constructed for lookup-only queries"
+        )
+
+    monkeypatch.setattr(
+        "bloom_lims.domain.external_specimens.AtlasService",
+        _unexpected_atlas_service,
+    )
+
+    calls: list[tuple[str, str]] = []
+
+    def _find_parent_uids_for_reference(*, reference_type: str, reference_value: str):
+        calls.append((reference_type, reference_value))
+        if reference_type == "order_euid":
+            return {123}
+        if reference_type == "order_test_euid":
+            return set()
+        raise AssertionError(f"unexpected reference filter: {reference_type}")
+
+    service = object.__new__(ExternalSpecimenService)
+    service._atlas = None
+    service.bdb = SimpleNamespace()
+    service.bobj = SimpleNamespace()
+    service._find_parent_uids_for_reference = _find_parent_uids_for_reference
+
+    result = ExternalSpecimenService.find_by_references(
+        service,
+        AtlasReferences(order_euid="ORDER-1", order_test_euid="ORDERTEST-1"),
+    )
+
+    assert result == []
+    assert calls == [("order_euid", "ORDER-1"), ("order_test_euid", "ORDERTEST-1")]
+    assert service._atlas is None
+
+
 def test_user_tokens_endpoints_create_list_usage_revoke(client):
     token_id = _create_token(client)
 

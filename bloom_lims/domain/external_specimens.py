@@ -34,6 +34,7 @@ class ExternalSpecimenService:
         "trf_euid",
         "patient_id",
         "order_euid",
+        "order_test_euid",
         "shipment_euid",
         "kit_barcode",
         "atlas_tenant_id",
@@ -51,6 +52,10 @@ class ExternalSpecimenService:
         },
         "order_euid": {
             "reference_types": ("order_euid",),
+            "value_field": "reference_value",
+        },
+        "order_test_euid": {
+            "reference_types": ("order_test_euid",),
             "value_field": "reference_value",
         },
         "shipment_euid": {
@@ -77,6 +82,7 @@ class ExternalSpecimenService:
     _REFERENCE_RESPONSE_NORMALIZATION: dict[str, tuple[str, str]] = {
         "atlas_trf": ("atlas_trf_euid", "atlas_trf_euid"),
         "atlas_test": ("atlas_test_euid", "atlas_test_euid"),
+        "order_test_euid": ("order_test_euid", "reference_value"),
         "atlas_patient": ("atlas_patient_euid", "atlas_patient_euid"),
         "atlas_testkit": ("atlas_testkit_euid", "atlas_testkit_euid"),
         "atlas_shipment": ("atlas_shipment_euid", "atlas_shipment_euid"),
@@ -351,6 +357,7 @@ class ExternalSpecimenService:
             "trf_euid": refs.trf_euid,
             "patient_id": refs.patient_id,
             "order_euid": refs.order_euid,
+            "order_test_euid": refs.order_test_euid,
             "shipment_euid": refs.shipment_euid,
             "kit_barcode": refs.kit_barcode,
             "atlas_tenant_id": refs.atlas_tenant_id,
