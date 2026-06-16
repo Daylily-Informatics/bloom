@@ -59,9 +59,9 @@ def _load_shared_display_timezone(email: str) -> str:
                     FROM generic_instance gi
                     WHERE gi.is_deleted = FALSE
                       AND gi.polymorphic_discriminator = 'actor_instance'
-                      AND gi.category = 'generic'
-                      AND gi.type = 'actor'
-                      AND gi.subtype = 'system_user'
+                      AND gi.category = 'actor'
+                      AND gi.type = 'user'
+                      AND gi.subtype = 'system'
                       AND (
                             lower(COALESCE(gi.json_addl->>'login_identifier', '')) = :identifier
                          OR lower(COALESCE(gi.json_addl->>'email', '')) = :identifier
@@ -104,9 +104,9 @@ def persist_display_timezone(email: str, display_timezone: str | None) -> bool:
                         modified_dt = NOW()
                     WHERE gi.is_deleted = FALSE
                       AND gi.polymorphic_discriminator = 'actor_instance'
-                      AND gi.category = 'generic'
-                      AND gi.type = 'actor'
-                      AND gi.subtype = 'system_user'
+                      AND gi.category = 'actor'
+                      AND gi.type = 'user'
+                      AND gi.subtype = 'system'
                       AND (
                             lower(COALESCE(gi.json_addl->>'login_identifier', '')) = :identifier
                          OR lower(COALESCE(gi.json_addl->>'email', '')) = :identifier
