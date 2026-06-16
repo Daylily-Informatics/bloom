@@ -601,6 +601,21 @@ class _BetaLabReferenceMixin:
             reference_type=self.TRF_REFERENCE_TYPE,
             value_field="atlas_trf_euid",
         )
+        atlas_order_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type="order_euid",
+            value_field="order_euid",
+        )
+        atlas_order_test_euid = self._first_reachable_reference_value(
+            instance,
+            reference_type="order_test_euid",
+            value_field="order_test_euid",
+        )
+        direct_order_test_euids = self._reachable_reference_values(
+            instance,
+            reference_type="order_test_euid",
+            value_field="order_test_euid",
+        )
         atlas_test_euid = self._first_reachable_reference_value(
             instance,
             reference_type=self.TEST_REFERENCE_TYPE,
@@ -628,6 +643,16 @@ class _BetaLabReferenceMixin:
         )
         atlas_test_euids: list[str] = []
         seen_test_euids: set[str] = set()
+        atlas_order_test_euids: list[str] = []
+        seen_order_test_euids: set[str] = set()
+        for direct_order_test_euid in direct_order_test_euids:
+            if direct_order_test_euid in seen_order_test_euids:
+                continue
+            seen_order_test_euids.add(direct_order_test_euid)
+            atlas_order_test_euids.append(direct_order_test_euid)
+        if atlas_order_test_euid and atlas_order_test_euid not in seen_order_test_euids:
+            seen_order_test_euids.add(atlas_order_test_euid)
+            atlas_order_test_euids.append(atlas_order_test_euid)
         for direct_test_euid in direct_test_euids:
             if direct_test_euid in seen_test_euids:
                 continue
@@ -654,6 +679,16 @@ class _BetaLabReferenceMixin:
             or self._first_reachable_reference_value(
                 instance,
                 reference_type=self.TEST_REFERENCE_TYPE,
+                value_field="atlas_tenant_id",
+            )
+            or self._first_reachable_reference_value(
+                instance,
+                reference_type="order_euid",
+                value_field="atlas_tenant_id",
+            )
+            or self._first_reachable_reference_value(
+                instance,
+                reference_type="order_test_euid",
                 value_field="atlas_tenant_id",
             )
             or self._first_reachable_reference_value(
@@ -685,6 +720,9 @@ class _BetaLabReferenceMixin:
         if not fulfillment_items:
             return {
                 "atlas_tenant_id": atlas_tenant_id,
+                "atlas_order_euid": atlas_order_euid,
+                "atlas_order_test_euid": atlas_order_test_euid,
+                "atlas_order_test_euids": atlas_order_test_euids,
                 "atlas_trf_euid": atlas_trf_euid,
                 "atlas_test_euid": atlas_test_euid,
                 "atlas_test_euids": atlas_test_euids,
@@ -709,6 +747,9 @@ class _BetaLabReferenceMixin:
         first = fulfillment_items[0]
         return {
             "atlas_tenant_id": first["atlas_tenant_id"],
+            "atlas_order_euid": atlas_order_euid,
+            "atlas_order_test_euid": atlas_order_test_euid,
+            "atlas_order_test_euids": atlas_order_test_euids,
             "atlas_trf_euid": first["atlas_trf_euid"] or atlas_trf_euid,
             "atlas_test_euid": atlas_test_euid or first["atlas_test_euid"],
             "atlas_test_euids": atlas_test_euids,
