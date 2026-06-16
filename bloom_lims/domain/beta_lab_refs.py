@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from bloom_lims.domain.v0_graph import attach_bloom_v0_edge, object_evidence
 from bloom_lims.tapdb_adapter import get_child_lineages, get_parent_lineages
 from bloom_lims.template_identity import instance_semantic_category
 
@@ -22,8 +23,80 @@ class _BetaLabReferenceMixin:
             "beta_pool_member",
             "beta_sequenced_library_assignment",
             "beta_sequencing_run",
+            "HOLDS_MATERIAL",
+            "RUN_CONSUMED",
+            "RUN_PRODUCED",
+            "DERIVED_FROM",
         }
     )
+
+    def _attach_v0_edge_to_lineage(
+        self,
+        lineage,
+        *,
+        edge_type: str,
+        source_euid: str,
+        target_euid: str,
+        source_role: str,
+        target_role: str,
+        evidence_refs: list[dict[str, Any]],
+        correlation_id: str,
+        causation_id: str,
+        source_system: str = "bloom",
+        target_system: str = "bloom",
+    ):
+        return attach_bloom_v0_edge(
+            lineage,
+            edge_type=edge_type,
+            source_euid=source_euid,
+            target_euid=target_euid,
+            source_role=source_role,
+            target_role=target_role,
+            source_system=source_system,
+            target_system=target_system,
+            evidence_refs=evidence_refs,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+        )
+
+    def _attach_bloom_v0_lineage(
+        self,
+        parent_euid: str,
+        child_euid: str,
+        *,
+        relationship_type: str,
+        edge_type: str,
+        source_euid: str,
+        target_euid: str,
+        source_role: str,
+        target_role: str,
+        source_system: str = "bloom",
+        target_system: str = "bloom",
+        extra_evidence_refs: list[dict[str, Any]] | None = None,
+    ):
+        lineage = self.bobj.create_generic_instance_lineage_by_euids(
+            parent_euid,
+            child_euid,
+            relationship_type=relationship_type,
+        )
+        evidence_refs = [
+            object_evidence(parent_euid, role="tapdb_lineage_parent"),
+            object_evidence(child_euid, role="tapdb_lineage_child"),
+            *(extra_evidence_refs or []),
+        ]
+        return self._attach_v0_edge_to_lineage(
+            lineage,
+            edge_type=edge_type,
+            source_euid=source_euid,
+            target_euid=target_euid,
+            source_role=source_role,
+            target_role=target_role,
+            source_system=source_system,
+            target_system=target_system,
+            evidence_refs=evidence_refs,
+            correlation_id=f"{relationship_type}:{parent_euid}:{child_euid}",
+            causation_id=f"bloom:{relationship_type}:{parent_euid}:{child_euid}",
+        )
 
     def _resolve_fulfillment_item_context(
         self,
@@ -367,10 +440,37 @@ class _BetaLabReferenceMixin:
                 self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
                 {"json_addl": {"properties": properties}},
             )
-            self.bobj.create_generic_instance_lineage_by_euids(
+            lineage = self.bobj.create_generic_instance_lineage_by_euids(
                 instance.euid,
                 ref_obj.euid,
                 relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
+            )
+            self._attach_v0_edge_to_lineage(
+                lineage,
+                edge_type="SLOT_SATISFIED_BY",
+                source_euid=atlas_fulfillment_slot_euid,
+                target_euid=instance.euid,
+                source_role="fulfillment_slot",
+                target_role="satisfying_bloom_object",
+                source_system="atlas",
+                target_system="bloom",
+                evidence_refs=[
+                    object_evidence(
+                        atlas_fulfillment_slot_euid,
+                        role="fulfillment_slot",
+                        system="atlas",
+                    ),
+                    object_evidence(instance.euid, role="satisfying_bloom_object"),
+                    object_evidence(ref_obj.euid, role="atlas_reference_link"),
+                ],
+                correlation_id=(
+                    f"SLOT_SATISFIED_BY:{atlas_fulfillment_slot_euid}:"
+                    f"{instance.euid}"
+                ),
+                causation_id=(
+                    f"bloom:atlas_fulfillment_reference:"
+                    f"{atlas_fulfillment_slot_euid}:{instance.euid}"
+                ),
             )
         self._sync_atlas_tapdb_graph_refs(
             instance, additional_payloads=created_payloads

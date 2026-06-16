@@ -559,7 +559,7 @@ class BloomObj:
                 "node_role": "fixed_plate_well",
                 "role": "bloom_fixed_plate_well",
                 "expected_fanout_max": 1,
-                "fanout_reason": "plate well contains at most one material",
+                "fanout_reason": "plate well holds at most one material",
                 "expected_fanout": [
                     self._expected_fanout_entry(
                         relationship_types=["HOLDS_MATERIAL"],

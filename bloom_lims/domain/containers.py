@@ -36,6 +36,8 @@ class BloomContainer(BloomObj):
             edge_type="HOLDS_MATERIAL",
             source_euid=container_euid,
             target_euid=content_euid,
+            source_role="container",
+            target_role="material",
             evidence_refs=[
                 object_evidence(container_euid, role="container"),
                 object_evidence(content_euid, role="material"),

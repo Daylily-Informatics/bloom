@@ -263,8 +263,10 @@ def test_containers_content_link_layout_and_delete(client: TestClient, bdb) -> N
     )
     v0_edge = lineage.json_addl["properties"]["v0_edge"]
     assert v0_edge["edge_type"] == "HOLDS_MATERIAL"
-    assert v0_edge["source_euid"] == container_euid
-    assert v0_edge["target_euid"] == content_euid
+    assert v0_edge["semantic_source"]["euid"] == container_euid
+    assert v0_edge["semantic_source"]["role"] == "container"
+    assert v0_edge["semantic_target"]["euid"] == content_euid
+    assert v0_edge["semantic_target"]["role"] == "material"
 
     # Remove content from container
     unlink_resp = client.delete(

@@ -136,10 +136,15 @@ class _BetaLabStagesMixin:
             extraction_run.euid,
             relationship_type="beta_extraction_batch_run",
         )
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             source.euid,
             extraction_run.euid,
             relationship_type="beta_extraction_run_input",
+            edge_type="RUN_CONSUMED",
+            source_euid=extraction_run.euid,
+            target_euid=source.euid,
+            source_role="workflow_run",
+            target_role="consumed_material",
         )
         self.bobj.create_generic_instance_lineage_by_euids(
             plate.euid,
@@ -205,20 +210,35 @@ class _BetaLabStagesMixin:
         output.name = output_name
         output_props["name"] = output_name
         self._write_props(output, output_props)
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             source.euid,
             output.euid,
             relationship_type="beta_extraction_output",
+            edge_type="DERIVED_FROM",
+            source_euid=output.euid,
+            target_euid=source.euid,
+            source_role="derived_material",
+            target_role="source_material",
         )
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             extraction_run.euid,
             output.euid,
             relationship_type="beta_extraction_run_output",
+            edge_type="RUN_PRODUCED",
+            source_euid=extraction_run.euid,
+            target_euid=output.euid,
+            source_role="workflow_run",
+            target_role="produced_material",
         )
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             well.euid,
             output.euid,
-            relationship_type="contains",
+            relationship_type="HOLDS_MATERIAL",
+            edge_type="HOLDS_MATERIAL",
+            source_euid=well.euid,
+            target_euid=output.euid,
+            source_role="container",
+            target_role="held_material",
         )
         self._write_graph_metadata(
             output,
@@ -231,7 +251,7 @@ class _BetaLabStagesMixin:
                         "beta_library_material_output",
                         "beta_library_prep_output",
                         "beta_post_extract_qc",
-                        "contains",
+                        "HOLDS_MATERIAL",
                     ],
                     max_child_count=6,
                     reason="extraction output links its specimen, run, well, QC, and library material handoff",
@@ -523,7 +543,7 @@ class _BetaLabStagesMixin:
                     idempotency_key=idempotency_key,
                 )
                 library_well = (
-                    self._first_parent(library_material, "contains")
+                    self._first_parent(library_material, "HOLDS_MATERIAL")
                     if library_material is not None
                     else None
                 )
@@ -575,7 +595,7 @@ class _BetaLabStagesMixin:
         )
 
         fulfillment_item_context = self._resolve_fulfillment_item_context(source)
-        source_well = self._first_parent(source, "contains")
+        source_well = self._first_parent(source, "HOLDS_MATERIAL")
         source_well_name = (
             payload.library_well_name or self._well_name(source_well) or "A1"
         )
@@ -598,10 +618,15 @@ class _BetaLabStagesMixin:
         lib_output.name = lib_name
         lib_props["name"] = lib_name
         self._write_props(lib_output, lib_props)
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             source.euid,
             lib_output.euid,
             relationship_type="beta_library_prep_output",
+            edge_type="DERIVED_FROM",
+            source_euid=lib_output.euid,
+            target_euid=source.euid,
+            source_role="derived_artifact",
+            target_role="source_material",
         )
         self._write_graph_metadata(
             lib_output,
@@ -653,10 +678,15 @@ class _BetaLabStagesMixin:
         library_material.name = library_material_name
         library_material_props["name"] = library_material_name
         self._write_props(library_material, library_material_props)
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             source.euid,
             library_material.euid,
             relationship_type="beta_library_material_output",
+            edge_type="DERIVED_FROM",
+            source_euid=library_material.euid,
+            target_euid=source.euid,
+            source_role="derived_material",
+            target_role="source_material",
         )
         self._write_graph_metadata(
             library_material,
@@ -674,7 +704,7 @@ class _BetaLabStagesMixin:
                 ),
                 self._graph_expected_fanout_entry(
                     relationship_types=[
-                        "contains",
+                        "HOLDS_MATERIAL",
                         "beta_used_reagent",
                         "executed_on",
                         "execution_subject_lease",
@@ -705,10 +735,15 @@ class _BetaLabStagesMixin:
         library_well_props["beta_kind"] = "library_plate_well"
         library_well_props["idempotency_key"] = idempotency_key or ""
         self._write_props(library_well, library_well_props)
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             library_well.euid,
             library_material.euid,
-            relationship_type="contains",
+            relationship_type="HOLDS_MATERIAL",
+            edge_type="HOLDS_MATERIAL",
+            source_euid=library_well.euid,
+            target_euid=library_material.euid,
+            source_role="container",
+            target_role="held_material",
         )
         self._replace_fulfillment_item_references(
             lib_output,
@@ -997,31 +1032,51 @@ class _BetaLabStagesMixin:
             },
             template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("pooling_run"),
         )
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             pooling_run.euid,
             pool.euid,
             relationship_type="beta_pooling_run_output",
+            edge_type="RUN_PRODUCED",
+            source_euid=pooling_run.euid,
+            target_euid=pool.euid,
+            source_role="workflow_run",
+            target_role="produced_material",
         )
 
         pool_container = self.bobj.create_instance_by_code(
             payload.pool_container_template_code or self.POOL_CONTAINER_TEMPLATE_CODE,
             {"json_addl": {"properties": {"name": f"{pool_name} tube"}}},
         )
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             pool_container.euid,
             pool.euid,
-            relationship_type="contains",
+            relationship_type="HOLDS_MATERIAL",
+            edge_type="HOLDS_MATERIAL",
+            source_euid=pool_container.euid,
+            target_euid=pool.euid,
+            source_role="container",
+            target_role="held_material",
         )
         for member in members:
-            self.bobj.create_generic_instance_lineage_by_euids(
+            self._attach_bloom_v0_lineage(
                 member.euid,
                 pool.euid,
                 relationship_type="beta_pool_member",
+                edge_type="DERIVED_FROM",
+                source_euid=pool.euid,
+                target_euid=member.euid,
+                source_role="derived_material",
+                target_role="source_material",
             )
-            self.bobj.create_generic_instance_lineage_by_euids(
+            self._attach_bloom_v0_lineage(
                 member.euid,
                 pooling_run.euid,
                 relationship_type="beta_pooling_run_input",
+                edge_type="RUN_CONSUMED",
+                source_euid=pooling_run.euid,
+                target_euid=member.euid,
+                source_role="workflow_run",
+                target_role="consumed_material",
             )
         self._write_graph_metadata(
             pool,
@@ -1035,7 +1090,7 @@ class _BetaLabStagesMixin:
                 self._graph_expected_fanout_entry(
                     relationship_types=[
                         "beta_sequencing_run",
-                        "contains",
+                        "HOLDS_MATERIAL",
                         "executed_on",
                         "execution_subject_lease",
                         "execution_subject_record",
@@ -1226,10 +1281,15 @@ class _BetaLabStagesMixin:
         run_props = self._props(run)
         run_props["run_folder"] = f"{run.euid}/"
         self._write_props(run, run_props)
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             pool.euid,
             run.euid,
             relationship_type="beta_sequencing_run",
+            edge_type="RUN_CONSUMED",
+            source_euid=run.euid,
+            target_euid=pool.euid,
+            source_role="workflow_run",
+            target_role="consumed_material",
         )
         self._attach_execution_metadata_lineage(run, normalized_metadata)
 
@@ -1266,16 +1326,26 @@ class _BetaLabStagesMixin:
                 assignment_record.euid,
                 relationship_type="beta_sequenced_library_assignment",
             )
-            self.bobj.create_generic_instance_lineage_by_euids(
+            self._attach_bloom_v0_lineage(
                 source.euid,
                 assignment_record.euid,
                 relationship_type="beta_assignment_source",
+                edge_type="RUN_CONSUMED",
+                source_euid=run.euid,
+                target_euid=source.euid,
+                source_role="workflow_run",
+                target_role="consumed_artifact",
             )
             if library_material is not None:
-                self.bobj.create_generic_instance_lineage_by_euids(
+                self._attach_bloom_v0_lineage(
                     library_material.euid,
                     assignment_record.euid,
                     relationship_type="beta_assignment_library_material",
+                    edge_type="RUN_CONSUMED",
+                    source_euid=run.euid,
+                    target_euid=library_material.euid,
+                    source_role="workflow_run",
+                    target_role="consumed_material",
                 )
             if barcode_reagent is not None:
                 self.bobj.create_generic_instance_lineage_by_euids(
@@ -1343,10 +1413,15 @@ class _BetaLabStagesMixin:
                 },
                 template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("run_artifact"),
             )
-            self.bobj.create_generic_instance_lineage_by_euids(
+            self._attach_bloom_v0_lineage(
                 run.euid,
                 artifact_record.euid,
                 relationship_type="beta_run_artifact",
+                edge_type="RUN_PRODUCED",
+                source_euid=run.euid,
+                target_euid=artifact_record.euid,
+                source_role="workflow_run",
+                target_role="produced_artifact",
             )
             self._attach_execution_metadata_lineage(artifact_record, artifact_metadata)
 
@@ -1501,7 +1576,7 @@ class _BetaLabStagesMixin:
         self, extraction_output, *, replay: bool
     ) -> BetaExtractionResponse:
         source = self._first_parent(extraction_output, "beta_extraction_output")
-        well = self._first_parent(extraction_output, "contains")
+        well = self._first_parent(extraction_output, "HOLDS_MATERIAL")
         plate = self._first_parent(well, "contains") if well is not None else None
         run = self._first_parent(extraction_output, "beta_extraction_run_output")
         batch = (

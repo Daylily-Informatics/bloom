@@ -306,7 +306,10 @@ class ExternalSpecimenService:
         for lineage in get_parent_lineages(container):
             if lineage.is_deleted:
                 continue
-            if lineage.child_instance_uid == specimen.uid:
+            if (
+                lineage.child_instance_uid == specimen.uid
+                and lineage.relationship_type == "HOLDS_MATERIAL"
+            ):
                 return
         lineage = self.bobj.create_generic_instance_lineage_by_euids(
             container_euid,
@@ -318,6 +321,8 @@ class ExternalSpecimenService:
             edge_type="HOLDS_MATERIAL",
             source_euid=container_euid,
             target_euid=specimen_euid,
+            source_role="container",
+            target_role="material",
             evidence_refs=[
                 object_evidence(container_euid, role="container"),
                 object_evidence(specimen_euid, role="material"),
@@ -614,7 +619,7 @@ class ExternalSpecimenService:
                 .filter(
                     lineage_cls.is_deleted.is_(False),
                     lineage_cls.parent_instance_uid.in_(sorted(parent_uids)),
-                    lineage_cls.relationship_type.in_(["contains", "HOLDS_MATERIAL"]),
+                    lineage_cls.relationship_type == "HOLDS_MATERIAL",
                     instance_cls.domain_code == self.domain_code,
                     instance_cls.is_deleted.is_(False),
                     instance_category_filter(instance_cls, "content"),
@@ -784,6 +789,8 @@ class ExternalSpecimenService:
                     edge_type="MATERIAL_FROM_SUBJECT",
                     source_euid=specimen.euid,
                     target_euid=ref_obj.euid,
+                    source_role="material",
+                    target_role="subject_ref",
                     evidence_refs=[
                         object_evidence(specimen.euid, role="material"),
                         object_evidence(ref_obj.euid, role="subject_ref"),

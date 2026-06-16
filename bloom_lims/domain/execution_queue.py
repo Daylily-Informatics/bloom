@@ -1479,8 +1479,10 @@ class ExecutionQueueService:
         queue_key = self._authoritative_queue_key_for_instance(instance)
         if queue_key:
             return queue_key
+        category = instance_semantic_category(instance)
+        parent_relationship = "contains" if category == "container" else "HOLDS_MATERIAL"
         for lineage in get_child_lineages(instance):
-            if lineage.is_deleted or lineage.relationship_type != "contains":
+            if lineage.is_deleted or lineage.relationship_type != parent_relationship:
                 continue
             parent = lineage.parent_instance
             if (
@@ -2050,8 +2052,10 @@ class ExecutionQueueService:
         visible_uids = {item.uid for item in self._visible_queue_items(queue, now)}
         if subject.uid in visible_uids:
             return True
+        category = instance_semantic_category(subject)
+        parent_relationship = "contains" if category == "container" else "HOLDS_MATERIAL"
         for lineage in get_child_lineages(subject):
-            if lineage.is_deleted or lineage.relationship_type != "contains":
+            if lineage.is_deleted or lineage.relationship_type != parent_relationship:
                 continue
             parent = lineage.parent_instance
             if (

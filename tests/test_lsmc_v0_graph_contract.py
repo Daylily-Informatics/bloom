@@ -26,8 +26,19 @@ def test_attach_bloom_v0_edge_stores_metadata_under_properties():
     v0_edge = lineage.json_addl["properties"]["v0_edge"]
     assert v0_edge["contract"] == "LSMC_V0"
     assert v0_edge["edge_type"] == "HOLDS_MATERIAL"
-    assert v0_edge["source_euid"] == "Z-BCT-SRC"
-    assert v0_edge["target_euid"] == "Z-BNB-TGT"
+    assert v0_edge["semantic_source"] == {
+        "system": "bloom",
+        "euid": "Z-BCT-SRC",
+        "role": "source",
+    }
+    assert v0_edge["semantic_target"] == {
+        "system": "bloom",
+        "euid": "Z-BNB-TGT",
+        "role": "target",
+    }
+    assert "source_euid" not in v0_edge
+    assert "target_euid" not in v0_edge
+    assert v0_edge["validity"]["valid_to"] is None
 
 
 def test_attach_bloom_v0_edge_rejects_missing_evidence():
