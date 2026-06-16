@@ -88,11 +88,21 @@ class _BetaLabReferenceMixin:
             if ref_type != self.PROCESS_ITEM_REFERENCE_TYPE:
                 continue
             fulfillment_item_euid = str(
-                payload.get("atlas_test_fulfillment_item_euid") or ""
+                payload.get("atlas_test_fulfillment_item_euid")
+                or payload.get("atlas_fulfillment_slot_euid")
+                or ""
             ).strip()
-            atlas_test_euid = str(payload.get("atlas_test_euid") or "").strip()
+            atlas_test_euid = str(
+                payload.get("atlas_test_euid")
+                or payload.get("atlas_order_test_euid")
+                or ""
+            ).strip()
             atlas_tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
-            atlas_trf_euid = str(payload.get("atlas_trf_euid") or "").strip()
+            atlas_trf_euid = str(
+                payload.get("atlas_trf_euid")
+                or payload.get("atlas_order_euid")
+                or ""
+            ).strip()
             if not (
                 fulfillment_item_euid
                 and atlas_test_euid
@@ -105,6 +115,16 @@ class _BetaLabReferenceMixin:
                 "atlas_trf_euid": atlas_trf_euid,
                 "atlas_test_euid": atlas_test_euid,
                 "atlas_test_fulfillment_item_euid": fulfillment_item_euid,
+                "atlas_order_euid": str(
+                    payload.get("atlas_order_euid") or atlas_trf_euid
+                ).strip(),
+                "atlas_order_test_euid": str(
+                    payload.get("atlas_order_test_euid") or atlas_test_euid
+                ).strip(),
+                "atlas_fulfillment_slot_euid": str(
+                    payload.get("atlas_fulfillment_slot_euid")
+                    or fulfillment_item_euid
+                ).strip(),
             }
         return list(refs.values())
 
@@ -272,7 +292,27 @@ class _BetaLabReferenceMixin:
 
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
+        atlas_order_euid = str(
+            atlas_context.get("atlas_order_euid") or atlas_context.get("order_euid") or ""
+        ).strip()
         fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
+        for fulfillment_slot in list(atlas_context.get("fulfillment_slots") or []):
+            atlas_fulfillment_slot_euid = str(
+                fulfillment_slot.get("atlas_fulfillment_slot_euid") or ""
+            ).strip()
+            atlas_order_test_euid = str(
+                fulfillment_slot.get("atlas_order_test_euid") or ""
+            ).strip()
+            if not (atlas_fulfillment_slot_euid and atlas_order_test_euid):
+                continue
+            fulfillment_items.append(
+                {
+                    "atlas_test_euid": atlas_order_test_euid,
+                    "atlas_order_test_euid": atlas_order_test_euid,
+                    "atlas_test_fulfillment_item_euid": atlas_fulfillment_slot_euid,
+                    "atlas_fulfillment_slot_euid": atlas_fulfillment_slot_euid,
+                }
+            )
         direct_fulfillment_item_euid = str(
             atlas_context.get("atlas_test_fulfillment_item_euid") or ""
         ).strip()
@@ -288,13 +328,23 @@ class _BetaLabReferenceMixin:
 
         for fulfillment_item in fulfillment_items:
             atlas_test_euid = str(fulfillment_item.get("atlas_test_euid") or "").strip()
+            atlas_order_test_euid = str(
+                fulfillment_item.get("atlas_order_test_euid") or atlas_test_euid or ""
+            ).strip()
             atlas_test_fulfillment_item_euid = str(
-                fulfillment_item.get("atlas_test_fulfillment_item_euid") or ""
+                fulfillment_item.get("atlas_test_fulfillment_item_euid")
+                or fulfillment_item.get("atlas_fulfillment_slot_euid")
+                or ""
+            ).strip()
+            atlas_fulfillment_slot_euid = str(
+                fulfillment_item.get("atlas_fulfillment_slot_euid")
+                or atlas_test_fulfillment_item_euid
+                or ""
             ).strip()
             if not (
                 atlas_tenant_id
-                and atlas_trf_euid
-                and atlas_test_euid
+                and (atlas_trf_euid or atlas_order_euid)
+                and (atlas_test_euid or atlas_order_test_euid)
                 and atlas_test_fulfillment_item_euid
             ):
                 continue
@@ -305,8 +355,11 @@ class _BetaLabReferenceMixin:
                 "foreign_reference": atlas_test_fulfillment_item_euid,
                 "atlas_tenant_id": atlas_tenant_id,
                 "atlas_trf_euid": atlas_trf_euid,
+                "atlas_order_euid": atlas_order_euid,
                 "atlas_test_euid": atlas_test_euid,
+                "atlas_order_test_euid": atlas_order_test_euid,
                 "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
+                "atlas_fulfillment_slot_euid": atlas_fulfillment_slot_euid,
                 "validation": {},
             }
             created_payloads.append(properties)
@@ -743,8 +796,21 @@ class _BetaLabReferenceMixin:
                     patient_ref["atlas_patient_euid"] if patient_ref is not None else ""
                 ),
                 "fulfillment_items": [],
+                "fulfillment_slots": [],
             }
         first = fulfillment_items[0]
+        fulfillment_slot_payloads = [
+            {
+                "atlas_order_test_euid": item["atlas_order_test_euid"],
+                "atlas_fulfillment_slot_euid": item["atlas_fulfillment_slot_euid"],
+            }
+            for item in sorted(
+                fulfillment_items,
+                key=lambda item: item["atlas_test_fulfillment_item_euid"],
+            )
+            if item.get("atlas_order_test_euid")
+            and item.get("atlas_fulfillment_slot_euid")
+        ]
         return {
             "atlas_tenant_id": first["atlas_tenant_id"],
             "atlas_order_euid": atlas_order_euid,
@@ -781,6 +847,7 @@ class _BetaLabReferenceMixin:
                     key=lambda item: item["atlas_test_fulfillment_item_euid"],
                 )
             ],
+            "fulfillment_slots": fulfillment_slot_payloads,
         }
 
     def _first_reachable_reference_value(
