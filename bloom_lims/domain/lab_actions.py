@@ -866,14 +866,10 @@ class LabActionsService:
         writer.writerows(rows)
         return output.getvalue()
 
-    def illumina_sample_sheet(self, set_euid: str) -> str:
+    def sequencing_sample_sheet(self, set_euid: str) -> str:
         run_set = self._require(set_euid)
         props = self._props(run_set)
         platform = str(props.get("platform") or "").strip()
-        if platform != "ILMN":
-            raise ValueError(
-                f"Sample sheet download is only implemented for ILMN, not {platform or 'unknown'}"
-            )
         pool_content = self._require(str(props.get("pool_content_euid") or ""))
         library_inputs = [
             lineage.parent_instance
@@ -916,6 +912,26 @@ class LabActionsService:
                     ),
                 }
             )
+        if platform == "ONT":
+            return self._ont_sample_sheet(run_set=run_set, props=props, data_rows=data_rows)
+        if platform != "ILMN":
+            raise ValueError(
+                f"Sample sheet download is implemented for ILMN and ONT, not {platform or 'unknown'}"
+            )
+        return self._illumina_sample_sheet(run_set=run_set, props=props, data_rows=data_rows)
+
+    def sequencing_sample_sheet_download(self, set_euid: str) -> tuple[str, str, str]:
+        run_set = self._require(set_euid)
+        props = self._props(run_set)
+        platform = str(props.get("platform") or "").strip()
+        content = self.sequencing_sample_sheet(set_euid)
+        if platform == "ONT":
+            return content, f"{set_euid}_ONT_manifest.tsv", "text/tab-separated-values"
+        return content, f"{set_euid}_{platform or 'sequencing'}_SampleSheet.csv", "text/csv"
+
+    def _illumina_sample_sheet(
+        self, *, run_set, props: dict[str, Any], data_rows: list[dict[str, str]]
+    ) -> str:
         output = io.StringIO()
         output.write("[Header]\n")
         output.write(f"RunSetEUID,{run_set.euid}\n")
@@ -927,6 +943,43 @@ class LabActionsService:
         )
         writer.writeheader()
         writer.writerows(data_rows)
+        return output.getvalue()
+
+    def _ont_sample_sheet(
+        self, *, run_set, props: dict[str, Any], data_rows: list[dict[str, str]]
+    ) -> str:
+        output = io.StringIO()
+        fieldnames = [
+            "sample_id",
+            "alias",
+            "barcode",
+            "run_set_euid",
+            "library_euid",
+            "source_gdna_euid",
+            "source_specimen_content_euid",
+            "flowcell_barcode",
+            "operator",
+        ]
+        writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter="\t")
+        writer.writeheader()
+        for row in data_rows:
+            description = json.loads(row.get("Description") or "{}")
+            writer.writerow(
+                {
+                    "sample_id": row.get("Sample_ID") or "",
+                    "alias": row.get("Sample_Name") or row.get("Sample_ID") or "",
+                    "barcode": row.get("index") or "",
+                    "run_set_euid": run_set.euid,
+                    "library_euid": description.get("library_euid") or row.get("Sample_ID") or "",
+                    "source_gdna_euid": description.get("source_gdna_euid") or "",
+                    "source_specimen_content_euid": description.get(
+                        "source_specimen_content_euid"
+                    )
+                    or "",
+                    "flowcell_barcode": props.get("flowcell_barcode") or "",
+                    "operator": props.get("operator") or "",
+                }
+            )
         return output.getvalue()
 
     def _split_values(self, value: Any) -> list[str]:

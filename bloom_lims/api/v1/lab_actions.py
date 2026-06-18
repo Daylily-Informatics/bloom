@@ -177,12 +177,12 @@ async def download_seq_run_sample_sheet(
 ):
     service = _service_for_user(user)
     try:
-        content = service.illumina_sample_sheet(set_euid)
+        content, filename, media_type = service.sequencing_sample_sheet_download(set_euid)
         return PlainTextResponse(
             content,
-            media_type="text/csv",
+            media_type=media_type,
             headers={
-                "Content-Disposition": f'attachment; filename="{set_euid}_SampleSheet.csv"'
+                "Content-Disposition": f'attachment; filename="{filename}"'
             },
         )
     except Exception as exc:

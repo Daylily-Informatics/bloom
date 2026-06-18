@@ -61,16 +61,16 @@
         </div>
         <div class="card-body">
             <label for="extract-tubes">Incoming tube EUIDs</label>
-            <textarea id="extract-tubes" class="form-control" rows="5" placeholder="One tube EUID per line"></textarea>
+            <textarea id="extract-tubes" class="form-control" data-testid="bloom-lab-extract-tubes" rows="5" placeholder="One tube EUID per line"></textarea>
             <div class="form-row">
                 <label for="extract-name">Plate name</label>
-                <input id="extract-name" class="form-control" value="extraction plate">
+            <input id="extract-name" class="form-control" data-testid="bloom-lab-extract-name" value="extraction plate">
             </div>
             <label class="checkbox-row">
-                <input type="checkbox" id="extract-run-set">
+                <input type="checkbox" id="extract-run-set" data-testid="bloom-lab-extract-run-set">
                 Create associated run set
             </label>
-            <button class="btn btn-primary" type="button" data-action="create-extraction">
+            <button class="btn btn-primary" type="button" data-action="create-extraction" data-testid="bloom-lab-create-extraction">
                 <i class="fas fa-flask"></i> Create Extraction Plate
             </button>
         </div>
@@ -82,12 +82,12 @@
         </div>
         <div class="card-body">
             <label for="qc-source-plate">Extraction plate EUID</label>
-            <input id="qc-source-plate" class="form-control" placeholder="BCP-...">
+            <input id="qc-source-plate" class="form-control" data-testid="bloom-lab-qc-source-plate" placeholder="BCP-...">
             <label for="qc-name">QC plate name</label>
-            <input id="qc-name" class="form-control" value="extraction QC plate">
+            <input id="qc-name" class="form-control" data-testid="bloom-lab-qc-name" value="extraction QC plate">
             <label for="qc-assignments">QC assignments</label>
-            <textarea id="qc-assignments" class="form-control" rows="4" placeholder="A1,pass,concentration_ng_ul=12.3&#10;A2,review,concentration_ng_ul=8.1"></textarea>
-            <button class="btn btn-primary" type="button" data-action="create-qc">
+            <textarea id="qc-assignments" class="form-control" data-testid="bloom-lab-qc-assignments" rows="4" placeholder="A1,pass,concentration_ng_ul=12.3&#10;A2,review,concentration_ng_ul=8.1"></textarea>
+            <button class="btn btn-primary" type="button" data-action="create-qc" data-testid="bloom-lab-create-qc">
                 <i class="fas fa-clipboard-check"></i> Fill Extraction QC Plate
             </button>
         </div>
@@ -99,10 +99,12 @@
         </div>
         <div class="card-body">
             <label for="library-source-plate">Extraction plate EUID</label>
-            <input id="library-source-plate" class="form-control" placeholder="BCP-...">
+            <input id="library-source-plate" class="form-control" data-testid="bloom-lab-library-source-plate" placeholder="BCP-...">
             <label for="library-name">Library plate name</label>
-            <input id="library-name" class="form-control" value="seq library plate">
-            <button class="btn btn-primary" type="button" data-action="create-library">
+            <input id="library-name" class="form-control" data-testid="bloom-lab-library-name" value="seq library plate">
+            <label for="library-assignments">Directed library assignments</label>
+            <textarea id="library-assignments" class="form-control" data-testid="bloom-lab-library-assignments" rows="4" placeholder="source_well_euid,A1,ACGTACGT,index_euid,data_cycles=8&#10;Leave empty for 1:1 mapping from the source plate"></textarea>
+            <button class="btn btn-primary" type="button" data-action="create-library" data-testid="bloom-lab-create-library">
                 <i class="fas fa-table-cells-large"></i> Create Library Plate
             </button>
         </div>
@@ -114,10 +116,10 @@
         </div>
         <div class="card-body">
             <label for="pool-inputs">Input EUIDs</label>
-            <textarea id="pool-inputs" class="form-control" rows="5" placeholder="Library content, well, tube, or pool EUID per line"></textarea>
+            <textarea id="pool-inputs" class="form-control" data-testid="bloom-lab-pool-inputs" rows="5" placeholder="Library content, well, tube, or pool EUID per line"></textarea>
             <div>
                 <label for="pool-platform">Platform</label>
-                <select id="pool-platform" class="form-control">
+                <select id="pool-platform" class="form-control" data-testid="bloom-lab-pool-platform">
                     <option value="ILMN">ILMN</option>
                     <option value="ONT">ONT</option>
                     <option value="Ultima">Ultima</option>
@@ -126,8 +128,8 @@
                 </select>
             </div>
             <label for="pool-name">Pool name</label>
-            <input id="pool-name" class="form-control" value="seq library">
-            <button class="btn btn-primary" type="button" data-action="create-pool">
+            <input id="pool-name" class="form-control" data-testid="bloom-lab-pool-name" value="seq library">
+            <button class="btn btn-primary" type="button" data-action="create-pool" data-testid="bloom-lab-create-pool">
                 <i class="fas fa-vial-circle-check"></i> Create Pool Tube
             </button>
         </div>
@@ -139,14 +141,22 @@
         </div>
         <div class="card-body">
             <label for="run-pool-tube">Pool tube EUID</label>
-            <input id="run-pool-tube" class="form-control" placeholder="BCT-...">
+            <input id="run-pool-tube" class="form-control" data-testid="bloom-lab-run-pool-tube" placeholder="BCT-...">
             <label for="run-pool-content">Pool content EUID</label>
-            <input id="run-pool-content" class="form-control" placeholder="BNP-...">
+            <input id="run-pool-content" class="form-control" data-testid="bloom-lab-run-pool-content" placeholder="BNP-...">
+            <label for="run-platform">Platform</label>
+            <select id="run-platform" class="form-control" data-testid="bloom-lab-run-platform">
+                <option value="ILMN">ILMN</option>
+                <option value="ONT">ONT</option>
+                <option value="Ultima">Ultima</option>
+                <option value="PacBio">PacBio</option>
+                <option value="CompleteGenomics">CompleteGenomics</option>
+            </select>
             <label for="run-flowcell">Flowcell barcode</label>
-            <input id="run-flowcell" class="form-control" value="FLOWCELL-TEST">
+            <input id="run-flowcell" class="form-control" data-testid="bloom-lab-run-flowcell" value="FLOWCELL-TEST">
             <label for="run-operator">Operator</label>
-            <input id="run-operator" class="form-control" value="{{ (udat.email if udat and udat.email else '') }}">
-            <button class="btn btn-primary" type="button" data-action="create-run">
+            <input id="run-operator" class="form-control" data-testid="bloom-lab-run-operator" value="{{ (udat.email if udat and udat.email else '') }}">
+            <button class="btn btn-primary" type="button" data-action="create-run" data-testid="bloom-lab-create-run">
                 <i class="fas fa-play"></i> Create Seq Run Set
             </button>
         </div>
@@ -160,12 +170,12 @@
         </div>
         <div class="card-body">
             <label for="set-name">Set name</label>
-            <input id="set-name" class="form-control" value="sequencing run set">
+            <input id="set-name" class="form-control" data-testid="bloom-lab-set-name" value="sequencing run set">
             <label for="set-members">Member EUIDs</label>
-            <textarea id="set-members" class="form-control" rows="3" placeholder="One EUID per line"></textarea>
+            <textarea id="set-members" class="form-control" data-testid="bloom-lab-set-members" rows="3" placeholder="One EUID per line"></textarea>
             <label for="set-external-members">External member EUIDs/IDs</label>
-            <textarea id="set-external-members" class="form-control" rows="2" placeholder="Optional external IDs"></textarea>
-            <button class="btn btn-primary" type="button" data-action="create-set">
+            <textarea id="set-external-members" class="form-control" data-testid="bloom-lab-set-external-members" rows="2" placeholder="Optional external IDs"></textarea>
+            <button class="btn btn-primary" type="button" data-action="create-set" data-testid="bloom-lab-create-set">
                 <i class="fas fa-layer-group"></i> Create Set
             </button>
         </div>
@@ -177,12 +187,12 @@
         </div>
         <div class="card-body">
             <label for="data-plate">Plate EUID</label>
-            <input id="data-plate" class="form-control" placeholder="BCP-...">
+            <input id="data-plate" class="form-control" data-testid="bloom-lab-data-plate" placeholder="BCP-...">
             <label for="data-template">Data template code</label>
-            <input id="data-template" class="form-control" value="data/operation/extraction-qc/1.0/">
+            <input id="data-template" class="form-control" data-testid="bloom-lab-data-template" value="data/operation/extraction-qc/1.0/">
             <label for="data-records">Data records</label>
-            <textarea id="data-records" class="form-control" rows="4" placeholder="A1,concentration_ng_ul=12.3,qc_status=pass&#10;A2,concentration_ng_ul=8.1,qc_status=review"></textarea>
-            <button class="btn btn-primary" type="button" data-action="attach-data">
+            <textarea id="data-records" class="form-control" data-testid="bloom-lab-data-records" rows="4" placeholder="A1,concentration_ng_ul=12.3,qc_status=pass&#10;A2,concentration_ng_ul=8.1,qc_status=review"></textarea>
+            <button class="btn btn-primary" type="button" data-action="attach-data" data-testid="bloom-lab-attach-data">
                 <i class="fas fa-table"></i> Associate Data To Wells
             </button>
         </div>
@@ -198,12 +208,12 @@
             Upload `.xlsx` or `.csv` sheets for Extraction Plate, Extraction QC, Seq Library Plate, Seq Pool,
             Seq Run Set, Sets, or Plate Well Data. Bulk Create, Transfer, and Annotation sheets are parsed as previews.
         </p>
-        <input id="spreadsheet-file" class="form-control" type="file" accept=".xlsx,.csv">
+        <input id="spreadsheet-file" class="form-control" data-testid="bloom-lab-spreadsheet-file" type="file" accept=".xlsx,.csv">
         <label class="checkbox-row">
-            <input type="checkbox" id="spreadsheet-execute">
+            <input type="checkbox" id="spreadsheet-execute" data-testid="bloom-lab-spreadsheet-execute">
             Execute actions now
         </label>
-        <button class="btn btn-primary" type="button" data-action="upload-spreadsheet">
+        <button class="btn btn-primary" type="button" data-action="upload-spreadsheet" data-testid="bloom-lab-upload-spreadsheet">
             <i class="fas fa-file-excel"></i> Upload Spreadsheet
         </button>
     </div>
@@ -215,22 +225,22 @@
     </div>
     <div class="card-body">
         <label for="print-euids">EUIDs to print</label>
-        <textarea id="print-euids" class="form-control" rows="3" placeholder="One EUID per line"></textarea>
+        <textarea id="print-euids" class="form-control" data-testid="bloom-lab-print-euids" rows="3" placeholder="One EUID per line"></textarea>
         <div class="lab-actions-controls">
             <div>
                 <label for="print-lab">Lab</label>
-                <input id="print-lab" class="form-control" value="SSF">
+                <input id="print-lab" class="form-control" data-testid="bloom-lab-print-lab" value="SSF">
             </div>
             <div>
                 <label for="print-printer">Printer ID</label>
-                <input id="print-printer" class="form-control" value="default">
+                <input id="print-printer" class="form-control" data-testid="bloom-lab-print-printer" value="default">
             </div>
             <div>
                 <label for="print-style">Label style</label>
-                <input id="print-style" class="form-control" value="euid">
+                <input id="print-style" class="form-control" data-testid="bloom-lab-print-style" value="euid">
             </div>
         </div>
-        <button class="btn btn-outline" type="button" data-action="print-euids">
+        <button class="btn btn-outline" type="button" data-action="print-euids" data-testid="bloom-lab-print-submit">
             <i class="fas fa-barcode"></i> Print Selected EUIDs
         </button>
     </div>
@@ -242,7 +252,7 @@
     </div>
     <div class="card-body">
         <div id="lab-action-links" class="button-row"></div>
-        <pre id="lab-action-output" class="code-block" aria-live="polite">{}</pre>
+        <pre id="lab-action-output" class="code-block" data-testid="bloom-lab-action-output" aria-live="polite">{}</pre>
     </div>
 </section>
 {% endblock %}
@@ -265,7 +275,8 @@
       links.appendChild(link(`/api/v1/lab-actions/plates/${payload.plate_euid}/mapping.csv`, 'Download plate CSV'));
     }
     if (payload.set_euid) {
-      links.appendChild(link(`/api/v1/lab-actions/seq-runs/${payload.set_euid}/samplesheet`, 'Download ILMN sample sheet'));
+      const platform = payload.platform || document.getElementById('run-platform').value || 'sequencing';
+      links.appendChild(link(`/api/v1/lab-actions/seq-runs/${payload.set_euid}/samplesheet`, `Download ${platform} sample sheet`));
     }
     const euids = [];
     ['new_container_euids', 'created_euids'].forEach((key) => {
@@ -325,6 +336,17 @@
     return data;
   }
 
+  function keyValueData(pairs) {
+    const data = {};
+    pairs.forEach((pair) => {
+      const [key, value] = pair.split('=');
+      if (key && value !== undefined) {
+        data[key.trim()] = value.trim();
+      }
+    });
+    return data;
+  }
+
   function assignmentRows(textareaId) {
     return document.getElementById(textareaId).value
       .split(/\r?\n/)
@@ -333,19 +355,33 @@
       .map((line) => {
         const [position, status, ...pairs] = line.split(',').map((value) => value.trim());
         const match = position.match(/^([A-Ha-h])(\d{1,2})$/);
-        const data = {};
-        pairs.forEach((pair) => {
-          const [key, value] = pair.split('=');
-          if (key && value !== undefined) {
-            data[key.trim()] = value.trim();
-          }
-        });
         return {
           row: match ? match[1].toUpperCase() : null,
           col: match ? Number(match[2]) : null,
           status: status || null,
           result: status || null,
-          data,
+          data: keyValueData(pairs),
+        };
+      });
+  }
+
+  function libraryAssignmentRows(textareaId) {
+    return document.getElementById(textareaId).value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [sourceWellEuid, position, indexBarcode, indexEuid, ...pairs] = line
+          .split(',')
+          .map((value) => value.trim());
+        const match = (position || '').match(/^([A-Ha-h])(\d{1,2})$/);
+        return {
+          source_well_euid: sourceWellEuid,
+          row: match ? match[1].toUpperCase() : null,
+          col: match ? Number(match[2]) : null,
+          index_barcode: indexBarcode || null,
+          index_euid: indexEuid || null,
+          data: keyValueData(pairs),
         };
       });
   }
@@ -376,11 +412,21 @@
       plate_name: document.getElementById('extract-name').value || 'extraction plate',
       create_run_set: document.getElementById('extract-run-set').checked,
     }),
-    'create-library': async () => postJson('/api/v1/lab-actions/seq-library-plates', {
-      mode: 'plate_1_to_1',
-      source_plate_euid: document.getElementById('library-source-plate').value.trim(),
-      plate_name: document.getElementById('library-name').value || 'seq library plate',
-    }),
+    'create-library': async () => {
+      const assignments = libraryAssignmentRows('library-assignments');
+      if (assignments.length) {
+        return postJson('/api/v1/lab-actions/seq-library-plates', {
+          mode: 'directed',
+          assignments,
+          plate_name: document.getElementById('library-name').value || 'seq library plate',
+        });
+      }
+      return postJson('/api/v1/lab-actions/seq-library-plates', {
+        mode: 'plate_1_to_1',
+        source_plate_euid: document.getElementById('library-source-plate').value.trim(),
+        plate_name: document.getElementById('library-name').value || 'seq library plate',
+      });
+    },
     'create-qc': async () => postJson('/api/v1/lab-actions/extraction-qc-plates', {
       source_plate_euid: document.getElementById('qc-source-plate').value.trim(),
       qc_plate_name: document.getElementById('qc-name').value || 'extraction QC plate',
@@ -394,7 +440,7 @@
     'create-run': async () => postJson('/api/v1/lab-actions/seq-runs', {
       pool_tube_euid: document.getElementById('run-pool-tube').value.trim(),
       pool_content_euid: document.getElementById('run-pool-content').value.trim() || null,
-      platform: 'ILMN',
+      platform: document.getElementById('run-platform').value,
       flowcell_barcode: document.getElementById('run-flowcell').value.trim(),
       operator: document.getElementById('run-operator').value.trim(),
       status: 'created',

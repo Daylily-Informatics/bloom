@@ -213,7 +213,7 @@ def test_lab_actions_full_ilmn_flow_and_csv_export() -> None:
         assert library_content in sample_sheet.text
 
 
-def test_lab_actions_validation_and_non_ilmn_samplesheet_rejection() -> None:
+def test_lab_actions_validation_and_ont_samplesheet_download() -> None:
     client = _client()
     invalid = client.post(
         "/api/v1/lab-actions/extraction-plates",
@@ -247,8 +247,12 @@ def test_lab_actions_validation_and_non_ilmn_samplesheet_rejection() -> None:
     sample_sheet = client.get(
         f"/api/v1/lab-actions/seq-runs/{run.json()['set_euid']}/samplesheet"
     )
-    assert sample_sheet.status_code == 400
-    assert "only implemented for ILMN" in sample_sheet.json()["detail"]
+    assert sample_sheet.status_code == 200, sample_sheet.text
+    assert sample_sheet.headers["content-type"].startswith("text/tab-separated-values")
+    assert "_ONT_manifest.tsv" in sample_sheet.headers["content-disposition"]
+    assert "sample_id\talias\tbarcode\trun_set_euid" in sample_sheet.text
+    assert run.json()["set_euid"] in sample_sheet.text
+    assert "ONT-FLOWCELL" in sample_sheet.text
 
 
 def test_object_creation_count_and_print_euid_mock() -> None:
@@ -310,6 +314,10 @@ def test_lab_actions_gui_renders_wizard() -> None:
     assert "Sequencing Pool Tube" in html
     assert "Sequencing Run Set" in html
     assert "/api/v1/lab-actions/extraction-plates" in html
+    assert 'data-testid="bloom-lab-library-assignments"' in html
+    assert 'data-testid="bloom-lab-run-platform"' in html
+    assert "mode: 'directed'" in html
+    assert "Download ${platform} sample sheet" in html
 
 
 def test_directed_extraction_into_existing_plate_with_quant_and_reuse_guard() -> None:
