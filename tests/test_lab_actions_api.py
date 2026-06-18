@@ -201,6 +201,9 @@ def test_lab_actions_full_ilmn_flow_and_csv_export() -> None:
     assert seq_run.status_code == 200, seq_run.text
     run_payload = seq_run.json()
     assert run_payload["set_euid"]
+    assert run_payload["assignments"]
+    assert run_payload["assignments"][0]["flowcell_id"] == "PYTEST-FLOWCELL"
+    assert run_payload["assignments"][0]["lane"] == "1"
 
     sample_sheet = client.get(
         f"/api/v1/lab-actions/seq-runs/{run_payload['set_euid']}/samplesheet"
@@ -282,11 +285,14 @@ def test_object_creation_count_and_print_euid_mock() -> None:
                 "printer_id": "pytest-printer",
                 "label_zpl_style": "euid",
                 "copies": 1,
+                "dry_run": True,
             },
         )
     assert response.status_code == 200, response.text
-    assert response.json()["printed"] == 3
-    assert service.submit_print_job.call_count == 3
+    assert response.json()["printed"] == 0
+    assert response.json()["dry_run"] is True
+    assert service.submit_print_job.call_count == 0
+    assert len(response.json()["results"]) == 3
 
     recursive_batch = client.post(
         "/api/v1/object-creation/create",

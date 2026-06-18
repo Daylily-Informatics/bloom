@@ -240,6 +240,10 @@
                 <input id="print-style" class="form-control" data-testid="bloom-lab-print-style" value="euid">
             </div>
         </div>
+        <label class="checkbox-row">
+            <input type="checkbox" id="print-dry-run" data-testid="bloom-lab-print-dry-run" checked>
+            Preview only; do not send to printer
+        </label>
         <button class="btn btn-outline" type="button" data-action="print-euids" data-testid="bloom-lab-print-submit">
             <i class="fas fa-barcode"></i> Print Selected EUIDs
         </button>
@@ -468,6 +472,7 @@
       printer_id: document.getElementById('print-printer').value.trim(),
       label_zpl_style: document.getElementById('print-style').value.trim(),
       copies: 1,
+      dry_run: document.getElementById('print-dry-run').checked,
     }),
   };
 

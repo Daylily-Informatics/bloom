@@ -46,6 +46,9 @@ POOL_TUBE_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0/"
 POOL_CONTENT_TEMPLATE_CODE = "content/pool/sequencing-library/1.0/"
 GDNA_QUANT_TEMPLATE_CODE = "data/quantification/gdna/1.0/"
 EXTRACTION_QC_TEMPLATE_CODE = "data/operation/extraction-qc/1.0/"
+SEQUENCED_LIBRARY_ASSIGNMENT_TEMPLATE_CODE = (
+    "data/library-index-assignment/sequencing-library/1.0/"
+)
 
 
 def re_split_multi(value: str) -> list[str]:
@@ -795,6 +798,11 @@ class LabActionsService:
             self._create_lineage(run_set.euid, request.instrument_euid, "run_uses_instrument")
         for reagent_euid in request.reagent_euids:
             self._create_lineage(run_set.euid, reagent_euid, "run_uses_reagent")
+        assignments = self._create_sequenced_library_assignments(
+            run_set=run_set,
+            pool_content=pool_content,
+            flowcell_barcode=request.flowcell_barcode,
+        )
         self.bdb.session.commit()
         return {
             "set_euid": run_set.euid,
@@ -802,7 +810,64 @@ class LabActionsService:
             "platform": request.platform,
             "pool_tube_euid": pool_tube.euid,
             "pool_content_euid": pool_content.euid,
+            "assignments": assignments,
         }
+
+    def _create_sequenced_library_assignments(
+        self,
+        *,
+        run_set,
+        pool_content,
+        flowcell_barcode: str,
+    ) -> list[dict[str, str]]:
+        assignments: list[dict[str, str]] = []
+        source_libraries = [
+            lineage.parent_instance
+            for lineage in self._lineages_to_child(pool_content, "DERIVED_FROM")
+        ]
+        for index, library in enumerate(source_libraries, start=1):
+            props = self._props(library)
+            barcode = str(props.get("index_barcode") or "").strip()
+            lane = str(props.get("lane") or props.get("lane_index") or "1").strip()
+            assignment = self._create_by_code(
+                SEQUENCED_LIBRARY_ASSIGNMENT_TEMPLATE_CODE,
+                name=f"{run_set.euid}:{lane}:{barcode or library.euid}",
+                properties={
+                    "flowcell_id": flowcell_barcode,
+                    "lane": lane,
+                    "library_barcode": barcode,
+                    "library_prep_output_euid": library.euid,
+                    "library_material_euid": library.euid,
+                    "barcode_reagent_euid": str(props.get("index_euid") or "").strip(),
+                    "metadata": {
+                        "created_by": "bloom_lab_actions",
+                        "pool_content_euid": pool_content.euid,
+                    },
+                },
+            )
+            self._create_lineage(
+                run_set.euid,
+                assignment.euid,
+                "beta_sequenced_library_assignment",
+            )
+            self._create_lineage(
+                library.euid,
+                assignment.euid,
+                "beta_assignment_source",
+                edge_type="RUN_CONSUMED",
+                source_role="sequencing_run_set",
+                target_role="library_material",
+            )
+            assignments.append(
+                {
+                    "assignment_euid": assignment.euid,
+                    "library_content_euid": library.euid,
+                    "flowcell_id": flowcell_barcode,
+                    "lane": lane,
+                    "library_barcode": barcode,
+                }
+            )
+        return assignments
 
     def plate_mapping_rows(self, plate_euid: str) -> list[dict[str, str]]:
         plate = self._require(plate_euid)
@@ -1302,10 +1367,22 @@ class LabActionsService:
         return {"filename": filename, "dry_run": dry_run, "actions": actions}
 
     def print_euids(self, request: PrintEuidRequest) -> dict[str, Any]:
-        service = ZebraDayService()
         results = []
         for euid in request.euids:
             self._require(euid)
+            if request.dry_run:
+                results.append(
+                    {
+                        "dry_run": True,
+                        "lab": request.lab,
+                        "printer_id": request.printer_id,
+                        "label_zpl_style": request.label_zpl_style,
+                        "euid": euid,
+                        "copies": request.copies,
+                    }
+                )
+                continue
+            service = ZebraDayService()
             results.append(
                 service.submit_print_job(
                     lab=request.lab,
@@ -1315,4 +1392,4 @@ class LabActionsService:
                     print_n=request.copies,
                 )
             )
-        return {"printed": len(results), "results": results}
+        return {"printed": 0 if request.dry_run else len(results), "dry_run": request.dry_run, "results": results}

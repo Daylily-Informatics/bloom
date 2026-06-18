@@ -260,6 +260,7 @@ class PrintEuidRequest(BaseModel):
     printer_id: str
     label_zpl_style: str
     copies: int = Field(default=1, ge=1, le=20)
+    dry_run: bool = False
 
     @field_validator("euids")
     @classmethod
