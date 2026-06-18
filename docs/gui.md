@@ -207,9 +207,13 @@ Older workflow/workset-centric creation surfaces are not the current product dir
 `/lab-actions` exposes the temporary wet-lab action wizard for:
 
 - incoming tube to extraction plate mapping
+- extraction plate to extraction QC plate mapping
 - extraction plate to sequencing-library plate mapping
 - sequencing-library pool tube creation
 - sequencing run set setup
+- generic lab/run set creation and member management
+- plate-well associated data attachment
+- spreadsheet upload for `.csv` and `.xlsx` lab-action sheets
 - plate CSV export
 - ILMN sample-sheet download
 - generic EUID barcode print dispatch

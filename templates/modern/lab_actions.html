@@ -78,7 +78,24 @@
 
     <section class="card lab-actions-card">
         <div class="card-header">
-            <h2>2. Sequencing-Library Plate</h2>
+            <h2>2. Extraction QC Plate</h2>
+        </div>
+        <div class="card-body">
+            <label for="qc-source-plate">Extraction plate EUID</label>
+            <input id="qc-source-plate" class="form-control" placeholder="BCP-...">
+            <label for="qc-name">QC plate name</label>
+            <input id="qc-name" class="form-control" value="extraction QC plate">
+            <label for="qc-assignments">QC assignments</label>
+            <textarea id="qc-assignments" class="form-control" rows="4" placeholder="A1,pass,concentration_ng_ul=12.3&#10;A2,review,concentration_ng_ul=8.1"></textarea>
+            <button class="btn btn-primary" type="button" data-action="create-qc">
+                <i class="fas fa-clipboard-check"></i> Fill Extraction QC Plate
+            </button>
+        </div>
+    </section>
+
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>3. Sequencing-Library Plate</h2>
         </div>
         <div class="card-body">
             <label for="library-source-plate">Extraction plate EUID</label>
@@ -93,7 +110,7 @@
 
     <section class="card lab-actions-card">
         <div class="card-header">
-            <h2>3. Sequencing Pool Tube</h2>
+            <h2>4. Sequencing Pool Tube</h2>
         </div>
         <div class="card-body">
             <label for="pool-inputs">Input EUIDs</label>
@@ -118,7 +135,7 @@
 
     <section class="card lab-actions-card">
         <div class="card-header">
-            <h2>4. Sequencing Run Set</h2>
+            <h2>5. Sequencing Run Set</h2>
         </div>
         <div class="card-body">
             <label for="run-pool-tube">Pool tube EUID</label>
@@ -135,6 +152,62 @@
         </div>
     </section>
 </div>
+
+<div class="grid grid-2 gap-lg mt-lg lab-actions-grid">
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>Manage Sets</h2>
+        </div>
+        <div class="card-body">
+            <label for="set-name">Set name</label>
+            <input id="set-name" class="form-control" value="sequencing run set">
+            <label for="set-members">Member EUIDs</label>
+            <textarea id="set-members" class="form-control" rows="3" placeholder="One EUID per line"></textarea>
+            <label for="set-external-members">External member EUIDs/IDs</label>
+            <textarea id="set-external-members" class="form-control" rows="2" placeholder="Optional external IDs"></textarea>
+            <button class="btn btn-primary" type="button" data-action="create-set">
+                <i class="fas fa-layer-group"></i> Create Set
+            </button>
+        </div>
+    </section>
+
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>Plate-Well Data</h2>
+        </div>
+        <div class="card-body">
+            <label for="data-plate">Plate EUID</label>
+            <input id="data-plate" class="form-control" placeholder="BCP-...">
+            <label for="data-template">Data template code</label>
+            <input id="data-template" class="form-control" value="data/operation/extraction-qc/1.0/">
+            <label for="data-records">Data records</label>
+            <textarea id="data-records" class="form-control" rows="4" placeholder="A1,concentration_ng_ul=12.3,qc_status=pass&#10;A2,concentration_ng_ul=8.1,qc_status=review"></textarea>
+            <button class="btn btn-primary" type="button" data-action="attach-data">
+                <i class="fas fa-table"></i> Associate Data To Wells
+            </button>
+        </div>
+    </section>
+</div>
+
+<section class="card mt-lg lab-actions-card">
+    <div class="card-header">
+        <h2>Spreadsheet Upload</h2>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">
+            Upload `.xlsx` or `.csv` sheets for Extraction Plate, Extraction QC, Seq Library Plate, Seq Pool,
+            Seq Run Set, Sets, or Plate Well Data. Bulk Create, Transfer, and Annotation sheets are parsed as previews.
+        </p>
+        <input id="spreadsheet-file" class="form-control" type="file" accept=".xlsx,.csv">
+        <label class="checkbox-row">
+            <input type="checkbox" id="spreadsheet-execute">
+            Execute actions now
+        </label>
+        <button class="btn btn-primary" type="button" data-action="upload-spreadsheet">
+            <i class="fas fa-file-excel"></i> Upload Spreadsheet
+        </button>
+    </div>
+</section>
 
 <section class="card mt-lg lab-actions-card">
     <div class="card-header">
@@ -203,11 +276,17 @@
     if (payload.pool_tube_euid) {
       euids.push(payload.pool_tube_euid);
     }
+    if (payload.qc_plate_euid) {
+      euids.push(payload.qc_plate_euid);
+    }
     if (euids.length) {
       document.getElementById('print-euids').value = Array.from(new Set(euids)).join('\n');
     }
     if (payload.plate_euid && !document.getElementById('library-source-plate').value) {
       document.getElementById('library-source-plate').value = payload.plate_euid;
+    }
+    if (payload.plate_euid && !document.getElementById('qc-source-plate').value) {
+      document.getElementById('qc-source-plate').value = payload.plate_euid;
     }
     if (payload.mappings) {
       const libraryInputs = payload.mappings
@@ -246,6 +325,50 @@
     return data;
   }
 
+  function assignmentRows(textareaId) {
+    return document.getElementById(textareaId).value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [position, status, ...pairs] = line.split(',').map((value) => value.trim());
+        const match = position.match(/^([A-Ha-h])(\d{1,2})$/);
+        const data = {};
+        pairs.forEach((pair) => {
+          const [key, value] = pair.split('=');
+          if (key && value !== undefined) {
+            data[key.trim()] = value.trim();
+          }
+        });
+        return {
+          row: match ? match[1].toUpperCase() : null,
+          col: match ? Number(match[2]) : null,
+          status: status || null,
+          result: status || null,
+          data,
+        };
+      });
+  }
+
+  async function uploadSpreadsheet() {
+    const input = document.getElementById('spreadsheet-file');
+    if (!input.files.length) {
+      throw new Error('Choose a .xlsx or .csv file first');
+    }
+    const execute = document.getElementById('spreadsheet-execute').checked;
+    const form = new FormData();
+    form.append('file', input.files[0]);
+    const response = await fetch(`/api/v1/lab-actions/spreadsheet-import?dry_run=${execute ? 'false' : 'true'}`, {
+      method: 'POST',
+      body: form,
+    });
+    const data = await response.json().catch(() => ({detail: response.statusText}));
+    if (!response.ok) {
+      throw new Error(data.detail || response.statusText);
+    }
+    return data;
+  }
+
   const handlers = {
     'create-extraction': async () => postJson('/api/v1/lab-actions/extraction-plates', {
       mode: 'auto',
@@ -257,6 +380,11 @@
       mode: 'plate_1_to_1',
       source_plate_euid: document.getElementById('library-source-plate').value.trim(),
       plate_name: document.getElementById('library-name').value || 'seq library plate',
+    }),
+    'create-qc': async () => postJson('/api/v1/lab-actions/extraction-qc-plates', {
+      source_plate_euid: document.getElementById('qc-source-plate').value.trim(),
+      qc_plate_name: document.getElementById('qc-name').value || 'extraction QC plate',
+      assignments: assignmentRows('qc-assignments'),
     }),
     'create-pool': async () => postJson('/api/v1/lab-actions/seq-library-pools', {
       input_euids: lines('pool-inputs'),
@@ -271,6 +399,23 @@
       operator: document.getElementById('run-operator').value.trim(),
       status: 'created',
     }),
+    'create-set': async () => postJson('/api/v1/lab-actions/sets', {
+      name: document.getElementById('set-name').value.trim(),
+      members: lines('set-members'),
+      external_members: lines('set-external-members'),
+      status: 'created',
+    }),
+    'attach-data': async () => postJson('/api/v1/lab-actions/plate-well-data', {
+      data_template_code: document.getElementById('data-template').value.trim(),
+      records: assignmentRows('data-records').map((item) => ({
+        plate_euid: document.getElementById('data-plate').value.trim(),
+        row: item.row,
+        col: item.col,
+        target: 'content',
+        data: item.data,
+      })),
+    }),
+    'upload-spreadsheet': uploadSpreadsheet,
     'print-euids': async () => postJson('/api/v1/lab-actions/print-euids', {
       euids: lines('print-euids'),
       lab: document.getElementById('print-lab').value.trim(),

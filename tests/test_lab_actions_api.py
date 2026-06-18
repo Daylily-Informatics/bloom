@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import zipfile
+from io import BytesIO
 from unittest.mock import patch
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
@@ -10,6 +12,7 @@ os.environ["BLOOM_OAUTH"] = "no"
 
 from fastapi.testclient import TestClient
 
+from bloom_lims.domain.lab_action_spreadsheets import parse_workbook
 from main import app
 
 
@@ -564,3 +567,303 @@ def test_lab_action_schema_validation_edges() -> None:
         },
     )
     assert too_many_prints.status_code == 422
+
+
+def test_qc_plate_data_sets_and_pool_from_well_and_tube() -> None:
+    client = _client()
+    tube_1, _ = _create_filled_tube(client, suffix="qc-a")
+    tube_2, _ = _create_filled_tube(client, suffix="qc-b")
+
+    with patch(
+        "bloom_lims.integrations.atlas.events.emit_bloom_event", return_value=None
+    ):
+        extraction = client.post(
+            "/api/v1/lab-actions/extraction-plates",
+            json={
+                "mode": "auto",
+                "tube_euids": [tube_1],
+                "plate_name": "pytest spreadsheet extraction plate",
+            },
+        )
+    assert extraction.status_code == 200, extraction.text
+    extraction_payload = extraction.json()
+    source_well = extraction_payload["mappings"][0]["well_euid"]
+
+    qc = client.post(
+        "/api/v1/lab-actions/extraction-qc-plates",
+        json={
+            "source_plate_euid": extraction_payload["plate_euid"],
+            "qc_plate_name": "pytest extraction QC plate",
+            "assignments": [
+                {
+                    "source_well_euid": source_well,
+                    "qc_row": "A",
+                    "qc_col": 1,
+                    "result": "pass",
+                    "status": "recorded",
+                    "data": {"concentration_ng_ul": 12.3},
+                }
+            ],
+        },
+    )
+    assert qc.status_code == 200, qc.text
+    qc_payload = qc.json()
+    assert qc_payload["qc_plate_euid"]
+    assert qc_payload["mappings"][0]["result"] == "pass"
+    assert qc_payload["mappings"][0]["data_euid"]
+
+    data = client.post(
+        "/api/v1/lab-actions/plate-well-data",
+        json={
+            "data_template_code": "data/operation/extraction-qc/1.0/",
+            "records": [
+                {
+                    "plate_euid": extraction_payload["plate_euid"],
+                    "row": "A",
+                    "col": 1,
+                    "target": "content",
+                    "data": {"a260_280": 1.82},
+                }
+            ],
+        },
+    )
+    assert data.status_code == 200, data.text
+    assert data.json()["mappings"][0]["data_euid"]
+
+    lab_set = client.post(
+        "/api/v1/lab-actions/sets",
+        json={
+            "name": "pytest extraction set",
+            "members": [extraction_payload["plate_euid"], qc_payload["qc_plate_euid"]],
+            "external_members": ["external-reagent-lot-1"],
+        },
+    )
+    assert lab_set.status_code == 200, lab_set.text
+    set_euid = lab_set.json()["set_euid"]
+    add_members = client.post(
+        f"/api/v1/lab-actions/sets/{set_euid}/members",
+        json={"members": [tube_2], "external_members": ["operator-note-1"]},
+    )
+    assert add_members.status_code == 200, add_members.text
+    fetched = client.get(f"/api/v1/lab-actions/sets/{set_euid}")
+    assert fetched.status_code == 200
+    assert tube_2 in fetched.json()["members"]
+    assert "operator-note-1" in fetched.json()["external_members"]
+
+    with patch(
+        "bloom_lims.integrations.atlas.events.emit_bloom_event", return_value=None
+    ):
+        pool = client.post(
+            "/api/v1/lab-actions/seq-library-pools",
+            json={
+                "input_euids": [source_well, tube_2],
+                "platform": "ILMN",
+                "pool_name": "pytest well plus tube pool",
+            },
+        )
+    assert pool.status_code == 200, pool.text
+    assert len(pool.json()["member_euids"]) == 2
+
+
+def _minimal_xlsx(sheet_name: str, rows: list[list[str | None]]) -> bytes:
+    def cell_ref(row_index: int, col_index: int) -> str:
+        col = ""
+        value = col_index
+        while value:
+            value, remainder = divmod(value - 1, 26)
+            col = chr(65 + remainder) + col
+        return f"{col}{row_index}"
+
+    sheet_rows = []
+    for row_index, row in enumerate(rows, start=1):
+        cells = []
+        for col_index, value in enumerate(row, start=1):
+            if value is None:
+                continue
+            cells.append(
+                f'<c r="{cell_ref(row_index, col_index)}" t="inlineStr"><is><t>{value}</t></is></c>'
+            )
+        sheet_rows.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+    worksheet = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{"".join(sheet_rows)}</sheetData></worksheet>'
+    )
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            f'<sheets><sheet name="{sheet_name}" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            "</Relationships>",
+        )
+        archive.writestr("xl/worksheets/sheet1.xml", worksheet)
+    return output.getvalue()
+
+
+def test_spreadsheet_import_csv_and_xlsx_preview() -> None:
+    client = _client()
+    tube, _ = _create_filled_tube(client, suffix="spreadsheet")
+    csv_bytes = (
+        "tube_euid,row,col,plate_name\n"
+        f"{tube},A,1,pytest upload extraction plate\n"
+    ).encode()
+    dry_run = client.post(
+        "/api/v1/lab-actions/spreadsheet-import",
+        params={"dry_run": "true"},
+        files={"file": ("extraction.csv", csv_bytes, "text/csv")},
+    )
+    assert dry_run.status_code == 200, dry_run.text
+    assert dry_run.json()["actions"][0]["action"] == "extraction_plate"
+    assert dry_run.json()["actions"][0]["request"]["mode"] == "directed"
+
+    with patch(
+        "bloom_lims.integrations.atlas.events.emit_bloom_event", return_value=None
+    ):
+        execute = client.post(
+            "/api/v1/lab-actions/spreadsheet-import",
+            params={"dry_run": "false"},
+            files={"file": ("extraction.csv", csv_bytes, "text/csv")},
+        )
+    assert execute.status_code == 200, execute.text
+    assert execute.json()["actions"][0]["result"]["plate_euid"]
+
+    workbook = _minimal_xlsx(
+        "Transfer",
+        [
+            [],
+            [],
+            ["SOURCE CONTAINER(s)", None, None, None, None, None, None, None, None, "DESTINATION CONTAINER(s)"],
+            ["Container EUID", "Container Template EUID", "Continer Cat/Type/Subtype"],
+            ["BCT-EXAMPLE", "container/tube/tube-generic-10ml/1.0", "container/tube/generic"],
+        ],
+    )
+    parsed = parse_workbook("container_interactions.xlsx", workbook)
+    assert parsed[0].name == "Transfer"
+    assert "container_euid" in parsed[0].headers
+    preview = client.post(
+        "/api/v1/lab-actions/spreadsheet-import",
+        params={"dry_run": "true"},
+        files={
+            "file": (
+                "container_interactions.xlsx",
+                workbook,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["actions"][0]["action"] == "container_interaction_preview"
+
+
+def _upload_csv(client: TestClient, csv_text: str, *, dry_run: bool = False):
+    return client.post(
+        "/api/v1/lab-actions/spreadsheet-import",
+        params={"dry_run": str(dry_run).lower()},
+        files={"file": ("lab_action.csv", csv_text.encode(), "text/csv")},
+    )
+
+
+def test_spreadsheet_import_executes_each_lab_action_sheet_shape() -> None:
+    client = _client()
+    tube, _ = _create_filled_tube(client, suffix="upload-flow")
+    extraction = client.post(
+        "/api/v1/lab-actions/extraction-plates",
+        json={"mode": "auto", "tube_euids": [tube]},
+    )
+    assert extraction.status_code == 200, extraction.text
+    extraction_payload = extraction.json()
+    source_well = extraction_payload["mappings"][0]["well_euid"]
+
+    qc_csv = (
+        "source_well_euid,qc_row,qc_col,result,status,data_concentration_ng_ul\n"
+        f"{source_well},A,1,pass,recorded,11.2\n"
+    )
+    qc = _upload_csv(client, qc_csv)
+    assert qc.status_code == 200, qc.text
+    qc_action = qc.json()["actions"][0]
+    assert qc_action["action"] == "extraction_qc"
+    assert qc_action["result"]["mappings"][0]["result"] == "pass"
+
+    library_csv = (
+        "source_well_euid,row,col,index_barcode,data_cycles\n"
+        f"{source_well},A,1,ACGTACGT,8\n"
+    )
+    library = _upload_csv(client, library_csv)
+    assert library.status_code == 200, library.text
+    library_action = library.json()["actions"][0]
+    assert library_action["action"] == "seq_library_plate"
+    library_content = library_action["result"]["mappings"][0]["library_content_euid"]
+
+    pool_csv = (
+        "input_euids,platform,pool_name,pool_batch\n"
+        f"{library_content},ILMN,pytest upload pool,batch-1\n"
+    )
+    pool = _upload_csv(client, pool_csv)
+    assert pool.status_code == 200, pool.text
+    pool_action = pool.json()["actions"][0]
+    assert pool_action["action"] == "seq_pool"
+    pool_result = pool_action["result"]
+
+    run_csv = (
+        "pool_tube_euid,pool_content_euid,platform,operator,flowcell_barcode,status,run_batch\n"
+        f"{pool_result['pool_tube_euid']},{pool_result['pool_content_euid']},ILMN,pytest@example.com,FLOWCELL-UPLOAD,created,batch-1\n"
+    )
+    run = _upload_csv(client, run_csv)
+    assert run.status_code == 200, run.text
+    run_action = run.json()["actions"][0]
+    assert run_action["action"] == "seq_run_set"
+    assert run_action["result"]["set_euid"]
+
+    set_csv = (
+        "name,members,external_members,status,set_note\n"
+        f"pytest upload set,{extraction_payload['plate_euid']};{pool_result['pool_tube_euid']},lot:123,created,upload\n"
+    )
+    lab_set = _upload_csv(client, set_csv)
+    assert lab_set.status_code == 200, lab_set.text
+    set_action = lab_set.json()["actions"][0]
+    assert set_action["action"] == "sets"
+    assert set_action["result"][0]["set_euid"]
+
+    data_csv = (
+        "well_euid,data_template_code,target,name,annotation_value,metric_a260_280\n"
+        f"{source_well},data/operation/extraction-qc/1.0/,content,pytest uploaded data,ok,1.82\n"
+    )
+    data = _upload_csv(client, data_csv)
+    assert data.status_code == 200, data.text
+    data_action = data.json()["actions"][0]
+    assert data_action["action"] == "plate_well_data"
+    assert data_action["result"]["mappings"][0]["data_euid"]
+
+    bad_extension = client.post(
+        "/api/v1/lab-actions/spreadsheet-import",
+        files={"file": ("lab_action.txt", b"not,csv", "text/plain")},
+    )
+    assert bad_extension.status_code == 400
+    assert "must be .csv or .xlsx" in bad_extension.json()["detail"]
+
+
+def test_lab_actions_gui_renders_upload_qc_and_set_controls() -> None:
+    client = _client()
+    response = client.get("/lab-actions")
+    assert response.status_code == 200, response.text
+    assert "Extraction QC Plate" in response.text
+    assert "Spreadsheet Upload" in response.text
+    assert "Manage Sets" in response.text
+    assert 'data-action="upload-spreadsheet"' in response.text

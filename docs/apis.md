@@ -370,9 +370,15 @@ The detailed operator/API runbook is [`lab_actions.md`](lab_actions.md). It is t
 Current routes:
 
 - `POST /api/v1/lab-actions/extraction-plates`: create or fill extraction plates from incoming filled tube EUIDs, create gDNA contents, and link tube/content/well/material provenance.
+- `POST /api/v1/lab-actions/extraction-qc-plates`: create or fill extraction QC plates from extraction wells and attach QC data records.
 - `POST /api/v1/lab-actions/seq-library-plates`: create sequencing-library plates from filled extraction wells or directed mappings.
 - `POST /api/v1/lab-actions/seq-library-pools`: create or fill sequencing-library pool tubes from tube, well, content, or existing pool inputs.
 - `POST /api/v1/lab-actions/seq-runs`: create sequencing run sets with pool, instrument/operator/reagent metadata, flowcell barcode, platform, and status.
+- `POST /api/v1/lab-actions/sets`: create generic lab/run sets for batches, reagents, instruments, operators, or external members.
+- `GET /api/v1/lab-actions/sets/{set_euid}`: read the stored set metadata and members.
+- `POST /api/v1/lab-actions/sets/{set_euid}/members`: append internal Bloom EUID members or external member identifiers.
+- `POST /api/v1/lab-actions/plate-well-data`: attach structured data records to plate wells or well contents.
+- `POST /api/v1/lab-actions/spreadsheet-import`: dry-run or execute `.csv`/`.xlsx` uploads for explicit lab-action sheet shapes.
 - `GET /api/v1/lab-actions/seq-runs/{set_euid}/samplesheet`: download ILMN sample sheets. Non-ILMN platforms fail explicitly until file formats are specified.
 - `GET /api/v1/lab-actions/plates/{plate_euid}/mapping.csv`: export one-degree parent/child plate mapping CSV.
 - `POST /api/v1/lab-actions/print-euids`: dispatch EUID barcode print requests through Zebra Day.

@@ -5,18 +5,26 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.domain.base import BloomObj
+from bloom_lims.domain.lab_action_spreadsheets import ParsedSheet, parse_workbook
 from bloom_lims.domain.v0_graph import attach_bloom_v0_edge, object_evidence
 from bloom_lims.integrations.zebra_day import ZebraDayService
 from bloom_lims.schemas.lab_actions import (
     ExtractionPlateRequest,
+    ExtractionQcAssignment,
+    ExtractionQcPlateRequest,
     ExtractionTubeAssignment,
+    LabSetMembersRequest,
+    LabSetRequest,
     LibraryPlateAssignment,
+    PlateWellDataRecord,
+    PlateWellDataRequest,
     PrintEuidRequest,
     RunSetInput,
     SeqLibraryPlateRequest,
@@ -37,6 +45,11 @@ LIBRARY_CONTENT_TEMPLATE_CODE = "content/sample/sequencing-library/1.0/"
 POOL_TUBE_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0/"
 POOL_CONTENT_TEMPLATE_CODE = "content/pool/sequencing-library/1.0/"
 GDNA_QUANT_TEMPLATE_CODE = "data/quantification/gdna/1.0/"
+EXTRACTION_QC_TEMPLATE_CODE = "data/operation/extraction-qc/1.0/"
+
+
+def re_split_multi(value: str) -> list[str]:
+    return re.split(r"[\n,|;]+", value)
 
 
 @dataclass(frozen=True)
@@ -256,9 +269,9 @@ class LabActionsService:
                 "members": members,
                 "external_members": payload.external_members,
                 "metadata": payload.metadata,
-                "status": "created",
+                "status": payload.status,
             },
-            status="created",
+            status=payload.status,
         )
         for member in members:
             if self.bobj.get_by_euid(member) is None:
@@ -266,6 +279,233 @@ class LabActionsService:
             self._create_lineage(instance.euid, member, "run_set_member")
             self._create_lineage(member, instance.euid, "associated_set")
         return instance
+
+    def _well_from_plate_position(self, plate_euid: str, row: str, col: int):
+        plate = self._require(plate_euid)
+        wells = self._plate_wells(plate)
+        position = WellPosition(row=row, col=col).name
+        well = wells.get(position)
+        if well is None:
+            raise ValueError(f"Destination well not found on plate: {position}")
+        return well
+
+    def _well_for_data_record(self, record: PlateWellDataRecord):
+        if record.well_euid:
+            return self._require(record.well_euid)
+        return self._well_from_plate_position(record.plate_euid, record.row, record.col)
+
+    def _well_for_qc_assignment(
+        self, assignment: ExtractionQcAssignment, source_plate_euid: str | None
+    ):
+        if assignment.source_well_euid:
+            return self._require(assignment.source_well_euid)
+        if not source_plate_euid:
+            raise ValueError("source_plate_euid is required when assignment uses row/col")
+        return self._well_from_plate_position(
+            source_plate_euid, assignment.row, assignment.col
+        )
+
+    def _create_or_get_qc_plate(self, request: ExtractionQcPlateRequest):
+        if request.qc_plate_euid:
+            plate = self._require(request.qc_plate_euid)
+            if instance_semantic_category(plate) != "container" or plate.type != "plate":
+                raise ValueError(f"{request.qc_plate_euid} is not a plate container")
+            return plate, []
+        plate = self._create_by_code(
+            EXTRACTION_PLATE_TEMPLATE_CODE,
+            name=request.qc_plate_name or "extraction QC plate",
+        )
+        return plate, [plate.euid]
+
+    def _all_filled_well_qc_assignments(
+        self, source_plate_euid: str
+    ) -> list[ExtractionQcAssignment]:
+        plate = self._require(source_plate_euid)
+        assignments: list[ExtractionQcAssignment] = []
+        for name, well in sorted(self._plate_wells(plate).items()):
+            if self._lineages_from_parent(well, "HOLDS_MATERIAL"):
+                assignments.append(
+                    ExtractionQcAssignment(
+                        source_well_euid=well.euid,
+                        qc_row=name[:1],
+                        qc_col=int(name[1:]),
+                    )
+                )
+        if not assignments:
+            raise ValueError(f"Source plate {source_plate_euid} has no filled wells")
+        return assignments
+
+    def create_lab_set(self, request: LabSetRequest) -> dict[str, Any]:
+        run_set = self._create_by_code(
+            RUN_SET_TEMPLATE_CODE,
+            name=request.name,
+            properties={
+                "name": request.name,
+                "description": request.description or "",
+                "members": list(dict.fromkeys(request.members)),
+                "external_members": list(dict.fromkeys(request.external_members)),
+                "operator": request.operator or "",
+                "instrument": request.instrument or "",
+                "reagents": request.reagents,
+                "machine": request.machine or "",
+                "flowcell_barcode": request.flowcell_barcode or "",
+                "status": request.status,
+                "metadata": request.metadata,
+            },
+            status=request.status,
+        )
+        for member in dict.fromkeys(request.members):
+            if self.bobj.get_by_euid(member) is not None:
+                self._create_lineage(run_set.euid, member, "run_set_member")
+                self._create_lineage(member, run_set.euid, "associated_set")
+        self.bdb.session.commit()
+        return self.get_lab_set(run_set.euid)
+
+    def add_lab_set_members(
+        self, set_euid: str, request: LabSetMembersRequest
+    ) -> dict[str, Any]:
+        run_set = self._require(set_euid)
+        props = self._props(run_set)
+        members = list(
+            dict.fromkeys([*props.get("members", []), *request.members])
+        )
+        external_members = list(
+            dict.fromkeys(
+                [*props.get("external_members", []), *request.external_members]
+            )
+        )
+        props["members"] = members
+        props["external_members"] = external_members
+        self._write_props(run_set, props)
+        for member in request.members:
+            if self.bobj.get_by_euid(member) is not None:
+                self._create_lineage(run_set.euid, member, "run_set_member")
+                self._create_lineage(member, run_set.euid, "associated_set")
+        self.bdb.session.commit()
+        return self.get_lab_set(set_euid)
+
+    def get_lab_set(self, set_euid: str) -> dict[str, Any]:
+        run_set = self._require(set_euid)
+        props = self._props(run_set)
+        return {
+            "set_euid": run_set.euid,
+            "name": run_set.name,
+            "status": run_set.bstatus,
+            "properties": props,
+            "members": props.get("members", []),
+            "external_members": props.get("external_members", []),
+        }
+
+    def fill_extraction_qc_plate(
+        self, request: ExtractionQcPlateRequest
+    ) -> dict[str, Any]:
+        assignments = request.assignments or self._all_filled_well_qc_assignments(
+            request.source_plate_euid
+        )
+        if len(assignments) > 96:
+            raise ValueError("extraction QC plate can accept at most 96 assignments")
+        qc_plate, new_container_euids = self._create_or_get_qc_plate(request)
+        qc_wells = self._plate_wells(qc_plate)
+        used_qc_positions: set[str] = set()
+        mappings: list[dict[str, Any]] = []
+        for index, assignment in enumerate(assignments):
+            source_well = self._well_for_qc_assignment(
+                assignment, request.source_plate_euid
+            )
+            source_content = self._well_content(source_well)
+            if assignment.qc_row is not None and assignment.qc_col is not None:
+                qc_position = WellPosition(
+                    row=assignment.qc_row, col=assignment.qc_col
+                ).name
+            else:
+                qc_position = WellPosition(
+                    row=assignment.row or ROWS[index // 12],
+                    col=assignment.col or (index % 12) + 1,
+                ).name
+            if qc_position in used_qc_positions:
+                raise ValueError(f"duplicate QC destination well: {qc_position}")
+            used_qc_positions.add(qc_position)
+            qc_well = qc_wells.get(qc_position)
+            if qc_well is None:
+                raise ValueError(f"QC well not found on plate: {qc_position}")
+            data = self._create_by_code(
+                EXTRACTION_QC_TEMPLATE_CODE,
+                name=f"{source_well.euid} extraction QC",
+                properties={
+                    "source_well_euid": source_well.euid,
+                    "source_content_euid": source_content.euid,
+                    "qc_plate_euid": qc_plate.euid,
+                    "qc_well_euid": qc_well.euid,
+                    "qc_well_name": qc_position,
+                    "result": assignment.result or "",
+                    "status": assignment.status or "recorded",
+                    "data": assignment.data,
+                },
+                status=assignment.status or "recorded",
+            )
+            self._create_lineage(source_well.euid, qc_well.euid, "qc_source_well")
+            self._create_lineage(qc_well.euid, data.euid, "well_associated_data")
+            self._create_lineage(source_content.euid, data.euid, "qc_for_material")
+            mappings.append(
+                {
+                    "source_well_euid": source_well.euid,
+                    "source_content_euid": source_content.euid,
+                    "qc_well_euid": qc_well.euid,
+                    "qc_well_name": qc_position,
+                    "data_euid": data.euid,
+                    "result": assignment.result or "",
+                    "status": assignment.status or "recorded",
+                }
+            )
+        run_set = self._run_set(
+            requested=request.create_run_set,
+            run_set=request.run_set,
+            default_name=f"{qc_plate.euid} extraction QC set",
+            member_euids=[qc_plate.euid, *[item["data_euid"] for item in mappings]],
+        )
+        self.bdb.session.commit()
+        return {
+            "qc_plate_euid": qc_plate.euid,
+            "run_set_euid": run_set.euid if run_set is not None else None,
+            "new_container_euids": new_container_euids,
+            "mappings": mappings,
+        }
+
+    def attach_plate_well_data(self, request: PlateWellDataRequest) -> dict[str, Any]:
+        mappings: list[dict[str, Any]] = []
+        for record in request.records:
+            well = self._well_for_data_record(record)
+            target = well if record.target == "well" else self._well_content(well)
+            data = self._create_by_code(
+                request.data_template_code,
+                name=record.name or f"{well.euid} associated data",
+                properties={
+                    "well_euid": well.euid,
+                    "target_euid": target.euid,
+                    "target_kind": record.target,
+                    "data": record.data,
+                },
+            )
+            self._create_lineage(target.euid, data.euid, request.relationship_type)
+            mappings.append(
+                {
+                    "well_euid": well.euid,
+                    "target_euid": target.euid,
+                    "data_euid": data.euid,
+                    "relationship_type": request.relationship_type,
+                }
+            )
+        run_set = self._run_set(
+            requested=request.create_run_set,
+            run_set=request.run_set,
+            default_name="plate well data set",
+            member_euids=[item["data_euid"] for item in mappings],
+        )
+        self.bdb.session.commit()
+        return {
+            "run_set_euid": run_set.euid if run_set is not None else None,
+            "mappings": mappings,
+        }
 
     def create_extraction_plate(self, request: ExtractionPlateRequest) -> dict[str, Any]:
         assignments = self._normalize_assignments(request)
@@ -688,6 +928,325 @@ class LabActionsService:
         writer.writeheader()
         writer.writerows(data_rows)
         return output.getvalue()
+
+    def _split_values(self, value: Any) -> list[str]:
+        if value in (None, ""):
+            return []
+        return [
+            token.strip()
+            for token in re_split_multi(str(value))
+            if token and token.strip()
+        ]
+
+    def _row_metadata(self, row: dict[str, Any], *prefixes: str) -> dict[str, Any]:
+        metadata: dict[str, Any] = {}
+        for key, value in row.items():
+            if value in (None, ""):
+                continue
+            for prefix in prefixes:
+                if key.startswith(prefix):
+                    metadata[key.removeprefix(prefix)] = value
+        return metadata
+
+    def _sheet_action(self, sheet: ParsedSheet) -> str:
+        name = sheet.name.strip().lower().replace("-", " ").replace("_", " ")
+        headers = set(sheet.headers)
+        if name == "csv":
+            if {"pool_tube_euid", "flowcell_barcode"} & headers:
+                return "seq_run_set"
+            if {"input_euid", "input_euids"} & headers:
+                return "seq_pool"
+            if "source_well_euid" in headers and {"index_barcode", "index_euid"} & headers:
+                return "seq_library_plate"
+            if {"source_well_euid", "qc_row", "qc_col"} & headers:
+                return "extraction_qc"
+            if {"well_euid", "data_template_code"} & headers:
+                return "plate_well_data"
+            if {"set_name", "members", "member_euids"} & headers:
+                return "sets"
+            if "tube_euid" in headers:
+                return "extraction_plate"
+        if name in {"extraction plate", "extraction"}:
+            return "extraction_plate"
+        if name in {"extraction qc", "extractionqc", "extraction qc plate"}:
+            return "extraction_qc"
+        if name in {"seq library plate", "sequencing library plate", "library plate"}:
+            return "seq_library_plate"
+        if name in {"seq pool", "sequencing pool", "seq library pool", "pool"}:
+            return "seq_pool"
+        if name in {"seq run", "seq run set", "sequencing run", "sequencing run set"}:
+            return "seq_run_set"
+        if name in {"sets", "set", "run sets", "run set"}:
+            return "sets"
+        if name in {"plate well data", "well data", "annotation"}:
+            return "plate_well_data" if name != "annotation" else "container_annotation_preview"
+        if name in {"bulk create", "transfer"}:
+            return "container_interaction_preview"
+        return "unknown"
+
+    def _request_from_extraction_sheet(self, sheet: ParsedSheet) -> ExtractionPlateRequest:
+        assignments: list[ExtractionTubeAssignment] = []
+        tube_euids: list[str] = []
+        plate_name: str | None = None
+        for row in sheet.rows:
+            tube_euid = str(
+                row.get("tube_euid") or row.get("container_euid") or ""
+            ).strip()
+            if not tube_euid:
+                continue
+            plate_name = plate_name or str(row.get("plate_name") or "").strip() or None
+            row_name = row.get("row") or row.get("well_row") or row.get("child_container_row")
+            col_value = row.get("col") or row.get("well_col") or row.get("child_container_column")
+            if row_name not in (None, "") or col_value not in (None, ""):
+                assignments.append(
+                    ExtractionTubeAssignment(
+                        tube_euid=tube_euid,
+                        row=row_name,
+                        col=col_value,
+                        quant=self._row_metadata(row, "quant_", "qc_"),
+                    )
+                )
+            else:
+                tube_euids.append(tube_euid)
+        if assignments:
+            return ExtractionPlateRequest(
+                mode="directed",
+                assignments=assignments,
+                plate_name=plate_name or "extraction plate",
+            )
+        return ExtractionPlateRequest(
+            mode="auto",
+            tube_euids=tube_euids,
+            plate_name=plate_name or "extraction plate",
+        )
+
+    def _request_from_qc_sheet(self, sheet: ParsedSheet) -> ExtractionQcPlateRequest:
+        source_plate_euid = None
+        qc_plate_name = None
+        assignments: list[ExtractionQcAssignment] = []
+        for row in sheet.rows:
+            source_plate_euid = source_plate_euid or str(
+                row.get("source_plate_euid") or row.get("plate_euid") or ""
+            ).strip() or None
+            qc_plate_name = qc_plate_name or str(row.get("qc_plate_name") or "").strip() or None
+            assignments.append(
+                ExtractionQcAssignment(
+                    source_well_euid=str(row.get("source_well_euid") or row.get("well_euid") or "").strip()
+                    or None,
+                    row=row.get("row") or row.get("well_row"),
+                    col=row.get("col") or row.get("well_col"),
+                    qc_row=row.get("qc_row") or row.get("target_row"),
+                    qc_col=row.get("qc_col") or row.get("target_col"),
+                    result=str(row.get("result") or "").strip() or None,
+                    status=str(row.get("status") or "").strip() or None,
+                    data=self._row_metadata(row, "data_", "qc_", "metric_"),
+                )
+            )
+        return ExtractionQcPlateRequest(
+            source_plate_euid=source_plate_euid,
+            qc_plate_name=qc_plate_name or "extraction QC plate",
+            assignments=assignments,
+        )
+
+    def _request_from_library_sheet(self, sheet: ParsedSheet) -> SeqLibraryPlateRequest:
+        source_plate_euid = None
+        plate_name = None
+        assignments: list[LibraryPlateAssignment] = []
+        for row in sheet.rows:
+            source_plate_euid = source_plate_euid or str(
+                row.get("source_plate_euid") or ""
+            ).strip() or None
+            plate_name = plate_name or str(row.get("plate_name") or "").strip() or None
+            source_well_euid = str(row.get("source_well_euid") or row.get("well_euid") or "").strip()
+            if source_well_euid:
+                assignments.append(
+                    LibraryPlateAssignment(
+                        source_well_euid=source_well_euid,
+                        row=row.get("row") or row.get("well_row"),
+                        col=row.get("col") or row.get("well_col"),
+                        index_barcode=str(row.get("index_barcode") or "").strip() or None,
+                        index_euid=str(row.get("index_euid") or "").strip() or None,
+                        data=self._row_metadata(row, "data_", "library_"),
+                    )
+                )
+        if assignments:
+            return SeqLibraryPlateRequest(
+                mode="directed",
+                assignments=assignments,
+                plate_name=plate_name or "seq library plate",
+            )
+        return SeqLibraryPlateRequest(
+            mode="plate_1_to_1",
+            source_plate_euid=source_plate_euid,
+            plate_name=plate_name or "seq library plate",
+        )
+
+    def _request_from_pool_sheet(self, sheet: ParsedSheet) -> SeqLibraryPoolRequest:
+        input_euids: list[str] = []
+        platform = "ILMN"
+        pool_tube_euid = None
+        pool_name = None
+        metadata: dict[str, Any] = {}
+        for row in sheet.rows:
+            input_euids.extend(
+                self._split_values(
+                    row.get("input_euid")
+                    or row.get("input_euids")
+                    or row.get("well_euid")
+                    or row.get("tube_euid")
+                    or row.get("container_euid")
+                    or row.get("content_euid")
+                )
+            )
+            platform = str(row.get("platform") or platform).strip() or platform
+            pool_tube_euid = pool_tube_euid or str(row.get("pool_tube_euid") or "").strip() or None
+            pool_name = pool_name or str(row.get("pool_name") or "").strip() or None
+            metadata.update(self._row_metadata(row, "metadata_", "pool_"))
+        return SeqLibraryPoolRequest(
+            input_euids=list(dict.fromkeys(input_euids)),
+            platform=platform,
+            pool_tube_euid=pool_tube_euid,
+            pool_name=pool_name or "seq library",
+            metadata=metadata,
+        )
+
+    def _request_from_run_sheet(self, sheet: ParsedSheet) -> SeqRunSetRequest:
+        if not sheet.rows:
+            raise ValueError("Seq Run Set sheet has no rows")
+        row = sheet.rows[0]
+        return SeqRunSetRequest(
+            pool_tube_euid=str(row.get("pool_tube_euid") or "").strip(),
+            pool_content_euid=str(row.get("pool_content_euid") or "").strip() or None,
+            platform=str(row.get("platform") or "ILMN").strip() or "ILMN",
+            operator=str(row.get("operator") or "").strip() or None,
+            instrument_euid=str(row.get("instrument_euid") or "").strip() or None,
+            machine=str(row.get("machine") or "").strip() or None,
+            flowcell_barcode=str(row.get("flowcell_barcode") or row.get("flowcell") or "").strip(),
+            reagent_euids=self._split_values(row.get("reagent_euids") or row.get("reagents")),
+            status=str(row.get("status") or "created").strip() or "created",
+            name=str(row.get("name") or "").strip() or None,
+            description=str(row.get("description") or "").strip() or None,
+            metadata=self._row_metadata(row, "metadata_", "run_"),
+        )
+
+    def _request_from_data_sheet(self, sheet: ParsedSheet) -> PlateWellDataRequest:
+        records: list[PlateWellDataRecord] = []
+        data_template_code = "data/operation/extraction-qc/1.0/"
+        relationship_type = "well_associated_data"
+        for row in sheet.rows:
+            data_template_code = str(
+                row.get("data_template_code")
+                or row.get("annotation_template_euid")
+                or data_template_code
+            ).strip()
+            relationship_type = str(row.get("relationship_type") or relationship_type).strip()
+            records.append(
+                PlateWellDataRecord(
+                    well_euid=str(row.get("well_euid") or row.get("child_container_euid") or "").strip()
+                    or None,
+                    plate_euid=str(row.get("plate_euid") or row.get("container_euid") or "").strip()
+                    or None,
+                    row=row.get("row") or row.get("well_row") or row.get("child_container_row"),
+                    col=row.get("col") or row.get("well_col") or row.get("child_container_column"),
+                    name=str(row.get("name") or row.get("annotation_name") or "").strip()
+                    or None,
+                    target="content"
+                    if "content"
+                    in str(
+                        row.get("target")
+                        or row.get("annotate_container_child_container_content")
+                        or "content"
+                    ).strip().lower()
+                    else "well",
+                    data={
+                        **self._row_metadata(row, "data_", "annotation_", "metric_"),
+                        **({"value": row.get("annotation_value")} if row.get("annotation_value") not in (None, "") else {}),
+                    },
+                )
+            )
+        return PlateWellDataRequest(
+            data_template_code=data_template_code,
+            relationship_type=relationship_type,
+            records=records,
+        )
+
+    def _requests_from_sets_sheet(self, sheet: ParsedSheet) -> list[LabSetRequest]:
+        requests: list[LabSetRequest] = []
+        for row in sheet.rows:
+            name = str(row.get("name") or row.get("set_name") or "").strip()
+            if not name:
+                continue
+            requests.append(
+                LabSetRequest(
+                    name=name,
+                    description=str(row.get("description") or "").strip() or None,
+                    members=self._split_values(row.get("members") or row.get("member_euids")),
+                    external_members=self._split_values(row.get("external_members")),
+                    operator=str(row.get("operator") or "").strip() or None,
+                    instrument=str(row.get("instrument") or row.get("instrument_euid") or "").strip() or None,
+                    reagents=self._split_values(row.get("reagents") or row.get("reagent_euids")),
+                    machine=str(row.get("machine") or "").strip() or None,
+                    flowcell_barcode=str(row.get("flowcell_barcode") or "").strip() or None,
+                    status=str(row.get("status") or "created").strip() or "created",
+                    metadata=self._row_metadata(row, "metadata_", "set_"),
+                )
+            )
+        return requests
+
+    def import_spreadsheet(
+        self, *, filename: str, data: bytes, dry_run: bool = True
+    ) -> dict[str, Any]:
+        sheets = parse_workbook(filename, data)
+        actions: list[dict[str, Any]] = []
+        for sheet in sheets:
+            action = self._sheet_action(sheet)
+            entry: dict[str, Any] = {
+                "sheet": sheet.name,
+                "action": action,
+                "headers": sheet.headers,
+                "row_count": len(sheet.rows),
+            }
+            if action in {"container_interaction_preview", "container_annotation_preview", "unknown"}:
+                entry["preview_rows"] = sheet.rows[:25]
+                actions.append(entry)
+                continue
+            if action == "extraction_plate":
+                request = self._request_from_extraction_sheet(sheet)
+                entry["request"] = request.model_dump(mode="json")
+                if not dry_run:
+                    entry["result"] = self.create_extraction_plate(request)
+            elif action == "extraction_qc":
+                request = self._request_from_qc_sheet(sheet)
+                entry["request"] = request.model_dump(mode="json")
+                if not dry_run:
+                    entry["result"] = self.fill_extraction_qc_plate(request)
+            elif action == "seq_library_plate":
+                request = self._request_from_library_sheet(sheet)
+                entry["request"] = request.model_dump(mode="json")
+                if not dry_run:
+                    entry["result"] = self.create_seq_library_plate(request)
+            elif action == "seq_pool":
+                request = self._request_from_pool_sheet(sheet)
+                entry["request"] = request.model_dump(mode="json")
+                if not dry_run:
+                    entry["result"] = self.create_seq_library_pool(request)
+            elif action == "seq_run_set":
+                request = self._request_from_run_sheet(sheet)
+                entry["request"] = request.model_dump(mode="json")
+                if not dry_run:
+                    entry["result"] = self.create_seq_run_set(request)
+            elif action == "plate_well_data":
+                request = self._request_from_data_sheet(sheet)
+                entry["request"] = request.model_dump(mode="json")
+                if not dry_run:
+                    entry["result"] = self.attach_plate_well_data(request)
+            elif action == "sets":
+                requests = self._requests_from_sets_sheet(sheet)
+                entry["request"] = [item.model_dump(mode="json") for item in requests]
+                if not dry_run:
+                    entry["result"] = [self.create_lab_set(item) for item in requests]
+            actions.append(entry)
+        return {"filename": filename, "dry_run": dry_run, "actions": actions}
 
     def print_euids(self, request: PrintEuidRequest) -> dict[str, Any]:
         service = ZebraDayService()

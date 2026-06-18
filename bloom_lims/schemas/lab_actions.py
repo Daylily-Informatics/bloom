@@ -56,6 +56,7 @@ class RunSetInput(BaseModel):
     members: list[str] = Field(default_factory=list)
     external_members: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    status: RunSetStatus = "created"
 
 
 class ExtractionPlateRequest(BaseModel):
@@ -118,6 +119,83 @@ class SeqLibraryPlateRequest(BaseModel):
         return self
 
 
+class ExtractionQcAssignment(BaseModel):
+    source_well_euid: str | None = None
+    row: str | None = None
+    col: int | None = None
+    qc_row: str | None = None
+    qc_col: int | None = None
+    result: str | None = None
+    status: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_source_position(self) -> "ExtractionQcAssignment":
+        if self.source_well_euid and (self.row is not None or self.col is not None):
+            raise ValueError("provide source_well_euid or row/col, not both")
+        if not self.source_well_euid and (self.row is None or self.col is None):
+            raise ValueError("source_well_euid or row/col is required")
+        if (self.row is None) ^ (self.col is None):
+            raise ValueError("row and col must be provided together")
+        if self.row is not None and self.col is not None:
+            WellPosition(row=self.row, col=self.col)
+        if (self.qc_row is None) ^ (self.qc_col is None):
+            raise ValueError("qc_row and qc_col must be provided together")
+        if self.qc_row is not None and self.qc_col is not None:
+            WellPosition(row=self.qc_row, col=self.qc_col)
+        return self
+
+
+class ExtractionQcPlateRequest(BaseModel):
+    source_plate_euid: str | None = None
+    qc_plate_euid: str | None = None
+    qc_plate_name: str | None = None
+    assignments: list[ExtractionQcAssignment] = Field(default_factory=list)
+    create_run_set: bool = False
+    run_set: RunSetInput | None = None
+
+    @model_validator(mode="after")
+    def validate_input(self) -> "ExtractionQcPlateRequest":
+        if not self.source_plate_euid and not self.assignments:
+            raise ValueError("source_plate_euid or assignments is required")
+        return self
+
+
+class PlateWellDataRecord(BaseModel):
+    well_euid: str | None = None
+    plate_euid: str | None = None
+    row: str | None = None
+    col: int | None = None
+    name: str | None = None
+    target: Literal["well", "content"] = "content"
+    data: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "PlateWellDataRecord":
+        if self.well_euid and (self.plate_euid or self.row is not None or self.col is not None):
+            raise ValueError("provide well_euid or plate_euid with row/col, not both")
+        if not self.well_euid:
+            if not self.plate_euid or self.row is None or self.col is None:
+                raise ValueError("well_euid or plate_euid with row/col is required")
+            WellPosition(row=self.row, col=self.col)
+        return self
+
+
+class PlateWellDataRequest(BaseModel):
+    data_template_code: str = "data/operation/extraction-qc/1.0/"
+    relationship_type: str = "well_associated_data"
+    records: list[PlateWellDataRecord]
+    create_run_set: bool = False
+    run_set: RunSetInput | None = None
+
+    @field_validator("records")
+    @classmethod
+    def validate_records(cls, value):
+        if not value:
+            raise ValueError("records must not be empty")
+        return value
+
+
 class SeqLibraryPoolRequest(BaseModel):
     input_euids: list[str]
     platform: PlatformName = "ILMN"
@@ -149,6 +227,31 @@ class SeqRunSetRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LabSetRequest(BaseModel):
+    name: str
+    description: str | None = None
+    members: list[str] = Field(default_factory=list)
+    external_members: list[str] = Field(default_factory=list)
+    operator: str | None = None
+    instrument: str | None = None
+    reagents: list[str] = Field(default_factory=list)
+    machine: str | None = None
+    flowcell_barcode: str | None = None
+    status: RunSetStatus = "created"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LabSetMembersRequest(BaseModel):
+    members: list[str] = Field(default_factory=list)
+    external_members: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_members(self) -> "LabSetMembersRequest":
+        if not self.members and not self.external_members:
+            raise ValueError("members or external_members is required")
+        return self
 
 
 class PrintEuidRequest(BaseModel):
