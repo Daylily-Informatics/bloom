@@ -45,6 +45,9 @@ PGLOBAL = False if os.environ.get("PGLOBAL", False) else True
 
 logger = logging.getLogger(__name__)
 
+MAX_TEMPLATE_INSTANTIATION_DEPTH = 8
+MAX_TEMPLATE_INSTANTIATION_OBJECTS = 1000
+
 
 class BloomObj:
     def __init__(
@@ -421,7 +424,7 @@ class BloomObj:
         )
 
     # centralizing creation more cleanly.
-    def create_instance(self, template_euid, json_addl_overrides={}):
+    def create_instance(self, template_euid, json_addl_overrides=None):
         """Given an EUID for an object template, instantiate an instance from the template.
             No child objects defined by the tmplate will be generated.
 
@@ -432,6 +435,7 @@ class BloomObj:
 
         self.logger.debug(f"Creating instance from template EUID {template_euid}")
 
+        json_addl_overrides = dict(json_addl_overrides or {})
         template = self.get_by_euid(template_euid)
 
         if not template:
@@ -583,10 +587,19 @@ class BloomObj:
         flag_modified(instance, "json_addl")
 
     # fix naming, instance_type==table_name_prefix
-    def create_instances(self, template_euid):
+    def create_instances(
+        self,
+        template_euid,
+        json_addl_overrides=None,
+        *,
+        max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
+        max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
+    ):
         """
-        IMPORTANTLY: this method creates the requested object from the template, and also will recurse one level to create any children objects defined by the template.
-        You get back an array with the first element being the parent the second an array of children.
+        IMPORTANTLY: this method creates the requested object from the template,
+        and recursively creates any child objects defined by instantiation_layouts.
+        You get back an array with the first element being the parent and the
+        second an array of all descendant children.
 
         Create instances from exsiting templates in the *_template table that the euid is a member of.
         The class subclassing is an experiment, see the docs (hopefully) for more, in short:
@@ -596,7 +609,7 @@ class BloomObj:
             These are only used to seed the templates... the idea is to allow users to add subtypes as they see fit. (TBD)
 
             ~ TABLE_template/{type}/{subtype}/{version} is the pattern used to for the template table name
-        This is a recursive function that will only create one level of children instances.
+        Recursive instantiation is bounded by ``max_depth`` and ``max_instances``.
 
         Args:
             template_euid (_type_): a template euid of the pattern [A-Z][A-Z]T[0-9]+ , which is a nicety and nothing at all is ever inferred from the prefix.
@@ -606,25 +619,83 @@ class BloomObj:
             [[],[]]: arr[0][:] are parents (presently, there is only ever 1 parent), arr[1][:] are children, if any.
         """
 
-        self.logger.debug(f"Creating instances from template EUID {template_euid}")
-        template = self.get_by_euid(
-            template_euid
-        )  # needed to get this for the child recrods if any
-        parent_instance = self.create_instance(template_euid)
         ret_objs = [[], []]
+        state = {"created_count": 0}
+        parent_instance = self._create_instance_tree(
+            template_euid=template_euid,
+            json_addl_overrides=json_addl_overrides or {},
+            ret_objs=ret_objs,
+            depth=0,
+            template_stack=(),
+            max_depth=max_depth,
+            max_instances=max_instances,
+            state=state,
+        )
         ret_objs[0].append(parent_instance)
-
-        # template_json_addl = template.json_addl
-        if template.json_addl.get("instantiation_layouts"):
-            ret_objs = self._process_instantiation_layouts(
-                template.json_addl["instantiation_layouts"],
-                parent_instance,
-                ret_objs,
-            )
-        ##self.session.flush()
         self.session.commit()
-
         return ret_objs
+
+    def _template_instantiation_key(self, template):
+        return str(
+            getattr(template, "euid", None)
+            or ":".join(
+                str(getattr(template, attr, "") or "")
+                for attr in ("category", "type", "subtype", "version")
+            )
+        )
+
+    def _create_instance_tree(
+        self,
+        *,
+        template_euid,
+        json_addl_overrides,
+        ret_objs,
+        depth,
+        template_stack,
+        max_depth,
+        max_instances,
+        state,
+    ):
+        if depth > max_depth:
+            raise Exception(
+                f"Template instantiation exceeded max depth {max_depth}: "
+                + " -> ".join(template_stack + (str(template_euid),))
+            )
+        if state["created_count"] >= max_instances:
+            raise Exception(
+                f"Template instantiation exceeded max object count {max_instances}"
+            )
+
+        template = self.get_by_euid(template_euid)
+        if not template:
+            raise Exception(f"Template not found: {template_euid}")
+
+        template_key = self._template_instantiation_key(template)
+        if template_key in template_stack:
+            raise Exception(
+                "Template instantiation cycle detected: "
+                + " -> ".join(template_stack + (template_key,))
+            )
+
+        state["created_count"] += 1
+        instance = self.create_instance(
+            template.euid, json_addl_overrides=json_addl_overrides or {}
+        )
+
+        layouts = template.json_addl.get("instantiation_layouts")
+        if layouts:
+            self._process_instantiation_layouts(
+                layouts,
+                instance,
+                ret_objs,
+                depth=depth,
+                template_stack=template_stack + (template_key,),
+                max_depth=max_depth,
+                max_instances=max_instances,
+                state=state,
+            )
+
+        return instance
 
     # I am of two minds re: if actions should be full objects, or pseudo-objects as they are now...
     def _create_action_ds(self, action_imports):
@@ -717,9 +788,16 @@ class BloomObj:
         instantiation_layouts,
         parent_instance,
         ret_objs,
+        *,
+        depth=0,
+        template_stack=(),
+        max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
+        max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
+        state=None,
     ):
-        # Revisit the lineage set creation, this will not behave as expected if the json templates define more than 1 level deep children.
-        ## or is this desireable, and the referenced children should reference thier children... crazy town begins at this level...
+        if state is None:
+            state = {"created_count": 0}
+
         for row in instantiation_layouts:
             if isinstance(row, dict) and isinstance(row.get("child_templates"), list):
                 relationship_type = str(row.get("relationship_type") or "generic")
@@ -730,25 +808,18 @@ class BloomObj:
                     if not layout_str:
                         continue
                     layout_ds = {"json_addl": child_cfg.get("json_addl") or {}}
-                    child_instance = self._create_child_instance(layout_str, layout_ds)
-                    parent_category = (
-                        instance_semantic_category(parent_instance)
-                        or str(parent_instance.category or "").strip()
+                    child_instance = self._create_child_instance(
+                        layout_str,
+                        layout_ds,
+                        ret_objs=ret_objs,
+                        depth=depth + 1,
+                        template_stack=template_stack,
+                        max_depth=max_depth,
+                        max_instances=max_instances,
+                        state=state,
                     )
-                    lineage_record = self.Base.classes.generic_instance_lineage(
-                        parent_instance_uid=parent_instance.uid,
-                        child_instance_uid=child_instance.uid,
-                        name=f"{parent_instance.name} :: {child_instance.name}",
-                        type=parent_instance.type,
-                        subtype=parent_instance.subtype,
-                        version=parent_instance.version,
-                        json_addl=parent_instance.json_addl,
-                        bstatus=parent_instance.bstatus,
-                        category=parent_category,
-                        parent_type=parent_instance.polymorphic_discriminator,
-                        child_type=child_instance.polymorphic_discriminator,
-                        polymorphic_discriminator=f"{parent_category}_instance_lineage",
-                        relationship_type=relationship_type,
+                    lineage_record = self._new_instantiation_lineage(
+                        parent_instance, child_instance, relationship_type
                     )
                     self.session.add(lineage_record)
                     ret_objs[1].append(child_instance)
@@ -761,30 +832,46 @@ class BloomObj:
                 for i in ds:
                     layout_str = i
                     layout_ds = ds[i]
-                    child_instance = self._create_child_instance(layout_str, layout_ds)
-                    parent_category = (
-                        instance_semantic_category(parent_instance)
-                        or str(parent_instance.category or "").strip()
+                    child_instance = self._create_child_instance(
+                        layout_str,
+                        layout_ds,
+                        ret_objs=ret_objs,
+                        depth=depth + 1,
+                        template_stack=template_stack,
+                        max_depth=max_depth,
+                        max_instances=max_instances,
+                        state=state,
                     )
-                    lineage_record = self.Base.classes.generic_instance_lineage(
-                        parent_instance_uid=parent_instance.uid,
-                        child_instance_uid=child_instance.uid,
-                        name=f"{parent_instance.name} :: {child_instance.name}",
-                        type=parent_instance.type,
-                        subtype=parent_instance.subtype,
-                        version=parent_instance.version,
-                        json_addl=parent_instance.json_addl,
-                        bstatus=parent_instance.bstatus,
-                        category=parent_category,
-                        parent_type=parent_instance.polymorphic_discriminator,
-                        child_type=child_instance.polymorphic_discriminator,
-                        polymorphic_discriminator=f"{parent_category}_instance_lineage",
+                    lineage_record = self._new_instantiation_lineage(
+                        parent_instance, child_instance, "generic"
                     )
                     self.session.add(lineage_record)
-                    ##self.session.flush()
                     ret_objs[1].append(child_instance)
 
         return ret_objs
+
+    def _new_instantiation_lineage(
+        self, parent_instance, child_instance, relationship_type
+    ):
+        parent_category = (
+            instance_semantic_category(parent_instance)
+            or str(parent_instance.category or "").strip()
+        )
+        return self.Base.classes.generic_instance_lineage(
+            parent_instance_uid=parent_instance.uid,
+            child_instance_uid=child_instance.uid,
+            name=f"{parent_instance.name} :: {child_instance.name}",
+            type=parent_instance.type,
+            subtype=parent_instance.subtype,
+            version=parent_instance.version,
+            json_addl=parent_instance.json_addl,
+            bstatus=parent_instance.bstatus,
+            category=parent_category,
+            parent_type=parent_instance.polymorphic_discriminator,
+            child_type=child_instance.polymorphic_discriminator,
+            polymorphic_discriminator=f"{parent_category}_instance_lineage",
+            relationship_type=str(relationship_type or "generic"),
+        )
 
     def create_generic_instance_lineage_by_euids(
         self, parent_instance_euid, child_instance_euid, relationship_type="generic"
@@ -826,11 +913,31 @@ class BloomObj:
         )
 
     def create_instance_by_code(self, layout_str, layout_ds):
-        ret_obj = self._create_child_instance(layout_str, layout_ds)
+        ret_obj = self._create_child_instance(
+            layout_str,
+            layout_ds,
+            ret_objs=[[], []],
+            depth=0,
+            template_stack=(),
+            max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
+            max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
+            state={"created_count": 0},
+        )
 
         return ret_obj
 
-    def _create_child_instance(self, layout_str, layout_ds):
+    def _create_child_instance(
+        self,
+        layout_str,
+        layout_ds,
+        *,
+        ret_objs=None,
+        depth=0,
+        template_stack=(),
+        max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
+        max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
+        state=None,
+    ):
         (
             category,
             type_name,
@@ -859,12 +966,20 @@ class BloomObj:
                 "Please ensure the database is seeded with templates."
             )
         template = templates[0]
-
-        new_instance = self.create_instance(template.euid)
-        update_recursive(new_instance.json_addl, defaults_ds)
-        flag_modified(new_instance, "json_addl")
-        ##self.session.flush()
-        self.session.commit()
+        if ret_objs is None:
+            ret_objs = [[], []]
+        if state is None:
+            state = {"created_count": 0}
+        new_instance = self._create_instance_tree(
+            template_euid=template.euid,
+            json_addl_overrides=defaults_ds,
+            ret_objs=ret_objs,
+            depth=depth,
+            template_stack=template_stack,
+            max_depth=max_depth,
+            max_instances=max_instances,
+            state=state,
+        )
 
         return new_instance
 

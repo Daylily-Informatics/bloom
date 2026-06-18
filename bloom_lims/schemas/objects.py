@@ -3,7 +3,8 @@ Pydantic schemas for BloomObj (generic instances) in BLOOM LIMS.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
+
 from pydantic import Field, field_validator, model_validator
 
 from .base import BloomBaseSchema, TimestampMixin, validate_euid
@@ -12,19 +13,19 @@ from .base import BloomBaseSchema, TimestampMixin, validate_euid
 class JsonAddlSchema(BloomBaseSchema):
     """
     Schema for json_addl field validation.
-    
+
     The json_addl field stores additional metadata as JSON. This schema
     validates common fields while allowing extension.
     """
-    
+
     # Common optional fields
     notes: Optional[str] = Field(None, max_length=10000, description="General notes")
     tags: Optional[List[str]] = Field(None, description="Tags for categorization")
     custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom field values")
-    
+
     # Allow extra fields for flexibility
     model_config = {"extra": "allow"}
-    
+
     @field_validator("tags", mode="before")
     @classmethod
     def normalize_tags(cls, v):
@@ -52,7 +53,7 @@ class ObjectBaseSchema(BloomBaseSchema):
         if v:
             return str(v).strip().lower()
         return v
-    
+
     @field_validator("json_addl", mode="before")
     @classmethod
     def ensure_json_addl_dict(cls, v):
@@ -70,12 +71,18 @@ class ObjectBaseSchema(BloomBaseSchema):
 
 class ObjectCreateSchema(ObjectBaseSchema):
     """Schema for creating a new BloomObj."""
-    
+
     parent_euid: Optional[str] = Field(None, description="Parent object EUID for lineage")
     lineage_euid: Optional[str] = Field(None, description="Lineage EUID to attach to")
     container_euid: Optional[str] = Field(None, description="Container EUID for placement")
     container_position: Optional[str] = Field(None, description="Position in container (e.g., A1)")
-    
+    count: int = Field(
+        default=1,
+        ge=1,
+        le=100,
+        description="Number of sibling objects to create from the same template",
+    )
+
     @field_validator("parent_euid", "lineage_euid", "container_euid", mode="before")
     @classmethod
     def validate_euids(cls, v):
@@ -104,13 +111,13 @@ class ObjectUpdateSchema(BloomBaseSchema):
 
 class ObjectResponseSchema(ObjectBaseSchema, TimestampMixin):
     """Schema for BloomObj API responses."""
-    
+
     euid: str = Field(..., description="Entity Unique Identifier")
     status: str = Field(default="active", description="Object status")
     is_deleted: bool = Field(default=False, description="Soft delete flag")
     is_singleton: bool = Field(default=False, description="Singleton instance flag")
     polymorphic_discriminator: Optional[str] = Field(None, description="Type discriminator")
-    
+
     # Relationship info (optional)
     parent_euid: Optional[str] = Field(None, description="Parent object EUID")
     lineage_euid: Optional[str] = Field(None, description="Lineage EUID")

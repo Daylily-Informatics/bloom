@@ -1,0 +1,303 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Lab Actions - BLOOM{% endblock %}
+
+{% block extra_css %}
+<style>
+.lab-actions-grid {
+    align-items: stretch;
+}
+
+.lab-actions-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.lab-actions-card label {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.lab-actions-card input,
+.lab-actions-card select,
+.lab-actions-card textarea {
+    width: min(100%, 36rem);
+}
+
+.lab-actions-card .checkbox-row {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.lab-actions-card .checkbox-row input {
+    width: auto;
+}
+
+.lab-actions-controls {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <h1>Lab Actions</h1>
+        <p class="text-muted">
+            Build extraction plates, sequencing-library plates, pools, and sequencing run sets from Bloom EUIDs.
+        </p>
+    </div>
+</section>
+
+<div class="grid grid-2 gap-lg lab-actions-grid">
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>1. Extraction Plate</h2>
+        </div>
+        <div class="card-body">
+            <label for="extract-tubes">Incoming tube EUIDs</label>
+            <textarea id="extract-tubes" class="form-control" rows="5" placeholder="One tube EUID per line"></textarea>
+            <div class="form-row">
+                <label for="extract-name">Plate name</label>
+                <input id="extract-name" class="form-control" value="extraction plate">
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" id="extract-run-set">
+                Create associated run set
+            </label>
+            <button class="btn btn-primary" type="button" data-action="create-extraction">
+                <i class="fas fa-flask"></i> Create Extraction Plate
+            </button>
+        </div>
+    </section>
+
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>2. Sequencing-Library Plate</h2>
+        </div>
+        <div class="card-body">
+            <label for="library-source-plate">Extraction plate EUID</label>
+            <input id="library-source-plate" class="form-control" placeholder="BCP-...">
+            <label for="library-name">Library plate name</label>
+            <input id="library-name" class="form-control" value="seq library plate">
+            <button class="btn btn-primary" type="button" data-action="create-library">
+                <i class="fas fa-table-cells-large"></i> Create Library Plate
+            </button>
+        </div>
+    </section>
+
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>3. Sequencing Pool Tube</h2>
+        </div>
+        <div class="card-body">
+            <label for="pool-inputs">Input EUIDs</label>
+            <textarea id="pool-inputs" class="form-control" rows="5" placeholder="Library content, well, tube, or pool EUID per line"></textarea>
+            <div>
+                <label for="pool-platform">Platform</label>
+                <select id="pool-platform" class="form-control">
+                    <option value="ILMN">ILMN</option>
+                    <option value="ONT">ONT</option>
+                    <option value="Ultima">Ultima</option>
+                    <option value="PacBio">PacBio</option>
+                    <option value="CompleteGenomics">CompleteGenomics</option>
+                </select>
+            </div>
+            <label for="pool-name">Pool name</label>
+            <input id="pool-name" class="form-control" value="seq library">
+            <button class="btn btn-primary" type="button" data-action="create-pool">
+                <i class="fas fa-vial-circle-check"></i> Create Pool Tube
+            </button>
+        </div>
+    </section>
+
+    <section class="card lab-actions-card">
+        <div class="card-header">
+            <h2>4. Sequencing Run Set</h2>
+        </div>
+        <div class="card-body">
+            <label for="run-pool-tube">Pool tube EUID</label>
+            <input id="run-pool-tube" class="form-control" placeholder="BCT-...">
+            <label for="run-pool-content">Pool content EUID</label>
+            <input id="run-pool-content" class="form-control" placeholder="BNP-...">
+            <label for="run-flowcell">Flowcell barcode</label>
+            <input id="run-flowcell" class="form-control" value="FLOWCELL-TEST">
+            <label for="run-operator">Operator</label>
+            <input id="run-operator" class="form-control" value="{{ (udat.email if udat and udat.email else '') }}">
+            <button class="btn btn-primary" type="button" data-action="create-run">
+                <i class="fas fa-play"></i> Create Seq Run Set
+            </button>
+        </div>
+    </section>
+</div>
+
+<section class="card mt-lg lab-actions-card">
+    <div class="card-header">
+        <h2>Print EUID Barcodes</h2>
+    </div>
+    <div class="card-body">
+        <label for="print-euids">EUIDs to print</label>
+        <textarea id="print-euids" class="form-control" rows="3" placeholder="One EUID per line"></textarea>
+        <div class="lab-actions-controls">
+            <div>
+                <label for="print-lab">Lab</label>
+                <input id="print-lab" class="form-control" value="SSF">
+            </div>
+            <div>
+                <label for="print-printer">Printer ID</label>
+                <input id="print-printer" class="form-control" value="default">
+            </div>
+            <div>
+                <label for="print-style">Label style</label>
+                <input id="print-style" class="form-control" value="euid">
+            </div>
+        </div>
+        <button class="btn btn-outline" type="button" data-action="print-euids">
+            <i class="fas fa-barcode"></i> Print Selected EUIDs
+        </button>
+    </div>
+</section>
+
+<section class="card mt-lg">
+    <div class="card-header">
+        <h2>Action Results</h2>
+    </div>
+    <div class="card-body">
+        <div id="lab-action-links" class="button-row"></div>
+        <pre id="lab-action-output" class="code-block" aria-live="polite">{}</pre>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  function lines(id) {
+    return document.getElementById(id).value
+      .split(/\r?\n|,/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  function showResult(payload) {
+    document.getElementById('lab-action-output').textContent = JSON.stringify(payload, null, 2);
+    const links = document.getElementById('lab-action-links');
+    links.innerHTML = '';
+    if (payload.plate_euid) {
+      links.appendChild(link(`/api/v1/lab-actions/plates/${payload.plate_euid}/mapping.csv`, 'Download plate CSV'));
+    }
+    if (payload.set_euid) {
+      links.appendChild(link(`/api/v1/lab-actions/seq-runs/${payload.set_euid}/samplesheet`, 'Download ILMN sample sheet'));
+    }
+    const euids = [];
+    ['new_container_euids', 'created_euids'].forEach((key) => {
+      if (Array.isArray(payload[key])) {
+        payload[key].forEach((euid) => euids.push(euid));
+      }
+    });
+    if (payload.pool_tube_euid) {
+      euids.push(payload.pool_tube_euid);
+    }
+    if (euids.length) {
+      document.getElementById('print-euids').value = Array.from(new Set(euids)).join('\n');
+    }
+    if (payload.plate_euid && !document.getElementById('library-source-plate').value) {
+      document.getElementById('library-source-plate').value = payload.plate_euid;
+    }
+    if (payload.mappings) {
+      const libraryInputs = payload.mappings
+        .map((item) => item.library_content_euid || item.output_content_euid)
+        .filter(Boolean);
+      if (libraryInputs.length) {
+        document.getElementById('pool-inputs').value = libraryInputs.join('\n');
+      }
+    }
+    if (payload.pool_tube_euid) {
+      document.getElementById('run-pool-tube').value = payload.pool_tube_euid;
+    }
+    if (payload.pool_content_euid) {
+      document.getElementById('run-pool-content').value = payload.pool_content_euid;
+    }
+  }
+
+  function link(href, text) {
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.className = 'btn btn-outline btn-sm';
+    anchor.textContent = text;
+    return anchor;
+  }
+
+  async function postJson(path, payload) {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({detail: response.statusText}));
+    if (!response.ok) {
+      throw new Error(data.detail || response.statusText);
+    }
+    return data;
+  }
+
+  const handlers = {
+    'create-extraction': async () => postJson('/api/v1/lab-actions/extraction-plates', {
+      mode: 'auto',
+      tube_euids: lines('extract-tubes'),
+      plate_name: document.getElementById('extract-name').value || 'extraction plate',
+      create_run_set: document.getElementById('extract-run-set').checked,
+    }),
+    'create-library': async () => postJson('/api/v1/lab-actions/seq-library-plates', {
+      mode: 'plate_1_to_1',
+      source_plate_euid: document.getElementById('library-source-plate').value.trim(),
+      plate_name: document.getElementById('library-name').value || 'seq library plate',
+    }),
+    'create-pool': async () => postJson('/api/v1/lab-actions/seq-library-pools', {
+      input_euids: lines('pool-inputs'),
+      platform: document.getElementById('pool-platform').value,
+      pool_name: document.getElementById('pool-name').value || 'seq library',
+    }),
+    'create-run': async () => postJson('/api/v1/lab-actions/seq-runs', {
+      pool_tube_euid: document.getElementById('run-pool-tube').value.trim(),
+      pool_content_euid: document.getElementById('run-pool-content').value.trim() || null,
+      platform: 'ILMN',
+      flowcell_barcode: document.getElementById('run-flowcell').value.trim(),
+      operator: document.getElementById('run-operator').value.trim(),
+      status: 'created',
+    }),
+    'print-euids': async () => postJson('/api/v1/lab-actions/print-euids', {
+      euids: lines('print-euids'),
+      lab: document.getElementById('print-lab').value.trim(),
+      printer_id: document.getElementById('print-printer').value.trim(),
+      label_zpl_style: document.getElementById('print-style').value.trim(),
+      copies: 1,
+    }),
+  };
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-action]');
+    if (!button) {
+      return;
+    }
+    const action = button.dataset.action;
+    if (!handlers[action]) {
+      return;
+    }
+    button.disabled = true;
+    try {
+      showResult(await handlers[action]());
+    } catch (error) {
+      showResult({error: String(error.message || error)});
+    } finally {
+      button.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

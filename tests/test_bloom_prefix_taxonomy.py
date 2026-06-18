@@ -62,6 +62,7 @@ def test_wet_lab_templates_use_bloom_prefix_taxonomy() -> None:
         "data/library-index-assignment/sequencing-library/1.0": "BDA",
         "data/execution/transfer/1.0": "BDT",
         "generic/generic/external_object_link/1.0": "BGX",
+        "set/run-set/generic/1.01": "BGS",
     }
 
     for code, expected_prefix in expected_prefixes.items():

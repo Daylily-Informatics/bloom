@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-lsmc-service="bloom" data-theme="original">
+<html lang="en" data-lsmc-service="bloom" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -68,6 +68,9 @@
             </a>
             <a href="/create_object" class="{% if '/create_object' in request.url.path %}active{% endif %}">
                 <i class="fas fa-plus-circle"></i> Create
+            </a>
+            <a href="/lab-actions" class="{% if '/lab-actions' in request.url.path %}active{% endif %}">
+                <i class="fas fa-route"></i> Lab Actions
             </a>
             <div class="nav-dropdown">
                 <a href="#" class="nav-dropdown-toggle {% if '/search' in request.url.path or '/bulk_create' in request.url.path %}active{% endif %}">

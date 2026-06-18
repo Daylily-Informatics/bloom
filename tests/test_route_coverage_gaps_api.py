@@ -113,6 +113,45 @@ def test_object_creation_creates_all_sequencing_run_platform_prefixes(
         assert created["euid"].startswith(f"{domain_code}-{prefix}-")
 
 
+def test_object_creation_plate_creates_96_linked_wells(
+    client: TestClient, bdb
+) -> None:
+    created = _create_instance_via_object_creation(
+        client,
+        category="container",
+        type_name="plate",
+        subtype="fixed-plate-96",
+        version="1.0",
+        name="pytest-fixed-96",
+    )
+    plate_euid = created["euid"]
+
+    lineage_cls = bdb.Base.classes.generic_instance_lineage
+    instance_cls = bdb.Base.classes.generic_instance
+    plate = bdb.session.query(instance_cls).filter_by(euid=plate_euid).one()
+    lineages = (
+        bdb.session.query(lineage_cls)
+        .filter(
+            lineage_cls.parent_instance_uid == plate.uid,
+            lineage_cls.relationship_type == "contains",
+            lineage_cls.is_deleted.is_(False),
+        )
+        .all()
+    )
+    wells = [lineage.child_instance for lineage in lineages]
+    positions = {
+        ((well.json_addl or {}).get("cont_address") or {}).get("name")
+        for well in wells
+    }
+    assert len(wells) == 96
+    assert {well.type for well in wells} == {"well"}
+    assert {"A1", "H12"}.issubset(positions)
+
+    layout = client.get(f"/api/v1/containers/{plate_euid}/layout")
+    assert layout.status_code == 200, layout.text
+    assert layout.json()["well_count"] == 96
+
+
 def test_actions_endpoints_execute_handler_body(client: TestClient) -> None:
     resp = client.post(
         "/api/v1/actions/aliquot",

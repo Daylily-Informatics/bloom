@@ -7467,6 +7467,107 @@
       }
     },
     {
+      "name": "Generic Run Set",
+      "polymorphic_discriminator": "generic_template",
+      "category": "BGS",
+      "type": "run-set",
+      "subtype": "generic",
+      "version": "1.01",
+      "instance_prefix": "BGS",
+      "instance_polymorphic_identity": "generic_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "action_groups": {},
+        "action_imports": {
+          "print_barcode_label": "BAC/core/print_barcode_label/1.0",
+          "set_object_status": "BAC/core/set_object_status/1.0"
+        },
+        "controlled_properties": {},
+        "description": "Generic run set for temporary Bloom lab batch and sequencing-run grouping.",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "name": "",
+          "description": "",
+          "members": [],
+          "external_members": [],
+          "operator": "",
+          "instrument": "",
+          "reagents": [],
+          "machine": "",
+          "flowcell_barcode": "",
+          "status": "created",
+          "metadata": {}
+        },
+        "singleton": "0",
+        "ui_form_properties": [
+          {
+            "form_label": "Set Name",
+            "property_key": "name",
+            "required": false,
+            "value_type": "string"
+          },
+          {
+            "form_label": "Description",
+            "property_key": "description",
+            "required": false,
+            "value_type": "string"
+          },
+          {
+            "form_label": "Members",
+            "property_key": "members",
+            "required": false,
+            "value_type": "list"
+          },
+          {
+            "form_label": "External Members",
+            "property_key": "external_members",
+            "required": false,
+            "value_type": "list"
+          },
+          {
+            "form_label": "Operator",
+            "property_key": "operator",
+            "required": false,
+            "value_type": "string"
+          },
+          {
+            "form_label": "Instrument",
+            "property_key": "instrument",
+            "required": false,
+            "value_type": "uid-interactive"
+          },
+          {
+            "form_label": "Reagents",
+            "property_key": "reagents",
+            "required": false,
+            "value_type": "list"
+          },
+          {
+            "form_label": "Machine",
+            "property_key": "machine",
+            "required": false,
+            "value_type": "string"
+          },
+          {
+            "form_label": "Flowcell Barcode",
+            "property_key": "flowcell_barcode",
+            "required": false,
+            "value_type": "string"
+          },
+          {
+            "form_label": "Status",
+            "property_key": "status",
+            "required": false,
+            "value_type": "controlled"
+          }
+        ],
+        "semantic_category": "set"
+      }
+    },
+    {
       "name": "Generic File Reference",
       "polymorphic_discriminator": "file_template",
       "category": "BFX",

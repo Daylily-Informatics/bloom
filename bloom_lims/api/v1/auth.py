@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .dependencies import APIUser, require_api_auth
 
 logger = logging.getLogger(__name__)
-THEME_NAMES = {"original", "light", "dark", "cbf"}
+THEME_NAMES = {"original", "light", "dark", "ssf", "viridis", "viridis-dark"}
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 preferences_router = APIRouter(tags=["Preferences"])
@@ -78,9 +78,21 @@ async def update_current_user_preferences(
     theme = str(payload.get("theme") or "").strip()
     if theme and theme not in THEME_NAMES:
         raise HTTPException(status_code=400, detail="Unknown theme")
+    service_themes = payload.get("service_themes")
+    if service_themes is not None:
+        if not isinstance(service_themes, dict):
+            raise HTTPException(status_code=400, detail="service_themes must be an object")
+        for service_theme in service_themes.values():
+            if service_theme is not None and str(service_theme).strip() not in THEME_NAMES:
+                raise HTTPException(status_code=400, detail="Unknown theme")
+    forward_payload = {}
+    if "theme" in payload:
+        forward_payload["theme"] = theme or None
+    if service_themes is not None:
+        forward_payload["service_themes"] = service_themes
     url, headers = _broker_preferences_contract(user.email)
     with httpx.Client(timeout=5.0) as client:
-        response = client.put(url, headers=headers, json={"theme": theme or None})
+        response = client.put(url, headers=headers, json=forward_payload)
         if response.status_code < 400:
             response = client.get(url, headers=headers)
     if response.status_code >= 400:

@@ -4,12 +4,13 @@ BLOOM LIMS API v1 - Object Creation Wizard Endpoints
 Endpoints to support the multi-step object creation workflow.
 """
 
+import copy
 import logging
 import re
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from bloom_lims.config import get_settings
 from bloom_lims.integrations.atlas.events import emit_bloom_event
@@ -72,6 +73,12 @@ class CreateObjectRequest(BaseModel):
     version: str
     name: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
+    count: int = Field(
+        default=1,
+        ge=1,
+        le=100,
+        description="Number of sibling objects to create from the same template.",
+    )
 
 
 class CreateObjectResponse(BaseModel):
@@ -83,6 +90,7 @@ class CreateObjectResponse(BaseModel):
     type: str
     subtype: str
     message: str
+    created_euids: list[str] = Field(default_factory=list)
 
 
 def get_bdb(username: str = "api-user"):
@@ -95,6 +103,19 @@ def get_bdb(username: str = "api-user"):
 def _template_payload(template_row) -> Dict[str, Any]:
     """Return template json_addl as a dict."""
     return template_payload(template_row)
+
+
+def _is_singleton_template(template_row) -> bool:
+    payload = _template_payload(template_row)
+    singleton_value = payload.get("singleton")
+    return bool(getattr(template_row, "is_singleton", False)) or str(
+        singleton_value
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _has_recursive_layout(template_row) -> bool:
+    layouts = _template_payload(template_row).get("instantiation_layouts")
+    return bool(layouts)
 
 
 def _sort_key(value: str | None) -> tuple[str, str]:
@@ -433,60 +454,88 @@ async def create_object(
             )
 
         template = templates[0]
-
-        # Prepare json_addl overrides
-        json_addl_overrides = {}
-        if request.properties:
-            json_addl_overrides["properties"] = request.properties
-        if request.name:
-            json_addl_overrides["properties"] = json_addl_overrides.get(
-                "properties", {}
-            )
-            json_addl_overrides["properties"]["name"] = request.name
-
-        # Create instance from template using the create_instance method
-        new_instance = bloom_obj.create_instance(
-            template.euid, json_addl_overrides=json_addl_overrides
-        )
-
-        if not new_instance:
+        if request.count > 1 and _is_singleton_template(template):
             raise HTTPException(
-                status_code=500, detail="Failed to create object instance"
+                status_code=400,
+                detail="count > 1 is not allowed for singleton templates",
             )
+        if request.count > 1 and _has_recursive_layout(template):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "count > 1 is not allowed for recursive templates; "
+                    "create recursive containers one at a time"
+                ),
+            )
+
+        created_instances = []
+        for index in range(request.count):
+            # Prepare fresh json_addl overrides for every object. Reusing the same dict
+            # can leak generated child state across recursive template instantiations.
+            json_addl_overrides = {}
+            if request.properties:
+                json_addl_overrides["properties"] = copy.deepcopy(request.properties)
+            if request.name:
+                json_addl_overrides["properties"] = json_addl_overrides.get(
+                    "properties", {}
+                )
+                json_addl_overrides["properties"]["name"] = (
+                    f"{request.name} {index + 1}" if request.count > 1 else request.name
+                )
+
+            # Create the object and any nested children declared by the template.
+            created = bloom_obj.create_instances(
+                template.euid, json_addl_overrides=json_addl_overrides
+            )
+            new_instance = created[0][0] if created and created[0] else None
+            if not new_instance:
+                raise HTTPException(
+                    status_code=500, detail="Failed to create object instance"
+                )
+            if request.name:
+                new_instance.name = json_addl_overrides["properties"]["name"]
+            bdb.session.flush()
+            bloom_obj.track_user_interaction(
+                new_instance.euid,
+                relationship_type="user_created",
+                user_id=user.user_id,
+                email=user.email,
+            )
+
+            if instance_semantic_category(new_instance) == "container":
+                emit_bloom_event(
+                    "container.created",
+                    {
+                        "euid": new_instance.euid,
+                        "container_euid": new_instance.euid,
+                        "name": new_instance.name,
+                        "category": new_instance.category,
+                        "type": new_instance.type,
+                        "subtype": new_instance.subtype,
+                        "status": new_instance.bstatus,
+                        "json_addl": new_instance.json_addl
+                        if isinstance(new_instance.json_addl, dict)
+                        else {},
+                        "is_deleted": bool(getattr(new_instance, "is_deleted", False)),
+                    },
+                )
+            created_instances.append(new_instance)
 
         bdb.session.commit()
-        bloom_obj.track_user_interaction(
-            new_instance.euid,
-            relationship_type="user_created",
-            user_id=user.user_id,
-            email=user.email,
-        )
-
-        if instance_semantic_category(new_instance) == "container":
-            emit_bloom_event(
-                "container.created",
-                {
-                    "euid": new_instance.euid,
-                    "container_euid": new_instance.euid,
-                    "name": new_instance.name,
-                    "category": new_instance.category,
-                    "type": new_instance.type,
-                    "subtype": new_instance.subtype,
-                    "status": new_instance.bstatus,
-                    "json_addl": new_instance.json_addl
-                    if isinstance(new_instance.json_addl, dict)
-                    else {},
-                    "is_deleted": bool(getattr(new_instance, "is_deleted", False)),
-                },
-            )
-
+        new_instance = created_instances[0]
+        created_euids = [instance.euid for instance in created_instances]
         return CreateObjectResponse(
             euid=new_instance.euid,
             name=new_instance.name or "",
             category=new_instance.category,
             type=new_instance.type,
             subtype=new_instance.subtype,
-            message=f"Successfully created {new_instance.euid}",
+            message=(
+                f"Successfully created {new_instance.euid}"
+                if request.count == 1
+                else f"Successfully created {len(created_euids)} objects"
+            ),
+            created_euids=created_euids,
         )
     except HTTPException:
         raise

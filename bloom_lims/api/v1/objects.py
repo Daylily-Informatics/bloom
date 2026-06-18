@@ -4,6 +4,7 @@ BLOOM LIMS API v1 - Objects Endpoints
 CRUD endpoints for BloomObj (generic instances).
 """
 
+import copy
 import logging
 from typing import Any, Dict, Optional
 
@@ -13,6 +14,7 @@ from bloom_lims.schemas import (
     ObjectCreateSchema,
     ObjectUpdateSchema,
 )
+from bloom_lims.template_identity import template_payload
 
 from .dependencies import APIUser, require_read, require_write
 
@@ -20,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/objects", tags=["Objects"])
+
+
+def _is_singleton_template(template_row) -> bool:
+    payload = template_payload(template_row)
+    singleton_value = payload.get("singleton")
+    return bool(getattr(template_row, "is_singleton", False)) or str(
+        singleton_value
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _has_recursive_layout(template_row) -> bool:
+    layouts = template_payload(template_row).get("instantiation_layouts")
+    return bool(layouts)
 
 
 @router.get("/", response_model=Dict[str, Any])
@@ -161,28 +176,58 @@ async def create_object(
                 status_code=400,
                 detail=f"No template found for {category}/{data.type}/{data.subtype or '*'}@{version}",
             )
+        template = templates[0]
+        if data.count > 1 and _is_singleton_template(template):
+            raise HTTPException(
+                status_code=400,
+                detail="count > 1 is not allowed for singleton templates",
+            )
+        if data.count > 1 and _has_recursive_layout(template):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "count > 1 is not allowed for recursive templates; "
+                    "create recursive containers one at a time"
+                ),
+            )
 
-        json_overrides = data.json_addl or {}
-        props = json_overrides.get("properties")
-        if not isinstance(props, dict):
-            props = {}
-        props.setdefault("name", data.name)
-        json_overrides["properties"] = props
+        created_objects = []
+        for index in range(data.count):
+            json_overrides = copy.deepcopy(data.json_addl or {})
+            props = json_overrides.get("properties")
+            if not isinstance(props, dict):
+                props = {}
+            props.setdefault(
+                "name", f"{data.name} {index + 1}" if data.count > 1 else data.name
+            )
+            json_overrides["properties"] = props
 
-        obj = bo.create_instance(templates[0].euid, json_overrides)
-        obj.name = data.name
+            created = bo.create_instances(
+                template.euid, json_addl_overrides=json_overrides
+            )
+            obj = created[0][0] if created and created[0] else None
+            if obj is None:
+                raise HTTPException(status_code=500, detail="Failed to create object")
+            obj.name = props["name"]
+            bdb.session.flush()
+            bo.track_user_interaction(
+                obj.euid,
+                relationship_type="user_created",
+                user_id=user.user_id,
+                email=user.email,
+            )
+            created_objects.append(obj)
+
         bdb.session.commit()
-        bo.track_user_interaction(
-            obj.euid,
-            relationship_type="user_created",
-            user_id=user.user_id,
-            email=user.email,
-        )
+        obj = created_objects[0]
 
         return {
             "success": True,
             "euid": obj.euid,
-            "message": "Object created successfully",
+            "created_euids": [created.euid for created in created_objects],
+            "message": "Object created successfully"
+            if data.count == 1
+            else f"{len(created_objects)} objects created successfully",
         }
 
     except Exception as e:

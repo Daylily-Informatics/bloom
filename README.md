@@ -41,13 +41,29 @@ For normal user/admin behavior, the CLI, API, and GUI are alternate surfaces ove
 
 ## GUI
 
-Bloom exposes a FastAPI/Jinja GUI for internal operators. Current surfaces include dashboard/home, object search and details, container/content/equipment operations, graph views, auth/profile flows, and the mounted TapDB GUI at `/tapdb` when configured by Dayhoff.
+Bloom exposes a FastAPI/Jinja GUI for internal operators. Current surfaces include dashboard/home, object search and details, container/content/equipment operations, graph views, auth/profile flows, the `/lab-actions` wet-lab action wizard, and the mounted TapDB GUI at `/tapdb` when configured by Dayhoff.
+
+`/lab-actions` is the temporary operator flow for mapping incoming biospecimen tubes to extraction plates, sequencing-library plates, pool tubes, and sequencing run sets. It is backed by `/api/v1/lab-actions/*`; GUI actions should not have behavior that is unavailable through the API.
+
+See [`docs/lab_actions.md`](docs/lab_actions.md) for the template matrix, lineage contract, API examples, GUI flow, and production rollout checklist for this surface.
 
 Every human-visible EUID should link to the canonical TapDB object page at `/tapdb/object/{euid}` unless Bloom owns a more specific detail page; service-specific pages should still link back to canonical TapDB details.
 
 ## API
 
-The primary API is under `/api/v1/*`. Current route families include objects, containers, content, equipment, execution queue, batch operations, templates, subjects, lineages, stats, search, object creation, user tokens, admin auth, external specimens, Atlas integration, beta lab integration, and graph APIs.
+The primary API is under `/api/v1/*`. Current route families include objects, containers, content, equipment, execution queue, batch operations, templates, subjects, lineages, stats, search, object creation, lab actions, user tokens, admin auth, external specimens, Atlas integration, beta lab integration, and graph APIs.
+
+The lab-action route family includes:
+
+- `POST /api/v1/lab-actions/extraction-plates`
+- `POST /api/v1/lab-actions/seq-library-plates`
+- `POST /api/v1/lab-actions/seq-library-pools`
+- `POST /api/v1/lab-actions/seq-runs`
+- `GET /api/v1/lab-actions/seq-runs/{set_euid}/samplesheet`
+- `GET /api/v1/lab-actions/plates/{plate_euid}/mapping.csv`
+- `POST /api/v1/lab-actions/print-euids`
+
+The generic run-set template is `set/run-set/generic/1.01`. It is used for sequencing-run sets and other temporary Bloom-owned sets of internal or external EUIDs.
 
 Health and observability routes include `/healthz`, `/readyz`, `/health`, `/obs_services`, `/api_health`, `/endpoint_health`, `/db_health`, `/my_health`, and `/auth_health` when configured for Dayhoff observability.
 
@@ -66,6 +82,7 @@ Deployed browser evidence should target `https://bloom.<deploy>.dev.lsmc.bio` an
 
 - [`docs/apis.md`](docs/apis.md): API details.
 - [`docs/gui.md`](docs/gui.md): GUI routes and screenshots when current.
+- [`docs/lab_actions.md`](docs/lab_actions.md): extraction/library/pooling/sequencing-run action flow, template matrix, and production rollout checklist.
 - [`docs/architecture.md`](docs/architecture.md): domain model and runtime boundaries.
 - [`docs/becoming_a_discoverable_service.md`](docs/becoming_a_discoverable_service.md): Dayhoff/Kahlo observability contract.
 - [`docs/plans/`](docs/plans/): active ledgers.

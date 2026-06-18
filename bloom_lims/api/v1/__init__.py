@@ -16,7 +16,8 @@ from bloom_lims import __version__
 from .admin_auth import router as admin_auth_router
 from .async_tasks import router as async_tasks_router
 from .atlas_bridge import router as atlas_bridge_router
-from .auth import preferences_router, router as auth_router
+from .auth import preferences_router
+from .auth import router as auth_router
 from .batch import router as batch_router
 from .beta_lab import router as beta_lab_router
 from .containers import router as containers_router
@@ -25,6 +26,7 @@ from .equipment import router as equipment_router
 from .execution_queue import router as execution_queue_router
 from .external_specimens import router as external_specimens_router
 from .graph import router as graph_router
+from .lab_actions import router as lab_actions_router
 from .lineages import router as lineages_router
 from .object_creation import router as object_creation_router
 from .objects import router as objects_router
@@ -61,6 +63,7 @@ router.include_router(external_specimens_router)
 router.include_router(atlas_bridge_router)
 router.include_router(beta_lab_router)
 router.include_router(graph_router)
+router.include_router(lab_actions_router)
 
 
 @router.get("/")
@@ -91,5 +94,6 @@ async def api_v1_info():
             "external_atlas": "/api/v1/external/atlas",
             "external_atlas_beta": "/api/v1/external/atlas/beta",
             "graph": "/api/v1/graph",
+            "lab_actions": "/api/v1/lab-actions",
         },
     }
