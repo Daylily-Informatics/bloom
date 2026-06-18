@@ -476,8 +476,11 @@ class LabActionsService:
 
     def attach_plate_well_data(self, request: PlateWellDataRequest) -> dict[str, Any]:
         mappings: list[dict[str, Any]] = []
+        plate_euids: set[str] = set()
         for record in request.records:
             well = self._well_for_data_record(record)
+            if record.plate_euid:
+                plate_euids.add(record.plate_euid)
             target = well if record.target == "well" else self._well_content(well)
             data = self._create_by_code(
                 request.data_template_code,
@@ -493,6 +496,7 @@ class LabActionsService:
             mappings.append(
                 {
                     "well_euid": well.euid,
+                    "plate_euid": record.plate_euid,
                     "target_euid": target.euid,
                     "data_euid": data.euid,
                     "relationship_type": request.relationship_type,
@@ -505,7 +509,10 @@ class LabActionsService:
             member_euids=[item["data_euid"] for item in mappings],
         )
         self.bdb.session.commit()
+        sorted_plate_euids = sorted(plate_euids)
         return {
+            "plate_euid": sorted_plate_euids[0] if len(sorted_plate_euids) == 1 else None,
+            "plate_euids": sorted_plate_euids,
             "run_set_euid": run_set.euid if run_set is not None else None,
             "mappings": mappings,
         }

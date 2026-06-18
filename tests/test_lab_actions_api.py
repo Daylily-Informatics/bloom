@@ -642,7 +642,11 @@ def test_qc_plate_data_sets_and_pool_from_well_and_tube() -> None:
         },
     )
     assert data.status_code == 200, data.text
-    assert data.json()["mappings"][0]["data_euid"]
+    data_payload = data.json()
+    assert data_payload["plate_euid"] == extraction_payload["plate_euid"]
+    assert data_payload["plate_euids"] == [extraction_payload["plate_euid"]]
+    assert data_payload["mappings"][0]["plate_euid"] == extraction_payload["plate_euid"]
+    assert data_payload["mappings"][0]["data_euid"]
 
     lab_set = client.post(
         "/api/v1/lab-actions/sets",
