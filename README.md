@@ -1,12 +1,49 @@
-# BLOOM
+<div align="center">
+<pre>
+██████╗ ██╗      ██████╗  ██████╗ ███╗   ███╗
+██╔══██╗██║     ██╔═══██╗██╔═══██╗████╗ ████║
+██████╔╝██║     ██║   ██║██║   ██║██╔████╔██║
+██╔══██╗██║     ██║   ██║██║   ██║██║╚██╔╝██║
+██████╔╝███████╗╚██████╔╝╚██████╔╝██║ ╚═╝ ██║
+╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚═╝
+</pre>
+<p><strong>Internal material, container, lineage, and lab-action graph service.</strong></p>
+<p>
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#api">API</a> ·
+  <a href="#gui">GUI</a> ·
+  <a href="docs/lab_actions.md">Lab actions</a> ·
+  <a href="#testing-info">Tests</a>
+</p>
+</div>
 
 ## Overview
 
 Bloom is the LSMC internal material and container graph service. It owns laboratory containers, materials/content, equipment, lineage, recursive template creation, search, and graph views. Atlas owns orders and customer-facing accession context; Bloom owns the physical/material execution graph.
 
-Current Dayhoff pin: `7.0.14`. Current TapDB dependency: `daylily-tapdb @ ...@9.0.4`.
+Current Dayhoff pin: `7.0.16`. Current TapDB dependency: `daylily-tapdb @ ...@9.0.5`.
 
 Bloom is internal-only in Dayhoff exposure policy. It must be reachable only through approved LSMC networks and Dayhoff-generated service credentials.
+
+## What It Does
+
+- Owns Bloom containers, materials/content, equipment, recursive templates, lineages, search, and graph views.
+- Exposes `/lab-actions` and `/api/v1/lab-actions/*` for extraction plate, sequencing-library plate, pool-tube, and sequencing-run setup.
+- Mounts TapDB at `/tapdb` for generic object, template, lineage, audit, graph, and external-link inspection.
+- Provides health and observability surfaces for Kahlo and Dayhoff deployment verification.
+
+## How It Works
+
+```mermaid
+flowchart LR
+    Tube["Incoming tube + content"] --> Extraction["Extraction plate + gDNA"]
+    Extraction --> Library["Sequencing-library plate"]
+    Library --> Pool["Pool tube + pool content"]
+    Pool --> RunSet["Sequencing run set"]
+    RunSet --> OWY["Samplesheet for OWY/Kahlo traceability"]
+```
+
+Bloom models physical/material execution. Atlas owns orders and customer accession context; Dewey owns durable artifact identity; Ursa owns analysis trigger/job records.
 
 ## Quickstart
 
@@ -76,7 +113,7 @@ python -m pytest tests -q
 python -m pytest tests/test_lsmc_ui_skin_system_contract.py -q
 ```
 
-Deployed browser evidence should target `https://bloom.<deploy>.dev.lsmc.bio` and include the dashboard, object search/detail, TapDB mount, graph, and auth redirect surfaces. Current committed `jemdev5` evidence is linked from Dayhoff `docs/releases/dayhoff_7_0_61_jemdev5_evidence/`.
+Deployed browser evidence should target `https://bloom.<deploy>.dev.lsmc.bio` and include the dashboard, object search/detail, TapDB mount, graph, and auth redirect surfaces. Current `jemdev5` deployment evidence is linked from Dayhoff `docs/plans/20260618T132900Z_jemdev5_dayhoff_7067_live_deploy_ledger.md`.
 
 ## Technical Details, History, And Linkouts
 
