@@ -12,6 +12,7 @@ os.environ["BLOOM_OAUTH"] = "no"
 
 from fastapi.testclient import TestClient
 
+from bloom_lims.api.v1 import container_actions as container_actions_api
 from bloom_lims.domain.lab_action_spreadsheets import parse_workbook
 from main import app
 
@@ -216,6 +217,99 @@ def test_lab_actions_full_ilmn_flow_and_csv_export() -> None:
         assert library_content in sample_sheet.text
 
 
+def test_container_actions_validate_and_explicit_execute_dispatch(monkeypatch) -> None:
+    client = _client()
+    tube_euid = "Z-BCT-CONTAINER-ACTION"
+
+    def fake_object_kind(euid, user):
+        return {
+            "euid": euid,
+            "exists": True,
+            "kind": "container/tube/tube-generic-10ml/1.0",
+        }
+
+    monkeypatch.setattr(container_actions_api, "_object_kind", fake_object_kind)
+
+    validation = client.post(
+        "/api/v1/container-actions/validate",
+        json={
+            "rows": f"{tube_euid},CREATE.container/plate/96-well/1.0,A1\n",
+            "child_name": "pytest container action plate",
+            "child_content_type": "content/gdna/generic/1.0",
+        },
+    )
+    assert validation.status_code == 200, validation.text
+    payload = validation.json()
+    assert payload["valid"] is True
+    assert payload["row_count"] == 1
+    assert payload["planned"][0]["source_euid"] == tube_euid
+    assert payload["planned"][0]["create_type"] == "container/plate/96-well/1.0"
+    assert payload["planned"][0]["target_well"] == "A1"
+    assert payload["source_types"][tube_euid]["exists"] is True
+
+    tsv_validation = client.post(
+        "/api/v1/container-actions/validate",
+        json={
+            "rows": f"{tube_euid}\tCREATE.container/plate/96-well/1.0\tB2\n",
+            "child_name": "pytest tsv container action plate",
+            "child_content_type": "content/gdna/generic/1.0",
+        },
+    )
+    assert tsv_validation.status_code == 200, tsv_validation.text
+    tsv_payload = tsv_validation.json()
+    assert tsv_payload["valid"] is True
+    assert tsv_payload["planned"][0]["create_type"] == "container/plate/96-well/1.0"
+    assert tsv_payload["planned"][0]["target_well"] == "B2"
+
+    execution = client.post(
+        "/api/v1/container-actions/execute",
+        json={"rows": f"{tube_euid},CREATE.container/plate/96-well/1.0,A1\n"},
+    )
+    assert execution.status_code == 400, execution.text
+    assert "operation_type is required" in execution.text
+
+    class FakeLabActionsService:
+        def __init__(self):
+            self.closed = False
+
+        def create_lab_set(self, request):
+            return {
+                "set_euid": "Z-SET-CONTAINER-ACTION",
+                "members": request.members,
+                "external_members": request.external_members,
+            }
+
+        def close(self):
+            self.closed = True
+
+    fake_service = FakeLabActionsService()
+    monkeypatch.setattr(
+        container_actions_api,
+        "_service_for_user",
+        lambda user: fake_service,
+    )
+
+    explicit = client.post(
+        "/api/v1/container-actions/execute",
+        json={
+            "rows": f"{tube_euid},CREATE.set/run-set/generic/1.01,A1\n",
+            "operation_type": "lab_set",
+            "operation_payload": {
+                "name": "pytest container action set",
+                "members": [tube_euid],
+                "metadata": {"source": "container-actions-test"},
+            },
+        },
+    )
+    assert explicit.status_code == 200, explicit.text
+    executed = explicit.json()
+    assert executed["operation_type"] == "lab_set"
+    assert executed["validation"]["row_count"] == 1
+    assert executed["result"]["set_euid"]
+    assert executed["result"]["members"] == [tube_euid]
+    assert fake_service.closed is True
+
+
 def test_lab_actions_validation_and_ont_samplesheet_download() -> None:
     client = _client()
     invalid = client.post(
@@ -324,6 +418,20 @@ def test_lab_actions_gui_renders_wizard() -> None:
     assert 'data-testid="bloom-lab-run-platform"' in html
     assert "mode: 'directed'" in html
     assert "Download ${platform} sample sheet" in html
+
+
+def test_container_actions_gui_renders_dedicated_api_backed_page() -> None:
+    client = _client()
+    response = client.get("/container-actions")
+    assert response.status_code == 200, response.text
+    html = response.text
+    assert "Container Actions" in html
+    assert "/api/v1/container-actions/validate" in html
+    assert "/api/v1/container-actions/execute" in html
+    assert 'data-testid="bloom-container-action-rows"' in html
+    assert 'data-testid="bloom-container-action-operation"' in html
+    assert 'data-testid="bloom-container-action-payload"' in html
+    assert "Lab Actions" not in html.partition("<main")[2].partition("</main>")[0]
 
 
 def test_directed_extraction_into_existing_plate_with_quant_and_reuse_guard() -> None:

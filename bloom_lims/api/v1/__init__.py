@@ -21,6 +21,7 @@ from .auth import router as auth_router
 from .batch import router as batch_router
 from .beta_lab import router as beta_lab_router
 from .containers import router as containers_router
+from .container_actions import router as container_actions_router
 from .content import router as content_router
 from .equipment import router as equipment_router
 from .execution_queue import router as execution_queue_router
@@ -45,6 +46,7 @@ router.include_router(objects_router)
 router.include_router(auth_router)
 router.include_router(preferences_router)
 router.include_router(containers_router)
+router.include_router(container_actions_router)
 router.include_router(content_router)
 router.include_router(equipment_router)
 router.include_router(execution_queue_router)
@@ -77,6 +79,7 @@ async def api_v1_info():
             "objects": "/api/v1/objects",
             "auth": "/api/v1/auth",
             "containers": "/api/v1/containers",
+            "container_actions": "/api/v1/container-actions",
             "content": "/api/v1/content",
             "equipment": "/api/v1/equipment",
             "execution": "/api/v1/execution",

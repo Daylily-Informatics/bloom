@@ -175,6 +175,19 @@ async def lab_actions_wizard(request: Request, _auth=Depends(require_auth)):
     return HTMLResponse(content=template.render(context), status_code=200)
 
 
+@router.get("/container-actions", response_class=HTMLResponse)
+async def container_actions_wizard(request: Request, _auth=Depends(require_auth)):
+    user_data = request.session.get("user_data", {})
+    template = templates.get_template("modern/container_actions.html")
+    context = {
+        "request": request,
+        "udat": user_data,
+        "user": user_data,
+        "page_title": "Container Actions",
+    }
+    return HTMLResponse(content=template.render(context), status_code=200)
+
+
 @router.get("/help", response_class=HTMLResponse)
 async def help_page(request: Request):
     user_data = request.session.get("user_data", {})
