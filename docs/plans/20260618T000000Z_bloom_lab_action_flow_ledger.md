@@ -81,3 +81,36 @@ Build a Bloom-owned lab actions layer for extraction plates, sequencing library 
 - No real Zebra Day print job was sent.
 - Bloom release, Dayhoff pin update, and Dayhoff double-release are tracked in `dayhoff/docs/plans/20260618T131619Z_bloom_lab_actions_release_train_ledger.md`.
 - No live `jemdev5` refresh was performed in this pass.
+
+## 2026-06-19 Live `jemdev5` Proof
+
+The lab-action flow was released as Bloom `7.0.19`, pinned by Dayhoff `7.0.74`,
+self-pinned by Dayhoff `7.0.75`, and exercised in the live `jemdev5`
+greenfield hybrid GUI E2E run.
+
+| Surface | Live evidence |
+|---|---|
+| Deploy verification | `/Users/jmajor/projects/mega_dayhoff/dayhoff/output/jemdev5_verify_7_0_75_final/deploy-verify.md` |
+| GUI E2E screenshot pack | `/Users/jmajor/projects/mega_dayhoff/dayhoff/output/playwright/hybrid_order_to_delivery/hybrid_order_to_delivery/codex-hybrid-e2e-20260619T002814Z/` |
+| Tracked evidence guide | `/Users/jmajor/projects/mega_dayhoff/dayhoff/docs/evidence/hybrid_order_to_delivery_gui_e2e.md` |
+| Pytest result | `1 passed in 149.11s` |
+
+Live Bloom lab-action EUIDs from the passing run:
+
+| Role | EUID |
+|---|---|
+| Patient biospecimen tube | `Z-BCT-2AM` |
+| Extraction plate | `Z-BCP-19Z` |
+| Extraction well | `Z-BCW-3EN3` |
+| Extraction gDNA content | `Z-BNG-FX` |
+| ILMN prep set | `Z-BGS-15X` |
+| ONT prep set | `Z-BGS-16V` |
+| ILMN library plate | `Z-BCP-1AX` |
+| ONT library plate | `Z-BCP-1BV` |
+| ILMN pool tube | `Z-BCT-2BJ` |
+| ONT pool tube | `Z-BCT-2CG` |
+| ILMN seq-run set | `Z-BGS-17S` |
+| ONT seq-run set | `Z-BGS-18Q` |
+
+All Bloom lab-action rows are source-tested, release-pinned, deployed to
+`jemdev5`, and live-proven. Final status: `100%`.
