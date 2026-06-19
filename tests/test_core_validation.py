@@ -224,7 +224,7 @@ class TestTemplateValidator:
         # Valid patterns
         assert validator._is_valid_reference("action/generic/test/1.0")
         assert validator._is_valid_reference("workflow/dna_extraction/v1/1.0")
-        assert validator._is_valid_reference("content/sample/blood/*/")
+        assert validator._is_valid_reference("material/sample/blood/*/")
 
         # Invalid patterns
         assert not validator._is_valid_reference("invalid")

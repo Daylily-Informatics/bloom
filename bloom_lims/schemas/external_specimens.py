@@ -20,7 +20,7 @@ class AtlasReferences(BaseModel):
 
 
 class ExternalSpecimenCreateRequest(BaseModel):
-    specimen_template_code: str = Field(default="content/specimen/generic/1.0")
+    specimen_template_code: str = Field(default="material/specimen/generic/1.0")
     specimen_name: str | None = None
     container_euid: str | None = None
     container_template_code: str = Field(default="container/tube/generic/1.0")

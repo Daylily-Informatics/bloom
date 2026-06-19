@@ -489,23 +489,23 @@ def test_seed_templates_split_core_and_client_ownership(
         lambda _dirs, strict: (
             [
                 {
-                    "category": "SYS",
-                    "type": "system",
-                    "subtype": "config",
+                    "category": "actor",
+                    "type": "user",
+                    "subtype": "system",
                     "version": "1.0",
                     "instance_prefix": "SYS",
                     "_source_file": str(core_template_path),
                 },
                 {
-                    "category": "XRF",
-                    "type": "reference",
-                    "subtype": "external_object",
+                    "category": "reference",
+                    "type": "external_identifier",
+                    "subtype": "tapdb_object",
                     "version": "1.0",
                     "instance_prefix": "XRF",
                     "_source_file": str(core_template_path),
                 },
                 {
-                    "category": "BAC",
+                    "category": "action",
                     "type": "beta_lab",
                     "subtype": "claim_material_in_queue",
                     "version": "1.0",
@@ -615,31 +615,34 @@ def test_seed_templates_split_core_and_client_ownership(
 def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None:
     templates = [
         {
-            "category": "BRM",
+            "category": "data",
             "type": "sequencing_run",
             "subtype": "illumina",
             "version": "1.0",
+            "instance_prefix": "BRM",
             "json_addl": {"semantic_category": "data"},
         },
         {
-            "category": "BRN",
+            "category": "data",
             "type": "sequencing_run",
             "subtype": "ont",
             "version": "1.0",
+            "instance_prefix": "BRN",
             "json_addl": {"semantic_category": "data"},
         },
         {
-            "category": "BCT",
+            "category": "container",
             "type": "tube",
             "subtype": "tube-generic-10ml",
             "version": "1.0",
+            "instance_prefix": "BCN",
             "json_addl": {"semantic_category": "container"},
         },
     ]
     current = SimpleNamespace(
         domain_code="Z",
         type="sequencing_run",
-        category="BRM",
+        category="data",
         subtype="illumina",
         version="1.0",
         is_deleted=False,
@@ -728,14 +731,16 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
         domain_code="Z",
     )
 
-    assert retired == 2
+    assert retired == 4
     assert current.is_deleted is False
     assert stale_prefix.is_deleted is True
     assert stale_prefix.bstatus == "retired"
-    assert stale_subtype.is_deleted is False
+    assert stale_subtype.is_deleted is True
+    assert stale_subtype.bstatus == "retired"
     assert stale_container_prefix.is_deleted is True
     assert stale_container_prefix.bstatus == "retired"
-    assert non_data.is_deleted is False
+    assert non_data.is_deleted is True
+    assert non_data.bstatus == "retired"
     assert fake_session.flushed == 1
 
 

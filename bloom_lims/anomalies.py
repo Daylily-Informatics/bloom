@@ -15,7 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from bloom_lims.config import get_settings
 from bloom_lims.observability import ProjectionMetadata
 
-ANOMALY_TEMPLATE_CODE = "BAN/ops/anomaly-record/1.0/"
+ANOMALY_TEMPLATE_CODE = "ops/anomaly-record/generic/1.0/"
 ANOMALY_PREFIX = "BAN"
 
 

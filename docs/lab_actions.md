@@ -19,16 +19,16 @@ The current flow uses the existing Bloom template pack plus one new generic run-
 
 | Purpose | Semantic template path | Instance prefix | Notes |
 |---|---|---:|---|
-| Generic run/set object | `set/run-set/generic/1.01` | `BGS` | New template. Seeded as `category=BGS`, `type=run-set`, `subtype=generic`, `version=1.01`. Holds named sets, run metadata, members, external members, status, and arbitrary metadata. |
+| Generic run/set object | `set/run-set/generic/1.01` | `BGS` | New template. Seeded as `category=set`, `type=run-set`, `subtype=generic`, `version=1.01`. Holds named sets, run metadata, members, external members, status, and arbitrary metadata. |
 | Extraction plate | `container/plate/fixed-plate-96/1.0` | `BCP` | Existing recursive 96-well plate template. Creates linked well containers. |
 | Sequencing-library plate | `container/plate/sequencing-library-plate-96/1.0` | `BCP` | Existing recursive 96-well plate template. Creates linked well containers. |
 | Plate well | `container/well/fixed-plate-well/1.0` | `BCW` | Created by recursive plate templates. |
 | Pool tube | `container/tube/tube-generic-10ml/1.0` | `BCT` | Existing generic tube template. More specific pool-tube templates can be added later if needed. |
-| Incoming specimen contents | `content/specimen/{blood-whole,buccal-swab,saliva}/1.0` | `BNB`, `BNS`, `BNA` | Existing whole-blood, buccal-swab, and saliva specimen templates. Incoming tubes must already hold one content object unless the caller creates/fills the tube first. |
-| Extraction well gDNA | `content/sample/gdna/1.0` | `BNG` | Created during extraction mapping. |
-| Sequencing-library content | `content/sample/sequencing-library/1.0` | `BNQ` | Created during library plate mapping. |
-| Sequencing-library pool content | `content/pool/sequencing-library/1.0` | `BNP` | Created when filling the pool tube. |
-| Sequencing index reagent | `content/reagent/sequencing-index/1.0` | `BNX` | Optional; callers may also store an index barcode string directly. |
+| Incoming specimen contents | `material/specimen/{blood-whole,buccal-swab,saliva}/1.0` | `BNB`, `BNS`, `BNA` | Existing whole-blood, buccal-swab, and saliva specimen templates. Incoming tubes must already hold one material object unless the caller creates/fills the tube first. |
+| Extraction well gDNA | `material/sample/gdna/1.0` | `BNG` | Created during extraction mapping. |
+| Sequencing-library content | `material/sample/sequencing-library/1.0` | `BNQ` | Created during library plate mapping. |
+| Sequencing-library pool content | `material/pool/sequencing-library/1.0` | `BNP` | Created when filling the pool tube. |
+| Sequencing index reagent | `material/reagent/sequencing-index/1.0` | `BNX` | Optional; callers may also store an index barcode string directly. |
 | gDNA quant data | `data/quantification/gdna/1.0` | `BDQ` | Optional per-well extraction output data. |
 
 No additional templates are required for the current implementation. The semantic paths above are the operator-facing shorthand used by the API and docs; the seed file stores Bloom's actual prefix-backed template identity in `category`, `type`, `subtype`, `version`, and `instance_prefix`. If production operators need separate EUID prefixes or stricter metadata for pool tubes, flowcells, reagent sets, or run kits, add those templates as a separate versioned template-pack change and update this matrix before production rollout.

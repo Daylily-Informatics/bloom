@@ -28,7 +28,7 @@ license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
     "cli-core-yo==2.1.1",
-    "daylily-tapdb @ git+https://github.com/Daylily-Informatics/daylily-tapdb.git@9.0.5",
+    "daylily-tapdb @ git+https://github.com/Daylily-Informatics/daylily-tapdb.git@9.0.6",
     "daylily-auth-cognito==2.1.5",
     "IPython>=8.18.1",
     "bandit[toml]>=1.8.0",

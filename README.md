@@ -21,9 +21,11 @@
 
 Bloom is the LSMC internal material and container graph service. It owns laboratory containers, materials/content, equipment, lineage, recursive template creation, search, and graph views. Atlas owns orders and customer-facing accession context; Bloom owns the physical/material execution graph.
 
-Current Dayhoff pin: `7.0.16`. Current TapDB dependency: `daylily-tapdb @ ...@9.0.5`.
+Current Dayhoff pin: `7.0.20`. Current TapDB dependency: `daylily-tapdb @ ...@9.0.6`.
 
 Bloom is internal-only in Dayhoff exposure policy. It must be reachable only through approved LSMC networks and Dayhoff-generated service credentials.
+
+TapDB template identity is semantic. Categories are names like `container`, `material`, `data`, `equipment`, `set`, and `workflow`; prefixes such as `BC*`, `BN*`, `BD*`, `BR*`, and `BG*` are issuance and governance labels only. Existing historical objects keep their already minted EUIDs, but new and active template definitions must not use a Meridian/EUID prefix as the category name.
 
 ## What It Does
 

@@ -15,7 +15,7 @@ Build a Bloom-owned lab actions layer for extraction plates, sequencing library 
 - Existing primitives found:
   - recursive template create in `BloomObj.create_instances`
   - `container/plate/fixed-plate-96/1.0`, `container/plate/sequencing-library-plate-96/1.0`, `container/well/fixed-plate-well/1.0`
-  - `content/sample/gdna/1.0`, `content/sample/sequencing-library/1.0`, `content/pool/sequencing-library/1.0`, `content/reagent/sequencing-index/1.0`
+  - `material/sample/gdna/1.0`, `material/sample/sequencing-library/1.0`, `material/pool/sequencing-library/1.0`, `material/reagent/sequencing-index/1.0`
   - `data/quantification/gdna/1.0`, `data/sequencing_run/*/1.0`
   - Zebra Day service wrapper for print dispatch
 
@@ -57,19 +57,19 @@ Build a Bloom-owned lab actions layer for extraction plates, sequencing library 
 - `source ./activate dev && python -m pytest tests/test_lab_actions_api.py tests/test_bloom_prefix_taxonomy.py::test_wet_lab_templates_use_bloom_prefix_taxonomy tests/test_route_coverage_gaps_api.py::test_object_creation_plate_creates_96_linked_wells tests/test_template_instantiation_recursion.py tests/test_api_v1.py::TestObjectCreationAPI tests/test_api_v1.py::TestObjectCreationPathTraversal -q --cov-reset --cov=bloom_lims.api.v1.lab_actions --cov=bloom_lims.domain.lab_actions --cov=bloom_lims.schemas.lab_actions --cov=bloom_lims.api.v1.object_creation --cov=bloom_lims.schemas.objects --cov-report=term-missing --cov-report=json:coverage-lab-actions.json --cov-fail-under=81` -> 30 passed; total changed-surface coverage 83.81%.
 - Full repo test collection is not clean in the local Bloom env: `tests/test_beta_cross_repo_smoke.py` imports Ursa and requires `daylily-ephemeral-cluster`; broad non-E2E collection also stalled before progress in local subprocess handling. These are not lab-action source failures.
 - Template inventory from `config/tapdb_templates/bloom/templates.json` confirmed these seeded records for the lab-action flow:
-  - `BGS/run-set/generic/1.01`
-  - `BCP/plate/fixed-plate-96/1.0`
-  - `BCP/plate/sequencing-library-plate-96/1.0`
-  - `BCW/well/fixed-plate-well/1.0`
-  - `BCT/tube/tube-generic-10ml/1.0`
-  - `BNB/specimen/blood-whole/1.0`
-  - `BNS/specimen/buccal-swab/1.0`
-  - `BNA/specimen/saliva/1.0`
-  - `BNG/sample/gdna/1.0`
-  - `BNQ/sample/sequencing-library/1.0`
-  - `BNP/pool/sequencing-library/1.0`
-  - `BNX/reagent/sequencing-index/1.0`
-  - `BDQ/quantification/gdna/1.0`
+  - `set/run-set/generic/1.01`
+  - `container/plate/fixed-plate-96/1.0`
+  - `container/plate/sequencing-library-plate-96/1.0`
+  - `container/well/fixed-plate-well/1.0`
+  - `container/tube/tube-generic-10ml/1.0`
+  - `material/specimen/blood-whole/1.0`
+  - `material/specimen/buccal-swab/1.0`
+  - `material/specimen/saliva/1.0`
+  - `material/sample/gdna/1.0`
+  - `material/sample/sequencing-library/1.0`
+  - `material/pool/sequencing-library/1.0`
+  - `material/reagent/sequencing-index/1.0`
+  - `data/quantification/gdna/1.0`
 - Local browser proof used repo test-runtime config plus `BLOOM_OAUTH=no`; Playwright captured `/lab-actions` at `output/playwright/bloom_lab_actions/lab_actions_wizard_local.png`.
 - Local browser console still shows the pre-existing `/api/v1/me/preferences` 503 under test-runtime config; `/lab-actions` itself returned 200 and static assets loaded.
 - Docs pass added `docs/lab_actions.md` and linked it from `README.md`, `docs/apis.md`, `docs/gui.md`, and `docs/architecture.md`.

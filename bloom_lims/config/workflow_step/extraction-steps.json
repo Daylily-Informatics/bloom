@@ -24,22 +24,22 @@
         [
           {
             "container/tube/tube-generic-10ml/*/": {
-              "holds_content": "content/sample/blood-plasma/*"
+              "holds_content": "material/sample/blood-plasma/*"
             }
           },
           {
             "container/tube/tube-generic-10ml/*/": {
-              "holds_content": "content/sample/blood-plasma/*"
+              "holds_content": "material/sample/blood-plasma/*"
             }
           },
           {
             "container/tube/tube-generic-10ml/*/": {
-              "holds_content": "content/sample/blood-plasma/*"
+              "holds_content": "material/sample/blood-plasma/*"
             }
           },
           {
             "container/tube/tube-generic-10ml/*/": {
-              "holds_content": "content/sample/blood-plasma/*"
+              "holds_content": "material/sample/blood-plasma/*"
             }
           }
         ]
@@ -51,7 +51,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/cfdna/*"
+                    "holds_content": "material/sample/cfdna/*"
                   }
                 }
               ]
@@ -62,7 +62,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/cfdna/*"
+                    "holds_content": "material/sample/cfdna/*"
                   }
                 }
               ]
@@ -73,7 +73,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/cfdna/*"
+                    "holds_content": "material/sample/cfdna/*"
                   }
                 }
               ]
@@ -84,7 +84,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/cfdna/*"
+                    "holds_content": "material/sample/cfdna/*"
                   }
                 }
               ]
@@ -133,22 +133,22 @@
       "expected_inputs": [
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         }
       ],
@@ -159,7 +159,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/gdna/*"
+                    "holds_content": "material/sample/gdna/*"
                   }
                 }
               ]
@@ -170,7 +170,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/gdna/*"
+                    "holds_content": "material/sample/gdna/*"
                   }
                 }
               ]
@@ -181,7 +181,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/gdna/*"
+                    "holds_content": "material/sample/gdna/*"
                   }
                 }
               ]
@@ -192,7 +192,7 @@
               "child_of_lineages": [
                 {
                   "container/well/fixed-plate-well/*/": {
-                    "holds_content": "content/sample/gdna/*"
+                    "holds_content": "material/sample/gdna/*"
                   }
                 }
               ]
@@ -241,22 +241,22 @@
       "expected_inputs": [
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         }
       ],
@@ -302,44 +302,44 @@
       "expected_inputs": [
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         },
         {
           "container/tube/tube-strek-10ml/*/": {
-            "holds_content": "content/specimen/blood-whole/*"
+            "holds_content": "material/specimen/blood-whole/*"
           }
         }
       ],
       "expected_outputs": [
         {
           "container/tube/tube-generic-10ml/*/": {
-            "holds_content": "content/sample/blood-plasma/*"
+            "holds_content": "material/sample/blood-plasma/*"
           }
         },
         {
           "container/tube/tube-generic-10ml/*/": {
-            "holds_content": "content/sample/blood-plasma/*"
+            "holds_content": "material/sample/blood-plasma/*"
           }
         },
         {
           "container/tube/tube-generic-10ml/*/": {
-            "holds_content": "content/sample/blood-plasma/*"
+            "holds_content": "material/sample/blood-plasma/*"
           }
         },
         {
           "container/tube/tube-generic-10ml/*/": {
-            "holds_content": "content/sample/blood-plasma/*"
+            "holds_content": "material/sample/blood-plasma/*"
           }
         }
       ],

@@ -22,8 +22,8 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 )
 from bloom_lims.config import get_settings
 
-TOKEN_TEMPLATE_CODE = "BBX/auth/user-api-token/1.0/"
-TOKEN_USAGE_LOG_TEMPLATE_CODE = "BBX/auth/user-api-token-usage-log/1.0/"
+TOKEN_TEMPLATE_CODE = "auth/user-api-token/generic/1.0/"
+TOKEN_USAGE_LOG_TEMPLATE_CODE = "auth/user-api-token-usage-log/generic/1.0/"
 
 TOKEN_PREFIX = "BBX"
 TOKEN_USAGE_PREFIX = "BBX"

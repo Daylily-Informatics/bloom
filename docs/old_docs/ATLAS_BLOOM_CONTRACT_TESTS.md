@@ -36,7 +36,7 @@ def test_create_container_contract(client):
 ```python
 def test_specimen_crud_contract(client, container_euid):
     create_payload = {
-        "specimen_template_code": "content/specimen/blood-whole/1.0",
+        "specimen_template_code": "material/specimen/blood-whole/1.0",
         "container_euid": container_euid,
         "atlas_refs": {"trf_euid": "TRF-1", "patient_id": "PAT-1", "kit_barcode": "KIT-1"},
         "properties": {"source": "atlas"},

@@ -174,7 +174,7 @@ class AtlasFulfillmentContext(BaseModel):
 
 
 class BetaAcceptedMaterialCreateRequest(BaseModel):
-    specimen_template_code: str = Field(default="content/specimen/blood-whole/1.0")
+    specimen_template_code: str = Field(default="material/specimen/blood-whole/1.0")
     specimen_name: str | None = None
     container_euid: str | None = None
     container_template_code: str = Field(default="container/tube/tube-generic-10ml/1.0")

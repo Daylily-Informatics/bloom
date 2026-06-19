@@ -287,7 +287,7 @@ curl -k https://localhost:8912/api/v1/external/specimens \
   -H "Idempotency-Key: atlas-specimen-001" \
   -H "Content-Type: application/json" \
   -d '{
-    "specimen_template_code": "content/specimen/blood-whole/1.0",
+    "specimen_template_code": "material/specimen/blood-whole/1.0",
     "specimen_name": "specimen-demo",
     "status": "active",
     "container_template_code": "container/tube/tube-generic-10ml/1.0",
