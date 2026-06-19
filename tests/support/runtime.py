@@ -56,6 +56,7 @@ _BLOOM_TEMPLATE_CONFIG = (
 _TAPDB_CORE_PREFIX_OWNERSHIP = {
     "ADT",
     "EDG",
+    "GSE",
     "GVR",
     "MSG",
     "SYS",
