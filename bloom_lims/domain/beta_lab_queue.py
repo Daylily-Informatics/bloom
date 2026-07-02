@@ -739,7 +739,7 @@ class _BetaLabQueueMixin:
 
     def _find_execution_container(self, material):
         for lineage in get_child_lineages(material):
-            if lineage.is_deleted or lineage.relationship_type != "contains":
+            if lineage.is_deleted or lineage.relationship_type != "HOLDS_MATERIAL":
                 continue
             parent = lineage.parent_instance
             if (

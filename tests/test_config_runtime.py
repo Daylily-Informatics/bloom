@@ -348,7 +348,9 @@ def test_create_app_does_not_mount_upload_or_tmp_static_dirs(
     get_settings.cache_clear()
 
     app = create_app()
-    mount_paths = {route.path for route in app.routes}
+    mount_paths = {
+        path for route in app.routes if (path := getattr(route, "path", None))
+    }
 
     assert "/static" in mount_paths
     assert "/templates" in mount_paths
@@ -445,7 +447,7 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: 
     settings = BloomSettings(storage={"upload_dir": str(tmp_path / "uploads")})
     expected_tapdb_spec = read_pyproject_dependency_spec("daylily-tapdb")
 
-    assert expected_tapdb_spec == "==7.0.9"
+    assert expected_tapdb_spec == "==9.0.10"
     assert assert_tapdb_version()
     assert settings.tapdb.owner_repo_name == DEFAULT_TAPDB_OWNER_REPO_NAME
     assert settings.tapdb.domain_code == DEFAULT_TAPDB_DOMAIN_CODE
@@ -503,6 +505,7 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: 
     assert set(packaged_prefix_registry["ownership"]["Z"]) == {
         "ADT",
         "BAC",
+        "BAN",
         "BAR",
         "BBX",
         "BC",
@@ -556,9 +559,12 @@ def test_tapdb_contract_defaults_match_shipped_templates(monkeypatch, tmp_path: 
         "BWF",
         "BWS",
         "EDG",
+        "GSE",
+        "GVR",
         "MSG",
         "SYS",
         "TPX",
+        "XRF",
     }
     assert {
         claim["issuer_app_code"]

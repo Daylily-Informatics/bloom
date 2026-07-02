@@ -10,7 +10,6 @@ from pydantic import ValidationError
 
 from bloom_lims.schemas.beta_lab import BetaRunCreateRequest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -63,7 +62,7 @@ def test_sequencing_run_templates_are_shipped_for_tapdb_seed():
     for template_key, (platform, instance_prefix) in expected.items():
         template = templates[template_key]
         props = template["json_addl"]["properties"]
-        assert template["category"] == instance_prefix
+        assert template["category"] == "data"
         assert template["instance_prefix"] == instance_prefix
         assert template["json_addl"]["semantic_category"] == "data"
         assert props["beta_kind"] == "sequencing_run"

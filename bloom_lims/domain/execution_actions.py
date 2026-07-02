@@ -228,7 +228,7 @@ class ExecutionQueueActionRecorder:
         return action_record
 
     def _ensure_action_template(self, action_key: str) -> generic_template:
-        template_code = f"{EXECUTION_ACTION_TEMPLATE_PREFIX}/{EXECUTION_ACTION_GROUP}/{action_key}/1.0/"
+        template_code = f"action/{EXECUTION_ACTION_GROUP}/{action_key}/1.0/"
         return require_seeded_template(
             self.session,
             template_code,

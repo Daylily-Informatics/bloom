@@ -11,6 +11,7 @@ class AtlasReferences(BaseModel):
     trf_euid: str | None = None
     patient_id: str | None = None
     order_euid: str | None = None
+    order_test_euid: str | None = None
     shipment_euid: str | None = None
     kit_barcode: str | None = None
     atlas_tenant_id: str | None = None
@@ -19,7 +20,7 @@ class AtlasReferences(BaseModel):
 
 
 class ExternalSpecimenCreateRequest(BaseModel):
-    specimen_template_code: str = Field(default="content/specimen/generic/1.0")
+    specimen_template_code: str = Field(default="material/specimen/generic/1.0")
     specimen_name: str | None = None
     container_euid: str | None = None
     container_template_code: str = Field(default="container/tube/generic/1.0")
@@ -33,6 +34,7 @@ class ExternalSpecimenCreateRequest(BaseModel):
         if not any(
             [
                 refs.order_euid,
+                refs.order_test_euid,
                 refs.patient_id,
                 refs.shipment_euid,
                 refs.kit_barcode,

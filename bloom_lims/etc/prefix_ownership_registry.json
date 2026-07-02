@@ -7,6 +7,9 @@
       "BAC": {
         "issuer_app_code": "bloom"
       },
+      "BAN": {
+        "issuer_app_code": "bloom"
+      },
       "BAR": {
         "issuer_app_code": "bloom"
       },
@@ -166,6 +169,12 @@
       "EDG": {
         "issuer_app_code": "daylily-tapdb"
       },
+      "GVR": {
+        "issuer_app_code": "daylily-tapdb"
+      },
+      "GSE": {
+        "issuer_app_code": "daylily-tapdb"
+      },
       "MSG": {
         "issuer_app_code": "daylily-tapdb"
       },
@@ -173,6 +182,9 @@
         "issuer_app_code": "daylily-tapdb"
       },
       "TPX": {
+        "issuer_app_code": "daylily-tapdb"
+      },
+      "XRF": {
         "issuer_app_code": "daylily-tapdb"
       }
     }

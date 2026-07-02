@@ -131,6 +131,7 @@ The domain layer is where Bloom's narrow ownership becomes concrete:
 | Module group | Current responsibility |
 | --- | --- |
 | `containers.py`, `content.py`, `equipment.py`, `external_specimens.py` | material/object state management |
+| `lab_actions.py` | temporary operator actions that create and link extraction plates, sequencing-library plates, pool tubes, sequencing run sets, CSV exports, and barcode print jobs without driving workflow queues |
 | `execution_queue.py`, `execution_actions.py` | queue-centric runtime behavior |
 | `beta_lab*.py`, `beta_actions.py` | beta queue/lab flows and staged material operations |
 | `workflows.py`, `object_sets.py` | older concepts that still exist in code but are not current mounted product surfaces |
@@ -167,6 +168,8 @@ Bloom persists state through TapDB-managed PostgreSQL structures and namespaced 
 - object creation mints EUID-backed instances
 - lineage edges and containment relationships connect those instances
 - operator/runtime surfaces project queue state on top of the same core identity graph
+
+The `/lab-actions` surface follows the same persistence model. It composes existing templates and lineage records into operator-friendly extraction, library, pooling, and sequencing-run setup actions. It does not add tables or queue execution semantics. See [`lab_actions.md`](lab_actions.md) for the concrete template matrix and rollout checklist.
 
 That is why Bloom feels like a foundation service rather than a vertical application. It stores the durable material graph that other services and operator workflows can interrogate.
 

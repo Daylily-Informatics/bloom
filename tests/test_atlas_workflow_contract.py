@@ -142,7 +142,7 @@ def _create_specimen_payload(
     container_euid: str | None = None,
 ) -> dict:
     payload = {
-        "specimen_template_code": "content/specimen/blood-whole/1.0",
+        "specimen_template_code": "material/specimen/blood-whole/1.0",
         "specimen_name": f"specimen-{_suffix()}",
         "status": "active",
         "properties": {"source": "atlas-contract-test"},
@@ -260,7 +260,7 @@ def test_container_context_validation_mismatch_returns_400(monkeypatch):
             "/api/v1/external/specimens",
             headers={"Idempotency-Key": _opaque("idem", 16)},
             json={
-                "specimen_template_code": "content/specimen/blood-whole/1.0",
+                "specimen_template_code": "material/specimen/blood-whole/1.0",
                 "specimen_name": "context-mismatch",
                 "container_euid": container["euid"],
                 "status": "active",
@@ -315,7 +315,7 @@ def test_container_context_summary_is_projected_through_explicit_reference_objec
         created = _create_specimen(
             client,
             payload={
-                "specimen_template_code": "content/specimen/blood-whole/1.0",
+                "specimen_template_code": "material/specimen/blood-whole/1.0",
                 "specimen_name": "context-match",
                 "container_euid": container["euid"],
                 "status": "active",
@@ -408,7 +408,7 @@ def test_unsupported_template_returns_validation_error(monkeypatch):
         response = client.post(
             "/api/v1/external/specimens",
             json={
-                "specimen_template_code": "content/specimen/saliva/1.0",
+                "specimen_template_code": "material/specimen/saliva/1.0",
                 "specimen_name": "unsupported-template",
                 "status": "active",
                 "atlas_refs": {"patient_id": f"PAT-{_suffix()}"},

@@ -998,7 +998,7 @@ Templates are identified by a **template code string** with the format:
 **Examples:**
 - `container/plate/fixed-plate-96/1.0/`
 - `workflow/assay/ngs-library-prep/2.1/`
-- `content/sample/blood-specimen/1.0/`
+- `material/sample/blood-specimen/1.0/`
 - `equipment/instrument/sequencer/1.0/`
 
 ### 4.2 Template JSON Structure

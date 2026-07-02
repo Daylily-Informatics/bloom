@@ -67,8 +67,16 @@ def _assert_no_uuid_keys(payload):
 
 
 def _atlas_context_payload() -> dict[str, object]:
+    order_euid = _opaque("order")
+    primary_order_test_euid = _opaque("order-test-primary")
     return {
         "atlas_tenant_id": _opaque("tenant"),
+        "atlas_order_euid": order_euid,
+        "atlas_order_test_euid": primary_order_test_euid,
+        "atlas_order_test_euids": [
+            primary_order_test_euid,
+            _opaque("order-test-secondary"),
+        ],
         "atlas_trf_euid": _opaque("trf"),
         "atlas_test_euid": _opaque("test-primary"),
         "atlas_test_euids": [_opaque("test-secondary")],
@@ -736,6 +744,29 @@ def test_external_specimen_lookup_finds_queue_ready_material_by_container_refs()
                 "atlas_tenant_id": atlas_context["atlas_tenant_id"],
                 "atlas_trf_euid": atlas_context["atlas_trf_euid"],
                 "atlas_test_euid": atlas_context["atlas_test_euid"],
+            },
+        )
+        assert lookup.status_code == 200, lookup.text
+        payload = lookup.json()
+        assert payload["total"] >= 1
+        assert any(
+            item["specimen_euid"] == material["specimen_euid"]
+            and item["container_euid"] == material["container_euid"]
+            for item in payload["items"]
+        )
+
+
+def test_external_specimen_lookup_finds_queue_ready_material_by_order_refs():
+    app.dependency_overrides[require_external_token_auth] = _external_rw_user
+
+    with TestClient(app) as client:
+        material, atlas_context = _create_material_and_queue(client)
+        lookup = client.get(
+            "/api/v1/external/specimens/by-reference",
+            params={
+                "atlas_tenant_id": atlas_context["atlas_tenant_id"],
+                "order_euid": atlas_context["atlas_order_euid"],
+                "order_test_euid": atlas_context["atlas_order_test_euid"],
             },
         )
         assert lookup.status_code == 200, lookup.text

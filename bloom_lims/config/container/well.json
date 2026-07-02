@@ -36,7 +36,7 @@
       },
       "singleton": "0",
       "valid_content": [
-        "content/.*"
+        "material/.*"
       ],
       "valid_parents": [
         "container/plate/fixed-plate.*?/.*?"

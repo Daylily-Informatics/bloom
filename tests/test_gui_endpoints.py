@@ -451,11 +451,11 @@ class TestQueueEndpoints:
     """Tests for queue management endpoints."""
 
     def test_queue_details_returns_html(self, client):
-        """Test queue details returns HTML."""
+        """Bare queue details route renders the retired queue GUI explanation."""
         response = client.get("/queue_details")
-        assert response.status_code in [200, 422, 500]
-        if response.status_code == 200:
-            assert "text/html" in response.headers["content-type"]
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "Queue Runtime Hidden" in response.text
 
     def test_set_filter(self, client):
         """Test set filter endpoint works."""
@@ -653,11 +653,11 @@ class TestModernUIElements:
         assert "footer" in content.lower()
 
     def test_pages_have_breadcrumb_or_header(self, client):
-        """Queue runtime remains visible from the dashboard after assay-page retirement."""
+        """Dashboard renders normal modern page header after queue GUI retirement."""
         response = client.get("/")
         assert response.status_code == 200
         content = response.text
-        assert "page-header" in content or "Queue Runtime" in content
+        assert "page-header" in content
 
 
 class TestModernAPIs:
@@ -960,7 +960,7 @@ class TestModernUINavigation:
 
         # Check for main navigation links
         assert 'href="/"' in content  # Dashboard
-        assert 'href="/queue_details"' in content
+        assert 'href="/queue_details"' not in content
         assert 'href="/assays"' not in content
         assert 'href="/workflows"' not in content
         assert 'href="/admin"' in content
@@ -1789,7 +1789,8 @@ class TestQueueEndpointsV2:
     def test_queue_details_no_params(self, client):
         """Test queue details without parameters."""
         response = client.get("/queue_details")
-        assert response.status_code in [200, 302, 307, 400, 422, 500]
+        assert response.status_code == 200
+        assert "Queue Runtime Hidden" in response.text
 
     def test_queue_details_with_euid(self, client):
         """Test queue details with EUID."""

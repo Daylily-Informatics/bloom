@@ -489,15 +489,23 @@ def test_seed_templates_split_core_and_client_ownership(
         lambda _dirs, strict: (
             [
                 {
-                    "category": "SYS",
-                    "type": "system",
-                    "subtype": "config",
+                    "category": "actor",
+                    "type": "user",
+                    "subtype": "system",
                     "version": "1.0",
                     "instance_prefix": "SYS",
                     "_source_file": str(core_template_path),
                 },
                 {
-                    "category": "BAC",
+                    "category": "reference",
+                    "type": "external_identifier",
+                    "subtype": "tapdb_object",
+                    "version": "1.0",
+                    "instance_prefix": "XRF",
+                    "_source_file": str(core_template_path),
+                },
+                {
+                    "category": "action",
                     "type": "beta_lab",
                     "subtype": "claim_material_in_queue",
                     "version": "1.0",
@@ -520,6 +528,7 @@ def test_seed_templates_split_core_and_client_ownership(
                     "templates": [
                         template["instance_prefix"] for template in templates
                     ],
+                    "overwrite": kwargs["overwrite"],
                 },
             )
         )
@@ -579,12 +588,22 @@ def test_seed_templates_split_core_and_client_ownership(
     db_commands._seed_tapdb_templates("target", overwrite=False)
 
     assert events == [
-        ("seed", {"owner_repo_name": "daylily-tapdb", "templates": ["SYS"]}),
+        (
+            "seed",
+            {
+                "owner_repo_name": "daylily-tapdb",
+                "templates": ["SYS", "XRF"],
+                "overwrite": True,
+            },
+        ),
         (
             "claim",
             {"owner_repo_name": "bloom", "domain_code": "Z", "templates": ["BAC"]},
         ),
-        ("seed", {"owner_repo_name": "bloom", "templates": ["BAC"]}),
+        (
+            "seed",
+            {"owner_repo_name": "bloom", "templates": ["BAC"], "overwrite": False},
+        ),
     ]
     assert any("tapdb_identity_prefix_config" in sql for sql in fake_session.executed)
     assert fake_session.committed == 1
@@ -596,31 +615,42 @@ def test_seed_templates_split_core_and_client_ownership(
 def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None:
     templates = [
         {
-            "category": "BRM",
+            "category": "data",
             "type": "sequencing_run",
             "subtype": "illumina",
             "version": "1.0",
+            "instance_prefix": "BRM",
             "json_addl": {"semantic_category": "data"},
         },
         {
-            "category": "BRN",
+            "category": "data",
             "type": "sequencing_run",
             "subtype": "ont",
             "version": "1.0",
+            "instance_prefix": "BRN",
             "json_addl": {"semantic_category": "data"},
         },
         {
-            "category": "BCT",
+            "category": "material",
+            "type": "sample",
+            "subtype": "gdna",
+            "version": "1.0",
+            "instance_prefix": "BNG",
+            "json_addl": {"semantic_category": "content"},
+        },
+        {
+            "category": "container",
             "type": "tube",
             "subtype": "tube-generic-10ml",
             "version": "1.0",
+            "instance_prefix": "BCN",
             "json_addl": {"semantic_category": "container"},
         },
     ]
     current = SimpleNamespace(
         domain_code="Z",
         type="sequencing_run",
-        category="BRM",
+        category="data",
         subtype="illumina",
         version="1.0",
         is_deleted=False,
@@ -657,6 +687,16 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
         bstatus="active",
         json_addl={"semantic_category": "container"},
     )
+    material_content = SimpleNamespace(
+        domain_code="Z",
+        type="sample",
+        category="material",
+        subtype="gdna",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "content"},
+    )
     non_data = SimpleNamespace(
         domain_code="Z",
         type="sequencing_run",
@@ -687,6 +727,7 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
                 stale_prefix,
                 stale_subtype,
                 stale_container_prefix,
+                material_content,
                 non_data,
             ]
 
@@ -709,13 +750,15 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
         domain_code="Z",
     )
 
-    assert retired == 2
+    assert retired == 3
     assert current.is_deleted is False
     assert stale_prefix.is_deleted is True
     assert stale_prefix.bstatus == "retired"
-    assert stale_subtype.is_deleted is False
+    assert stale_subtype.is_deleted is True
+    assert stale_subtype.bstatus == "retired"
     assert stale_container_prefix.is_deleted is True
     assert stale_container_prefix.bstatus == "retired"
+    assert material_content.is_deleted is False
     assert non_data.is_deleted is False
     assert fake_session.flushed == 1
 
@@ -753,6 +796,7 @@ def test_claim_client_template_prefixes_ignores_reserved_core_prefixes(
         templates=[
             {"instance_prefix": "SYS"},
             {"instance_prefix": "MSG"},
+            {"instance_prefix": "XRF"},
             {"instance_prefix": "BAC"},
         ],
     )

@@ -1,0 +1,155 @@
+{% extends "modern/base.html" %}
+
+{% block title %}Container Actions - BLOOM{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Container Actions</h1>
+        <p class="page-subtitle">Validate scanned container mappings, then execute an explicit lab action API payload.</p>
+    </div>
+</div>
+
+<div class="grid grid-2 gap-lg">
+    <section class="card">
+        <div class="card-header">
+            <h2>Scan or Upload Rows</h2>
+        </div>
+        <div class="card-body">
+            <label class="form-label" for="container-action-rows">Rows</label>
+            <textarea
+                id="container-action-rows"
+                class="form-control"
+                data-testid="bloom-container-action-rows"
+                rows="10"
+                placeholder="source_euid(.WELL),target_euid|CREATE.category/type/subtype/version,.WELL&#10;Z-BCT-123,CREATE.container/plate/96-well/1.0,A1"
+            ></textarea>
+
+            <div class="grid grid-2 gap-md mt-md">
+                <div>
+                    <label class="form-label" for="container-action-child-name">Created child name</label>
+                    <input id="container-action-child-name" class="form-control" data-testid="bloom-container-action-child-name" placeholder="Extraction plate">
+                </div>
+                <div>
+                    <label class="form-label" for="container-action-content-type">Created child content type</label>
+                    <input id="container-action-content-type" class="form-control" data-testid="bloom-container-action-content-type" placeholder="content/gdna/generic/1.0">
+                </div>
+            </div>
+
+            <div class="lab-actions-controls mt-md">
+                <button class="btn btn-primary" type="button" id="container-action-validate" data-testid="bloom-container-action-validate">
+                    Validate rows
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <h2>Execute Explicit Operation</h2>
+        </div>
+        <div class="card-body">
+            <label class="form-label" for="container-action-operation">Operation type</label>
+            <select id="container-action-operation" class="form-control" data-testid="bloom-container-action-operation">
+                <option value="">Select explicit operation...</option>
+                <option value="extraction_plate">extraction_plate</option>
+                <option value="extraction_qc_plate">extraction_qc_plate</option>
+                <option value="plate_well_data">plate_well_data</option>
+                <option value="seq_library_plate">seq_library_plate</option>
+                <option value="seq_library_pool">seq_library_pool</option>
+                <option value="seq_run_set">seq_run_set</option>
+                <option value="lab_set">lab_set</option>
+                <option value="print_euids">print_euids</option>
+            </select>
+
+            <label class="form-label mt-md" for="container-action-payload">Operation payload JSON</label>
+            <textarea
+                id="container-action-payload"
+                class="form-control code-block"
+                data-testid="bloom-container-action-payload"
+                rows="12"
+                placeholder='{"name":"extraction set","members":["Z-BCT-123"]}'
+            ></textarea>
+
+            <div class="lab-actions-controls mt-md">
+                <button class="btn btn-primary" type="button" id="container-action-execute" data-testid="bloom-container-action-execute">
+                    Execute explicit action
+                </button>
+            </div>
+        </div>
+    </section>
+</div>
+
+<section class="card mt-lg">
+    <div class="card-header">
+        <h2>Validation And Execution Result</h2>
+    </div>
+    <div class="card-body">
+        <div id="container-action-status" class="alert alert-info" data-testid="bloom-container-action-status">Ready.</div>
+        <pre id="container-action-output" class="code-block" data-testid="bloom-container-action-output">{}</pre>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const rowsEl = document.getElementById('container-action-rows');
+  const childNameEl = document.getElementById('container-action-child-name');
+  const contentTypeEl = document.getElementById('container-action-content-type');
+  const operationEl = document.getElementById('container-action-operation');
+  const payloadEl = document.getElementById('container-action-payload');
+  const statusEl = document.getElementById('container-action-status');
+  const outputEl = document.getElementById('container-action-output');
+
+  function basePayload() {
+    return {
+      rows: rowsEl.value,
+      child_name: childNameEl.value || null,
+      child_content_type: contentTypeEl.value || null,
+    };
+  }
+
+  function show(status, body, ok = true) {
+    statusEl.textContent = status;
+    statusEl.className = ok ? 'alert alert-success' : 'alert alert-error';
+    outputEl.textContent = JSON.stringify(body, null, 2);
+  }
+
+  async function postJson(url, body) {
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      show(`Failed: ${response.status}`, payload, false);
+      return null;
+    }
+    show('Success', payload, true);
+    return payload;
+  }
+
+  document.getElementById('container-action-validate').addEventListener('click', () => {
+    postJson('/api/v1/container-actions/validate', basePayload());
+  });
+
+  document.getElementById('container-action-execute').addEventListener('click', () => {
+    let operationPayload = {};
+    try {
+      operationPayload = payloadEl.value.trim() ? JSON.parse(payloadEl.value) : {};
+    } catch (error) {
+      show(`Invalid JSON: ${error}`, {}, false);
+      return;
+    }
+    postJson('/api/v1/container-actions/execute', {
+      ...basePayload(),
+      operation_type: operationEl.value || null,
+      operation_payload: operationPayload,
+    });
+  });
+})();
+</script>
+{% endblock %}

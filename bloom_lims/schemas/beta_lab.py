@@ -26,6 +26,12 @@ CanonicalQueueName = Literal[
 class AtlasFulfillmentItemReference(BaseModel):
     atlas_test_euid: str
     atlas_test_fulfillment_item_euid: str
+    atlas_order_test_euid: str | None = None
+
+
+class AtlasFulfillmentSlotReference(BaseModel):
+    atlas_order_test_euid: str
+    atlas_fulfillment_slot_euid: str
 
 
 class AtlasCollectionEventSnapshot(BaseModel):
@@ -42,6 +48,9 @@ class AtlasCollectionEventSnapshot(BaseModel):
 
 class AtlasFulfillmentContext(BaseModel):
     atlas_tenant_id: str
+    atlas_order_euid: str | None = None
+    atlas_order_test_euid: str | None = None
+    atlas_order_test_euids: list[str] = Field(default_factory=list)
     atlas_trf_euid: str | None = None
     atlas_test_euid: str | None = None
     atlas_test_euids: list[str] = Field(default_factory=list)
@@ -52,6 +61,7 @@ class AtlasFulfillmentContext(BaseModel):
     atlas_collection_event_euid: str | None = None
     collection_event_snapshot: AtlasCollectionEventSnapshot | None = None
     fulfillment_items: list[AtlasFulfillmentItemReference] = Field(default_factory=list)
+    fulfillment_slots: list[AtlasFulfillmentSlotReference] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_context(self) -> "AtlasFulfillmentContext":
@@ -59,6 +69,44 @@ class AtlasFulfillmentContext(BaseModel):
             raise ValueError("atlas_tenant_id is required")
         if self.atlas_trf_euid is not None and not self.atlas_trf_euid.strip():
             raise ValueError("atlas_trf_euid must not be empty when provided")
+        if self.atlas_order_euid is not None and not self.atlas_order_euid.strip():
+            raise ValueError("atlas_order_euid must not be empty when provided")
+        if (
+            self.atlas_order_test_euid is not None
+            and not self.atlas_order_test_euid.strip()
+        ):
+            raise ValueError("atlas_order_test_euid must not be empty when provided")
+        normalized_order_test_euids: list[str] = []
+        seen_order_test_euids: set[str] = set()
+        primary_order_test_euid = str(self.atlas_order_test_euid or "").strip()
+        if primary_order_test_euid:
+            seen_order_test_euids.add(primary_order_test_euid)
+            normalized_order_test_euids.append(primary_order_test_euid)
+        for item in self.atlas_order_test_euids:
+            clean_item = str(item or "").strip()
+            if not clean_item or clean_item in seen_order_test_euids:
+                continue
+            seen_order_test_euids.add(clean_item)
+            normalized_order_test_euids.append(clean_item)
+        for item in self.fulfillment_slots:
+            clean_item = str(item.atlas_order_test_euid or "").strip()
+            if clean_item and clean_item not in seen_order_test_euids:
+                seen_order_test_euids.add(clean_item)
+                normalized_order_test_euids.append(clean_item)
+        for item in self.fulfillment_items:
+            clean_item = str(item.atlas_order_test_euid or "").strip()
+            if clean_item and clean_item not in seen_order_test_euids:
+                seen_order_test_euids.add(clean_item)
+                normalized_order_test_euids.append(clean_item)
+        self.atlas_order_test_euids = normalized_order_test_euids
+        if self.atlas_order_test_euid is None and self.atlas_order_test_euids:
+            self.atlas_order_test_euid = self.atlas_order_test_euids[0]
+        if (
+            self.atlas_order_test_euid or self.atlas_order_test_euids
+        ) and not self.atlas_order_euid:
+            raise ValueError(
+                "atlas_order_euid is required when atlas_order_test_euid is provided"
+            )
         if self.atlas_test_euid is not None and not self.atlas_test_euid.strip():
             raise ValueError("atlas_test_euid must not be empty when provided")
         normalized_test_euids: list[str] = []
@@ -128,7 +176,7 @@ class AtlasFulfillmentContext(BaseModel):
 
 
 class BetaAcceptedMaterialCreateRequest(BaseModel):
-    specimen_template_code: str = Field(default="content/specimen/blood-whole/1.0")
+    specimen_template_code: str = Field(default="material/specimen/blood-whole/1.0")
     specimen_name: str | None = None
     container_euid: str | None = None
     container_template_code: str = Field(default="container/tube/tube-generic-10ml/1.0")
@@ -348,9 +396,9 @@ class BetaRunArtifactInput(BaseModel):
 class BetaRunCreateRequest(BaseModel):
     pool_euid: str
     platform: Literal["ILMN", "ONT", "Ultima", "PacBio", "CompleteGenomics"]
-    run_subtype: Literal[
-        "illumina", "ont", "ultima", "pacbio", "completegenomics"
-    ] = Field(default="illumina")
+    run_subtype: Literal["illumina", "ont", "ultima", "pacbio", "completegenomics"] = (
+        Field(default="illumina")
+    )
     flowcell_id: str
     run_name: str | None = None
     status: Literal["started", "completed"] = Field(default="completed")

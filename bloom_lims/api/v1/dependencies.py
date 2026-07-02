@@ -11,6 +11,11 @@ from daylily_auth_cognito.runtime.verifier import CognitoTokenVerifier
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from bloom_lims.ai_agent_access import (
+    AgentTokenError,
+    is_ai_agent_token,
+    validate_ai_agent_request,
+)
 from bloom_lims.auth.rbac import (
     API_ACCESS_GROUP,
     ENABLE_ATLAS_API_GROUP,
@@ -286,6 +291,8 @@ async def get_api_user(
                 if isinstance(user_data.get("groups"), list)
                 else []
             )
+        request.state.auth_mode = "session"
+        request.state.authorized_by_email = user_data.get("email", "session-user")
         return _make_user(
             email=user_data.get("email", "session-user"),
             user_id=user_data.get("sub") or user_data.get("user_id"),
@@ -296,11 +303,38 @@ async def get_api_user(
 
     if credentials:
         token = (credentials.credentials or "").strip()
+        if is_ai_agent_token(token):
+            try:
+                grant = validate_ai_agent_request(request, token)
+            except AgentTokenError as exc:
+                raise HTTPException(
+                    status_code=exc.status_code,
+                    detail=exc.detail,
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if exc.status_code == 401
+                    else None,
+                ) from exc
+            return APIUser(
+                email=grant.issued_by_email or "ai-agent@kahlo.local",
+                user_id=f"ai-agent:{grant.agent_id}",
+                roles=[Role.READ_ONLY.value],
+                groups=["ai-agent"],
+                permissions=sorted(effective_permissions([Role.READ_ONLY.value])),
+                auth_source="ai_agent_token",
+                is_service_account=True,
+                token_scope="read:search",
+                token_id=grant.token_id,
+            )
         if token.startswith(TOKEN_PREFIX):
-            return _authenticate_bloom_token(request, token)
+            user = _authenticate_bloom_token(request, token)
+            request.state.auth_mode = user.auth_source
+            request.state.authorized_by_email = user.email
+            return user
         if _cognito_get_user is not None:
             try:
                 claims = _cognito_get_user(credentials)
+                request.state.auth_mode = "cognito"
+                request.state.authorized_by_email = claims.get("email", "token-user")
                 return _make_user(
                     email=claims.get("email", "token-user"),
                     user_id=claims.get("sub"),

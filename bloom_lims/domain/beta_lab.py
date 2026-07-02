@@ -60,10 +60,10 @@ class BetaLabService(
     REL_MATERIAL_CONSUMPTION = "beta_material_consumption"
     REL_USED_INSTRUMENT = "beta_used_instrument"
     REL_USED_REAGENT = "beta_used_reagent"
-    POOL_TEMPLATE_CODE = "content/pool/sequencing-library/1.0"
+    POOL_TEMPLATE_CODE = "material/pool/sequencing-library/1.0"
     POOL_CONTAINER_TEMPLATE_CODE = "container/tube/tube-generic-10ml/1.0"
     LIBRARY_PREP_OUTPUT_TEMPLATE_CODE = "data/operation/library-prep/1.0"
-    LIBRARY_MATERIAL_TEMPLATE_CODE = "content/sample/sequencing-library/1.0"
+    LIBRARY_MATERIAL_TEMPLATE_CODE = "material/sample/sequencing-library/1.0"
     SEQUENCING_RUN_TEMPLATE_BY_SUBTYPE = {
         "illumina": "data/sequencing_run/illumina/1.0",
         "ont": "data/sequencing_run/ont/1.0",
@@ -73,8 +73,8 @@ class BetaLabService(
     }
     LIBRARY_PLATE_TEMPLATE_CODE = "container/plate/sequencing-library-plate-96/1.0"
     EXTRACTION_TEMPLATE_BY_TYPE = {
-        "cfdna": "content/sample/cfdna/1.0",
-        "gdna": "content/sample/gdna/1.0",
+        "cfdna": "material/sample/cfdna/1.0",
+        "gdna": "material/sample/gdna/1.0",
     }
     LIB_PREP_QUEUE_BY_PLATFORM = {
         "ILMN": "ilmn_lib_prep",

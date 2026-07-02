@@ -17,7 +17,7 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
     assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
     assert "uv sync --frozen --no-dev" in dockerfile
     assert "USER lsmc" in dockerfile
-    assert "python\", \"-m\", \"bloom_lims.container_entry" in dockerfile
+    assert 'python", "-m", "bloom_lims.container_entry' in dockerfile
     assert ":latest" not in dockerfile
     assert "conda" not in dockerfile.lower()
     assert "tmux" not in entrypoint
@@ -25,7 +25,9 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
     assert "${BLOOM_CONFIG_PATH:?BLOOM_CONFIG_PATH is required}" in entrypoint
 
 
-def test_container_entry_requires_absolute_config_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_container_entry_requires_absolute_config_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BLOOM_CONFIG_PATH", "relative.yaml")
 
     with pytest.raises(RuntimeError, match="must be an absolute path"):
@@ -41,13 +43,9 @@ def test_container_entry_runs_foreground_http_server(
     monkeypatch.setenv("HOST", "127.0.0.1")
     monkeypatch.setenv("PORT", "8912")
 
-    with (
-        patch("bloom_lims.container_entry._initialize_cli_runtime") as init_runtime,
-        patch("bloom_lims.container_entry._start_server") as start,
-    ):
+    with patch("bloom_lims.container_entry._start_server") as start:
         container_entry.main()
 
-    init_runtime.assert_called_once_with(config_path)
     assert start.call_args.kwargs == {
         "port": 8912,
         "host": "127.0.0.1",

@@ -48,7 +48,7 @@ class _BetaLabMaterialsMixin:
             node_role="accepted_container",
             expected_fanout=[
                 self._graph_expected_fanout_entry(
-                    relationship_types=["contains"],
+                    relationship_types=["HOLDS_MATERIAL"],
                     max_child_count=1,
                     reason="accepted specimen container holds one accepted beta material",
                 ),
@@ -76,7 +76,7 @@ class _BetaLabMaterialsMixin:
                     relationship_types=[
                         "beta_extraction_output",
                         "beta_extraction_run_input",
-                        "contains",
+                        "HOLDS_MATERIAL",
                     ],
                     max_child_count=3,
                     reason="accepted specimen feeds one extraction path in the ILMN proband beta",

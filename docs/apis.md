@@ -287,7 +287,7 @@ curl -k https://localhost:8912/api/v1/external/specimens \
   -H "Idempotency-Key: atlas-specimen-001" \
   -H "Content-Type: application/json" \
   -d '{
-    "specimen_template_code": "content/specimen/blood-whole/1.0",
+    "specimen_template_code": "material/specimen/blood-whole/1.0",
     "specimen_name": "specimen-demo",
     "status": "active",
     "container_template_code": "container/tube/tube-generic-10ml/1.0",
@@ -360,6 +360,30 @@ assignments, and can capture operator start time, sequencing end time, and an
 instrument EUID.
 
 This is a real mounted surface with substantial tests, but its route naming and placement clearly mark it as beta/integration-specific rather than the most conservative public contract.
+
+### Lab Actions Surface
+
+`/api/v1/lab-actions` is the current Bloom-owned temporary wet-lab action surface. It uses TapDB generic instances and lineage records and does not drive queue execution.
+
+The detailed operator/API runbook is [`lab_actions.md`](lab_actions.md). It is the source to update when production rollout steps, template requirements, or action-flow semantics change.
+
+Current routes:
+
+- `POST /api/v1/lab-actions/extraction-plates`: create or fill extraction plates from incoming filled tube EUIDs, create gDNA contents, and link tube/content/well/material provenance.
+- `POST /api/v1/lab-actions/extraction-qc-plates`: create or fill extraction QC plates from extraction wells and attach QC data records.
+- `POST /api/v1/lab-actions/seq-library-plates`: create sequencing-library plates from filled extraction wells or directed mappings.
+- `POST /api/v1/lab-actions/seq-library-pools`: create or fill sequencing-library pool tubes from tube, well, content, or existing pool inputs.
+- `POST /api/v1/lab-actions/seq-runs`: create sequencing run sets with pool, instrument/operator/reagent metadata, flowcell barcode, platform, and status.
+- `POST /api/v1/lab-actions/sets`: create generic lab/run sets for batches, reagents, instruments, operators, or external members.
+- `GET /api/v1/lab-actions/sets/{set_euid}`: read the stored set metadata and members.
+- `POST /api/v1/lab-actions/sets/{set_euid}/members`: append internal Bloom EUID members or external member identifiers.
+- `POST /api/v1/lab-actions/plate-well-data`: attach structured data records to plate wells or well contents.
+- `POST /api/v1/lab-actions/spreadsheet-import`: dry-run or execute `.csv`/`.xlsx` uploads for explicit lab-action sheet shapes.
+- `GET /api/v1/lab-actions/seq-runs/{set_euid}/samplesheet`: download ILMN sample sheets. Non-ILMN platforms fail explicitly until file formats are specified.
+- `GET /api/v1/lab-actions/plates/{plate_euid}/mapping.csv`: export one-degree parent/child plate mapping CSV.
+- `POST /api/v1/lab-actions/print-euids`: dispatch EUID barcode print requests through Zebra Day.
+
+The generic set template for these flows is `set/run-set/generic/1.01`.
 
 ## Tokens And Admin APIs
 

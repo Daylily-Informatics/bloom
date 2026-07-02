@@ -48,7 +48,7 @@ from bloom_lims.template_identity import template_semantic_category
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
 console = Console()
 
-_TAPDB_CORE_TEMPLATE_PREFIXES = {"SYS", "MSG"}
+_TAPDB_CORE_TEMPLATE_PREFIXES = {"ADT", "EDG", "GSE", "GVR", "MSG", "SYS", "TPX", "XRF"}
 _IDENTITY_PREFIXES: dict[str, str] = {
     "generic_template": GENERIC_TEMPLATE_PREFIX,
     "generic_instance_lineage": GENERIC_INSTANCE_LINEAGE_PREFIX,
@@ -299,7 +299,7 @@ def _seed_tapdb_templates(
             seed_templates(
                 bdb.session,
                 core_templates,
-                overwrite=overwrite,
+                overwrite=True,
                 core_config_dir=core_config_dir,
                 domain_code=ctx.domain_code,
                 owner_repo_name="daylily-tapdb",
@@ -383,7 +383,26 @@ def _retire_obsolete_template_variants(
     domain_code: str,
 ) -> int:
     current = _active_template_categories_by_semantic_key(templates)
-    if not current:
+    current_semantic_types = {
+        (
+            str((template.get("json_addl") or {}).get("semantic_category") or "")
+            .strip()
+            .lower(),
+            str(template.get("type") or "").strip(),
+        )
+        for template in templates
+        if isinstance(template.get("json_addl"), dict)
+        and str(
+            (template.get("json_addl") or {}).get("semantic_category") or ""
+        ).strip()
+        and str(template.get("type") or "").strip()
+    }
+    current_prefixes = {
+        str(template.get("instance_prefix") or "").strip().upper()
+        for template in templates
+        if str(template.get("instance_prefix") or "").strip()
+    }
+    if not current and not current_prefixes:
         return 0
 
     rows = (
@@ -405,9 +424,18 @@ def _retire_obsolete_template_variants(
                 str(row.version or "").strip(),
             )
             expected_category = current.get(key)
-            if expected_category is None:
-                continue
             actual_category = str(row.category or "").strip().upper()
+            if actual_category in current_prefixes:
+                row.is_deleted = True
+                row.bstatus = "retired"
+                retired += 1
+                continue
+            if expected_category is None:
+                if (key[0], key[1]) in current_semantic_types:
+                    row.is_deleted = True
+                    row.bstatus = "retired"
+                    retired += 1
+                continue
             if actual_category == expected_category:
                 continue
             row.is_deleted = True

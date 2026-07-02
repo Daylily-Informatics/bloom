@@ -38,9 +38,9 @@ _USER_SELECT_SQL = """
         END AS is_active
     FROM generic_instance gi
     WHERE gi.polymorphic_discriminator = 'actor_instance'
-      AND gi.category = 'SYS'
-      AND gi.type = 'actor'
-      AND gi.subtype = 'system_user'
+      AND gi.category = 'actor'
+      AND gi.type = 'user'
+      AND gi.subtype = 'system'
       AND COALESCE(gi.is_deleted, FALSE) = FALSE
 """
 
@@ -56,7 +56,7 @@ def _normalize_stored_role(
     role_value: Any, *, default: str | None = None
 ) -> str | None:
     def _coerce(value: Any) -> str | None:
-        candidate = str(value or "").strip()
+        candidate = str(value or "").strip().upper()
         if not candidate:
             return None
         values = normalize_roles([candidate])
@@ -179,9 +179,9 @@ def set_user_role(session: Session, identifier: str | int, role: str) -> bool:
                     ),
                     modified_dt = NOW()
                 WHERE gi.polymorphic_discriminator = 'actor_instance'
-                  AND gi.category = 'SYS'
-                  AND gi.type = 'actor'
-                  AND gi.subtype = 'system_user'
+                  AND gi.category = 'actor'
+                  AND gi.type = 'user'
+                  AND gi.subtype = 'system'
                   AND COALESCE(gi.is_deleted, FALSE) = FALSE
                   AND gi.uid = :uid
                 RETURNING gi.uid
@@ -204,9 +204,9 @@ def set_user_role(session: Session, identifier: str | int, role: str) -> bool:
                 ),
                 modified_dt = NOW()
             WHERE gi.polymorphic_discriminator = 'actor_instance'
-              AND gi.category = 'SYS'
-              AND gi.type = 'actor'
-              AND gi.subtype = 'system_user'
+              AND gi.category = 'actor'
+              AND gi.type = 'user'
+              AND gi.subtype = 'system'
               AND COALESCE(gi.is_deleted, FALSE) = FALSE
               AND (
                     lower(COALESCE(gi.json_addl->>'login_identifier', '')) = :identifier

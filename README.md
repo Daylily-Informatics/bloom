@@ -1,399 +1,136 @@
-# BLOOM
+<div align="center">
+<pre>
+██████╗ ██╗      ██████╗  ██████╗ ███╗   ███╗
+██╔══██╗██║     ██╔═══██╗██╔═══██╗████╗ ████║
+██████╔╝██║     ██║   ██║██║   ██║██╔████╔██║
+██╔══██╗██║     ██║   ██║██║   ██║██║╚██╔╝██║
+██████╔╝███████╗╚██████╔╝╚██████╔╝██║ ╚═╝ ██║
+╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚═╝
+</pre>
+<p><strong>Internal material, container, lineage, and lab-action graph service.</strong></p>
+<p>
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#api">API</a> ·
+  <a href="#gui">GUI</a> ·
+  <a href="docs/lab_actions.md">Lab actions</a> ·
+  <a href="#testing-info">Tests</a>
+</p>
+</div>
 
-BLOOM is the material-state service in the Dayhoff lab-software bundle. It tracks the primitives that other systems build from: containers, specimens, samples, reagents, equipment, lineage edges, queue/runtime state, and the external references that tie those records back to the rest of a lab ecosystem. Bloom is intentionally not a soup-to-nuts LIMS. It does not own order intake, portal UX, identity lifecycle, artifact byte storage, or deployment orchestration. It owns the durable answer to questions like "what exists?", "where is it?", "what did it come from?", and "what instance of Bloom is serving that answer?"
+## Overview
 
-In practice that makes Bloom a foundation service. Atlas can accession and coordinate intake, Dewey can register and search artifacts, Ursa can provide adjacent service logic, Zebra Day can handle label printing, daycog can manage shared Cognito, and Dayhoff can deploy the stack, but Bloom remains the place where material primitives and lineage become first-class, queryable state.
+Bloom is the LSMC internal material and container graph service. It owns laboratory containers, materials/content, equipment, lineage, recursive template creation, search, and graph views. Atlas owns orders and customer-facing accession context; Bloom owns the physical/material execution graph.
 
-Bloom's Cognito integration now follows the `daylily-auth-cognito` 2.0 split: browser sessions live in `browser.session`, Hosted UI helpers live in `browser.oauth` and `browser.google`, bearer verification lives in `runtime.verifier` and `runtime.m2m`, and Cognito lifecycle stays in `daycog` via `admin.*`. Service runtime code should not import `daylily_auth_cognito.cli`.
+Current Dayhoff pin: `8.0.0`. Current TapDB dependency: `daylily-tapdb @ ...@9.0.10`.
 
-## Bloom In The Dayhoff Ecology
+Bloom is internal-only in Dayhoff exposure policy. It must be reachable only through approved LSMC networks and Dayhoff-generated service credentials.
 
-```mermaid
-flowchart LR
-    classDef control fill:#efe8d8,stroke:#7c5a00,color:#1a1a1a,stroke-width:1.5px;
-    classDef service fill:#e4f1ee,stroke:#0f6b5b,color:#10221d,stroke-width:1.5px;
-    classDef core fill:#f8ddd2,stroke:#aa4d24,color:#25130d,stroke-width:2px;
-    classDef data fill:#e7ebfb,stroke:#3758b5,color:#111a35,stroke-width:1.5px;
+TapDB template identity is semantic. Categories are names like `container`, `material`, `data`, `equipment`, `set`, and `workflow`; prefixes such as `BC*`, `BN*`, `BD*`, `BR*`, and `BG*` are issuance and governance labels only. Existing historical objects keep their already minted EUIDs, but new and active template definitions must not use a Meridian/EUID prefix as the category name.
 
-    subgraph Control["Control Plane And Shared Runtime"]
-        Dayhoff["Dayhoff<br/>deploys and locates services"]
-        daycog["daycog / daylily-auth-cognito<br/>shared Cognito lifecycle"]
-        TapDB["TapDB<br/>namespaced runtime and admin surface"]
-    end
+## What It Does
 
-    subgraph Services["LIS Ecology"]
-        Atlas["Atlas<br/>orders, intake, accession context"]
-        Bloom["Bloom<br/>material primitives and lineage"]
-        Dewey["Dewey<br/>artifact registration and retrieval"]
-        Ursa["Ursa<br/>adjacent service logic"]
-        Zebra["Zebra Day<br/>label printing"]
-    end
+- Owns Bloom containers, materials/content, equipment, recursive templates, lineages, search, and graph views.
+- Exposes `/lab-actions` and `/api/v1/lab-actions/*` for extraction plate, sequencing-library plate, pool-tube, and sequencing-run setup.
+- Mounts TapDB at `/tapdb` for generic object, template, lineage, audit, graph, and external-link inspection.
+- Provides health and observability surfaces for Kahlo and Dayhoff deployment verification.
 
-    Dayhoff --> Atlas
-    Dayhoff --> Bloom
-    Dayhoff --> Dewey
-    Dayhoff --> Ursa
-    Dayhoff --> Zebra
-    daycog --> Bloom
-    TapDB --> Bloom
-    Atlas --> Bloom
-    Bloom --> Dewey
-    Bloom --> Zebra
-    Bloom --> Atlas
-
-    class Dayhoff,daycog,TapDB control
-    class Atlas,Dewey,Ursa,Zebra service
-    class Bloom core
-```
-
-## What Bloom Owns
-
-- Material primitives: container, content, specimen, sample, reagent, subject, equipment, template-backed instances.
-- Material relationships: parent/child lineage, containment, graph traversal, and operator-visible provenance.
-- Queue/runtime state for the current queue-centric beta surface.
-- Integration-facing material references: Atlas reference binding, Atlas status event push, Dewey artifact registration calls, Zebra Day printer preferences, carrier tracking lookups.
-
-## What Bloom Does Not Own
-
-- End-to-end order or requisition lifecycle. Atlas owns that side of the ecology.
-- Artifact bytes and downstream analysis products. Dewey and the analysis stack own those surfaces.
-- Shared identity lifecycle. Cognito and `daycog` own pool and app-client lifecycle.
-- Deployment orchestration and service discovery. Dayhoff owns that control plane.
-
-## Architecture, Stack, And Philosophy
-
-Bloom is a FastAPI service with a mounted GUI and a mounted TapDB admin sub-application. The runtime is configured through deployment-scoped YAML and TapDB namespace config rather than ad hoc shell state. Persistence and object identity are TapDB-backed. Browser authentication is Cognito-hosted-UI based through `daylily-auth-cognito`. The GUI is mostly server-rendered Jinja templates with a modern operations surface, while graph exploration is powered by a Cytoscape-based client under `static/js/graph.js`.
-
-The design philosophy is narrower than a classic monolith:
-
-- Keep Bloom authoritative for material state and lineage, not for every lab concern.
-- Prefer deployment-scoped, reproducible runtime config over hidden workstation state.
-- Expose stable, EUID-centered HTTP contracts instead of leaking internal UUIDs.
-- Let other Dayhoff services call Bloom for state and provenance instead of copying that state.
-- Treat older workflow/workset surfaces as history. The supported product surface is queue-centric.
-
-```mermaid
-flowchart TB
-    classDef edge fill:#eef4e1,stroke:#597b2b,color:#18220f,stroke-width:1.5px;
-    classDef app fill:#dbe9f8,stroke:#2b5d90,color:#102030,stroke-width:1.5px;
-    classDef store fill:#fce9d7,stroke:#a85d17,color:#271406,stroke-width:1.5px;
-    classDef ext fill:#efe2f8,stroke:#7140a2,color:#1d1030,stroke-width:1.5px;
-
-    Browser["Browser Session"]
-    TokenClient["Service Or CLI Token Client"]
-    App["Bloom FastAPI App<br/>health, GUI, API v1, observability"]
-    GUI["GUI Routes<br/>dashboard, search, queue, admin, graph"]
-    API["Versioned API<br/>/api/v1/*"]
-    Admin["Mounted TapDB Admin<br/>/admin/tapdb"]
-    Domain["Domain Modules<br/>containers, content, queue, external specimens"]
-    Config["Bloom YAML + TapDB Namespace Config"]
-    Store["TapDB / PostgreSQL Runtime"]
-    AtlasExt["Atlas"]
-    DeweyExt["Dewey"]
-    ZebraExt["Zebra Day"]
-
-    Browser --> GUI
-    TokenClient --> API
-    GUI --> App
-    API --> App
-    App --> Admin
-    App --> Domain
-    Config --> App
-    Domain --> Store
-    Domain --> AtlasExt
-    Domain --> DeweyExt
-    Domain --> ZebraExt
-
-    class Browser,TokenClient edge
-    class App,GUI,API,Admin,Domain,Config app
-    class Store store
-    class AtlasExt,DeweyExt,ZebraExt ext
-```
-
-## Functional Model
-
-Bloom is best understood as a graph of material facts:
-
-- Templates define what kinds of things can exist.
-- Object creation mints EUID-backed instances from those templates.
-- Containers and content can be linked so Bloom knows what is in what.
-- Lineage edges record derivation and movement.
-- Queue/runtime objects describe the current operator-facing beta execution surface.
-- External references bind Bloom records to Atlas and other systems without giving those systems direct ownership of Bloom state.
+## How It Works
 
 ```mermaid
 flowchart LR
-    classDef state fill:#e9f7f1,stroke:#267a55,color:#10261c,stroke-width:1.5px;
-    classDef ref fill:#fce7da,stroke:#b05a21,color:#2a1407,stroke-width:1.5px;
-
-    T["Template"] --> C["Container Instance"]
-    T --> S["Specimen / Sample / Reagent"]
-    C -->|"contains"| S
-    S -->|"lineage"| D["Derived Material"]
-    D -->|"queue/runtime"| Q["Execution Queue Item"]
-    D -->|"external refs"| A["Atlas Context"]
-    D -->|"artifact pointer"| F["Dewey Artifact"]
-
-    class T,C,S,D,Q state
-    class A,F ref
+    Tube["Incoming tube + content"] --> Extraction["Extraction plate + gDNA"]
+    Extraction --> Library["Sequencing-library plate"]
+    Library --> Pool["Pool tube + pool content"]
+    Pool --> RunSet["Sequencing run set"]
+    RunSet --> OWY["Samplesheet for OWY/Kahlo traceability"]
 ```
 
-## Quick Start
+Bloom models physical/material execution. Atlas owns orders and customer accession context; Dewey owns durable artifact identity; Ursa owns analysis trigger/job records.
 
-Bloom's supported repo entrypoint is the activation script:
+## Quickstart
 
 ```bash
+cd /Users/jmajor/projects/mega_dayhoff/repos_work/bloom
 source ./activate <deploy-name>
-```
-
-For a first local bring-up:
-
-```bash
-source ./activate bringup
-bloom config init
+bloom --help
+bloom config init --help
 bloom db build --target local
-bloom config status
-bloom config doctor
 bloom server start --port 8912
-curl -k https://127.0.0.1:8912/readyz
 ```
 
-Bloom's primary config files are deployment-scoped:
+Runtime config, service config, TapDB config, and registry paths must be passed explicitly. Do not rely on deployment-name guessing or `~/.config` fallback discovery.
 
-- Bloom YAML: `~/.config/bloom-<deploy-name>/bloom-config-<deploy-name>.yaml`
-- TapDB runtime config: `~/.config/tapdb/bloom/bloom-<deploy-name>/tapdb-config.yaml`
-- Default local upload directory: `~/.config/tapdb/bloom/bloom-<deploy-name>/<tapdb-env>/uploads`
+## CLI Interface
 
-Use Bloom's CLI first:
+The primary CLI is `bloom`. It covers config initialization, DB/bootstrap tasks, service startup, object/template workflows, and operational helpers.
 
-- `bloom config ...` for service config inspection and repair.
-- `bloom db ...` for runtime/bootstrap actions delegated to TapDB.
-- `bloom server ...` for lifecycle.
-- `tapdb ...` only when Bloom explicitly delegates low-level DB/runtime config.
-- `daycog ...` only when Bloom explicitly delegates shared Cognito lifecycle.
+Bloom can delegate low-level storage lifecycle to `tapdb` and shared Cognito lifecycle to `daycog` only where the Bloom CLI or docs explicitly say so.
 
-See [docs/how-tos.md](docs/how-tos.md) for complete setup, auth, and troubleshooting recipes.
+Common command families:
 
-## API Surface Summary
+| Family | Purpose |
+|---|---|
+| `bloom config ...` | Materialize explicit deployment-scoped service config. |
+| `bloom db ...` | Build or verify Bloom-owned local database state through supported paths. |
+| `bloom server ...` | Start the FastAPI service with explicit generated config. |
+| `bloom objects/templates/lineage ...` | Work with Bloom-owned containers, materials, templates, and lineages where exposed by the CLI. |
+| `bloom tokens/admin ...` | Manage supported internal/admin auth surfaces without printing secrets. |
 
-The supported versioned API lives under `/api/v1`. Core route groups include:
+For normal user/admin behavior, the CLI, API, and GUI are alternate surfaces over the same Bloom object, template, lineage, and auth capabilities. A feature should not be CLI-only, API-only, or GUI-only unless the docs say why.
 
-- object and template management: `/api/v1/objects`, `/api/v1/containers`, `/api/v1/content`, `/api/v1/templates`, `/api/v1/object-creation`
-- identity and token introspection: `/api/v1/auth`, `/api/v1/user-tokens`, `/api/v1/admin/groups`, `/api/v1/admin/user-tokens`
-- graph and search: `/api/v1/lineages`, `/api/v1/graph`, `/api/v1/search/v2`
-- operator/runtime: `/api/v1/execution`, `/api/v1/batch`, `/api/v1/tasks`, `/api/v1/stats`, `/api/v1/tracking`
-- integration-specific: `/api/v1/external/specimens`, `/api/v1/external/atlas`, `/api/v1/external/atlas/beta`
+## GUI
 
-Two design points matter:
+Bloom exposes a FastAPI/Jinja GUI for internal operators. Current surfaces include dashboard/home, object search and details, container/content/equipment operations, graph views, auth/profile flows, the `/lab-actions` wet-lab action wizard, and the mounted TapDB GUI at `/tapdb` when configured by Dayhoff.
 
-- Public API payloads are EUID-centered. The tests explicitly check that internal UUIDs do not leak back out on key object surfaces.
-- Bloom does not currently expose a general event bus. "Messaging" in current code means synchronous HTTP APIs plus targeted integration hooks, such as Atlas status-event push and best-effort Bloom-to-Atlas webhook delivery.
+`/lab-actions` is the temporary operator flow for mapping incoming biospecimen tubes to extraction plates, extraction QC plates, sequencing-library plates, pool tubes, generic lab/run sets, per-well associated data, and sequencing run sets. It also accepts `.csv` and `.xlsx` spreadsheet uploads for the same API-backed actions. GUI actions should not have behavior that is unavailable through the API.
 
-Example: unified search v2
+See [`docs/lab_actions.md`](docs/lab_actions.md) for the template matrix, lineage contract, API examples, GUI flow, and production rollout checklist for this surface.
+
+Every human-visible EUID should link to the canonical TapDB object page at `/tapdb/object/{euid}` unless Bloom owns a more specific detail page; service-specific pages should still link back to canonical TapDB details.
+
+## API
+
+The primary API is under `/api/v1/*`. Current route families include objects, containers, content, equipment, execution queue, batch operations, templates, subjects, lineages, stats, search, object creation, lab actions, user tokens, admin auth, external specimens, Atlas integration, beta lab integration, and graph APIs.
+
+The lab-action route family includes:
+
+- `POST /api/v1/lab-actions/extraction-plates`
+- `POST /api/v1/lab-actions/extraction-qc-plates`
+- `POST /api/v1/lab-actions/seq-library-plates`
+- `POST /api/v1/lab-actions/seq-library-pools`
+- `POST /api/v1/lab-actions/seq-runs`
+- `POST /api/v1/lab-actions/sets`
+- `GET /api/v1/lab-actions/sets/{set_euid}`
+- `POST /api/v1/lab-actions/sets/{set_euid}/members`
+- `POST /api/v1/lab-actions/plate-well-data`
+- `POST /api/v1/lab-actions/spreadsheet-import`
+- `GET /api/v1/lab-actions/seq-runs/{set_euid}/samplesheet`
+- `GET /api/v1/lab-actions/plates/{plate_euid}/mapping.csv`
+- `POST /api/v1/lab-actions/print-euids`
+
+The generic run-set template is `set/run-set/generic/1.01`. It is used for sequencing-run sets and other temporary Bloom-owned sets of internal or external EUIDs.
+
+Health and observability routes include `/healthz`, `/readyz`, `/health`, `/obs_services`, `/api_health`, `/endpoint_health`, `/db_health`, `/my_health`, and `/auth_health` when configured for Dayhoff observability.
+
+## Testing Info
+
+Focused checks:
 
 ```bash
-curl -k https://localhost:8912/api/v1/search/v2/query \
-  -H "Authorization: Bearer <blm-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "test",
-    "record_types": ["instance", "template"],
-    "page": 1,
-    "page_size": 25
-  }'
+python -m pytest tests -q
+python -m pytest tests/test_lsmc_ui_skin_system_contract.py -q
 ```
 
-Example: external specimen create with Atlas references
+Deployed browser evidence should target `https://bloom.<deploy>.dev.lsmc.bio` and include the dashboard, object search/detail, TapDB mount, graph, and auth redirect surfaces. Current `jemdev5` deployment evidence is linked from Dayhoff `docs/plans/20260618T132900Z_jemdev5_dayhoff_7067_live_deploy_ledger.md`.
 
-```bash
-curl -k https://localhost:8912/api/v1/external/specimens \
-  -H "Authorization: Bearer <blm-token>" \
-  -H "Idempotency-Key: specimen-create-001" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "specimen_template_code": "content/specimen/blood-whole/1.0",
-    "specimen_name": "specimen-demo",
-    "status": "active",
-    "container_template_code": "container/tube/tube-generic-10ml/1.0",
-    "properties": {"source": "atlas-contract-test"},
-    "atlas_refs": {
-      "order_euid": "ORD-123",
-      "patient_id": "PAT-123",
-      "kit_barcode": "KIT-123"
-    }
-  }'
-```
+## Technical Details, History, And Linkouts
 
-Deep dive: [docs/apis.md](docs/apis.md)
+- [`docs/apis.md`](docs/apis.md): API details.
+- [`docs/gui.md`](docs/gui.md): GUI routes and screenshots when current.
+- [`docs/lab_actions.md`](docs/lab_actions.md): extraction/QC/library/pooling/set/sequencing-run action flow, spreadsheet upload schemas, template matrix, and production rollout checklist.
+- [`docs/architecture.md`](docs/architecture.md): domain model and runtime boundaries.
+- [`docs/becoming_a_discoverable_service.md`](docs/becoming_a_discoverable_service.md): Dayhoff/Kahlo observability contract.
+- [`docs/plans/`](docs/plans/): active ledgers.
+- [`docs/old_docs/`](docs/old_docs/): historical material only.
 
-## Prefix Taxonomy
-
-Bloom EUID prefixes are governed display labels for operators and downstream
-records. Prefixes are governance and display labels only; they do not drive
-behavior, authorization, routing, template lookup, or workflow dispatch. Code
-should use explicit template codes and semantic properties for behavior.
-
-| Family | Meaning |
-| --- | --- |
-| `BC*` | Containers |
-| `BN*` | Contents, materials, and reagents |
-| `BD*` | Data and evidence objects |
-| `BR*` | Runs and executions |
-| `BG*` | Generic helpers and external-object mappings |
-
-Concrete template kinds use three-letter prefixes. Two-letter prefixes are
-generic class reserves only: `BC`, `BN`, `BD`, `BR`, and `BG`. New Bloom-owned
-prefixes must not contain `I`, `L`, `O`, or `U`, and explicit numeric EUID
-input must not use leading zeros.
-
-Current concrete wet-lab prefixes:
-
-| Template kind | Category | Prefix |
-| --- | --- | --- |
-| tube container | `container` | `BCT` |
-| plate container | `container` | `BCP` |
-| well container | `container` | `BCW` |
-| bottle container | `container` | `BCB` |
-| flowcell container | `container` | `BCF` |
-| flowcell lane container | `container` | `BCE` |
-| rack, box, or storage container | `container` | `BCR` |
-| blood specimen/content | `content` | `BNB` |
-| buccal specimen content | `content` | `BNS` |
-| saliva specimen content | `content` | `BNA` |
-| gDNA content | `content` | `BNG` |
-| cfDNA content | `content` | `BNC` |
-| sequencing library content | `content` | `BNQ` |
-| sequencing library pool content | `content` | `BNP` |
-| generic reagent content | `content` | `BNR` |
-| sequencing index reagent content | `content` | `BNX` |
-| control material content | `content` | `BNK` |
-| gDNA quantification data | `data` | `BDQ` |
-| extraction run evidence/data | `data` | `BDX` |
-| extraction QC run evidence/data | `data` | `BDY` |
-| library prep run evidence/data | `data` | `BDP` |
-| pooling run evidence/data | `data` | `BDN` |
-| library-index assignment data | `data` | `BDA` |
-| transfer execution data | `data` | `BDT` |
-| Illumina sequencing run | `run` | `BRM` |
-| ONT sequencing run | `run` | `BRN` |
-| Ultima sequencing run | `run` | `BRT` |
-| PacBio sequencing run | `run` | `BRP` |
-| Complete Genomics sequencing run | `run` | `BRC` |
-| external object mapping | `generic` | `BGX` |
-
-Invalid historical proposals are explicitly replaced: `BCL` becomes `BCE`,
-`BRI` becomes `BRM`, `BRO` becomes `BRN`, `BRU` becomes `BRT`, `BNL` becomes
-`BNQ`, and `BDL` becomes `BDP`. Existing historical objects keep their already minted EUIDs; template prefix changes only affect future object creation.
-
-## GUI Overview
-
-Bloom's GUI is an operator and developer surface, not just a demo shell. The main current routes are:
-
-- `/`: dashboard
-- `/search`: unified search
-- `/queue_details`: queue runtime view
-- `/equipment_overview`: equipment inventory
-- `/reagent_overview`: reagent inventory
-- `/create_object`: object creation wizard
-- `/create_from_template`: template-driven instance creation
-- `/admin`: admin, token, observability, and anomaly pages
-- `/dindex2`: graph explorer
-
-The role model is simple:
-
-- `READ_ONLY`: can inspect data and manage own tokens.
-- `READ_WRITE`: can mutate standard Bloom records and runtime actions.
-- `ADMIN`: can use admin pages, admin token issuance, mounted TapDB admin, and graph mutation helpers.
-
-Group codes are orthogonal to that role ladder. In current code they are primarily feature gates for specific integrations and tokenized access, especially `API_ACCESS`, `ENABLE_ATLAS_API`, and `ENABLE_URSA_API`.
-
-Deep dive: [docs/gui.md](docs/gui.md)
-
-## Security And Auth
-
-Bloom uses YAML-first Cognito configuration for normal startup. If required TapDB or Cognito config is missing, startup validation fails fast. Browser auth uses `daylily-auth-cognito` Hosted UI session helpers and stores a normalized principal in the session rather than raw OAuth tokens. API access uses bearer tokens with Bloom-side RBAC and token-scope privilege caps.
-
-Security-relevant current behavior:
-
-- GUI auth is Cognito-backed and configured from Bloom YAML.
-- External integration routes require token auth and, for Atlas/Ursa surfaces, specific service groups in addition to general permissions.
-- Mounted TapDB admin at `/admin/tapdb` is Bloom-admin-gated; it does not run an independent TapDB login flow when mounted.
-- Outbound Bloom-to-Atlas event delivery is HMAC-signed and fail-open.
-
-For local tests and some unit test suites, auth bypass flags still exist in code. Those are test/dev escape hatches, not the supported operational path.
-
-## Testing
-
-Current repository facts:
-
-- `tests/` currently contains 60 `test_*.py` files.
-- `pyproject.toml` sets the coverage gate to `fail_under = 39`.
-- Playwright support is installed, but the checked-in E2E suite is intentionally narrow today.
-
-The current committed Playwright coverage is limited to browser login/logout round trips:
-
-- [tests/e2e/README.md](tests/e2e/README.md)
-- [tests/e2e/test_auth_e2e.py](tests/e2e/test_auth_e2e.py)
-
-Those E2E tests verify:
-
-- a Cognito-backed login returns the user to `/`
-- logout lands on `/login` or the Cognito Hosted UI logout/login pages
-- a protected route redirects back through the auth flow after logout
-
-There are no checked-in rich Playwright report bundles or curated screenshot sets in the repo today, so the code and test files are the authoritative reference.
-
-## Contributing
-
-Start from a feature branch, activate the repo-managed environment, and prefer Bloom's supported CLI path while working:
-
-```bash
-source ./activate <deploy-name>
-git switch -c codex/<short-topic>
-bloom config doctor
-pytest --no-cov tests/test_execution_queue_api.py -q
-ruff check bloom_lims tests
-```
-
-When you are touching runtime behavior, update docs and examples to match the actual Bloom CLI. Older references in historical docs, activation banners, or service-catalog metadata may still mention retired commands like `bloom db init`; the current CLI help is authoritative.
-
-## Docs Navigation
-
-- [docs/architecture.md](docs/architecture.md): implementation structure, runtime layers, persistence, and integration boundaries
-- [docs/apis.md](docs/apis.md): route groups, auth model, request/response examples, and messaging boundaries
-- [docs/gui.md](docs/gui.md): screens, roles, browser auth flow, and graph/admin behavior
-- [docs/how-tos.md](docs/how-tos.md): practical setup, config, test, and troubleshooting recipes
-- [docs/becoming_a_discoverable_service.md](docs/becoming_a_discoverable_service.md): how Bloom fits Dayhoff's service catalog and deployment-scoped discovery model
-- [docs/old_docs/README.md](docs/old_docs/README.md): historical background and retired planning material
-
-## Recommended Historical Reading
-
-These are worth reading for background, but they are not the current contract. Current code and the docs in this README's navigation section win when they disagree.
-
-- [docs/old_docs/README.md](docs/old_docs/README.md): the best map of what is archival versus still conceptually useful.
-- [docs/old_docs/material_transfer_algebra_and_execution_envelope_constitution.md](docs/old_docs/material_transfer_algebra_and_execution_envelope_constitution.md): the strongest articulation of Bloom's material-primitive worldview.
-- [docs/old_docs/ATLAS_BLOOM_CONTRACT_TESTS.md](docs/old_docs/ATLAS_BLOOM_CONTRACT_TESTS.md): good historical framing for Atlas-to-Bloom contract expectations.
-- [docs/old_docs/tapdb_mount_completion_report.md](docs/old_docs/tapdb_mount_completion_report.md): useful context for why TapDB admin is embedded inside Bloom.
-- [docs/old_docs/bloom_final_completion_report.md](docs/old_docs/bloom_final_completion_report.md): explains the queue-centric shift and the retirement of older workflow/workset product surfaces.
-- [docs/old_docs/SEARCH_V2.md](docs/old_docs/SEARCH_V2.md): background on the unified search direction that the current code now implements under `/api/v1/search/v2`.
-
-## Glossary
-
-- **Bloom**: the service in this repo; authoritative for material primitives, lineage, and related queue/runtime state.
-- **Dayhoff**: the deployment control plane that pins repos, activates them, starts services, and checks readiness.
-- **TapDB**: the shared runtime/database layer Bloom delegates to for namespaced config, DB lifecycle, and the mounted admin app.
-- **daycog / daylily-auth-cognito**: the shared Cognito library and CLI Bloom uses for browser auth and shared pool/app lifecycle.
-- **Atlas**: the order, intake, and accession-oriented service that exchanges external references and status information with Bloom.
-- **Dewey**: the artifact-oriented service Bloom calls when it needs to register or refer to analysis/storage outputs.
-- **Ursa**: an adjacent Dayhoff service with its own integration gate in Bloom's RBAC/group model.
-- **Zebra Day**: the label-printing service Bloom uses for printer discovery and print-job submission.
-- **material primitive**: a lowest-level material record Bloom treats as first-class state, such as a specimen, sample, reagent, or container-backed material instance.
-- **lineage**: the directed parent/child relationship graph that explains derivation, transfer, or containment history.
-- **queue runtime**: the queue-centric beta execution surface Bloom exposes for current operator workflows.
-- **deployment-scoped config**: config whose file path and runtime identity include the deploy name, such as `~/.config/bloom-<deploy>/...`.
-- **template pack**: the collection of template-backed definitions that describe which object categories, types, and subtypes may be created.
-- **instance**: a concrete EUID-backed object created from a template or direct object-creation path.
-- **workset / workflow**: older Bloom concepts that still exist historically in-repo but are not mounted as supported product API/GUI surfaces today.
-- **Hosted UI**: Cognito's browser-facing login/logout flow used by Bloom's GUI session path.
-- **discoverable service**: a service that follows Dayhoff's activation, bootstrap, start, and readiness conventions so the deployment bundle can locate and run it consistently.
- 
+Current Bloom language should use Container and Material separation. Order, OrderTest, SubjectRef, AccessionCase, and fulfillment semantics are Atlas-owned or cross-service references, not Bloom-owned order lifecycle objects.

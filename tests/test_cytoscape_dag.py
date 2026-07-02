@@ -13,12 +13,12 @@ Test Coverage:
     - Graph data structure validation
 """
 
-import pytest
-import json
 import os
-from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from bloom_lims.gui.routes.graph import _build_dag_filename
 
@@ -33,9 +33,7 @@ class TestDAGDataStructure:
                 "nodes": [
                     {"data": {"id": "CX1", "euid": "CX1", "obj_type": "container"}}
                 ],
-                "edges": [
-                    {"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}
-                ]
+                "edges": [{"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}],
             }
         }
         assert "elements" in valid_dag
@@ -45,8 +43,15 @@ class TestDAGDataStructure:
     def test_node_required_fields(self):
         """Test that nodes have required fields for Cytoscape rendering."""
         required_fields = ["id", "euid", "obj_type"]
-        node = {"data": {"id": "CX123", "euid": "CX123", "obj_type": "container",
-                        "name": "Test", "color": "#8B00FF"}}
+        node = {
+            "data": {
+                "id": "CX123",
+                "euid": "CX123",
+                "obj_type": "container",
+                "name": "Test",
+                "color": "#8B00FF",
+            }
+        }
 
         for field in required_fields:
             assert field in node["data"], f"Missing required field: {field}"
@@ -54,9 +59,15 @@ class TestDAGDataStructure:
     def test_edge_required_fields(self):
         """Test that edges have required fields."""
         required_fields = ["source", "target", "id"]
-        edge = {"data": {"source": "CX1", "target": "CX2", "id": "LX1", 
-                        "relationship_type": "generic"}}
-        
+        edge = {
+            "data": {
+                "source": "CX1",
+                "target": "CX2",
+                "id": "LX1",
+                "relationship_type": "generic",
+            }
+        }
+
         for field in required_fields:
             assert field in edge["data"], f"Missing required field: {field}"
 
@@ -97,23 +108,23 @@ class TestCycleDetection:
         """Helper function implementing cycle detection algorithm."""
         if source == target:
             return True
-        
+
         # Build adjacency list
         graph = {}
         for src, tgt in existing_edges:
             if src not in graph:
                 graph[src] = []
             graph[src].append(tgt)
-        
+
         # Add proposed edge temporarily
         if source not in graph:
             graph[source] = []
         graph[source].append(target)
-        
+
         # DFS to detect cycle from target to source
         visited = set()
         stack = [target]
-        
+
         while stack:
             current = stack.pop()
             if current == source:
@@ -123,7 +134,7 @@ class TestCycleDetection:
                 for neighbor in graph.get(current, []):
                     if neighbor not in visited:
                         stack.append(neighbor)
-        
+
         return False
 
 
@@ -375,7 +386,7 @@ class TestGraphManipulation:
                     {"data": {"id": "CX1"}},
                     {"data": {"id": "CX2"}},
                 ],
-                "edges": []
+                "edges": [],
             }
         }
         new_edge = {"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}
@@ -392,20 +403,18 @@ class TestGraphManipulation:
                     {"data": {"id": "CX1"}},
                     {"data": {"id": "CX2"}},
                 ],
-                "edges": [
-                    {"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}
-                ]
+                "edges": [{"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}],
             }
         }
 
         # Remove node CX1
         node_to_remove = "CX1"
         graph["elements"]["nodes"] = [
-            n for n in graph["elements"]["nodes"]
-            if n["data"]["id"] != node_to_remove
+            n for n in graph["elements"]["nodes"] if n["data"]["id"] != node_to_remove
         ]
         graph["elements"]["edges"] = [
-            e for e in graph["elements"]["edges"]
+            e
+            for e in graph["elements"]["edges"]
             if e["data"]["source"] != node_to_remove
             and e["data"]["target"] != node_to_remove
         ]
@@ -488,7 +497,7 @@ class TestDAGAPIEndpoints:
 
     def test_get_dagv2_returns_empty_when_file_missing(self, mock_request):
         """Test get_dagv2 returns empty structure when file doesn't exist."""
-        with patch('os.path.exists', return_value=False):
+        with patch("os.path.exists", return_value=False):
             # Simulating the endpoint behavior
             dag_fn = mock_request.session["user_data"]["dag_fnv2"]
             dag_data = {"elements": {"nodes": [], "edges": []}}
@@ -511,10 +520,7 @@ class TestDAGAPIEndpoints:
 
     def test_add_new_edge_request_structure(self):
         """Test add_new_edge endpoint request structure."""
-        request_data = {
-            "parent_euid": "CX1",
-            "child_euid": "CX2"
-        }
+        request_data = {"parent_euid": "CX1", "child_euid": "CX2"}
         assert "parent_euid" in request_data
         assert "child_euid" in request_data
 
@@ -530,19 +536,19 @@ class TestGraphDataValidation:
                     {"data": {"id": "CX1"}},
                     {"data": {"id": "CX2"}},
                 ],
-                "edges": [
-                    {"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}
-                ]
+                "edges": [{"data": {"source": "CX1", "target": "CX2", "id": "LX1"}}],
             }
         }
 
         node_ids = {n["data"]["id"] for n in graph["elements"]["nodes"]}
 
         for edge in graph["elements"]["edges"]:
-            assert edge["data"]["source"] in node_ids, \
+            assert edge["data"]["source"] in node_ids, (
                 f"Edge source {edge['data']['source']} not in nodes"
-            assert edge["data"]["target"] in node_ids, \
+            )
+            assert edge["data"]["target"] in node_ids, (
                 f"Edge target {edge['data']['target']} not in nodes"
+            )
 
     def test_no_duplicate_node_ids(self):
         """Test that there are no duplicate node IDs."""
@@ -568,8 +574,9 @@ class TestGraphDataValidation:
     def test_valid_euid_format_in_nodes(self):
         """Test that node EUIDs follow valid format."""
         import re
+
         # EUID pattern: 2-3 uppercase letters + sequence number (no leading zeros)
-        euid_pattern = re.compile(r'^[A-Z]{2,3}[1-9][0-9]*$')
+        euid_pattern = re.compile(r"^[A-Z]{2,3}[1-9][0-9]*$")
 
         valid_euids = ["CX1", "CX123", "WX1000", "MRX42"]
         invalid_euids = ["CX01", "cx1", "C1", "BCN-123"]
@@ -628,9 +635,13 @@ class TestFuzzySearch:
         """Test fuzzy search with no matches."""
         nodes = [{"id": "CX1", "name": "Test", "obj_type": "container"}]
         query = "xyz"
-        matches = [n for n in nodes if query.lower() in n["id"].lower() or
-                   query.lower() in n["name"].lower() or
-                   query.lower() in n["obj_type"].lower()]
+        matches = [
+            n
+            for n in nodes
+            if query.lower() in n["id"].lower()
+            or query.lower() in n["name"].lower()
+            or query.lower() in n["obj_type"].lower()
+        ]
         assert len(matches) == 0
 
 
@@ -664,6 +675,7 @@ class TestLayoutPersistence:
     def test_layout_expiration_check(self):
         """Test layout expiration logic (7 days)."""
         import time
+
         max_age_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
         current_time = int(time.time() * 1000)
 
@@ -687,7 +699,7 @@ class TestClickDetection:
         clicks = [0, 100, 200]  # timestamps in ms
         click_count = 1
         for i in range(1, len(clicks)):
-            if clicks[i] - clicks[i-1] < click_threshold_ms:
+            if clicks[i] - clicks[i - 1] < click_threshold_ms:
                 click_count += 1
             else:
                 click_count = 1
@@ -702,7 +714,7 @@ class TestClickDetection:
         clicks = [0, 100, 700]  # 700ms gap resets count
         click_count = 1
         for i in range(1, len(clicks)):
-            if clicks[i] - clicks[i-1] < click_threshold_ms:
+            if clicks[i] - clicks[i - 1] < click_threshold_ms:
                 click_count += 1
             else:
                 click_count = 1
@@ -802,3 +814,19 @@ class TestGraphViewerClientContract:
         assert 'runCogsForEuid("children", node.id()' in graph_js
         assert "runNeighborhoodFromNode(node)" in graph_js
         assert "openNodeActionDialog(node.data())" in graph_js
+
+    def test_graph_js_requires_z_for_mouse_wheel_zoom_and_points_arrows_to_parents(
+        self,
+    ):
+        graph_js = Path("static/js/graph.js").read_text(encoding="utf-8")
+        template = Path("templates/modern/dag_explorer.html").read_text(
+            encoding="utf-8"
+        )
+
+        assert "configureCytoscapeInteractions(container);" in graph_js
+        assert 'key === "z"' in graph_js
+        assert '"wheel"' in graph_js
+        assert "stopImmediatePropagation()" in graph_js
+        assert '"source-arrow-shape": "triangle"' in graph_js
+        assert '"target-arrow-shape": "none"' in graph_js
+        assert "Arrowheads point to parent nodes." in template

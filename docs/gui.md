@@ -202,6 +202,26 @@ Bloom currently exposes two creation entrypoints:
 
 Older workflow/workset-centric creation surfaces are not the current product direction.
 
+### Lab Actions
+
+`/lab-actions` exposes the temporary wet-lab action wizard for:
+
+- incoming tube to extraction plate mapping
+- extraction plate to extraction QC plate mapping
+- extraction plate to sequencing-library plate mapping
+- sequencing-library pool tube creation
+- sequencing run set setup
+- generic lab/run set creation and member management
+- plate-well associated data attachment
+- spreadsheet upload for `.csv` and `.xlsx` lab-action sheets
+- plate CSV export
+- ILMN sample-sheet download
+- generic EUID barcode print dispatch
+
+The GUI is backed by `/api/v1/lab-actions/*`. The GUI should remain an operator-friendly wrapper over the API rather than a separate behavior surface.
+
+The detailed runbook is [`lab_actions.md`](lab_actions.md). It includes the exact template matrix, lineage vocabulary, API examples, and production rollout checklist.
+
 ## Playwright Coverage
 
 Current committed browser E2E coverage is deliberately narrow.

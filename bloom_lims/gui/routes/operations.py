@@ -547,13 +547,30 @@ async def update_preference(request: Request, auth: dict = Depends(require_auth)
 
 @router.get("/queue_details", response_class=HTMLResponse)
 async def queue_details(
-    request: Request, queue_euid, page=1, _auth=Depends(require_auth)
+    request: Request,
+    queue_euid: str | None = Query(default=None),
+    euid: str | None = Query(default=None),
+    page=1,
+    _auth=Depends(require_auth),
 ):
+    queue_euid = str(queue_euid or euid or "").strip()
+    user_data = request.session.get("user_data", {})
+    if not queue_euid:
+        template = templates.get_template("modern/queue_retired.html")
+        return HTMLResponse(
+            content=template.render(
+                {
+                    "request": request,
+                    "udat": user_data,
+                    "queue_euid": "",
+                }
+            )
+        )
+
     page = int(page)
     if page < 1:
         page = 1
     per_page = 500
-    user_logged_in = True if "user_data" in request.session else False
     bobdb = BloomObj(BLOOMdb3(app_username=request.session["user_data"]["email"]))
     queue = bobdb.get_by_euid(queue_euid)
     qm = []
@@ -563,8 +580,6 @@ async def queue_details(
     queue_details = queue.sort_by_euid(qm)
     queue_details_list = queue_details[(page - 1) * per_page : page * per_page]
     pagination = {"next": page + 1, "prev": page - 1, "euid": queue_euid}
-    user_data = request.session.get("user_data", {})
-
     queue.items = queue_details_list
 
     template = templates.get_template("modern/queue_details.html")

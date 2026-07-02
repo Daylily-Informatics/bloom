@@ -33,7 +33,9 @@ def _build_fake_repository() -> TapdbAnomalyRepository:
     instances: list[SimpleNamespace] = []
     counter = {"value": 0}
 
-    def create_instance(*, template_code: str, name: str, properties: dict, session) -> SimpleNamespace:
+    def create_instance(
+        *, template_code: str, name: str, properties: dict, session
+    ) -> SimpleNamespace:
         counter["value"] += 1
         category, type_name, subtype, version = template_code.strip("/").split("/")
         instance = SimpleNamespace(
@@ -174,7 +176,9 @@ def test_anomaly_api_lists_and_reads_records(monkeypatch) -> None:
 
 def test_admin_anomalies_views_render(monkeypatch) -> None:
     monkeypatch.setattr(operations, "BLOOMdb3", _StubBloomDB)
-    monkeypatch.setattr(operations, "TapdbAnomalyRepository", lambda _session: _StubRepository())
+    monkeypatch.setattr(
+        operations, "TapdbAnomalyRepository", lambda _session: _StubRepository()
+    )
 
     with TestClient(app, raise_server_exceptions=False) as client:
         listing = client.get("/admin/anomalies")
@@ -213,7 +217,7 @@ def test_anomaly_api_tolerates_malformed_stored_properties(monkeypatch) -> None:
                 }
             },
             created_dt=datetime.now(UTC),
-            category="bloom",
+            category="BAN",
             type="ops",
             subtype="anomaly-record",
             version="1.0",

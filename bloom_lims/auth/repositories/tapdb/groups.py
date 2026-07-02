@@ -22,8 +22,8 @@ from bloom_lims.auth.repositories.tapdb.identity import (
 )
 from bloom_lims.config import get_settings
 
-GROUP_TEMPLATE_CODE = "BBX/auth/user-group/1.0/"
-GROUP_MEMBERSHIP_TEMPLATE_CODE = "BBX/auth/user-group-membership/1.0/"
+GROUP_TEMPLATE_CODE = "auth/user-group/generic/1.0/"
+GROUP_MEMBERSHIP_TEMPLATE_CODE = "auth/user-group-membership/generic/1.0/"
 
 GROUP_PREFIX = "BBX"
 GROUP_MEMBERSHIP_PREFIX = "BBX"

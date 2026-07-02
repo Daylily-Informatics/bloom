@@ -15,29 +15,39 @@ from bloom_lims.app import create_app
 
 def _client() -> TestClient:
     os.environ["BLOOM_TAPDB_MOUNT_ENABLED"] = "1"
-    os.environ["BLOOM_TAPDB_MOUNT_PATH"] = "/admin/tapdb"
+    os.environ["BLOOM_TAPDB_MOUNT_PATH"] = "/tapdb"
     return TestClient(create_app(), raise_server_exceptions=False)
+
+
+def _dummy_tapdb_app() -> FastAPI:
+    app = FastAPI()
+
+    @app.get("/")
+    async def _index():
+        return {"tapdb": "ok"}
+
+    return app
 
 
 def test_mounted_route_exists_under_bloom_app():
     with _client() as client:
-        response = client.get("/admin/tapdb/login", follow_redirects=False)
+        response = client.get("/tapdb/", follow_redirects=False)
         assert response.status_code != 404
 
 
 def test_unauthenticated_request_redirects_to_bloom_login():
     with _client() as client:
-        response = client.get("/admin/tapdb/login", follow_redirects=False)
-        assert response.status_code == 303
-        assert response.headers.get("location") == "/login"
+        response = client.get("/tapdb/", follow_redirects=False)
+        assert response.status_code == 302
+        assert response.headers.get("location") == "/login?next=/tapdb/"
 
         json_response = client.get(
-            "/admin/tapdb/login",
+            "/tapdb/api/search",
             headers={"accept": "application/json"},
             follow_redirects=False,
         )
         assert json_response.status_code == 401
-        assert json_response.json()["detail"] == "Authentication required"
+        assert json_response.json()["detail"] == "host_session_required"
 
 
 def test_non_admin_authenticated_user_is_denied(monkeypatch):
@@ -47,17 +57,13 @@ def test_non_admin_authenticated_user_is_denied(monkeypatch):
         lambda _scope: {"email": "user@example.com", "role": "READ_WRITE"},
     )
     with _client() as client:
-        response = client.get("/admin/tapdb/login", follow_redirects=False)
-        assert response.status_code == 303
-        assert response.headers.get("location") == "/user_home?admin_required=1"
-
         json_response = client.get(
-            "/admin/tapdb/login",
+            "/tapdb/api/admin/readiness",
             headers={"accept": "application/json"},
             follow_redirects=False,
         )
         assert json_response.status_code == 403
-        assert json_response.json()["detail"] == "Admin privileges required"
+        assert json_response.json()["detail"] == "tapdb_gui_admin_required"
 
 
 def test_admin_user_can_access_mounted_surface(monkeypatch):
@@ -66,10 +72,14 @@ def test_admin_user_can_access_mounted_surface(monkeypatch):
         "_resolve_bloom_user_data",
         lambda _scope: {"email": "admin@example.com", "role": "ADMIN"},
     )
+    monkeypatch.setattr(
+        tapdb_mount,
+        "_load_tapdb_admin_app",
+        lambda **_kwargs: _dummy_tapdb_app(),
+    )
     with _client() as client:
-        response = client.get("/admin/tapdb/login", follow_redirects=False)
-        assert response.status_code in {302, 303}
-        assert response.headers.get("location") == "/admin/tapdb/"
+        response = client.get("/tapdb/", follow_redirects=False)
+        assert response.status_code != 404
 
 
 def test_tapdb_local_auth_not_required_in_mounted_mode(monkeypatch):
@@ -78,10 +88,14 @@ def test_tapdb_local_auth_not_required_in_mounted_mode(monkeypatch):
         "_resolve_bloom_user_data",
         lambda _scope: {"email": "admin@example.com", "role": "ADMIN"},
     )
+    monkeypatch.setattr(
+        tapdb_mount,
+        "_load_tapdb_admin_app",
+        lambda **_kwargs: _dummy_tapdb_app(),
+    )
     with _client() as client:
-        response = client.get("/admin/tapdb/login", follow_redirects=False)
-        assert response.status_code in {302, 303}
-        assert response.headers.get("location") == "/admin/tapdb/"
+        response = client.get("/tapdb/", follow_redirects=False)
+        assert response.status_code != 404
 
 
 def test_bloom_single_app_serves_api_and_tapdb_mount(monkeypatch):
@@ -90,9 +104,14 @@ def test_bloom_single_app_serves_api_and_tapdb_mount(monkeypatch):
         "_resolve_bloom_user_data",
         lambda _scope: {"email": "admin@example.com", "role": "ADMIN"},
     )
+    monkeypatch.setattr(
+        tapdb_mount,
+        "_load_tapdb_admin_app",
+        lambda **_kwargs: _dummy_tapdb_app(),
+    )
     with _client() as client:
         api_response = client.get("/api/v1/")
-        tapdb_response = client.get("/admin/tapdb/login", follow_redirects=False)
+        tapdb_response = client.get("/tapdb/", follow_redirects=False)
         assert api_response.status_code == 200
         assert tapdb_response.status_code != 404
 

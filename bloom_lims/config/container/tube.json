@@ -39,7 +39,7 @@
         "name": "10ml glass tube"
       },
       "valid_content": [
-        "content/.*"
+        "material/.*"
       ],
       "valid_parents": []
     }
@@ -84,7 +84,7 @@
         "name": "1.5ml eppi tube"
       },
       "valid_content": [
-        "content/.*"
+        "material/.*"
       ],
       "valid_parents": []
     }
@@ -129,7 +129,7 @@
         "name": "10ml tube generic"
       },
       "valid_content": [
-        "content/.*"
+        "material/.*"
       ],
       "valid_parents": []
     }
@@ -175,7 +175,7 @@
       },
       "singleton": "0",
       "valid_content": [
-        "content/.*"
+        "material/.*"
       ],
       "valid_parents": []
     }

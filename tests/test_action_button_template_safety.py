@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -13,18 +12,31 @@ def _read(path: str) -> str:
 def test_modern_euid_details_uses_data_attribute_action_handler():
     template = _read("templates/modern/euid_details.html")
 
-    assert "onclick=\"showCapturedDataFormFromDataAttributes(this)\"" in template
-    assert "data-action-json=\"{{ action_value | tojson | e }}\"" in template
-    assert "onclick=\"showCapturedDataForm(this, {{ action_value | tojson }}" not in template
+    assert 'onclick="showCapturedDataFormFromDataAttributes(this)"' in template
+    assert 'data-action-json="{{ action_value | tojson | e }}"' in template
+    assert (
+        'onclick="showCapturedDataForm(this, {{ action_value | tojson }}'
+        not in template
+    )
+
+
+def test_modern_euid_details_has_no_toast_only_print_button():
+    template = _read("templates/modern/euid_details.html")
+
+    assert "onclick=\"printLabel('{{ obj.euid }}')\"" not in template
+    assert "Printing label for " not in template
 
 
 def test_modern_workflow_details_uses_data_attribute_action_handler():
     template = _read("templates/modern/workflow_details.html")
 
-    assert "onclick=\"showCapturedDataFormFromDataAttributes(this)\"" in template
-    assert "data-action-json=\"{{ action_value | tojson | e }}\"" in template
-    assert "onclick=\"showCapturedDataForm(this, {{ action_value }}" not in template
-    assert "onclick=\"showCapturedDataForm(this, {{ action_value | tojson }}" not in template
+    assert 'onclick="showCapturedDataFormFromDataAttributes(this)"' in template
+    assert 'data-action-json="{{ action_value | tojson | e }}"' in template
+    assert 'onclick="showCapturedDataForm(this, {{ action_value }}' not in template
+    assert (
+        'onclick="showCapturedDataForm(this, {{ action_value | tojson }}'
+        not in template
+    )
 
 
 def test_action_buttons_uses_ui_schema_fields_array_for_filtering():

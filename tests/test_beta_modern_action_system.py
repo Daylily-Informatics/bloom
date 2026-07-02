@@ -885,9 +885,18 @@ def test_beta_flow_records_modern_action_instances(bdb):
                         "lane": "1",
                         "library_barcode": "IDX-ACT-1",
                         "library_prep_output_euid": lib_output_euid,
+                        "library_material_euid": library_material_euid,
                     }
                 ],
-                "artifacts": [],
+                "artifacts": [
+                    {
+                        "artifact_type": "fastq",
+                        "bucket": "codex-bloom-v0-test",
+                        "filename": "lane1.fastq.gz",
+                        "lane": "1",
+                        "library_barcode": "IDX-ACT-1",
+                    }
+                ],
             },
         )
         assert run.status_code == 200, run.text
@@ -909,28 +918,169 @@ def test_beta_flow_records_modern_action_instances(bdb):
             (ref["system"], ref["root_euid"], ref["relationship_type"]) for ref in refs
         }
 
-    process_ref = atlas_context["fulfillment_items"][0][
+    lineage_cls = bdb.Base.classes.generic_instance_lineage
+
+    def first_child(parent_euid: str, relationship_type: str):
+        parent = instance(parent_euid)
+        lineage = (
+            bdb.session.query(lineage_cls)
+            .filter(
+                lineage_cls.parent_instance_uid == parent.uid,
+                lineage_cls.relationship_type == relationship_type,
+                lineage_cls.is_deleted.is_(False),
+            )
+            .one()
+        )
+        return lineage.child_instance
+
+    artifact_euid = first_child(run_euid, "beta_run_artifact").euid
+    pooling_run_euid = (
+        bdb.session.query(lineage_cls)
+        .filter(
+            lineage_cls.child_instance_uid == instance(pool_euid).uid,
+            lineage_cls.relationship_type == "beta_pooling_run_output",
+            lineage_cls.is_deleted.is_(False),
+        )
+        .one()
+        .parent_instance.euid
+    )
+
+    def v0_edge_tuples():
+        rows = (
+            bdb.session.query(lineage_cls)
+            .filter(lineage_cls.is_deleted.is_(False))
+            .all()
+        )
+        found = set()
+        for row in rows:
+            properties = (row.json_addl or {}).get("properties")
+            if not isinstance(properties, dict):
+                continue
+            metadata = properties.get("v0_edge")
+            if not isinstance(metadata, dict):
+                continue
+            found.add(
+                (
+                    metadata["edge_type"],
+                    metadata["semantic_source"]["euid"],
+                    metadata["semantic_source"]["role"],
+                    metadata["semantic_target"]["euid"],
+                    metadata["semantic_target"]["role"],
+                )
+            )
+        return found
+
+    fulfillment_slot_ref = atlas_context["fulfillment_items"][0][
         "atlas_test_fulfillment_item_euid"
     ]
     test_ref = atlas_context["fulfillment_items"][0]["atlas_test_euid"]
     expected_atlas_refs = {
         ("atlas", atlas_context["atlas_trf_euid"], "received_from_atlas_trf"),
         ("atlas", test_ref, "prepared_for_atlas_test"),
-        ("atlas", process_ref, "fulfills_atlas_test_fulfillment_item"),
+        ("atlas", fulfillment_slot_ref, "fulfills_atlas_test_fulfillment_item"),
     }
     assert expected_atlas_refs.issubset(graph_ref_tuples(specimen_euid))
     assert (
         "atlas",
-        process_ref,
+        fulfillment_slot_ref,
         "fulfills_atlas_test_fulfillment_item",
     ) in graph_ref_tuples(lib_output_euid), _props(instance(lib_output_euid))
     assert (
         "atlas",
-        process_ref,
+        fulfillment_slot_ref,
         "fulfills_atlas_test_fulfillment_item",
     ) in graph_ref_tuples(library_material_euid), _props(
         instance(library_material_euid)
     )
+
+    assert {
+        (
+            "HOLDS_MATERIAL",
+            well_euid,
+            "container",
+            extraction_output_euid,
+            "held_material",
+        ),
+        (
+            "HOLDS_MATERIAL",
+            library_well_euid,
+            "container",
+            library_material_euid,
+            "held_material",
+        ),
+        (
+            "DERIVED_FROM",
+            extraction_output_euid,
+            "derived_material",
+            specimen_euid,
+            "source_material",
+        ),
+        (
+            "DERIVED_FROM",
+            library_material_euid,
+            "derived_material",
+            extraction_output_euid,
+            "source_material",
+        ),
+        (
+            "DERIVED_FROM",
+            pool_euid,
+            "derived_material",
+            library_material_euid,
+            "source_material",
+        ),
+        (
+            "RUN_CONSUMED",
+            extraction_body["extraction_run_euid"],
+            "workflow_run",
+            specimen_euid,
+            "consumed_material",
+        ),
+        (
+            "RUN_PRODUCED",
+            extraction_body["extraction_run_euid"],
+            "workflow_run",
+            extraction_output_euid,
+            "produced_material",
+        ),
+        (
+            "RUN_CONSUMED",
+            pooling_run_euid,
+            "workflow_run",
+            library_material_euid,
+            "consumed_material",
+        ),
+        (
+            "RUN_PRODUCED",
+            pooling_run_euid,
+            "workflow_run",
+            pool_euid,
+            "produced_material",
+        ),
+        ("RUN_CONSUMED", run_euid, "workflow_run", pool_euid, "consumed_material"),
+        (
+            "RUN_CONSUMED",
+            run_euid,
+            "workflow_run",
+            lib_output_euid,
+            "consumed_artifact",
+        ),
+        (
+            "RUN_CONSUMED",
+            run_euid,
+            "workflow_run",
+            library_material_euid,
+            "consumed_material",
+        ),
+        ("RUN_PRODUCED", run_euid, "workflow_run", artifact_euid, "produced_artifact"),
+        (
+            "SLOT_SATISFIED_BY",
+            fulfillment_slot_ref,
+            "fulfillment_slot",
+            library_material_euid,
+            "satisfying_bloom_object",
+        ),
+    }.issubset(v0_edge_tuples())
 
     plate_graph = _props(instance(plate_euid))["graph"]
     well_graph = _props(instance(well_euid))["graph"]
@@ -953,7 +1103,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
     assert pool_fanout[("beta_pool_member",)] == 1
     assert (
         "beta_sequencing_run",
-        "contains",
+        "HOLDS_MATERIAL",
         "executed_on",
         "execution_subject_lease",
         "execution_subject_record",
@@ -962,7 +1112,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
     assert {
         tuple(entry["relationship_types"]): entry["max_child_count"]
         for entry in run_graph["expected_fanout"]
-    } == {("beta_sequenced_library_assignment",): 1, ("beta_run_artifact",): 0}
+    } == {("beta_sequenced_library_assignment",): 1, ("beta_run_artifact",): 1}
 
     subtypes = {
         row.subtype

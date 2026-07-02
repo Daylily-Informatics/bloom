@@ -5,8 +5,10 @@ This keeps `main.py` as a thin entrypoint while preserving `uvicorn main:app`.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 from time import monotonic
 from uuid import uuid4
@@ -38,6 +40,55 @@ from bloom_lims.tapdb_metrics import (
     request_path_var,
     stop_all_writers,
 )
+
+
+def _access_log_payload(
+    *,
+    request,
+    service_id: str,
+    status_code: int,
+    duration_ms: float,
+    route_template: str,
+) -> dict[str, object]:
+    actor = (
+        getattr(request.state, "authorized_by_email", None)
+        or getattr(request.state, "authorizing_human", None)
+        or getattr(request.state, "actor", None)
+    )
+    ai_agent_id = getattr(request.state, "ai_agent_id", None) or getattr(
+        request.state, "agent_id", None
+    )
+    return {
+        "event": "request_completed",
+        "request_id": getattr(request.state, "request_id", ""),
+        "correlation_id": getattr(request.state, "correlation_id", ""),
+        "service_id": service_id,
+        "actor": actor,
+        "ai_agent_id": ai_agent_id,
+        "authorizing_human": getattr(request.state, "authorizing_human", None)
+        or getattr(request.state, "authorized_by_email", None),
+        "ip": request.client.host if request.client else None,
+        "method": request.method,
+        "path": request.url.path,
+        "route": route_template or request.url.path,
+        "route_template": route_template or request.url.path,
+        "status": status_code,
+        "duration_ms": round(duration_ms, 2),
+        "denial_reason": getattr(request.state, "denial_reason", None)
+        or (f"http_{status_code}" if status_code in {401, 403} else None),
+        "auth_mode": getattr(request.state, "auth_mode", None),
+    }
+
+
+def _emit_access_log(payload: dict[str, object], *, level: int = logging.INFO) -> None:
+    message = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    logging.getLogger("lsmc.access").log(
+        level,
+        message,
+        extra=payload,
+    )
+    sys.stdout.write(f"{message}\n")
+    sys.stdout.flush()
 
 
 def _validate_required_config(settings) -> None:
@@ -116,23 +167,49 @@ def create_app() -> FastAPI:
         except Exception:
             route = request.scope.get("route")
             route_template = getattr(route, "path", "")
+            duration_ms = (monotonic() - started) * 1000
             if route_template:
                 app.state.observability.record_http_request(
                     method=request.method,
                     route_template=route_template,
                     status_code=500,
-                    duration_ms=(monotonic() - started) * 1000,
+                    duration_ms=duration_ms,
                 )
+            _emit_access_log(
+                _access_log_payload(
+                    request=request,
+                    service_id="bloom",
+                    status_code=500,
+                    duration_ms=duration_ms,
+                    route_template=route_template,
+                ),
+                level=logging.ERROR,
+            )
             raise
         route = request.scope.get("route")
         route_template = getattr(route, "path", "")
+        duration_ms = (monotonic() - started) * 1000
         if route_template:
             app.state.observability.record_http_request(
                 method=request.method,
                 route_template=route_template,
                 status_code=response.status_code,
-                duration_ms=(monotonic() - started) * 1000,
+                duration_ms=duration_ms,
             )
+        _emit_access_log(
+            _access_log_payload(
+                request=request,
+                service_id="bloom",
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+                route_template=route_template,
+            ),
+            level=logging.ERROR
+            if response.status_code >= 500
+            else logging.WARNING
+            if response.status_code >= 400
+            else logging.INFO,
+        )
         return response
 
     # Request attribution context for TapDB-style DB metrics.
@@ -193,14 +270,9 @@ def create_app() -> FastAPI:
     app.include_router(probe_router)
     app.include_router(observability_router)
     app.include_router(api_v1_router)
-    try:
-        from bloom_lims.gui.router import router as gui_router
-    except ModuleNotFoundError as exc:
-        logging.warning(
-            "Skipping GUI router due to missing optional dependency: %s", exc.name
-        )
-    else:
-        app.include_router(gui_router)
+    from bloom_lims.gui.router import router as gui_router
+
+    app.include_router(gui_router)
 
     register_exception_handlers(app)
     return app

@@ -73,12 +73,20 @@ class _BetaLabStoreMixin:
             child = lineage.child_instance
             if child is None or child.is_deleted:
                 continue
-            if child.uid == specimen.uid and lineage.relationship_type == "contains":
+            if (
+                child.uid == specimen.uid
+                and lineage.relationship_type == "HOLDS_MATERIAL"
+            ):
                 return
-        self.bobj.create_generic_instance_lineage_by_euids(
+        self._attach_bloom_v0_lineage(
             container_euid,
             specimen_euid,
-            relationship_type="contains",
+            relationship_type="HOLDS_MATERIAL",
+            edge_type="HOLDS_MATERIAL",
+            source_euid=container_euid,
+            target_euid=specimen_euid,
+            source_role="container",
+            target_role="held_material",
         )
 
     def _require_plate_well(self, plate, well_name: str):
@@ -318,9 +326,9 @@ class _BetaLabStoreMixin:
                 node_role="fixed_plate_well",
                 expected_fanout=[
                     self._graph_expected_fanout_entry(
-                        relationship_types=["contains"],
+                        relationship_types=["HOLDS_MATERIAL"],
                         max_child_count=1,
-                        reason="plate well contains at most one material",
+                        reason="plate well holds at most one material",
                     )
                 ],
             )

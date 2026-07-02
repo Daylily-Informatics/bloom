@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lsmc-service="bloom" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +8,6 @@
     <link rel="icon" href="/favicon.ico" sizes="any">
     
     <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" 
@@ -63,9 +60,6 @@
             <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
                 <i class="fas fa-home"></i> Dashboard
             </a>
-            <a href="/queue_details" class="{% if '/queue_details' in request.url.path %}active{% endif %}">
-                <i class="fas fa-list-check"></i> Queue Runtime
-            </a>
             <a href="/equipment" class="{% if '/equipment' in request.url.path %}active{% endif %}">
                 <i class="fas fa-microscope"></i> Equipment
             </a>
@@ -74,6 +68,12 @@
             </a>
             <a href="/create_object" class="{% if '/create_object' in request.url.path %}active{% endif %}">
                 <i class="fas fa-plus-circle"></i> Create
+            </a>
+            <a href="/lab-actions" class="{% if '/lab-actions' in request.url.path %}active{% endif %}">
+                <i class="fas fa-route"></i> Lab Actions
+            </a>
+            <a href="/container-actions" class="{% if '/container-actions' in request.url.path %}active{% endif %}">
+                <i class="fas fa-exchange-alt"></i> Container Actions
             </a>
             <div class="nav-dropdown">
                 <a href="#" class="nav-dropdown-toggle {% if '/search' in request.url.path or '/bulk_create' in request.url.path %}active{% endif %}">
@@ -159,6 +159,7 @@
     <!-- BLOOM Modern JS -->
     <script src="/static/modern/js/timezone.js"></script>
     <script src="/static/modern/js/bloom_modern.js"></script>
+    <script src="/static/modern/js/lsmc_ui.js"></script>
 
     <!-- Global configuration -->
     <script>
