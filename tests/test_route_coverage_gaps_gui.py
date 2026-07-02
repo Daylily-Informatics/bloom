@@ -41,9 +41,21 @@ def _warm_session(client: TestClient) -> None:
     assert resp.status_code == 200
 
 
-def _get_any_template_euid(bdb) -> str:
+def _get_bloom_creatable_template_euid(bdb) -> str:
     GT = bdb.Base.classes.generic_template
-    row = bdb.session.query(GT).filter(GT.is_deleted.is_(False)).first()
+    row = (
+        bdb.session.query(GT)
+        .filter(
+            GT.domain_code == "Z",
+            GT.category == "container",
+            GT.type == "tube",
+            GT.subtype == "tube-generic-10ml",
+            GT.version == "1.0",
+            GT.instance_prefix == "BCT",
+            GT.is_deleted.is_(False),
+        )
+        .one_or_none()
+    )
     assert row is not None
     return row.euid
 
@@ -216,7 +228,7 @@ def test_user_audit_logs_renders(client: TestClient) -> None:
 
 def test_create_from_template_executes_handler(client: TestClient, bdb) -> None:
     _warm_session(client)
-    template_euid = _get_any_template_euid(bdb)
+    template_euid = _get_bloom_creatable_template_euid(bdb)
     resp = client.get(
         "/create_from_template", params={"euid": template_euid}, follow_redirects=False
     )
@@ -232,7 +244,7 @@ def test_file_set_urls_and_admin_template_routes_are_removed(
     resp = client.get("/file_set_urls", params={"fs_euid": "BFL-NOT-REAL"})
     assert resp.status_code == 404
 
-    template_euid = _get_any_template_euid(bdb)
+    template_euid = _get_bloom_creatable_template_euid(bdb)
     # Admin template editor was retired.
     resp = client.get("/admin_template", params={"euid": template_euid})
     assert resp.status_code == 404

@@ -172,7 +172,9 @@ class PlateWellDataRecord(BaseModel):
 
     @model_validator(mode="after")
     def validate_target(self) -> "PlateWellDataRecord":
-        if self.well_euid and (self.plate_euid or self.row is not None or self.col is not None):
+        if self.well_euid and (
+            self.plate_euid or self.row is not None or self.col is not None
+        ):
             raise ValueError("provide well_euid or plate_euid with row/col, not both")
         if not self.well_euid:
             if not self.plate_euid or self.row is None or self.col is None:

@@ -177,13 +177,13 @@ async def download_seq_run_sample_sheet(
 ):
     service = _service_for_user(user)
     try:
-        content, filename, media_type = service.sequencing_sample_sheet_download(set_euid)
+        content, filename, media_type = service.sequencing_sample_sheet_download(
+            set_euid
+        )
         return PlainTextResponse(
             content,
             media_type=media_type,
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
-            },
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     except Exception as exc:
         _raise_http(exc)

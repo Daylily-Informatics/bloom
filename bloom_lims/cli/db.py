@@ -383,6 +383,20 @@ def _retire_obsolete_template_variants(
     domain_code: str,
 ) -> int:
     current = _active_template_categories_by_semantic_key(templates)
+    current_semantic_types = {
+        (
+            str((template.get("json_addl") or {}).get("semantic_category") or "")
+            .strip()
+            .lower(),
+            str(template.get("type") or "").strip(),
+        )
+        for template in templates
+        if isinstance(template.get("json_addl"), dict)
+        and str(
+            (template.get("json_addl") or {}).get("semantic_category") or ""
+        ).strip()
+        and str(template.get("type") or "").strip()
+    }
     current_prefixes = {
         str(template.get("instance_prefix") or "").strip().upper()
         for template in templates
@@ -411,18 +425,16 @@ def _retire_obsolete_template_variants(
             )
             expected_category = current.get(key)
             actual_category = str(row.category or "").strip().upper()
-            semantic_category = template_semantic_category(row).strip().upper()
-            if semantic_category and actual_category != semantic_category:
-                row.is_deleted = True
-                row.bstatus = "retired"
-                retired += 1
-                continue
             if actual_category in current_prefixes:
                 row.is_deleted = True
                 row.bstatus = "retired"
                 retired += 1
                 continue
             if expected_category is None:
+                if (key[0], key[1]) in current_semantic_types:
+                    row.is_deleted = True
+                    row.bstatus = "retired"
+                    retired += 1
                 continue
             if actual_category == expected_category:
                 continue

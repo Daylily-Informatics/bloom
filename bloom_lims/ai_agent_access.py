@@ -78,9 +78,13 @@ def _endpoint_id_for_request(method: str, path: str) -> str:
     resolved_method = str(method or "").upper()
     resolved_path = str(path or "").split("?", 1)[0].rstrip("/") or "/"
     for spec in ENDPOINT_CATALOG:
-        if spec.method == resolved_method and _template_matches(spec.path_template, resolved_path):
+        if spec.method == resolved_method and _template_matches(
+            spec.path_template, resolved_path
+        ):
             return spec.endpoint_id
-    raise AgentTokenError("AI-agent token is not authorized for this endpoint", status_code=403)
+    raise AgentTokenError(
+        "AI-agent token is not authorized for this endpoint", status_code=403
+    )
 
 
 def _parse_expiry(value: str) -> datetime:
@@ -95,15 +99,21 @@ def _parse_expiry(value: str) -> datetime:
 
 def _load_grants(path: Path) -> list[dict[str, Any]]:
     if not path.is_absolute():
-        raise AgentTokenError("AI-agent grant store path must be absolute", status_code=500)
+        raise AgentTokenError(
+            "AI-agent grant store path must be absolute", status_code=500
+        )
     if not path.exists():
         raise AgentTokenError("AI-agent grant store is missing", status_code=500)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise AgentTokenError("AI-agent grant store is malformed", status_code=500) from exc
+        raise AgentTokenError(
+            "AI-agent grant store is malformed", status_code=500
+        ) from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("tokens"), list):
-        raise AgentTokenError("AI-agent grant store must contain a tokens list", status_code=500)
+        raise AgentTokenError(
+            "AI-agent grant store must contain a tokens list", status_code=500
+        )
     return [record for record in payload["tokens"] if isinstance(record, dict)]
 
 
@@ -119,7 +129,9 @@ def validate_ai_agent_request(request: Request, token: str) -> ValidatedAgentAcc
     endpoint_id = _endpoint_id_for_request(request.method, request.url.path)
     token_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
     for record in _load_grants(Path(raw_path)):
-        if not secrets.compare_digest(str(record.get("token_hash") or ""), token_digest):
+        if not secrets.compare_digest(
+            str(record.get("token_hash") or ""), token_digest
+        ):
             continue
         if record.get("revoked_at"):
             raise AgentTokenError("AI-agent token has been revoked")
@@ -128,7 +140,9 @@ def validate_ai_agent_request(request: Request, token: str) -> ValidatedAgentAcc
             raise AgentTokenError("AI-agent token has expired")
         endpoint_ids = [str(item) for item in record.get("endpoint_ids") or []]
         if endpoint_id not in endpoint_ids:
-            raise AgentTokenError("AI-agent token is not authorized for this endpoint", status_code=403)
+            raise AgentTokenError(
+                "AI-agent token is not authorized for this endpoint", status_code=403
+            )
         validated = ValidatedAgentAccess(
             token_id=str(record.get("token_id") or ""),
             agent_id=str(record.get("agent_id") or ""),

@@ -130,7 +130,7 @@ class ExecutionQueueService:
             "dispatch_priority": 100,
             "subject_template_codes": [
                 "container/tube/tube-generic-10ml/1.0",
-                "material/specimen/blood-whole/1.0",
+                "content/specimen/blood-whole/1.0",
             ],
             "required_worker_capabilities": ["wetlab.extraction"],
         },
@@ -139,7 +139,7 @@ class ExecutionQueueService:
             "dispatch_priority": 90,
             "subject_template_codes": [
                 "container/tube/tube-generic-10ml/1.0",
-                "material/specimen/blood-whole/1.0",
+                "content/specimen/blood-whole/1.0",
             ],
             "required_worker_capabilities": ["wetlab.extraction"],
         },
@@ -147,8 +147,8 @@ class ExecutionQueueService:
             "display_name": "Post-Extract QC",
             "dispatch_priority": 100,
             "subject_template_codes": [
-                "material/sample/cfdna/1.0",
-                "material/sample/gdna/1.0",
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
             ],
             "required_worker_capabilities": ["wetlab.post_extract_qc"],
         },
@@ -156,8 +156,8 @@ class ExecutionQueueService:
             "display_name": "Illumina Library Prep",
             "dispatch_priority": 100,
             "subject_template_codes": [
-                "material/sample/cfdna/1.0",
-                "material/sample/gdna/1.0",
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
             ],
             "required_worker_capabilities": ["wetlab.library_prep", "platform.ILMN"],
         },
@@ -165,7 +165,7 @@ class ExecutionQueueService:
             "display_name": "Illumina Library QC",
             "dispatch_priority": 100,
             "subject_template_codes": [
-                "material/sample/sequencing-library/1.0",
+                "content/sample/sequencing-library/1.0",
             ],
             "required_worker_capabilities": ["wetlab.library_qc", "platform.ILMN"],
         },
@@ -173,8 +173,8 @@ class ExecutionQueueService:
             "display_name": "ONT Library Prep",
             "dispatch_priority": 100,
             "subject_template_codes": [
-                "material/sample/cfdna/1.0",
-                "material/sample/gdna/1.0",
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
             ],
             "required_worker_capabilities": ["wetlab.library_prep", "platform.ONT"],
         },
@@ -183,7 +183,7 @@ class ExecutionQueueService:
             "dispatch_priority": 100,
             "subject_template_codes": [
                 "data/operation/library-prep/1.0",
-                "material/sample/sequencing-library/1.0",
+                "content/sample/sequencing-library/1.0",
             ],
             "required_worker_capabilities": ["wetlab.pooling", "platform.ILMN"],
         },
@@ -192,28 +192,28 @@ class ExecutionQueueService:
             "dispatch_priority": 100,
             "subject_template_codes": [
                 "data/operation/library-prep/1.0",
-                "material/sample/sequencing-library/1.0",
+                "content/sample/sequencing-library/1.0",
             ],
             "required_worker_capabilities": ["wetlab.pooling", "platform.ONT"],
         },
         "ilmn_start_seq_run": {
             "display_name": "Illumina Start Run",
             "dispatch_priority": 100,
-            "subject_template_codes": ["material/pool/sequencing-library/1.0"],
+            "subject_template_codes": ["content/pool/sequencing-library/1.0"],
             "required_worker_capabilities": ["wetlab.run_start", "platform.ILMN"],
         },
         "ont_start_seq_run": {
             "display_name": "ONT Start Run",
             "dispatch_priority": 100,
-            "subject_template_codes": ["material/pool/sequencing-library/1.0"],
+            "subject_template_codes": ["content/pool/sequencing-library/1.0"],
             "required_worker_capabilities": ["wetlab.run_start", "platform.ONT"],
         },
         "post_extract_exception": {
             "display_name": "Post-Extract QC Exception",
             "dispatch_priority": 10,
             "subject_template_codes": [
-                "material/sample/cfdna/1.0",
-                "material/sample/gdna/1.0",
+                "content/sample/cfdna/1.0",
+                "content/sample/gdna/1.0",
             ],
             "required_worker_capabilities": ["wetlab.exception_review"],
         },
@@ -221,7 +221,7 @@ class ExecutionQueueService:
             "display_name": "Illumina Library QC Exception",
             "dispatch_priority": 10,
             "subject_template_codes": [
-                "material/sample/sequencing-library/1.0",
+                "content/sample/sequencing-library/1.0",
             ],
             "required_worker_capabilities": [
                 "wetlab.exception_review",
@@ -1480,7 +1480,9 @@ class ExecutionQueueService:
         if queue_key:
             return queue_key
         category = instance_semantic_category(instance)
-        parent_relationship = "contains" if category == "container" else "HOLDS_MATERIAL"
+        parent_relationship = (
+            "contains" if category == "container" else "HOLDS_MATERIAL"
+        )
         for lineage in get_child_lineages(instance):
             if lineage.is_deleted or lineage.relationship_type != parent_relationship:
                 continue
@@ -2053,7 +2055,9 @@ class ExecutionQueueService:
         if subject.uid in visible_uids:
             return True
         category = instance_semantic_category(subject)
-        parent_relationship = "contains" if category == "container" else "HOLDS_MATERIAL"
+        parent_relationship = (
+            "contains" if category == "container" else "HOLDS_MATERIAL"
+        )
         for lineage in get_child_lineages(subject):
             if lineage.is_deleted or lineage.relationship_type != parent_relationship:
                 continue

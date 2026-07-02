@@ -10,7 +10,6 @@ from pydantic import ValidationError
 
 from bloom_lims.schemas.beta_lab import BetaRunCreateRequest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

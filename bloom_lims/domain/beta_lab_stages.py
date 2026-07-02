@@ -409,9 +409,7 @@ class _BetaLabStagesMixin:
                 "idempotency_key": idempotency_key or "",
                 "occurred_at": self._timestamp(),
             },
-            template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get(
-                "post_extract_qc_result"
-            ),
+            template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("post_extract_qc_result"),
         )
         if payload.quant_artifact_euid:
             qc_props = self._props(qc_record)

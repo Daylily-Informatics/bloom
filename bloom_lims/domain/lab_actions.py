@@ -237,13 +237,18 @@ class LabActionsService:
                 raise ValueError(f"duplicate destination well: {position}")
             seen_positions.add(position)
         if len(request.assignments) > MAX_EXTRACTION_TUBES:
-            raise ValueError(f"directed extraction accepts at most {MAX_EXTRACTION_TUBES} tubes")
+            raise ValueError(
+                f"directed extraction accepts at most {MAX_EXTRACTION_TUBES} tubes"
+            )
         return request.assignments
 
     def _create_or_get_extraction_plate(self, request: ExtractionPlateRequest):
         if request.plate_euid:
             plate = self._require(request.plate_euid)
-            if instance_semantic_category(plate) != "container" or plate.type != "plate":
+            if (
+                instance_semantic_category(plate) != "container"
+                or plate.type != "plate"
+            ):
                 raise ValueError(f"{request.plate_euid} is not a plate container")
             return plate
         return self._create_by_code(
@@ -303,7 +308,9 @@ class LabActionsService:
         if assignment.source_well_euid:
             return self._require(assignment.source_well_euid)
         if not source_plate_euid:
-            raise ValueError("source_plate_euid is required when assignment uses row/col")
+            raise ValueError(
+                "source_plate_euid is required when assignment uses row/col"
+            )
         return self._well_from_plate_position(
             source_plate_euid, assignment.row, assignment.col
         )
@@ -311,7 +318,10 @@ class LabActionsService:
     def _create_or_get_qc_plate(self, request: ExtractionQcPlateRequest):
         if request.qc_plate_euid:
             plate = self._require(request.qc_plate_euid)
-            if instance_semantic_category(plate) != "container" or plate.type != "plate":
+            if (
+                instance_semantic_category(plate) != "container"
+                or plate.type != "plate"
+            ):
                 raise ValueError(f"{request.qc_plate_euid} is not a plate container")
             return plate, []
         plate = self._create_by_code(
@@ -369,9 +379,7 @@ class LabActionsService:
     ) -> dict[str, Any]:
         run_set = self._require(set_euid)
         props = self._props(run_set)
-        members = list(
-            dict.fromkeys([*props.get("members", []), *request.members])
-        )
+        members = list(dict.fromkeys([*props.get("members", []), *request.members]))
         external_members = list(
             dict.fromkeys(
                 [*props.get("external_members", []), *request.external_members]
@@ -511,13 +519,17 @@ class LabActionsService:
         self.bdb.session.commit()
         sorted_plate_euids = sorted(plate_euids)
         return {
-            "plate_euid": sorted_plate_euids[0] if len(sorted_plate_euids) == 1 else None,
+            "plate_euid": sorted_plate_euids[0]
+            if len(sorted_plate_euids) == 1
+            else None,
             "plate_euids": sorted_plate_euids,
             "run_set_euid": run_set.euid if run_set is not None else None,
             "mappings": mappings,
         }
 
-    def create_extraction_plate(self, request: ExtractionPlateRequest) -> dict[str, Any]:
+    def create_extraction_plate(
+        self, request: ExtractionPlateRequest
+    ) -> dict[str, Any]:
         assignments = self._normalize_assignments(request)
         plate = self._create_or_get_extraction_plate(request)
         wells = self._plate_wells(plate)
@@ -600,7 +612,9 @@ class LabActionsService:
             "mappings": [item.__dict__ for item in mappings],
         }
 
-    def create_seq_library_plate(self, request: SeqLibraryPlateRequest) -> dict[str, Any]:
+    def create_seq_library_plate(
+        self, request: SeqLibraryPlateRequest
+    ) -> dict[str, Any]:
         if request.mode == "plate_1_to_1":
             source_plate = self._require(request.source_plate_euid)
             source_wells = self._plate_wells(source_plate)
@@ -669,7 +683,9 @@ class LabActionsService:
                 source_role="source_material",
                 target_role="derived_material",
             )
-            self._create_lineage(source_well.euid, dest_well.euid, "library_source_well")
+            self._create_lineage(
+                source_well.euid, dest_well.euid, "library_source_well"
+            )
             if assignment.index_euid:
                 index = self._require(assignment.index_euid)
                 self._create_lineage(library.euid, index.euid, "uses_index")
@@ -688,7 +704,10 @@ class LabActionsService:
             requested=request.create_run_set,
             run_set=request.run_set,
             default_name=f"{plate.euid} library set",
-            member_euids=[plate.euid, *[item["library_content_euid"] for item in mappings]],
+            member_euids=[
+                plate.euid,
+                *[item["library_content_euid"] for item in mappings],
+            ],
         )
         self.bdb.session.commit()
         return {
@@ -754,7 +773,9 @@ class LabActionsService:
                 target_role="derived_material",
             )
             if container is not None:
-                self._create_lineage(container.euid, pool_tube.euid, "pooled_from_container")
+                self._create_lineage(
+                    container.euid, pool_tube.euid, "pooled_from_container"
+                )
         run_set = self._run_set(
             requested=request.create_run_set,
             run_set=request.run_set,
@@ -802,7 +823,9 @@ class LabActionsService:
         self._create_lineage(run_set.euid, pool_tube.euid, "run_uses_pool")
         self._create_lineage(run_set.euid, pool_content.euid, "run_uses_pool")
         if request.instrument_euid:
-            self._create_lineage(run_set.euid, request.instrument_euid, "run_uses_instrument")
+            self._create_lineage(
+                run_set.euid, request.instrument_euid, "run_uses_instrument"
+            )
         for reagent_euid in request.reagent_euids:
             self._create_lineage(run_set.euid, reagent_euid, "run_uses_reagent")
         assignments = self._create_sequenced_library_assignments(
@@ -890,7 +913,9 @@ class LabActionsService:
             ]
             source_tubes = [
                 lineage.parent_instance.euid
-                for lineage in self._lineages_to_child(well, "extraction_source_container")
+                for lineage in self._lineages_to_child(
+                    well, "extraction_source_container"
+                )
             ]
             for content in well_contents or [None]:
                 parent_contents = []
@@ -911,7 +936,9 @@ class LabActionsService:
                         "well_euid": well.euid,
                         "well_row": row,
                         "well_col": col,
-                        "well_content_euid": content.euid if content is not None else "",
+                        "well_content_euid": content.euid
+                        if content is not None
+                        else "",
                         "parent_content_euid": "|".join(parent_contents),
                         "one_degree_parent_euids": "|".join(parent_contents),
                         "one_degree_child_euids": "|".join(child_euids),
@@ -958,7 +985,9 @@ class LabActionsService:
             source_specimen = (
                 [
                     lineage.parent_instance
-                    for lineage in self._lineages_to_child(source_material, "DERIVED_FROM")
+                    for lineage in self._lineages_to_child(
+                        source_material, "DERIVED_FROM"
+                    )
                 ][0]
                 if source_material is not None
                 and self._lineages_to_child(source_material, "DERIVED_FROM")
@@ -985,12 +1014,16 @@ class LabActionsService:
                 }
             )
         if platform == "ONT":
-            return self._ont_sample_sheet(run_set=run_set, props=props, data_rows=data_rows)
+            return self._ont_sample_sheet(
+                run_set=run_set, props=props, data_rows=data_rows
+            )
         if platform != "ILMN":
             raise ValueError(
                 f"Sample sheet download is implemented for ILMN and ONT, not {platform or 'unknown'}"
             )
-        return self._illumina_sample_sheet(run_set=run_set, props=props, data_rows=data_rows)
+        return self._illumina_sample_sheet(
+            run_set=run_set, props=props, data_rows=data_rows
+        )
 
     def sequencing_sample_sheet_download(self, set_euid: str) -> tuple[str, str, str]:
         run_set = self._require(set_euid)
@@ -999,7 +1032,11 @@ class LabActionsService:
         content = self.sequencing_sample_sheet(set_euid)
         if platform == "ONT":
             return content, f"{set_euid}_ONT_manifest.tsv", "text/tab-separated-values"
-        return content, f"{set_euid}_{platform or 'sequencing'}_SampleSheet.csv", "text/csv"
+        return (
+            content,
+            f"{set_euid}_{platform or 'sequencing'}_SampleSheet.csv",
+            "text/csv",
+        )
 
     def _illumina_sample_sheet(
         self, *, run_set, props: dict[str, Any], data_rows: list[dict[str, str]]
@@ -1042,7 +1079,9 @@ class LabActionsService:
                     "alias": row.get("Sample_Name") or row.get("Sample_ID") or "",
                     "barcode": row.get("index") or "",
                     "run_set_euid": run_set.euid,
-                    "library_euid": description.get("library_euid") or row.get("Sample_ID") or "",
+                    "library_euid": description.get("library_euid")
+                    or row.get("Sample_ID")
+                    or "",
                     "source_gdna_euid": description.get("source_gdna_euid") or "",
                     "source_specimen_content_euid": description.get(
                         "source_specimen_content_euid"
@@ -1081,7 +1120,10 @@ class LabActionsService:
                 return "seq_run_set"
             if {"input_euid", "input_euids"} & headers:
                 return "seq_pool"
-            if "source_well_euid" in headers and {"index_barcode", "index_euid"} & headers:
+            if (
+                "source_well_euid" in headers
+                and {"index_barcode", "index_euid"} & headers
+            ):
                 return "seq_library_plate"
             if {"source_well_euid", "qc_row", "qc_col"} & headers:
                 return "extraction_qc"
@@ -1104,12 +1146,18 @@ class LabActionsService:
         if name in {"sets", "set", "run sets", "run set"}:
             return "sets"
         if name in {"plate well data", "well data", "annotation"}:
-            return "plate_well_data" if name != "annotation" else "container_annotation_preview"
+            return (
+                "plate_well_data"
+                if name != "annotation"
+                else "container_annotation_preview"
+            )
         if name in {"bulk create", "transfer"}:
             return "container_interaction_preview"
         return "unknown"
 
-    def _request_from_extraction_sheet(self, sheet: ParsedSheet) -> ExtractionPlateRequest:
+    def _request_from_extraction_sheet(
+        self, sheet: ParsedSheet
+    ) -> ExtractionPlateRequest:
         assignments: list[ExtractionTubeAssignment] = []
         tube_euids: list[str] = []
         plate_name: str | None = None
@@ -1120,8 +1168,14 @@ class LabActionsService:
             if not tube_euid:
                 continue
             plate_name = plate_name or str(row.get("plate_name") or "").strip() or None
-            row_name = row.get("row") or row.get("well_row") or row.get("child_container_row")
-            col_value = row.get("col") or row.get("well_col") or row.get("child_container_column")
+            row_name = (
+                row.get("row") or row.get("well_row") or row.get("child_container_row")
+            )
+            col_value = (
+                row.get("col")
+                or row.get("well_col")
+                or row.get("child_container_column")
+            )
             if row_name not in (None, "") or col_value not in (None, ""):
                 assignments.append(
                     ExtractionTubeAssignment(
@@ -1150,13 +1204,21 @@ class LabActionsService:
         qc_plate_name = None
         assignments: list[ExtractionQcAssignment] = []
         for row in sheet.rows:
-            source_plate_euid = source_plate_euid or str(
-                row.get("source_plate_euid") or row.get("plate_euid") or ""
-            ).strip() or None
-            qc_plate_name = qc_plate_name or str(row.get("qc_plate_name") or "").strip() or None
+            source_plate_euid = (
+                source_plate_euid
+                or str(
+                    row.get("source_plate_euid") or row.get("plate_euid") or ""
+                ).strip()
+                or None
+            )
+            qc_plate_name = (
+                qc_plate_name or str(row.get("qc_plate_name") or "").strip() or None
+            )
             assignments.append(
                 ExtractionQcAssignment(
-                    source_well_euid=str(row.get("source_well_euid") or row.get("well_euid") or "").strip()
+                    source_well_euid=str(
+                        row.get("source_well_euid") or row.get("well_euid") or ""
+                    ).strip()
                     or None,
                     row=row.get("row") or row.get("well_row"),
                     col=row.get("col") or row.get("well_col"),
@@ -1178,18 +1240,23 @@ class LabActionsService:
         plate_name = None
         assignments: list[LibraryPlateAssignment] = []
         for row in sheet.rows:
-            source_plate_euid = source_plate_euid or str(
-                row.get("source_plate_euid") or ""
-            ).strip() or None
+            source_plate_euid = (
+                source_plate_euid
+                or str(row.get("source_plate_euid") or "").strip()
+                or None
+            )
             plate_name = plate_name or str(row.get("plate_name") or "").strip() or None
-            source_well_euid = str(row.get("source_well_euid") or row.get("well_euid") or "").strip()
+            source_well_euid = str(
+                row.get("source_well_euid") or row.get("well_euid") or ""
+            ).strip()
             if source_well_euid:
                 assignments.append(
                     LibraryPlateAssignment(
                         source_well_euid=source_well_euid,
                         row=row.get("row") or row.get("well_row"),
                         col=row.get("col") or row.get("well_col"),
-                        index_barcode=str(row.get("index_barcode") or "").strip() or None,
+                        index_barcode=str(row.get("index_barcode") or "").strip()
+                        or None,
                         index_euid=str(row.get("index_euid") or "").strip() or None,
                         data=self._row_metadata(row, "data_", "library_"),
                     )
@@ -1224,7 +1291,9 @@ class LabActionsService:
                 )
             )
             platform = str(row.get("platform") or platform).strip() or platform
-            pool_tube_euid = pool_tube_euid or str(row.get("pool_tube_euid") or "").strip() or None
+            pool_tube_euid = (
+                pool_tube_euid or str(row.get("pool_tube_euid") or "").strip() or None
+            )
             pool_name = pool_name or str(row.get("pool_name") or "").strip() or None
             metadata.update(self._row_metadata(row, "metadata_", "pool_"))
         return SeqLibraryPoolRequest(
@@ -1246,8 +1315,12 @@ class LabActionsService:
             operator=str(row.get("operator") or "").strip() or None,
             instrument_euid=str(row.get("instrument_euid") or "").strip() or None,
             machine=str(row.get("machine") or "").strip() or None,
-            flowcell_barcode=str(row.get("flowcell_barcode") or row.get("flowcell") or "").strip(),
-            reagent_euids=self._split_values(row.get("reagent_euids") or row.get("reagents")),
+            flowcell_barcode=str(
+                row.get("flowcell_barcode") or row.get("flowcell") or ""
+            ).strip(),
+            reagent_euids=self._split_values(
+                row.get("reagent_euids") or row.get("reagents")
+            ),
             status=str(row.get("status") or "created").strip() or "created",
             name=str(row.get("name") or "").strip() or None,
             description=str(row.get("description") or "").strip() or None,
@@ -1264,16 +1337,28 @@ class LabActionsService:
                 or row.get("annotation_template_euid")
                 or data_template_code
             ).strip()
-            relationship_type = str(row.get("relationship_type") or relationship_type).strip()
+            relationship_type = str(
+                row.get("relationship_type") or relationship_type
+            ).strip()
             records.append(
                 PlateWellDataRecord(
-                    well_euid=str(row.get("well_euid") or row.get("child_container_euid") or "").strip()
+                    well_euid=str(
+                        row.get("well_euid") or row.get("child_container_euid") or ""
+                    ).strip()
                     or None,
-                    plate_euid=str(row.get("plate_euid") or row.get("container_euid") or "").strip()
+                    plate_euid=str(
+                        row.get("plate_euid") or row.get("container_euid") or ""
+                    ).strip()
                     or None,
-                    row=row.get("row") or row.get("well_row") or row.get("child_container_row"),
-                    col=row.get("col") or row.get("well_col") or row.get("child_container_column"),
-                    name=str(row.get("name") or row.get("annotation_name") or "").strip()
+                    row=row.get("row")
+                    or row.get("well_row")
+                    or row.get("child_container_row"),
+                    col=row.get("col")
+                    or row.get("well_col")
+                    or row.get("child_container_column"),
+                    name=str(
+                        row.get("name") or row.get("annotation_name") or ""
+                    ).strip()
                     or None,
                     target="content"
                     if "content"
@@ -1281,11 +1366,17 @@ class LabActionsService:
                         row.get("target")
                         or row.get("annotate_container_child_container_content")
                         or "content"
-                    ).strip().lower()
+                    )
+                    .strip()
+                    .lower()
                     else "well",
                     data={
                         **self._row_metadata(row, "data_", "annotation_", "metric_"),
-                        **({"value": row.get("annotation_value")} if row.get("annotation_value") not in (None, "") else {}),
+                        **(
+                            {"value": row.get("annotation_value")}
+                            if row.get("annotation_value") not in (None, "")
+                            else {}
+                        ),
                     },
                 )
             )
@@ -1305,13 +1396,21 @@ class LabActionsService:
                 LabSetRequest(
                     name=name,
                     description=str(row.get("description") or "").strip() or None,
-                    members=self._split_values(row.get("members") or row.get("member_euids")),
+                    members=self._split_values(
+                        row.get("members") or row.get("member_euids")
+                    ),
                     external_members=self._split_values(row.get("external_members")),
                     operator=str(row.get("operator") or "").strip() or None,
-                    instrument=str(row.get("instrument") or row.get("instrument_euid") or "").strip() or None,
-                    reagents=self._split_values(row.get("reagents") or row.get("reagent_euids")),
+                    instrument=str(
+                        row.get("instrument") or row.get("instrument_euid") or ""
+                    ).strip()
+                    or None,
+                    reagents=self._split_values(
+                        row.get("reagents") or row.get("reagent_euids")
+                    ),
                     machine=str(row.get("machine") or "").strip() or None,
-                    flowcell_barcode=str(row.get("flowcell_barcode") or "").strip() or None,
+                    flowcell_barcode=str(row.get("flowcell_barcode") or "").strip()
+                    or None,
                     status=str(row.get("status") or "created").strip() or "created",
                     metadata=self._row_metadata(row, "metadata_", "set_"),
                 )
@@ -1331,7 +1430,11 @@ class LabActionsService:
                 "headers": sheet.headers,
                 "row_count": len(sheet.rows),
             }
-            if action in {"container_interaction_preview", "container_annotation_preview", "unknown"}:
+            if action in {
+                "container_interaction_preview",
+                "container_annotation_preview",
+                "unknown",
+            }:
                 entry["preview_rows"] = sheet.rows[:25]
                 actions.append(entry)
                 continue
@@ -1399,4 +1502,8 @@ class LabActionsService:
                     print_n=request.copies,
                 )
             )
-        return {"printed": 0 if request.dry_run else len(results), "dry_run": request.dry_run, "results": results}
+        return {
+            "printed": 0 if request.dry_run else len(results),
+            "dry_run": request.dry_run,
+            "results": results,
+        }

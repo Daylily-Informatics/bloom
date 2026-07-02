@@ -20,8 +20,8 @@ from .auth import preferences_router
 from .auth import router as auth_router
 from .batch import router as batch_router
 from .beta_lab import router as beta_lab_router
-from .containers import router as containers_router
 from .container_actions import router as container_actions_router
+from .containers import router as containers_router
 from .content import router as content_router
 from .equipment import router as equipment_router
 from .execution_queue import router as execution_queue_router

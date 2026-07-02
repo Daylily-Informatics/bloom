@@ -54,7 +54,9 @@ def _fake_bloom_obj(templates):
     def get_by_euid(euid):
         return templates_by_euid.get(euid) or created["instances"].get(euid)
 
-    def query_template_by_component_v2(category=None, type=None, subtype=None, version=None):
+    def query_template_by_component_v2(
+        category=None, type=None, subtype=None, version=None
+    ):
         return [
             template
             for template in templates
@@ -133,9 +135,7 @@ def test_create_instances_recurses_nested_instantiation_layouts():
     assert len(parent_rows) == 1
     assert len(child_rows) == 2
     assert {child.type for child in child_rows} == {"well", "material"}
-    lineages = [
-        row for row in obj.session.added if isinstance(row, _FakeLineage)
-    ]
+    lineages = [row for row in obj.session.added if isinstance(row, _FakeLineage)]
     assert [row.relationship_type for row in lineages] == [
         "HOLDS_MATERIAL",
         "contains",
@@ -151,9 +151,7 @@ def test_create_instances_rejects_template_cycles():
         layouts=[
             {
                 "relationship_type": "contains",
-                "child_templates": [
-                    {"template_code": "container/plate/cycle/1.0/"}
-                ],
+                "child_templates": [{"template_code": "container/plate/cycle/1.0/"}],
             }
         ],
     )
@@ -173,9 +171,7 @@ def test_create_instances_enforces_object_count_limit():
         layouts=[
             {
                 "relationship_type": "contains",
-                "child_templates": [
-                    {"template_code": "container/well/child/1.0/"}
-                ],
+                "child_templates": [{"template_code": "container/well/child/1.0/"}],
             }
         ],
     )

@@ -25,10 +25,19 @@ RELATIONSHIP_TYPE_OPTIONS = [
     {"value": "beta_pool_member", "label": "beta_pool_member"},
     {"value": "beta_pooling_run_input", "label": "beta_pooling_run_input"},
     {"value": "beta_sequencing_run", "label": "beta_sequencing_run"},
-    {"value": "beta_sequenced_library_assignment", "label": "beta_sequenced_library_assignment"},
+    {
+        "value": "beta_sequenced_library_assignment",
+        "label": "beta_sequenced_library_assignment",
+    },
     {"value": "beta_assignment_source", "label": "beta_assignment_source"},
-    {"value": "beta_assignment_library_material", "label": "beta_assignment_library_material"},
-    {"value": "beta_assignment_barcode_reagent", "label": "beta_assignment_barcode_reagent"},
+    {
+        "value": "beta_assignment_library_material",
+        "label": "beta_assignment_library_material",
+    },
+    {
+        "value": "beta_assignment_barcode_reagent",
+        "label": "beta_assignment_barcode_reagent",
+    },
     {"value": "beta_run_artifact", "label": "beta_run_artifact"},
 ]
 

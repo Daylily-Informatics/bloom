@@ -74,9 +74,10 @@ def test_hydrate_dynamic_action_groups_adds_relationship_type_dropdown():
     assert {"value": "derived_from", "label": "derived_from"} in relationship_field[
         "options"
     ]
-    assert {"value": "beta_sequencing_run", "label": "beta_sequencing_run"} in relationship_field[
-        "options"
-    ]
+    assert {
+        "value": "beta_sequencing_run",
+        "label": "beta_sequencing_run",
+    } in relationship_field["options"]
 
 
 def test_hydrate_dynamic_action_groups_hides_subject_decision_scope_action():

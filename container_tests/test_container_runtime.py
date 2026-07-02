@@ -7,7 +7,6 @@ import pytest
 
 from bloom_lims import container_entry
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -18,7 +17,7 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
     assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
     assert "uv sync --frozen --no-dev" in dockerfile
     assert "USER lsmc" in dockerfile
-    assert "python\", \"-m\", \"bloom_lims.container_entry" in dockerfile
+    assert 'python", "-m", "bloom_lims.container_entry' in dockerfile
     assert ":latest" not in dockerfile
     assert "conda" not in dockerfile.lower()
     assert "tmux" not in entrypoint
@@ -26,7 +25,9 @@ def test_docker_runtime_files_use_foreground_uv_and_no_legacy_runtime() -> None:
     assert "${BLOOM_CONFIG_PATH:?BLOOM_CONFIG_PATH is required}" in entrypoint
 
 
-def test_container_entry_requires_absolute_config_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_container_entry_requires_absolute_config_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BLOOM_CONFIG_PATH", "relative.yaml")
 
     with pytest.raises(RuntimeError, match="must be an absolute path"):

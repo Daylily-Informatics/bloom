@@ -172,6 +172,9 @@
       "GVR": {
         "issuer_app_code": "daylily-tapdb"
       },
+      "GSE": {
+        "issuer_app_code": "daylily-tapdb"
+      },
       "MSG": {
         "issuer_app_code": "daylily-tapdb"
       },

@@ -631,6 +631,14 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
             "json_addl": {"semantic_category": "data"},
         },
         {
+            "category": "material",
+            "type": "sample",
+            "subtype": "gdna",
+            "version": "1.0",
+            "instance_prefix": "BNG",
+            "json_addl": {"semantic_category": "content"},
+        },
+        {
             "category": "container",
             "type": "tube",
             "subtype": "tube-generic-10ml",
@@ -679,6 +687,16 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
         bstatus="active",
         json_addl={"semantic_category": "container"},
     )
+    material_content = SimpleNamespace(
+        domain_code="Z",
+        type="sample",
+        category="material",
+        subtype="gdna",
+        version="1.0",
+        is_deleted=False,
+        bstatus="active",
+        json_addl={"semantic_category": "content"},
+    )
     non_data = SimpleNamespace(
         domain_code="Z",
         type="sequencing_run",
@@ -709,6 +727,7 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
                 stale_prefix,
                 stale_subtype,
                 stale_container_prefix,
+                material_content,
                 non_data,
             ]
 
@@ -731,7 +750,7 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
         domain_code="Z",
     )
 
-    assert retired == 4
+    assert retired == 3
     assert current.is_deleted is False
     assert stale_prefix.is_deleted is True
     assert stale_prefix.bstatus == "retired"
@@ -739,8 +758,8 @@ def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None
     assert stale_subtype.bstatus == "retired"
     assert stale_container_prefix.is_deleted is True
     assert stale_container_prefix.bstatus == "retired"
-    assert non_data.is_deleted is True
-    assert non_data.bstatus == "retired"
+    assert material_content.is_deleted is False
+    assert non_data.is_deleted is False
     assert fake_session.flushed == 1
 
 

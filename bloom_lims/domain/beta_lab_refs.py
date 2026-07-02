@@ -172,9 +172,7 @@ class _BetaLabReferenceMixin:
             ).strip()
             atlas_tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
             atlas_trf_euid = str(
-                payload.get("atlas_trf_euid")
-                or payload.get("atlas_order_euid")
-                or ""
+                payload.get("atlas_trf_euid") or payload.get("atlas_order_euid") or ""
             ).strip()
             if not (
                 fulfillment_item_euid
@@ -195,8 +193,7 @@ class _BetaLabReferenceMixin:
                     payload.get("atlas_order_test_euid") or atlas_test_euid
                 ).strip(),
                 "atlas_fulfillment_slot_euid": str(
-                    payload.get("atlas_fulfillment_slot_euid")
-                    or fulfillment_item_euid
+                    payload.get("atlas_fulfillment_slot_euid") or fulfillment_item_euid
                 ).strip(),
             }
         return list(refs.values())
@@ -366,7 +363,9 @@ class _BetaLabReferenceMixin:
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
         atlas_order_euid = str(
-            atlas_context.get("atlas_order_euid") or atlas_context.get("order_euid") or ""
+            atlas_context.get("atlas_order_euid")
+            or atlas_context.get("order_euid")
+            or ""
         ).strip()
         fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
         for fulfillment_slot in list(atlas_context.get("fulfillment_slots") or []):
@@ -464,8 +463,7 @@ class _BetaLabReferenceMixin:
                     object_evidence(ref_obj.euid, role="atlas_reference_link"),
                 ],
                 correlation_id=(
-                    f"SLOT_SATISFIED_BY:{atlas_fulfillment_slot_euid}:"
-                    f"{instance.euid}"
+                    f"SLOT_SATISFIED_BY:{atlas_fulfillment_slot_euid}:{instance.euid}"
                 ),
                 causation_id=(
                     f"bloom:atlas_fulfillment_reference:"
@@ -484,7 +482,9 @@ class _BetaLabReferenceMixin:
     ) -> None:
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_order_euid = str(
-            atlas_context.get("atlas_order_euid") or atlas_context.get("order_euid") or ""
+            atlas_context.get("atlas_order_euid")
+            or atlas_context.get("order_euid")
+            or ""
         ).strip()
         atlas_order_test_euid = str(
             atlas_context.get("atlas_order_test_euid")

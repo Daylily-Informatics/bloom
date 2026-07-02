@@ -85,7 +85,9 @@ def _explicit_config_metrics_enabled(config_path: Path) -> bool | None:
     try:
         loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        raise RuntimeError(f"Failed to parse Bloom TapDB metrics config: {exc}") from exc
+        raise RuntimeError(
+            f"Failed to parse Bloom TapDB metrics config: {exc}"
+        ) from exc
     if not isinstance(loaded, dict):
         return None
     target = loaded.get("target")

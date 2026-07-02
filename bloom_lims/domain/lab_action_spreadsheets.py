@@ -9,7 +9,8 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
-from xml.etree import ElementTree
+
+from defusedxml import ElementTree
 
 
 @dataclass(frozen=True)

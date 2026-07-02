@@ -15,7 +15,10 @@ def test_project_dependencies_pin_release_train_versions() -> None:
 
     assert "cli-core-yo==2.1.1" in dependencies
     assert "daylily-auth-cognito==2.1.5" in dependencies
-    assert "daylily-tapdb @ git+https://github.com/Daylily-Informatics/daylily-tapdb.git@9.0.9" in dependencies
+    assert (
+        "daylily-tapdb @ git+https://github.com/Daylily-Informatics/daylily-tapdb.git@9.0.10"
+        in dependencies
+    )
     assert "IPython>=8.18.1" in dependencies
     assert "psycopg2-binary==2.9.12" in dependencies
     assert not any(str(dep).startswith("zebra-day") for dep in dependencies)
@@ -48,7 +51,10 @@ def test_dockerfile_uses_package_specific_scm_version() -> None:
         encoding="utf-8"
     )
 
-    assert "ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}" not in dockerfile
+    assert (
+        "ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}"
+        not in dockerfile
+    )
     assert (
         "ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BLOOM_LIMS=${SETUPTOOLS_SCM_PRETEND_VERSION}"
         in dockerfile

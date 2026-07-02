@@ -73,7 +73,10 @@ def _atlas_context_payload() -> dict[str, object]:
         "atlas_tenant_id": _opaque("tenant"),
         "atlas_order_euid": order_euid,
         "atlas_order_test_euid": primary_order_test_euid,
-        "atlas_order_test_euids": [primary_order_test_euid, _opaque("order-test-secondary")],
+        "atlas_order_test_euids": [
+            primary_order_test_euid,
+            _opaque("order-test-secondary"),
+        ],
         "atlas_trf_euid": _opaque("trf"),
         "atlas_test_euid": _opaque("test-primary"),
         "atlas_test_euids": [_opaque("test-secondary")],

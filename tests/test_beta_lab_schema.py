@@ -29,7 +29,9 @@ def test_atlas_fulfillment_context_preserves_order_refs():
         "Z-AGX-TEST1",
         "Z-AGX-TEST2",
     ]
-    assert payload["fulfillment_slots"][0]["atlas_fulfillment_slot_euid"] == "Z-AGX-SLOT1"
+    assert (
+        payload["fulfillment_slots"][0]["atlas_fulfillment_slot_euid"] == "Z-AGX-SLOT1"
+    )
 
 
 def test_atlas_fulfillment_context_requires_order_for_order_tests():

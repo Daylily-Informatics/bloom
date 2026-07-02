@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 class BloomContainer(BloomObj):
     def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
-        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
+        super().__init__(
+            bdb, is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex
+        )
 
     def create_empty_container(self, template_euid):
         return self.create_instances(template_euid)
@@ -56,12 +58,16 @@ class BloomContainer(BloomObj):
                 lineage.is_deleted = True
                 self.session.commit()
                 return
-        raise Exception(f"Content {content_euid} not found in container {container_euid}")
+        raise Exception(
+            f"Content {content_euid} not found in container {container_euid}"
+        )
 
 
 class BloomContainerPlate(BloomContainer):
     def __init__(self, bdb, is_deleted=False, cfg_printers=False, cfg_fedex=False):
-        super().__init__(bdb,is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex)
+        super().__init__(
+            bdb, is_deleted=is_deleted, cfg_printers=cfg_printers, cfg_fedex=cfg_fedex
+        )
 
     def create_empty_plate(self, template_euid):
         return self.create_instances(template_euid)
@@ -117,8 +123,6 @@ class BloomContainerPlate(BloomContainer):
                 )
 
         return matrix
-
-
 
 
 __all__ = [

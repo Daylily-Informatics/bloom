@@ -112,7 +112,9 @@ def _build_tapdb_host_bridge() -> TapdbHostBridge:
         shell_title="Bloom",
         shell_subtitle="TapDB substrate",
         home_url="/",
-        login_url=lambda request: f"/login?next={quote(_request_next_path(request), safe='/')}",
+        login_url=lambda request: (
+            f"/login?next={quote(_request_next_path(request), safe='/')}"
+        ),
         logout_url="/logout",
         change_password_url=None,
         resolve_user=_tapdb_host_user,

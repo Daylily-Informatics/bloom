@@ -101,7 +101,9 @@ class AtlasFulfillmentContext(BaseModel):
         self.atlas_order_test_euids = normalized_order_test_euids
         if self.atlas_order_test_euid is None and self.atlas_order_test_euids:
             self.atlas_order_test_euid = self.atlas_order_test_euids[0]
-        if (self.atlas_order_test_euid or self.atlas_order_test_euids) and not self.atlas_order_euid:
+        if (
+            self.atlas_order_test_euid or self.atlas_order_test_euids
+        ) and not self.atlas_order_euid:
             raise ValueError(
                 "atlas_order_euid is required when atlas_order_test_euid is provided"
             )
@@ -394,9 +396,9 @@ class BetaRunArtifactInput(BaseModel):
 class BetaRunCreateRequest(BaseModel):
     pool_euid: str
     platform: Literal["ILMN", "ONT", "Ultima", "PacBio", "CompleteGenomics"]
-    run_subtype: Literal[
-        "illumina", "ont", "ultima", "pacbio", "completegenomics"
-    ] = Field(default="illumina")
+    run_subtype: Literal["illumina", "ont", "ultima", "pacbio", "completegenomics"] = (
+        Field(default="illumina")
+    )
     flowcell_id: str
     run_name: str | None = None
     status: Literal["started", "completed"] = Field(default="completed")

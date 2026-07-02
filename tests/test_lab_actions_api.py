@@ -48,7 +48,9 @@ def _create_object(
     return response.json()
 
 
-def _link_material(client: TestClient, *, container_euid: str, content_euid: str) -> None:
+def _link_material(
+    client: TestClient, *, container_euid: str, content_euid: str
+) -> None:
     response = client.post(
         "/api/v1/lineages/",
         json={
@@ -813,7 +815,7 @@ def _minimal_xlsx(sheet_name: str, rows: list[list[str | None]]) -> bytes:
     worksheet = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        f'<sheetData>{"".join(sheet_rows)}</sheetData></worksheet>'
+        f"<sheetData>{''.join(sheet_rows)}</sheetData></worksheet>"
     )
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as archive:
@@ -847,8 +849,7 @@ def test_spreadsheet_import_csv_and_xlsx_preview() -> None:
     client = _client()
     tube, _ = _create_filled_tube(client, suffix="spreadsheet")
     csv_bytes = (
-        "tube_euid,row,col,plate_name\n"
-        f"{tube},A,1,pytest upload extraction plate\n"
+        f"tube_euid,row,col,plate_name\n{tube},A,1,pytest upload extraction plate\n"
     ).encode()
     dry_run = client.post(
         "/api/v1/lab-actions/spreadsheet-import",
@@ -875,9 +876,24 @@ def test_spreadsheet_import_csv_and_xlsx_preview() -> None:
         [
             [],
             [],
-            ["SOURCE CONTAINER(s)", None, None, None, None, None, None, None, None, "DESTINATION CONTAINER(s)"],
+            [
+                "SOURCE CONTAINER(s)",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                "DESTINATION CONTAINER(s)",
+            ],
             ["Container EUID", "Container Template EUID", "Continer Cat/Type/Subtype"],
-            ["BCT-EXAMPLE", "container/tube/tube-generic-10ml/1.0", "container/tube/generic"],
+            [
+                "BCT-EXAMPLE",
+                "container/tube/tube-generic-10ml/1.0",
+                "container/tube/generic",
+            ],
         ],
     )
     parsed = parse_workbook("container_interactions.xlsx", workbook)

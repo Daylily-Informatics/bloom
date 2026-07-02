@@ -113,9 +113,7 @@ def test_object_creation_creates_all_sequencing_run_platform_prefixes(
         assert created["euid"].startswith(f"{domain_code}-{prefix}-")
 
 
-def test_object_creation_plate_creates_96_linked_wells(
-    client: TestClient, bdb
-) -> None:
+def test_object_creation_plate_creates_96_linked_wells(client: TestClient, bdb) -> None:
     created = _create_instance_via_object_creation(
         client,
         category="container",
@@ -140,8 +138,7 @@ def test_object_creation_plate_creates_96_linked_wells(
     )
     wells = [lineage.child_instance for lineage in lineages]
     positions = {
-        ((well.json_addl or {}).get("cont_address") or {}).get("name")
-        for well in wells
+        ((well.json_addl or {}).get("cont_address") or {}).get("name") for well in wells
     }
     assert len(wells) == 96
     assert {well.type for well in wells} == {"well"}
@@ -288,8 +285,16 @@ def test_containers_content_link_layout_and_delete(client: TestClient, bdb) -> N
     )
     assert link_resp.status_code == 200, link_resp.text
     lineage_cls = bdb.Base.classes.generic_instance_lineage
-    parent = bdb.session.query(bdb.Base.classes.generic_instance).filter_by(euid=container_euid).first()
-    child = bdb.session.query(bdb.Base.classes.generic_instance).filter_by(euid=content_euid).first()
+    parent = (
+        bdb.session.query(bdb.Base.classes.generic_instance)
+        .filter_by(euid=container_euid)
+        .first()
+    )
+    child = (
+        bdb.session.query(bdb.Base.classes.generic_instance)
+        .filter_by(euid=content_euid)
+        .first()
+    )
     lineage = (
         bdb.session.query(lineage_cls)
         .filter(

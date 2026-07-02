@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 
-from bloom_lims.tapdb_adapter import BLOOMdb3, generic_instance
 from bloom_lims.domain.lab_actions import LabActionsService
 from bloom_lims.schemas.lab_actions import (
     ExtractionPlateRequest,
@@ -22,6 +21,7 @@ from bloom_lims.schemas.lab_actions import (
     SeqLibraryPoolRequest,
     SeqRunSetRequest,
 )
+from bloom_lims.tapdb_adapter import BLOOMdb3, generic_instance
 
 from .dependencies import APIUser, require_write
 
@@ -76,8 +76,12 @@ def _split_source(value: str) -> tuple[str, str | None]:
     return euid, well
 
 
-def _normalize_record(row: dict[str, Any], default_target: str | None) -> dict[str, Any]:
-    source = row.get("source") or row.get("source_euid") or row.get("euid") or row.get("0")
+def _normalize_record(
+    row: dict[str, Any], default_target: str | None
+) -> dict[str, Any]:
+    source = (
+        row.get("source") or row.get("source_euid") or row.get("euid") or row.get("0")
+    )
     target = (
         row.get("target")
         or row.get("target_container_euid")
@@ -159,7 +163,10 @@ async def validate_container_action(
 ):
     try:
         planned = _parse_rows(payload)
-        source_types = {row["source_euid"]: _object_kind(row["source_euid"], user) for row in planned}
+        source_types = {
+            row["source_euid"]: _object_kind(row["source_euid"], user)
+            for row in planned
+        }
         target_types = {
             row["target_euid"]: _object_kind(row["target_euid"], user)
             for row in planned
@@ -232,9 +239,13 @@ async def execute_container_action(
                 SeqRunSetRequest.model_validate(operation_payload)
             )
         elif payload.operation_type == "lab_set":
-            result = service.create_lab_set(LabSetRequest.model_validate(operation_payload))
+            result = service.create_lab_set(
+                LabSetRequest.model_validate(operation_payload)
+            )
         elif payload.operation_type == "print_euids":
-            result = service.print_euids(PrintEuidRequest.model_validate(operation_payload))
+            result = service.print_euids(
+                PrintEuidRequest.model_validate(operation_payload)
+            )
         else:  # pragma: no cover - Literal validation should prevent this.
             raise HTTPException(status_code=400, detail="Unsupported operation_type")
         return {
