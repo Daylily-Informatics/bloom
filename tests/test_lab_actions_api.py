@@ -547,6 +547,11 @@ def test_directed_library_plate_with_index_and_run_set() -> None:
                         "col": 4,
                         "index_barcode": "ACGTACGT",
                         "index_euid": index_euid,
+                        "i7_sequence": "ACGTACGT",
+                        "i5_sequence": "TGCATGCA",
+                        "index_orientation": "forward",
+                        "index_set": "pytest-dual-index-set",
+                        "index_platform": "ILMN",
                         "data": {"cycles": 8},
                     }
                 ],
@@ -560,6 +565,36 @@ def test_directed_library_plate_with_index_and_run_set() -> None:
     assert payload["mappings"][0]["well_name"] == "C4"
     assert payload["mappings"][0]["index_barcode"] == "ACGTACGT"
     assert payload["mappings"][0]["index_euid"] == index_euid
+    assert payload["mappings"][0]["i7_sequence"] == "ACGTACGT"
+    assert payload["mappings"][0]["i5_sequence"] == "TGCATGCA"
+
+    pool = client.post(
+        "/api/v1/lab-actions/seq-library-pools",
+        json={
+            "input_euids": [payload["mappings"][0]["library_content_euid"]],
+            "platform": "ILMN",
+            "pool_name": "pytest dual-index pool",
+        },
+    )
+    assert pool.status_code == 200, pool.text
+    run = client.post(
+        "/api/v1/lab-actions/seq-runs",
+        json={
+            "pool_tube_euid": pool.json()["pool_tube_euid"],
+            "pool_content_euid": pool.json()["pool_content_euid"],
+            "platform": "ILMN",
+            "operator": "pytest@example.com",
+            "flowcell_barcode": "PYTEST-DUAL-FLOWCELL",
+            "status": "created",
+        },
+    )
+    assert run.status_code == 200, run.text
+    sample_sheet = client.get(
+        f"/api/v1/lab-actions/seq-runs/{run.json()['set_euid']}/samplesheet"
+    )
+    assert sample_sheet.status_code == 200, sample_sheet.text
+    assert "Sample_ID,Sample_Name,index,index2,Description" in sample_sheet.text
+    assert "ACGTACGT,TGCATGCA" in sample_sheet.text
 
     duplicate_destination = client.post(
         "/api/v1/lab-actions/seq-library-plates",
@@ -680,6 +715,41 @@ def test_lab_action_schema_validation_edges() -> None:
         json={"mode": "plate_1_to_1"},
     )
     assert bad_library.status_code == 422
+
+    mismatched_dual_index = client.post(
+        "/api/v1/lab-actions/seq-library-plates",
+        json={
+            "mode": "directed",
+            "assignments": [
+                {
+                    "source_well_euid": "not-a-persisted-euid",
+                    "row": "A",
+                    "col": 1,
+                    "index_barcode": "AAAAAAAA",
+                    "i7_sequence": "CCCCCCCC",
+                    "i5_sequence": "GGGGGGGG",
+                }
+            ],
+        },
+    )
+    assert mismatched_dual_index.status_code == 422
+
+    mixed_ont_and_illumina_index = client.post(
+        "/api/v1/lab-actions/seq-library-plates",
+        json={
+            "mode": "directed",
+            "assignments": [
+                {
+                    "source_well_euid": "not-a-persisted-euid",
+                    "row": "A",
+                    "col": 1,
+                    "barcode_name": "barcode01",
+                    "i7_sequence": "AAAAAAAA",
+                }
+            ],
+        },
+    )
+    assert mixed_ont_and_illumina_index.status_code == 422
 
     too_many_prints = client.post(
         "/api/v1/lab-actions/print-euids",

@@ -1,0 +1,32 @@
+{
+  "artifact_checksums_sha256": {
+    "bloom_bjuice_equipment_instance_create_plan.jsonl": "deb748aa0a2bf24a3e6354e9e112b3307fa0028ac9ee747b27b296f328aef981",
+    "bloom_equipment_lineage_audit_plan.json": "37d14fe9799b62b66c8ae5a9ad6c56b1ac374282e36bbcc65856ac54b88feb32",
+    "bloom_equipment_lineage_forward_skeleton.json": "7f4fb3ec1467a1c972a5d9b2ef451d6a5e8dd07632bff80f67ee81bb97e6550a",
+    "bloom_equipment_lineage_rollback_skeleton.json": "dae0477c0916aa7266f6ef17455a783307c2b7aeac15b80a46b4f19c9b06ace2",
+    "bloom_equipment_template_catalog.json": "a9c41963a7e622f02fb67d087ebf2a7f7c05f44b6e72bcab519dd26d14e14ebe",
+    "bloom_illumina_index_pair_create_plan.jsonl": "a833df4a51c810f44bae577241b0c89eb2d8b3b0bfe6a3660df066fb7122a04e",
+    "bloom_ont_barcode_create_plan.jsonl": "eaa581b56ac811baffeb2f981831610a65044322797c21a96d0ea27ed9dff7aa"
+  },
+  "counts": {
+    "bjuice_equipment_instance_create_plans": 2,
+    "equipment_templates": 12,
+    "illumina_dual_index_pairs": 21,
+    "ont_barcode_indexes": 16
+  },
+  "input_checksums_sha256": {
+    "illumina_samplesheet.csv": "4cffbff05a8a382d7acf9121ae8d2593ed1dda1785d8b3fa56d28442a5f56871",
+    "ont_barcode_to_sample_map.tsv": "1291730e5c4e3d94f094a8c8d910c3f7c5b78d2c659c27fc83eed2c8c589742d"
+  },
+  "mutation_contract": {
+    "create_only": true,
+    "direct_sql": false,
+    "invented_euids": false,
+    "update_or_delete": false
+  },
+  "schema": "bloom.bjuice_backfill_manifest_summary.v1",
+  "status": {
+    "create_plans": "READY_FOR_REVIEW",
+    "equipment_lineage_repair": "BLOCKED_PENDING_REAL_EUID_AUDIT"
+  }
+}

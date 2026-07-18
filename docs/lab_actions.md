@@ -28,7 +28,7 @@ The current flow uses the existing Bloom template pack plus one new generic run-
 | Extraction well gDNA | `material/sample/gdna/1.0` | `BNG` | Created during extraction mapping. |
 | Sequencing-library content | `material/sample/sequencing-library/1.0` | `BNQ` | Created during library plate mapping. |
 | Sequencing-library pool content | `material/pool/sequencing-library/1.0` | `BNP` | Created when filling the pool tube. |
-| Sequencing index reagent | `material/reagent/sequencing-index/1.0` | `BNX` | Optional; callers may also store an index barcode string directly. |
+| Sequencing index reagent | `material/reagent/sequencing-index/1.0` | `BNX` | One persisted reagent per usable index assignment. Illumina stores the i7/i5 pair on one object; ONT stores the `barcodeNN` name even when its sequence is not proven. |
 | gDNA quant data | `data/quantification/gdna/1.0` | `BDQ` | Optional per-well extraction output data. |
 
 No additional templates are required for the current implementation. The semantic paths above are the operator-facing shorthand used by the API and docs; the seed file stores Bloom's actual prefix-backed template identity in `category`, `type`, `subtype`, `version`, and `instance_prefix`. If production operators need separate EUID prefixes or stricter metadata for pool tubes, flowcells, reagent sets, or run kits, add those templates as a separate versioned template-pack change and update this matrix before production rollout.
@@ -44,7 +44,7 @@ Lab actions write explicit Bloom lineage records. The key relationship names are
 | `DERIVED_FROM` | Parent content/material | Child content/material | New material was derived from the source material. |
 | `extraction_source_container` | Incoming tube | Extraction well | Tube was assigned to this extraction well. |
 | `library_source_well` | Extraction well | Library well | Source well mapped to destination library well. |
-| `uses_index` | Library content | Index reagent | Library uses this sequencing index reagent. |
+| `uses_index` | Library content | Index reagent | Library uses this sequencing index reagent. This lineage is authoritative; copied barcode fields are search/export metadata. |
 | `pooled_from_container` | Source container | Pool tube | Pool tube was filled from this source container. |
 | `run_set_member` | Run set | Member EUID | Member belongs to the run set. |
 | `associated_set` | Member EUID | Run set | Reverse navigability for set membership. |
@@ -131,7 +131,11 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/seq-library-plates" \
   }'
 ```
 
-Directed mode accepts explicit input wells and output wells. Optional fields include `index_barcode`, `index_euid`, and arbitrary per-well `data`.
+Directed mode accepts explicit input wells and output wells. Optional fields include `index_euid`, arbitrary per-well `data`, and platform-specific index metadata.
+
+For Illumina dual-index libraries, create or reuse one sequencing-index reagent for the pair and supply `i7_sequence`, `i5_sequence`, `index_set`, and `index_orientation`. `index_barcode`, when supplied for compatibility, must equal `i7_sequence`. The generated SampleSheet emits both `index` and `index2`.
+
+For ONT libraries, create or reuse one sequencing-index reagent per named barcode and supply `barcode_name` (for example `barcode01`), `index_set`, and `index_platform=ONT`. An unknown sequence remains unknown; Bloom does not invent or infer it.
 
 ### 4. Sequencing-Library Pool Tube
 

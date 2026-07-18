@@ -103,5 +103,509 @@
       },
       "singleton": "0"
     }
-  }
+  },
+    "generic": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Generic Sequencer",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Explicit identification is required; this template is never selected automatically.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "neutral",
+          "location": "",
+          "manufacturer": "",
+          "model": "",
+          "model_family": "",
+          "name": "Generic Sequencer",
+          "operational_status": "",
+          "product_documentation_url": "",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "novaseq-6000": {
+      "1.1": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Illumina NovaSeq 6000",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "Illumina",
+          "model": "NovaSeq 6000",
+          "model_family": "NovaSeq 6000",
+          "name": "Illumina NovaSeq 6000",
+          "operational_status": "",
+          "product_documentation_url": "https://www.illumina.com/systems/sequencing-platforms/novaseq.html",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "novaseq-x-series": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Illumina NovaSeq X Series",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Exact NovaSeq X or NovaSeq X Plus model belongs on the equipment instance when proven.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "Illumina",
+          "model": "",
+          "model_family": "NovaSeq X Series",
+          "name": "Illumina NovaSeq X Series",
+          "operational_status": "",
+          "product_documentation_url": "https://support-docs.illumina.com/IN/NovaSeqX/Content/IN/NovaSeqX/SystemOverview.htm",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "ont-minion": {
+      "1.1": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Oxford Nanopore MinION",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Exact MinION generation belongs on the equipment instance when proven.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "Oxford Nanopore Technologies",
+          "model": "",
+          "model_family": "MinION",
+          "name": "Oxford Nanopore MinION",
+          "operational_status": "",
+          "product_documentation_url": "https://nanoporetech.com/resources/product-documentation/minion/document/minion-mk1d-user-manual",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "ont-promethion": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Oxford Nanopore PromethION",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Exact P2, P24, or P48 model belongs on the equipment instance when proven.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "Oxford Nanopore Technologies",
+          "model": "",
+          "model_family": "PromethION",
+          "name": "Oxford Nanopore PromethION",
+          "operational_status": "",
+          "product_documentation_url": "https://nanoporetech.com/products/sequence/promethion/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "ultima-ug-100": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Ultima Genomics UG 100",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "Ultima Genomics",
+          "model": "UG 100",
+          "model_family": "UG 100",
+          "name": "Ultima Genomics UG 100",
+          "operational_status": "",
+          "product_documentation_url": "https://www.ultimagenomics.com/products/ug-100-sequencing-platform/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "ultima-ug-200-series": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "Ultima Genomics UG200 Series",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Exact UG200 or UG200 Ultra model belongs on the equipment instance when proven.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "Ultima Genomics",
+          "model": "",
+          "model_family": "UG200 Series",
+          "name": "Ultima Genomics UG200 Series",
+          "operational_status": "",
+          "product_documentation_url": "https://www.ultimagenomics.com/products/ug200-series/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "pacbio-revio": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "PacBio Revio",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "PacBio",
+          "model": "Revio",
+          "model_family": "Revio",
+          "name": "PacBio Revio",
+          "operational_status": "",
+          "product_documentation_url": "https://www.pacb.com/sequencing-systems/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "pacbio-vega": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "PacBio Vega",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "current",
+          "location": "",
+          "manufacturer": "PacBio",
+          "model": "Vega",
+          "model_family": "Vega",
+          "name": "PacBio Vega",
+          "operational_status": "",
+          "product_documentation_url": "https://www.pacb.com/sequencing-systems/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "pacbio-sequel-ii": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "PacBio Sequel II",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Legacy installed-base instrument.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "legacy",
+          "location": "",
+          "manufacturer": "PacBio",
+          "model": "Sequel II",
+          "model_family": "Sequel II",
+          "name": "PacBio Sequel II",
+          "operational_status": "",
+          "product_documentation_url": "https://www.pacb.com/technology/hifi-sequencing/sequel-system/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "pacbio-sequel-iie": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "PacBio Sequel IIe",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Legacy installed-base instrument.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "legacy",
+          "location": "",
+          "manufacturer": "PacBio",
+          "model": "Sequel IIe",
+          "model_family": "Sequel IIe",
+          "name": "PacBio Sequel IIe",
+          "operational_status": "",
+          "product_documentation_url": "https://www.pacb.com/technology/hifi-sequencing/sequel-system/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    },
+    "pacbio-onso": {
+      "1.0": {
+        "action_groups": {},
+        "action_imports": {
+          "add_relationships": "action/core/add-relationships/1.0",
+          "create_subject_and_anchor": "action/core/create-subject-and-anchor/1.0",
+          "print_barcode_label": "action/core/print_barcode_label/1.0",
+          "set_object_status": "action/core/set_object_status/1.0"
+        },
+        "cogs": {
+          "allocation_type": "",
+          "cost": "0.00",
+          "cost_split_by_children": [
+            {
+              "*/*/*/*": {}
+            }
+          ],
+          "state": "inactive"
+        },
+        "description": "PacBio Onso",
+        "expected_inputs": [],
+        "expected_outputs": [],
+        "instantiation_layouts": [],
+        "properties": {
+          "comments": "",
+          "identification_notes": "Legacy short-read instrument.",
+          "instrument_id": "",
+          "lab_code": "",
+          "lifecycle_status": "legacy",
+          "location": "",
+          "manufacturer": "PacBio",
+          "model": "Onso",
+          "model_family": "Onso",
+          "name": "PacBio Onso",
+          "operational_status": "",
+          "product_documentation_url": "https://www.pacb.com/blog/sbb-sequencing/",
+          "room": "",
+          "serial_number": ""
+        },
+        "singleton": "0"
+      }
+    }
 }

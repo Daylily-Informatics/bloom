@@ -653,6 +653,12 @@ class LabActionsService:
             if dest_well is None:
                 raise ValueError(f"Destination well not found on plate: {position}")
             self._assert_well_empty(dest_well)
+            index_barcode = (
+                assignment.i7_sequence
+                or assignment.index_barcode
+                or assignment.barcode_name
+                or ""
+            )
             library = self._create_by_code(
                 LIBRARY_CONTENT_TEMPLATE_CODE,
                 name=f"{source_content.name or source_content.euid} seq library",
@@ -662,8 +668,14 @@ class LabActionsService:
                     "library_plate_euid": plate.euid,
                     "library_well_euid": dest_well.euid,
                     "library_well_name": position,
-                    "index_barcode": assignment.index_barcode or "",
+                    "index_barcode": index_barcode,
                     "index_euid": assignment.index_euid or "",
+                    "i7_sequence": assignment.i7_sequence or "",
+                    "i5_sequence": assignment.i5_sequence or "",
+                    "index_orientation": assignment.index_orientation or "",
+                    "index_set": assignment.index_set or "",
+                    "barcode_name": assignment.barcode_name or "",
+                    "index_platform": assignment.index_platform or "",
                     "data": assignment.data,
                 },
             )
@@ -696,8 +708,14 @@ class LabActionsService:
                     "library_well_euid": dest_well.euid,
                     "library_content_euid": library.euid,
                     "well_name": position,
-                    "index_barcode": assignment.index_barcode or "",
+                    "index_barcode": index_barcode,
                     "index_euid": assignment.index_euid or "",
+                    "i7_sequence": assignment.i7_sequence or "",
+                    "i5_sequence": assignment.i5_sequence or "",
+                    "index_orientation": assignment.index_orientation or "",
+                    "index_set": assignment.index_set or "",
+                    "barcode_name": assignment.barcode_name or "",
+                    "index_platform": assignment.index_platform or "",
                 }
             )
         run_set = self._run_set(
@@ -872,6 +890,16 @@ class LabActionsService:
                     "metadata": {
                         "created_by": "bloom_lab_actions",
                         "pool_content_euid": pool_content.euid,
+                        "i7_sequence": str(props.get("i7_sequence") or "").strip(),
+                        "i5_sequence": str(props.get("i5_sequence") or "").strip(),
+                        "index_orientation": str(
+                            props.get("index_orientation") or ""
+                        ).strip(),
+                        "index_set": str(props.get("index_set") or "").strip(),
+                        "barcode_name": str(props.get("barcode_name") or "").strip(),
+                        "index_platform": str(
+                            props.get("index_platform") or ""
+                        ).strip(),
                     },
                 },
             )
@@ -998,6 +1026,10 @@ class LabActionsService:
                     "Sample_ID": library.euid,
                     "Sample_Name": library.name or library.euid,
                     "index": str(library_props.get("index_barcode") or ""),
+                    "index2": str(library_props.get("i5_sequence") or ""),
+                    "barcode_name": str(
+                        library_props.get("barcode_name") or ""
+                    ),
                     "Description": json.dumps(
                         {
                             "run_set_euid": run_set.euid,
@@ -1048,7 +1080,15 @@ class LabActionsService:
         output.write(f"Operator,{props.get('operator') or ''}\n")
         output.write("\n[Reads]\n151\n151\n\n[Data]\n")
         writer = csv.DictWriter(
-            output, fieldnames=["Sample_ID", "Sample_Name", "index", "Description"]
+            output,
+            fieldnames=[
+                "Sample_ID",
+                "Sample_Name",
+                "index",
+                "index2",
+                "Description",
+            ],
+            extrasaction="ignore",
         )
         writer.writeheader()
         writer.writerows(data_rows)
@@ -1077,7 +1117,7 @@ class LabActionsService:
                 {
                     "sample_id": row.get("Sample_ID") or "",
                     "alias": row.get("Sample_Name") or row.get("Sample_ID") or "",
-                    "barcode": row.get("index") or "",
+                    "barcode": row.get("barcode_name") or row.get("index") or "",
                     "run_set_euid": run_set.euid,
                     "library_euid": description.get("library_euid")
                     or row.get("Sample_ID")
@@ -1122,7 +1162,14 @@ class LabActionsService:
                 return "seq_pool"
             if (
                 "source_well_euid" in headers
-                and {"index_barcode", "index_euid"} & headers
+                and {
+                    "index_barcode",
+                    "index_euid",
+                    "i7_sequence",
+                    "i5_sequence",
+                    "barcode_name",
+                }
+                & headers
             ):
                 return "seq_library_plate"
             if {"source_well_euid", "qc_row", "qc_col"} & headers:
@@ -1258,6 +1305,21 @@ class LabActionsService:
                         index_barcode=str(row.get("index_barcode") or "").strip()
                         or None,
                         index_euid=str(row.get("index_euid") or "").strip() or None,
+                        i7_sequence=str(row.get("i7_sequence") or "").strip()
+                        or None,
+                        i5_sequence=str(row.get("i5_sequence") or "").strip()
+                        or None,
+                        index_orientation=str(
+                            row.get("index_orientation") or ""
+                        ).strip()
+                        or None,
+                        index_set=str(row.get("index_set") or "").strip() or None,
+                        barcode_name=str(row.get("barcode_name") or "").strip()
+                        or None,
+                        index_platform=str(
+                            row.get("index_platform") or ""
+                        ).strip()
+                        or None,
                         data=self._row_metadata(row, "data_", "library_"),
                     )
                 )

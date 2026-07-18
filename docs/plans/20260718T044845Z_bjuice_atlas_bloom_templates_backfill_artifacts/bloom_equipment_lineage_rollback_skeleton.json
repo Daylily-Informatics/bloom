@@ -1,0 +1,8 @@
+{
+  "before_state_hashes": [],
+  "executable_operations": [],
+  "expected_change_count": null,
+  "schema": "bloom.equipment_lineage_rollback_skeleton.v1",
+  "status": "BLOCKED",
+  "unblock_condition": "Generate exact inverse from the reviewed forward manifest; do not invent identifiers."
+}

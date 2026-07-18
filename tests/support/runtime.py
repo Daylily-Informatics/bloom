@@ -32,6 +32,7 @@ INTEGRATION_TEST_FILES = frozenset(
         "test_beta_lab.py",
         "test_queue_flow.py",
         "test_gui_endpoints.py",
+        "test_lab_actions_api.py",
         "test_route_coverage_gaps_api.py",
         "test_route_coverage_gaps_gui.py",
     }

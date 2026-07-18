@@ -1,0 +1,21 @@
+{
+  "allowed_relationship_types": [
+    "beta_used_instrument",
+    "run_uses_instrument"
+  ],
+  "expected_instruments": [
+    "LH01106",
+    "PCA100"
+  ],
+  "mutation_allowed": false,
+  "operation": "READ_ONLY_AUDIT",
+  "required_receipts": [
+    "real run-set EUIDs returned by Bloom",
+    "real equipment EUIDs returned by Bloom",
+    "current active instrument lineage per run set",
+    "relationship EUIDs for any incorrect active links"
+  ],
+  "schema": "bloom.equipment_lineage_audit_plan.v1",
+  "status": "BLOCKED",
+  "unblock_condition": "Read current production lineage through supported Bloom APIs and review exact EUID-scoped diff."
+}

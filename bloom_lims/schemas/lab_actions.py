@@ -88,8 +88,16 @@ class LibraryPlateAssignment(BaseModel):
     source_well_euid: str
     row: str | None = None
     col: int | None = None
+    # index_barcode remains the compatibility field used by existing callers.
+    # For dual-index Illumina libraries it must equal i7_sequence.
     index_barcode: str | None = None
     index_euid: str | None = None
+    i7_sequence: str | None = None
+    i5_sequence: str | None = None
+    index_orientation: str | None = None
+    index_set: str | None = None
+    barcode_name: str | None = None
+    index_platform: Literal["ILMN", "ONT"] | None = None
     data: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -98,6 +106,16 @@ class LibraryPlateAssignment(BaseModel):
             raise ValueError("row and col must be provided together")
         if self.row is not None and self.col is not None:
             WellPosition(row=self.row, col=self.col)
+        if self.i5_sequence and not self.i7_sequence:
+            raise ValueError("i7_sequence is required when i5_sequence is provided")
+        if (
+            self.i7_sequence
+            and self.index_barcode
+            and self.i7_sequence != self.index_barcode
+        ):
+            raise ValueError("index_barcode must equal i7_sequence")
+        if self.barcode_name and (self.i7_sequence or self.i5_sequence):
+            raise ValueError("ONT barcode_name cannot be combined with i7/i5 sequences")
         return self
 
 
