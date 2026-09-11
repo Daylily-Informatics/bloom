@@ -9,7 +9,7 @@ Status: active execution ledger
 - This ledger replaces the earlier expanded migration process under the user-approved bounded amendment dated 2026-09-11.
 - Bloom will release as breaking major `10.0.0` and use `daylily-tapdb[aurora,gui]==10.1.1rc1`.
 - TapDB Git tag: annotated tag object `1ac2f09a1787b9e747eda582c45a628ca60b7020`, peeled commit `02ab7c9d0325dfcbf9dc47a03be66b62e0a22f2c`.
-- TapDB package hashes: wheel SHA-256 `6de691dd5f9c8fac596a18119c9220f4ea78826094753b47f9eb936b0677ce7`; sdist SHA-256 `abf2e5b18184db736c8e54fb77cbc96e78c77921f0f65b7c8f026ebb20a8a5fb`.
+- TapDB package hashes: wheel SHA-256 `26de691dd5f9c8fac596a18119c9220f4ea78826094753b47f9eb936b0677ce7`; sdist SHA-256 `abf2e5b18184db736c8e54fb77cbc96e78c77921f0f65b7c8f026ebb20a8a5fb`.
 - A sustained Bloom outage is accepted. The existing Aurora recovery arrangement is accepted. This execution creates no snapshot, dump, database copy, replacement database, or rehearsal database.
 - One production migration is permitted. Preserve acknowledged work, existing data, EUIDs, allocator guarantees, audit history, deleted history, authoritative lineage, and queued Bloom work.
 - Remove compatibility shims and fallback behavior. Minor features and outstanding pull-request integration remain phase 2 work after acceptance.
