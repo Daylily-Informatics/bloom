@@ -152,7 +152,10 @@ def create_app() -> FastAPI:
             stop_all_writers()
 
     app = FastAPI(lifespan=_lifespan, version=__version__)
-    app.state.observability = BloomObservabilityStore()
+    dag_mount = mount_tapdb_dag_api(app)
+    app.state.observability = BloomObservabilityStore(
+        dag_advertisement=dag_mount.advertisement or {}
+    )
     refresh_template_globals()
 
     @app.middleware("http")
@@ -259,7 +262,6 @@ def create_app() -> FastAPI:
     setup_bloom_session_middleware(app)
 
     mount_tapdb_admin_subapp(app)
-    mount_tapdb_dag_api(app)
 
     # Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
     if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":

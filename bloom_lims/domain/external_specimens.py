@@ -5,9 +5,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from daylily_tapdb.external_references import ExternalReferenceService
 from sqlalchemy import func
 from sqlalchemy.orm.attributes import flag_modified
 
+from bloom_lims.atlas_references import (
+    ASSERTION_AUTHORITY,
+    canonical_target,
+    list_reference_payloads,
+    relationship_type,
+    replace_references,
+)
 from bloom_lims.config import get_settings
 from bloom_lims.domain import BloomObj
 from bloom_lims.domain.v0_graph import attach_bloom_v0_edge, object_evidence
@@ -28,8 +36,6 @@ from bloom_lims.template_identity import (
 class ExternalSpecimenService:
     """Creates, updates, and queries external specimens in Bloom."""
 
-    EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
-    EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
     _ATLAS_REFERENCE_FIELDS = (
         "trf_euid",
         "patient_id",
@@ -237,11 +243,18 @@ class ExternalSpecimenService:
         if not normalized_filters:
             return []
 
+        tenant = normalized_filters.pop("atlas_tenant_id", "")
+        if tenant and not normalized_filters:
+            raise ValueError(
+                "atlas_tenant_id cannot be the only external reference filter"
+            )
+
         matching_parent_uids: set[int] | None = None
         for key, expected in normalized_filters.items():
             parent_uids = self._find_parent_uids_for_reference(
                 reference_type=key,
                 reference_value=expected,
+                atlas_tenant_id=tenant,
             )
             if matching_parent_uids is None:
                 matching_parent_uids = parent_uids
@@ -657,68 +670,52 @@ class ExternalSpecimenService:
         return list(payloads.values())
 
     def _atlas_reference_payloads_for_instance(self, instance) -> list[dict[str, Any]]:
-        payloads: list[dict[str, Any]] = []
-        for lineage in get_parent_lineages(instance):
-            if lineage.is_deleted:
-                continue
-            if lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP:
-                continue
-            external_ref = lineage.child_instance
-            if external_ref is None or external_ref.is_deleted:
-                continue
-            if (
-                instance_semantic_category(external_ref) != "generic"
-                or external_ref.type != "generic"
-                or external_ref.subtype != "external_object_link"
-            ):
-                continue
-            payload = self._props(external_ref)
-            if str(payload.get("provider") or "").strip() != "atlas":
-                continue
-            payloads.append(payload)
-        return payloads
+        return list_reference_payloads(self.bdb.session, instance)
 
     def _find_parent_uids_for_reference(
         self,
         *,
         reference_type: str,
         reference_value: str,
+        atlas_tenant_id: str = "",
     ) -> set[int]:
         spec = self._REFERENCE_QUERY_SPECS.get(str(reference_type).strip())
         if spec is None:
             return set()
-
-        lineage_cls = self.bdb.Base.classes.generic_instance_lineage
+        tenant = str(atlas_tenant_id or "").strip().lower()
         instance_cls = self.bdb.Base.classes.generic_instance
-        filters = [
-            lineage_cls.is_deleted.is_(False),
-            lineage_cls.relationship_type == self.EXTERNAL_REFERENCE_RELATIONSHIP,
-            instance_cls.domain_code == self.domain_code,
-            instance_cls.is_deleted.is_(False),
-            instance_category_filter(instance_cls, "generic"),
-            instance_cls.type == "generic",
-            instance_cls.subtype == "external_object_link",
-            func.jsonb_extract_path_text(
-                instance_cls.json_addl["properties"], "provider"
+        euids: set[str] = set()
+        service = ExternalReferenceService(self.bdb.session)
+        for kind in spec.get("reference_types") or ():
+            properties = {
+                "provider": "atlas",
+                "reference_type": str(kind),
+                "reference_value": str(reference_value).strip(),
+            }
+            if tenant:
+                properties["atlas_tenant_id"] = tenant
+            target = canonical_target(properties)
+            page = service.find_sources(
+                target,
+                relationship_type=relationship_type(properties),
+                assertion_authority=ASSERTION_AUTHORITY,
+                limit=100,
             )
-            == "atlas",
-            func.jsonb_extract_path_text(
-                instance_cls.json_addl["properties"], str(spec["value_field"])
+            if page["page"]["next_cursor"] is not None:
+                raise RuntimeError(
+                    "external reference query exceeds reviewed 100-source bound"
+                )
+            euids.update(str(item["source"]["euid"]) for item in page["items"])
+        rows = (
+            self.bdb.session.query(instance_cls.uid)
+            .filter(
+                instance_cls.euid.in_(sorted(euids)),
+                instance_cls.domain_code == self.domain_code,
+                instance_cls.is_deleted.is_(False),
             )
-            == str(reference_value).strip(),
-        ]
-        reference_types = spec.get("reference_types")
-        query = self.bdb.session.query(lineage_cls.parent_instance_uid).join(
-            instance_cls, lineage_cls.child_instance_uid == instance_cls.uid
+            .all()
         )
-        if reference_types:
-            query = query.filter(
-                func.jsonb_extract_path_text(
-                    instance_cls.json_addl["properties"], "reference_type"
-                ).in_([str(item).strip() for item in reference_types])
-            )
-        rows = query.filter(*filters).all()
-        return {parent_uid for (parent_uid,) in rows if parent_uid is not None}
+        return {uid for (uid,) in rows if uid is not None}
 
     def _normalize_reference_payload(self, payload: dict[str, Any]) -> tuple[str, str]:
         reference_type = str(payload.get("reference_type") or "").strip()
@@ -738,63 +735,25 @@ class ExternalSpecimenService:
         atlas_refs: dict[str, Any],
         atlas_validation: dict[str, Any],
     ) -> None:
-        existing_refs = []
-        for lineage in get_parent_lineages(specimen):
-            if lineage.is_deleted:
-                continue
-            if lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP:
-                continue
-            child = lineage.child_instance
-            if child is None:
-                continue
-            existing_refs.append((lineage, child))
-
-        for lineage, child in existing_refs:
-            lineage.is_deleted = True
-            child.is_deleted = True
-
+        tenant = str(atlas_refs.get("atlas_tenant_id") or "").strip()
+        desired: list[dict[str, Any]] = []
         for reference_type, reference_value in sorted(atlas_refs.items()):
+            if reference_type == "atlas_tenant_id":
+                continue
             value = str(reference_value or "").strip()
             if not value:
                 continue
             validation_payload = atlas_validation.get(reference_type)
-            ref_payload = {
-                "properties": {
-                    "provider": "atlas",
-                    "reference_type": str(reference_type),
-                    "reference_value": value,
-                    "foreign_reference": value,
-                    "validation": validation_payload
-                    if isinstance(validation_payload, dict)
-                    else {},
-                }
+            properties = {
+                "provider": "atlas",
+                "reference_type": str(reference_type),
+                "reference_value": value,
+                "foreign_reference": value,
+                "validation": (
+                    validation_payload if isinstance(validation_payload, dict) else {}
+                ),
             }
-            ref_obj = self.bobj.create_instance_by_code(
-                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                {"json_addl": ref_payload},
-            )
-            self.bobj.create_generic_instance_lineage_by_euids(
-                specimen.euid,
-                ref_obj.euid,
-                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-            )
-            if reference_type in {"patient_id", "atlas_patient", "atlas_patient_euid"}:
-                subject_lineage = self.bobj.create_generic_instance_lineage_by_euids(
-                    specimen.euid,
-                    ref_obj.euid,
-                    relationship_type="MATERIAL_FROM_SUBJECT",
-                )
-                attach_bloom_v0_edge(
-                    subject_lineage,
-                    edge_type="MATERIAL_FROM_SUBJECT",
-                    source_euid=specimen.euid,
-                    target_euid=ref_obj.euid,
-                    source_role="material",
-                    target_role="subject_ref",
-                    evidence_refs=[
-                        object_evidence(specimen.euid, role="material"),
-                        object_evidence(ref_obj.euid, role="subject_ref"),
-                    ],
-                    correlation_id=f"bloom:{specimen.euid}:subject:{value}",
-                    causation_id=f"bloom:{specimen.euid}:atlas-ref:{reference_type}",
-                )
+            if tenant:
+                properties["atlas_tenant_id"] = tenant
+            desired.append(properties)
+        replace_references(self.bdb.session, specimen, desired)

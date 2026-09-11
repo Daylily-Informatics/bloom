@@ -130,7 +130,7 @@ class FamilyRollup:
 
 
 class BloomObservabilityStore:
-    def __init__(self) -> None:
+    def __init__(self, *, dag_advertisement: dict[str, Any]) -> None:
         self._lock = RLock()
         self._started_at = _utcnow()
         self._endpoint_rollups: dict[tuple[str, str], EndpointRollup] = {}
@@ -138,7 +138,9 @@ class BloomObservabilityStore:
         self._db_probes: deque[dict[str, Any]] = deque(maxlen=25)
         self._auth_recent: deque[dict[str, Any]] = deque(maxlen=25)
         self._auth_status_counts: Counter[str] = Counter()
-        self._obs_services_snapshot = self._build_obs_services_snapshot()
+        self._obs_services_snapshot = self._build_obs_services_snapshot(
+            dag_advertisement=dag_advertisement
+        )
 
     @property
     def started_at(self) -> str:
@@ -158,7 +160,9 @@ class BloomObservabilityStore:
     def _managed_services(self) -> list[dict[str, Any]]:
         return []
 
-    def _build_obs_services_snapshot(self) -> dict[str, Any]:
+    def _build_obs_services_snapshot(
+        self, *, dag_advertisement: dict[str, Any]
+    ) -> dict[str, Any]:
         snapshot = {
             "status": "ok",
             "endpoints": [
@@ -220,7 +224,7 @@ class BloomObservabilityStore:
             "managed_services": self._managed_services(),
             "observed_at": self._started_at,
         }
-        fragment = bloom_tapdb_dag_obs_services_fragment()
+        fragment = bloom_tapdb_dag_obs_services_fragment(dag_advertisement)
         known_endpoints = {
             (str(item.get("path") or ""), str(item.get("kind") or ""))
             for item in snapshot["endpoints"]

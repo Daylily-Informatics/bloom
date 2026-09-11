@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from bloom_lims.atlas_references import (
+    list_reference_payloads,
+    replace_reference_types,
+)
 from bloom_lims.domain.v0_graph import attach_bloom_v0_edge, object_evidence
-from bloom_lims.tapdb_adapter import get_child_lineages, get_parent_lineages
-from bloom_lims.template_identity import instance_semantic_category
+from bloom_lims.tapdb_adapter import get_child_lineages
 
 
 class _BetaLabReferenceMixin:
@@ -199,105 +202,7 @@ class _BetaLabReferenceMixin:
         return list(refs.values())
 
     def _atlas_reference_payloads_for_instance(self, instance) -> list[dict[str, Any]]:
-        payloads: list[dict[str, Any]] = []
-        for lineage in get_parent_lineages(instance):
-            if (
-                lineage.is_deleted
-                or lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP
-            ):
-                continue
-            external_ref = lineage.child_instance
-            if external_ref is None or external_ref.is_deleted:
-                continue
-            if (
-                instance_semantic_category(external_ref) != "generic"
-                or external_ref.type != "generic"
-                or external_ref.subtype != "external_object_link"
-            ):
-                continue
-            payload = self._props(external_ref)
-            if str(payload.get("provider") or "").strip() != "atlas":
-                continue
-            payloads.append(payload)
-        return payloads
-
-    def _sync_atlas_tapdb_graph_refs(
-        self,
-        instance,
-        *,
-        additional_payloads: list[dict[str, Any]] | None = None,
-    ) -> None:
-        refs: list[dict[str, Any]] = []
-        seen: set[tuple[str, str, str]] = set()
-        payloads = [
-            *self._atlas_reference_payloads_for_instance(instance),
-            *(additional_payloads or []),
-        ]
-        for payload in payloads:
-            ref = self._atlas_tapdb_graph_ref(payload)
-            if ref is None:
-                continue
-            key = (ref["system"], ref["root_euid"], ref["relationship_type"])
-            if key in seen:
-                continue
-            seen.add(key)
-            refs.append(ref)
-        props = self._props(instance)
-        external_payload = props.get("external_payload")
-        if not isinstance(external_payload, dict):
-            external_payload = {}
-        external_payload["tapdb_graph"] = refs
-        props["external_payload"] = external_payload
-        self._write_props(instance, props)
-
-    def _atlas_tapdb_graph_ref(self, payload: dict[str, Any]) -> dict[str, Any] | None:
-        root_euid = self._atlas_graph_root_euid(payload)
-        if not root_euid:
-            return None
-        ref_type = str(payload.get("reference_type") or "").strip()
-        relationship_type = self._atlas_relationship_type(ref_type)
-        ref = {
-            "system": "atlas",
-            "root_euid": root_euid,
-            "target_euid": root_euid,
-            "relationship_type": relationship_type,
-            "source_field": ref_type or "reference_value",
-        }
-        tenant_id = str(payload.get("atlas_tenant_id") or "").strip()
-        if tenant_id:
-            ref["tenant_id"] = tenant_id
-        ref["label"] = f"atlas:{relationship_type}:{root_euid}"
-        return ref
-
-    def _atlas_graph_root_euid(self, payload: dict[str, Any]) -> str:
-        ref_type = str(payload.get("reference_type") or "").strip()
-        field_name = {
-            self.PROCESS_ITEM_REFERENCE_TYPE: "atlas_test_fulfillment_item_euid",
-            self.PATIENT_REFERENCE_TYPE: "atlas_patient_euid",
-            self.TRF_REFERENCE_TYPE: "atlas_trf_euid",
-            self.TEST_REFERENCE_TYPE: "atlas_test_euid",
-            self.TESTKIT_REFERENCE_TYPE: "atlas_testkit_euid",
-            self.SHIPMENT_REFERENCE_TYPE: "atlas_shipment_euid",
-            self.ORGANIZATION_SITE_REFERENCE_TYPE: "atlas_organization_site_euid",
-            self.COLLECTION_EVENT_REFERENCE_TYPE: "atlas_collection_event_euid",
-        }.get(ref_type)
-        if field_name:
-            value = str(payload.get(field_name) or "").strip()
-            if value:
-                return value
-        return str(payload.get("reference_value") or "").strip()
-
-    def _atlas_relationship_type(self, ref_type: str) -> str:
-        return {
-            self.PROCESS_ITEM_REFERENCE_TYPE: "fulfills_atlas_test_fulfillment_item",
-            self.PATIENT_REFERENCE_TYPE: "derived_from_atlas_patient",
-            self.TRF_REFERENCE_TYPE: "received_from_atlas_trf",
-            self.TEST_REFERENCE_TYPE: "prepared_for_atlas_test",
-            self.TESTKIT_REFERENCE_TYPE: "received_with_atlas_testkit",
-            self.SHIPMENT_REFERENCE_TYPE: "received_in_atlas_shipment",
-            self.ORGANIZATION_SITE_REFERENCE_TYPE: "received_from_atlas_organization_site",
-            self.COLLECTION_EVENT_REFERENCE_TYPE: "collected_during_atlas_event",
-        }.get(ref_type, f"references_{ref_type or 'atlas_object'}")
+        return list_reference_payloads(self.bdb.session, instance)
 
     def _patient_ref_for_instance(self, instance) -> dict[str, str] | None:
         for payload in self._atlas_reference_payloads_for_instance(instance):
@@ -355,11 +260,6 @@ class _BetaLabReferenceMixin:
     def _replace_fulfillment_item_references(
         self, instance, *, atlas_context: dict[str, Any]
     ) -> None:
-        self._delete_reference_type(
-            instance,
-            reference_type=self.PROCESS_ITEM_REFERENCE_TYPE,
-        )
-
         atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
         atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
         atlas_order_euid = str(
@@ -368,382 +268,238 @@ class _BetaLabReferenceMixin:
             or ""
         ).strip()
         fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
-        for fulfillment_slot in list(atlas_context.get("fulfillment_slots") or []):
-            atlas_fulfillment_slot_euid = str(
-                fulfillment_slot.get("atlas_fulfillment_slot_euid") or ""
-            ).strip()
-            atlas_order_test_euid = str(
-                fulfillment_slot.get("atlas_order_test_euid") or ""
-            ).strip()
-            if not (atlas_fulfillment_slot_euid and atlas_order_test_euid):
-                continue
-            fulfillment_items.append(
-                {
-                    "atlas_test_euid": atlas_order_test_euid,
-                    "atlas_order_test_euid": atlas_order_test_euid,
-                    "atlas_test_fulfillment_item_euid": atlas_fulfillment_slot_euid,
-                    "atlas_fulfillment_slot_euid": atlas_fulfillment_slot_euid,
-                }
-            )
-        direct_fulfillment_item_euid = str(
+        for slot in list(atlas_context.get("fulfillment_slots") or []):
+            slot_euid = str(slot.get("atlas_fulfillment_slot_euid") or "").strip()
+            test_euid = str(slot.get("atlas_order_test_euid") or "").strip()
+            if slot_euid and test_euid:
+                fulfillment_items.append(
+                    {
+                        "atlas_test_euid": test_euid,
+                        "atlas_order_test_euid": test_euid,
+                        "atlas_test_fulfillment_item_euid": slot_euid,
+                        "atlas_fulfillment_slot_euid": slot_euid,
+                    }
+                )
+        direct_item = str(
             atlas_context.get("atlas_test_fulfillment_item_euid") or ""
         ).strip()
-        direct_test_euid = str(atlas_context.get("atlas_test_euid") or "").strip()
-        if direct_fulfillment_item_euid and direct_test_euid and not fulfillment_items:
+        direct_test = str(atlas_context.get("atlas_test_euid") or "").strip()
+        if direct_item and direct_test and not fulfillment_items:
             fulfillment_items.append(
                 {
-                    "atlas_test_euid": direct_test_euid,
-                    "atlas_test_fulfillment_item_euid": direct_fulfillment_item_euid,
+                    "atlas_test_euid": direct_test,
+                    "atlas_test_fulfillment_item_euid": direct_item,
                 }
             )
-        created_payloads: list[dict[str, Any]] = []
-
-        for fulfillment_item in fulfillment_items:
-            atlas_test_euid = str(fulfillment_item.get("atlas_test_euid") or "").strip()
-            atlas_order_test_euid = str(
-                fulfillment_item.get("atlas_order_test_euid") or atlas_test_euid or ""
+        desired: list[dict[str, Any]] = []
+        for item in fulfillment_items:
+            atlas_test_euid = str(item.get("atlas_test_euid") or "").strip()
+            order_test_euid = str(
+                item.get("atlas_order_test_euid") or atlas_test_euid
             ).strip()
-            atlas_test_fulfillment_item_euid = str(
-                fulfillment_item.get("atlas_test_fulfillment_item_euid")
-                or fulfillment_item.get("atlas_fulfillment_slot_euid")
+            fulfillment_euid = str(
+                item.get("atlas_test_fulfillment_item_euid")
+                or item.get("atlas_fulfillment_slot_euid")
                 or ""
             ).strip()
-            atlas_fulfillment_slot_euid = str(
-                fulfillment_item.get("atlas_fulfillment_slot_euid")
-                or atlas_test_fulfillment_item_euid
-                or ""
+            slot_euid = str(
+                item.get("atlas_fulfillment_slot_euid") or fulfillment_euid
             ).strip()
             if not (
                 atlas_tenant_id
                 and (atlas_trf_euid or atlas_order_euid)
-                and (atlas_test_euid or atlas_order_test_euid)
-                and atlas_test_fulfillment_item_euid
+                and (atlas_test_euid or order_test_euid)
+                and fulfillment_euid
             ):
                 continue
-            properties = {
-                "provider": "atlas",
-                "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
-                "reference_value": atlas_test_fulfillment_item_euid,
-                "foreign_reference": atlas_test_fulfillment_item_euid,
-                "atlas_tenant_id": atlas_tenant_id,
-                "atlas_trf_euid": atlas_trf_euid,
-                "atlas_order_euid": atlas_order_euid,
-                "atlas_test_euid": atlas_test_euid,
-                "atlas_order_test_euid": atlas_order_test_euid,
-                "atlas_test_fulfillment_item_euid": atlas_test_fulfillment_item_euid,
-                "atlas_fulfillment_slot_euid": atlas_fulfillment_slot_euid,
-                "validation": {},
-            }
-            created_payloads.append(properties)
-            ref_obj = self.bobj.create_instance_by_code(
-                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                {"json_addl": {"properties": properties}},
+            desired.append(
+                {
+                    "provider": "atlas",
+                    "reference_type": self.PROCESS_ITEM_REFERENCE_TYPE,
+                    "reference_value": fulfillment_euid,
+                    "foreign_reference": fulfillment_euid,
+                    "atlas_tenant_id": atlas_tenant_id,
+                    "atlas_trf_euid": atlas_trf_euid,
+                    "atlas_order_euid": atlas_order_euid,
+                    "atlas_test_euid": atlas_test_euid,
+                    "atlas_order_test_euid": order_test_euid,
+                    "atlas_test_fulfillment_item_euid": fulfillment_euid,
+                    "atlas_fulfillment_slot_euid": slot_euid,
+                }
             )
-            lineage = self.bobj.create_generic_instance_lineage_by_euids(
-                instance.euid,
-                ref_obj.euid,
-                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-            )
-            self._attach_v0_edge_to_lineage(
-                lineage,
-                edge_type="SLOT_SATISFIED_BY",
-                source_euid=atlas_fulfillment_slot_euid,
-                target_euid=instance.euid,
-                source_role="fulfillment_slot",
-                target_role="satisfying_bloom_object",
-                source_system="atlas",
-                target_system="bloom",
-                evidence_refs=[
-                    object_evidence(
-                        atlas_fulfillment_slot_euid,
-                        role="fulfillment_slot",
-                        system="atlas",
-                    ),
-                    object_evidence(instance.euid, role="satisfying_bloom_object"),
-                    object_evidence(ref_obj.euid, role="atlas_reference_link"),
-                ],
-                correlation_id=(
-                    f"SLOT_SATISFIED_BY:{atlas_fulfillment_slot_euid}:{instance.euid}"
-                ),
-                causation_id=(
-                    f"bloom:atlas_fulfillment_reference:"
-                    f"{atlas_fulfillment_slot_euid}:{instance.euid}"
-                ),
-            )
-        self._sync_atlas_tapdb_graph_refs(
-            instance, additional_payloads=created_payloads
+        replace_reference_types(
+            self.bdb.session,
+            instance,
+            desired,
+            managed_reference_types=[self.PROCESS_ITEM_REFERENCE_TYPE],
         )
 
     def _replace_container_entity_references(
-        self,
-        instance,
-        *,
-        atlas_context: dict[str, Any],
+        self, instance, *, atlas_context: dict[str, Any]
     ) -> None:
-        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
-        atlas_order_euid = str(
+        tenant = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        order_euid = str(
             atlas_context.get("atlas_order_euid")
             or atlas_context.get("order_euid")
             or ""
         ).strip()
-        atlas_order_test_euid = str(
-            atlas_context.get("atlas_order_test_euid")
-            or atlas_context.get("order_test_euid")
-            or ""
-        ).strip()
-        atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
-        atlas_test_euid = str(atlas_context.get("atlas_test_euid") or "").strip()
-        atlas_test_euids: list[str] = []
-        atlas_order_test_euids: list[str] = []
-        seen_order_tests: set[str] = set()
-        if atlas_order_test_euid:
-            seen_order_tests.add(atlas_order_test_euid)
-            atlas_order_test_euids.append(atlas_order_test_euid)
-        for value in list(atlas_context.get("atlas_order_test_euids") or []):
-            clean_value = str(value or "").strip()
-            if not clean_value or clean_value in seen_order_tests:
-                continue
-            seen_order_tests.add(clean_value)
-            atlas_order_test_euids.append(clean_value)
-        seen_tests: set[str] = set()
-        if atlas_test_euid:
-            seen_tests.add(atlas_test_euid)
-            atlas_test_euids.append(atlas_test_euid)
-        for value in list(atlas_context.get("atlas_test_euids") or []):
-            clean_value = str(value or "").strip()
-            if not clean_value or clean_value in seen_tests:
-                continue
-            seen_tests.add(clean_value)
-            atlas_test_euids.append(clean_value)
-        fulfillment_items = list(atlas_context.get("fulfillment_items") or [])
-        for fulfillment_item in fulfillment_items:
-            candidate_order_test = str(
-                fulfillment_item.get("atlas_order_test_euid")
-                or fulfillment_item.get("order_test_euid")
+        trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
+
+        def _unique(primary: str, values: Any) -> list[str]:
+            result: list[str] = []
+            for value in [primary, *list(values or [])]:
+                clean = str(value or "").strip()
+                if clean and clean not in result:
+                    result.append(clean)
+            return result
+
+        order_tests = _unique(
+            str(
+                atlas_context.get("atlas_order_test_euid")
+                or atlas_context.get("order_test_euid")
                 or ""
-            ).strip()
-            if candidate_order_test and candidate_order_test not in seen_order_tests:
-                seen_order_tests.add(candidate_order_test)
-                atlas_order_test_euids.append(candidate_order_test)
-            candidate = str(fulfillment_item.get("atlas_test_euid") or "").strip()
-            if not candidate or candidate in seen_tests:
-                continue
-            seen_tests.add(candidate)
-            atlas_test_euids.append(candidate)
-        if not atlas_test_euid and atlas_test_euids:
-            atlas_test_euid = atlas_test_euids[0]
-        reference_fields = (
+            ).strip(),
+            atlas_context.get("atlas_order_test_euids"),
+        )
+        tests = _unique(
+            str(atlas_context.get("atlas_test_euid") or "").strip(),
+            atlas_context.get("atlas_test_euids"),
+        )
+        for item in list(atlas_context.get("fulfillment_items") or []):
+            order_tests = _unique(
+                "",
+                [
+                    *order_tests,
+                    item.get("atlas_order_test_euid") or item.get("order_test_euid"),
+                ],
+            )
+            tests = _unique("", [*tests, item.get("atlas_test_euid")])
+
+        desired: list[dict[str, Any]] = []
+
+        def _add(reference_type: str, value: str, **extra: str) -> None:
+            if not (tenant and value):
+                return
+            desired.append(
+                {
+                    "provider": "atlas",
+                    "reference_type": reference_type,
+                    "reference_value": value,
+                    "foreign_reference": value,
+                    "atlas_tenant_id": tenant,
+                    **{key: item for key, item in extra.items() if item},
+                }
+            )
+
+        _add(
+            "order_euid", order_euid, order_euid=order_euid, atlas_order_euid=order_euid
+        )
+        for value in order_tests:
+            _add(
+                "order_test_euid",
+                value,
+                order_test_euid=value,
+                atlas_order_test_euid=value,
+                order_euid=order_euid,
+                atlas_order_euid=order_euid,
+            )
+        for value in tests:
+            _add(
+                self.TEST_REFERENCE_TYPE,
+                value,
+                atlas_test_euid=value,
+                atlas_trf_euid=trf_euid,
+            )
+        for reference_type, field in (
             (self.TRF_REFERENCE_TYPE, "atlas_trf_euid"),
             (self.TESTKIT_REFERENCE_TYPE, "atlas_testkit_euid"),
             (self.SHIPMENT_REFERENCE_TYPE, "atlas_shipment_euid"),
             (self.ORGANIZATION_SITE_REFERENCE_TYPE, "atlas_organization_site_euid"),
-        )
-        created_payloads: list[dict[str, Any]] = []
-        self._delete_reference_type(instance, reference_type="order_test_euid")
-        self._delete_reference_type(instance, reference_type="order_euid")
-        if atlas_tenant_id and atlas_order_euid:
-            properties = {
-                "provider": "atlas",
-                "reference_type": "order_euid",
-                "reference_value": atlas_order_euid,
-                "foreign_reference": atlas_order_euid,
-                "atlas_tenant_id": atlas_tenant_id,
-                "order_euid": atlas_order_euid,
-                "atlas_order_euid": atlas_order_euid,
-                "validation": {},
-            }
-            created_payloads.append(properties)
-            ref_obj = self.bobj.create_instance_by_code(
-                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                {"json_addl": {"properties": properties}},
-            )
-            self.bobj.create_generic_instance_lineage_by_euids(
-                instance.euid,
-                ref_obj.euid,
-                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-            )
-        if atlas_tenant_id:
-            for reference_value in atlas_order_test_euids:
-                properties = {
-                    "provider": "atlas",
-                    "reference_type": "order_test_euid",
-                    "reference_value": reference_value,
-                    "foreign_reference": reference_value,
-                    "atlas_tenant_id": atlas_tenant_id,
-                    "order_test_euid": reference_value,
-                    "atlas_order_test_euid": reference_value,
-                    "validation": {},
-                }
-                if atlas_order_euid:
-                    properties["order_euid"] = atlas_order_euid
-                    properties["atlas_order_euid"] = atlas_order_euid
-                created_payloads.append(properties)
-                ref_obj = self.bobj.create_instance_by_code(
-                    self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                    {"json_addl": {"properties": properties}},
-                )
-                self.bobj.create_generic_instance_lineage_by_euids(
-                    instance.euid,
-                    ref_obj.euid,
-                    relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-                )
-        self._delete_reference_type(instance, reference_type=self.TEST_REFERENCE_TYPE)
-        if atlas_tenant_id:
-            for reference_value in atlas_test_euids:
-                properties = {
-                    "provider": "atlas",
-                    "reference_type": self.TEST_REFERENCE_TYPE,
-                    "reference_value": reference_value,
-                    "foreign_reference": reference_value,
-                    "atlas_tenant_id": atlas_tenant_id,
-                    "atlas_test_euid": reference_value,
-                    "validation": {},
-                }
-                if atlas_trf_euid:
-                    properties["atlas_trf_euid"] = atlas_trf_euid
-                created_payloads.append(properties)
-                ref_obj = self.bobj.create_instance_by_code(
-                    self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                    {"json_addl": {"properties": properties}},
-                )
-                self.bobj.create_generic_instance_lineage_by_euids(
-                    instance.euid,
-                    ref_obj.euid,
-                    relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-                )
-        for reference_type, field_name in reference_fields:
-            self._delete_reference_type(instance, reference_type=reference_type)
-            if not atlas_tenant_id:
-                continue
-            reference_value = str(atlas_context.get(field_name) or "").strip()
-            if not reference_value:
-                continue
-            properties = {
-                "provider": "atlas",
-                "reference_type": reference_type,
-                "reference_value": reference_value,
-                "foreign_reference": reference_value,
-                "atlas_tenant_id": atlas_tenant_id,
-                "validation": {},
-            }
-            if atlas_trf_euid:
-                properties["atlas_trf_euid"] = atlas_trf_euid
-            properties[field_name] = reference_value
-            created_payloads.append(properties)
-            ref_obj = self.bobj.create_instance_by_code(
-                self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-                {"json_addl": {"properties": properties}},
-            )
-            self.bobj.create_generic_instance_lineage_by_euids(
-                instance.euid,
-                ref_obj.euid,
-                relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-            )
-        self._sync_atlas_tapdb_graph_refs(
-            instance, additional_payloads=created_payloads
+        ):
+            value = str(atlas_context.get(field) or "").strip()
+            _add(reference_type, value, **{field: value, "atlas_trf_euid": trf_euid})
+        replace_reference_types(
+            self.bdb.session,
+            instance,
+            desired,
+            managed_reference_types=[
+                "order_euid",
+                "order_test_euid",
+                self.TEST_REFERENCE_TYPE,
+                self.TRF_REFERENCE_TYPE,
+                self.TESTKIT_REFERENCE_TYPE,
+                self.SHIPMENT_REFERENCE_TYPE,
+                self.ORGANIZATION_SITE_REFERENCE_TYPE,
+            ],
         )
 
     def _replace_collection_event_reference(
         self, instance, *, atlas_context: dict[str, Any]
     ) -> None:
-        self._delete_reference_type(
+        tenant = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        event_euid = str(atlas_context.get("atlas_collection_event_euid") or "").strip()
+        snapshot = atlas_context.get("collection_event_snapshot")
+        if not event_euid and isinstance(snapshot, dict):
+            event_euid = str(snapshot.get("collection_event_euid") or "").strip()
+        desired = []
+        if tenant and event_euid:
+            desired.append(
+                {
+                    "provider": "atlas",
+                    "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
+                    "reference_value": event_euid,
+                    "foreign_reference": event_euid,
+                    "atlas_tenant_id": tenant,
+                    "atlas_collection_event_euid": event_euid,
+                    "atlas_trf_euid": str(
+                        atlas_context.get("atlas_trf_euid") or ""
+                    ).strip(),
+                    "collection_event_snapshot": snapshot
+                    if isinstance(snapshot, dict)
+                    else {},
+                }
+            )
+        replace_reference_types(
+            self.bdb.session,
             instance,
-            reference_type=self.COLLECTION_EVENT_REFERENCE_TYPE,
+            desired,
+            managed_reference_types=[self.COLLECTION_EVENT_REFERENCE_TYPE],
         )
-        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
-        collection_event_euid = str(
-            atlas_context.get("atlas_collection_event_euid") or ""
-        ).strip()
-        if not collection_event_euid:
-            snapshot = atlas_context.get("collection_event_snapshot")
-            if isinstance(snapshot, dict):
-                collection_event_euid = str(
-                    snapshot.get("collection_event_euid") or ""
-                ).strip()
-        if not (atlas_tenant_id and collection_event_euid):
-            self._sync_atlas_tapdb_graph_refs(instance)
-            return
-        snapshot_payload = atlas_context.get("collection_event_snapshot")
-        if not isinstance(snapshot_payload, dict):
-            snapshot_payload = {}
-        properties = {
-            "provider": "atlas",
-            "reference_type": self.COLLECTION_EVENT_REFERENCE_TYPE,
-            "reference_value": collection_event_euid,
-            "foreign_reference": collection_event_euid,
-            "atlas_tenant_id": atlas_tenant_id,
-            "atlas_collection_event_euid": collection_event_euid,
-            "atlas_trf_euid": str(atlas_context.get("atlas_trf_euid") or "").strip(),
-            "collection_event_snapshot": snapshot_payload,
-            "validation": {},
-        }
-        ref_obj = self.bobj.create_instance_by_code(
-            self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-            {"json_addl": {"properties": properties}},
-        )
-        self.bobj.create_generic_instance_lineage_by_euids(
-            instance.euid,
-            ref_obj.euid,
-            relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-        )
-        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=[properties])
 
     def _replace_patient_reference(
         self, instance, *, atlas_context: dict[str, Any]
     ) -> None:
-        self._delete_reference_type(
+        tenant = str(atlas_context.get("atlas_tenant_id") or "").strip()
+        patient_euid = str(atlas_context.get("atlas_patient_euid") or "").strip()
+        desired = []
+        if tenant and patient_euid:
+            desired.append(
+                {
+                    "provider": "atlas",
+                    "reference_type": self.PATIENT_REFERENCE_TYPE,
+                    "reference_value": patient_euid,
+                    "foreign_reference": patient_euid,
+                    "atlas_tenant_id": tenant,
+                    "atlas_patient_euid": patient_euid,
+                    "atlas_trf_euid": str(
+                        atlas_context.get("atlas_trf_euid") or ""
+                    ).strip(),
+                }
+            )
+        replace_reference_types(
+            self.bdb.session,
             instance,
-            reference_type=self.PATIENT_REFERENCE_TYPE,
+            desired,
+            managed_reference_types=[self.PATIENT_REFERENCE_TYPE],
         )
-        atlas_tenant_id = str(atlas_context.get("atlas_tenant_id") or "").strip()
-        atlas_patient_euid = str(atlas_context.get("atlas_patient_euid") or "").strip()
-        atlas_trf_euid = str(atlas_context.get("atlas_trf_euid") or "").strip()
-        if not (atlas_tenant_id and atlas_patient_euid):
-            self._sync_atlas_tapdb_graph_refs(instance)
-            return
-        properties = {
-            "provider": "atlas",
-            "reference_type": self.PATIENT_REFERENCE_TYPE,
-            "reference_value": atlas_patient_euid,
-            "foreign_reference": atlas_patient_euid,
-            "atlas_tenant_id": atlas_tenant_id,
-            "atlas_patient_euid": atlas_patient_euid,
-            "atlas_trf_euid": atlas_trf_euid,
-            "validation": {},
-        }
-        ref_obj = self.bobj.create_instance_by_code(
-            self.EXTERNAL_REFERENCE_TEMPLATE_CODE,
-            {"json_addl": {"properties": properties}},
-        )
-        self.bobj.create_generic_instance_lineage_by_euids(
-            instance.euid,
-            ref_obj.euid,
-            relationship_type=self.EXTERNAL_REFERENCE_RELATIONSHIP,
-        )
-        self._sync_atlas_tapdb_graph_refs(instance, additional_payloads=[properties])
 
     def _delete_reference_type(self, instance, *, reference_type: str) -> None:
-        existing_refs = []
-        for lineage in get_parent_lineages(instance):
-            if (
-                lineage.is_deleted
-                or lineage.relationship_type != self.EXTERNAL_REFERENCE_RELATIONSHIP
-            ):
-                continue
-            child = lineage.child_instance
-            if child is None:
-                continue
-            existing_refs.append((lineage, child))
-
-        for lineage, child in existing_refs:
-            payload = self._props(child)
-            if (
-                str(payload.get("reference_type") or "").strip()
-                != str(reference_type).strip()
-            ):
-                continue
-            lineage.is_deleted = True
-            child.is_deleted = True
+        replace_reference_types(
+            self.bdb.session,
+            instance,
+            [],
+            managed_reference_types=[reference_type],
+        )
 
     def _atlas_context_for_instance(self, instance) -> dict[str, Any]:
         fulfillment_items = self._reachable_fulfillment_item_refs(instance)

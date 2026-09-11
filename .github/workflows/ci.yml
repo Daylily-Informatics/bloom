@@ -305,12 +305,12 @@ jobs:
       - name: Install bloom in editable mode
         shell: bash -el {0}
         run: |
-          pip install -e '.[dev]'
+          pip install -e .
 
       - name: Initialize local Bloom database
         shell: bash -el {0}
         run: |
-          bloom db build --skip-conda-env-check
+          bloom db build --target local --skip-conda-env-check
 
       - name: Run beta-critical tests
         shell: bash -el {0}

@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm.attributes import flag_modified
 
 from bloom_lims.api.v1.dependencies import APIUser, require_external_token_auth
+from bloom_lims.atlas_references import ASSERTION_AUTHORITY, DEWEY_ASSERTION_AUTHORITY
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.core import action_execution as action_exec
 from bloom_lims.core.tapdb_action_dispatcher import (
@@ -819,6 +820,7 @@ def test_beta_flow_records_modern_action_instances(bdb):
         plate_euid = extraction_body["plate_euid"]
         well_euid = extraction_body["well_euid"]
 
+        quant_artifact_ref = _opaque("dewey-quant")
         qc = client.post(
             "/api/v1/external/atlas/beta/post-extract-qc",
             headers={"Idempotency-Key": _opaque("idem-qc")},
@@ -826,9 +828,11 @@ def test_beta_flow_records_modern_action_instances(bdb):
                 "extraction_output_euid": extraction_output_euid,
                 "passed": True,
                 "next_queue": "ilmn_lib_prep",
+                "quant_artifact_euid": quant_artifact_ref,
             },
         )
         assert qc.status_code == 200, qc.text
+        qc_record_euid = qc.json()["qc_record_euid"]
 
         library_prep = client.post(
             "/api/v1/external/atlas/beta/library-prep",
@@ -911,11 +915,19 @@ def test_beta_flow_records_modern_action_instances(bdb):
             .one()
         )
 
-    def graph_ref_tuples(euid: str):
-        props = _props(instance(euid))
-        refs = props.get("external_payload", {}).get("tapdb_graph", [])
+    def xrf_tuples(euid: str, *, authority: str = ASSERTION_AUTHORITY):
+        from daylily_tapdb.external_references import ExternalReferenceService
+
+        refs = ExternalReferenceService(bdb.session).list_for_source(
+            instance(euid), assertion_authority=authority, limit=100
+        )["items"]
         return {
-            (ref["system"], ref["root_euid"], ref["relationship_type"]) for ref in refs
+            (
+                str(ref["namespace"]).split(".", 1)[0],
+                ref["value"],
+                ref["relationship_type"],
+            )
+            for ref in refs
         }
 
     lineage_cls = bdb.Base.classes.generic_instance_lineage
@@ -975,22 +987,32 @@ def test_beta_flow_records_modern_action_instances(bdb):
     ]
     test_ref = atlas_context["fulfillment_items"][0]["atlas_test_euid"]
     expected_atlas_refs = {
-        ("atlas", atlas_context["atlas_trf_euid"], "received_from_atlas_trf"),
-        ("atlas", test_ref, "prepared_for_atlas_test"),
-        ("atlas", fulfillment_slot_ref, "fulfills_atlas_test_fulfillment_item"),
+        ("atlas", atlas_context["atlas_trf_euid"], "references_atlas_atlas_trf"),
+        ("atlas", test_ref, "references_atlas_atlas_test"),
+        (
+            "atlas",
+            fulfillment_slot_ref,
+            "references_atlas_atlas_test_fulfillment_item",
+        ),
     }
-    assert expected_atlas_refs.issubset(graph_ref_tuples(specimen_euid))
+    assert expected_atlas_refs.issubset(xrf_tuples(specimen_euid))
     assert (
         "atlas",
         fulfillment_slot_ref,
-        "fulfills_atlas_test_fulfillment_item",
-    ) in graph_ref_tuples(lib_output_euid), _props(instance(lib_output_euid))
+        "references_atlas_atlas_test_fulfillment_item",
+    ) in xrf_tuples(lib_output_euid), _props(instance(lib_output_euid))
     assert (
         "atlas",
         fulfillment_slot_ref,
-        "fulfills_atlas_test_fulfillment_item",
-    ) in graph_ref_tuples(library_material_euid), _props(
-        instance(library_material_euid)
+        "references_atlas_atlas_test_fulfillment_item",
+    ) in xrf_tuples(library_material_euid), _props(instance(library_material_euid))
+    assert (
+        "dewey",
+        quant_artifact_ref,
+        "uses_quant_artifact",
+    ) in xrf_tuples(qc_record_euid, authority=DEWEY_ASSERTION_AUTHORITY)
+    assert "tapdb_graph" not in _props(instance(qc_record_euid)).get(
+        "external_payload", {}
     )
 
     assert {
@@ -1073,13 +1095,6 @@ def test_beta_flow_records_modern_action_instances(bdb):
             "consumed_material",
         ),
         ("RUN_PRODUCED", run_euid, "workflow_run", artifact_euid, "produced_artifact"),
-        (
-            "SLOT_SATISFIED_BY",
-            fulfillment_slot_ref,
-            "fulfillment_slot",
-            library_material_euid,
-            "satisfying_bloom_object",
-        ),
     }.issubset(v0_edge_tuples())
 
     plate_graph = _props(instance(plate_euid))["graph"]
