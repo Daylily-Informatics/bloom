@@ -17,9 +17,9 @@ from bloom_lims.api.v1.dependencies import (
     require_external_token_auth,
     require_external_ursa_api_enabled,
 )
+from bloom_lims.atlas_references import list_reference_payloads
 from bloom_lims.auth.rbac import ENABLE_ATLAS_API_GROUP, ENABLE_URSA_API_GROUP
 from bloom_lims.domain import BloomObj
-from bloom_lims.tapdb_adapter import get_parent_lineages
 
 os.environ["BLOOM_DEV_AUTH_BYPASS"] = "true"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -82,24 +82,7 @@ def test_material_registration_links_fulfillment_items_on_container_and_specimen
         )
 
     def _atlas_refs(instance):
-        refs: list[dict] = []
-        for lineage in get_parent_lineages(instance):
-            if (
-                lineage.is_deleted
-                or lineage.relationship_type != "has_external_reference"
-            ):
-                continue
-            child = lineage.child_instance
-            if child is None or child.is_deleted:
-                continue
-            payload = child.json_addl or {}
-            props = payload.get("properties") if isinstance(payload, dict) else {}
-            if not isinstance(props, dict):
-                continue
-            if str(props.get("provider") or "").strip() != "atlas":
-                continue
-            refs.append(props)
-        return refs
+        return list_reference_payloads(bdb.session, instance)
 
     app.dependency_overrides[require_external_token_auth] = _atlas_rw_user
     client = TestClient(app)
@@ -231,24 +214,7 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         )
 
     def _atlas_refs(instance):
-        refs: list[dict] = []
-        for lineage in get_parent_lineages(instance):
-            if (
-                lineage.is_deleted
-                or lineage.relationship_type != "has_external_reference"
-            ):
-                continue
-            child = lineage.child_instance
-            if child is None or child.is_deleted:
-                continue
-            payload = child.json_addl or {}
-            props = payload.get("properties") if isinstance(payload, dict) else {}
-            if not isinstance(props, dict):
-                continue
-            if str(props.get("provider") or "").strip() != "atlas":
-                continue
-            refs.append(props)
-        return refs
+        return list_reference_payloads(bdb.session, instance)
 
     app.dependency_overrides[require_external_token_auth] = _atlas_rw_user
     client = TestClient(app)
@@ -321,6 +287,9 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         assert not any(
             str(ref.get("reference_type")) == "atlas_patient" for ref in specimen_refs
         )
+        # End the reader's repeatable-read transaction before the API commits a
+        # later snapshot. TapDB 10 installs identity context per transaction.
+        bdb.session.rollback()
 
         patched = client.patch(
             f"/api/v1/external/atlas/beta/specimens/{specimen_body['specimen_euid']}",
@@ -338,17 +307,16 @@ def test_empty_tube_create_and_specimen_update_use_collection_event_reference(bd
         )
         assert patched.status_code == 200, patched.text
 
-        updated_specimen_refs = _atlas_refs(
-            bobj.get_by_euid(specimen_body["specimen_euid"])
-        )
-        assert any(
-            str(ref.get("reference_type")) == "atlas_collection_event"
-            and str(ref.get("collection_event_snapshot", {}).get("collection_type"))
-            == "fingerstick"
-            and str(ref.get("collection_event_snapshot", {}).get("expected_name"))
-            == "Pat Ient"
+        updated_specimen = bobj.get_by_euid(specimen_body["specimen_euid"])
+        updated_specimen_refs = _atlas_refs(updated_specimen)
+        collection_ref = next(
+            ref
             for ref in updated_specimen_refs
+            if str(ref.get("reference_type")) == "atlas_collection_event"
         )
+        updated_snapshot = collection_ref["collection_event_snapshot"]
+        assert updated_snapshot["collection_type"] == "fingerstick"
+        assert updated_snapshot["expected_name"] == "Pat Ient"
         assert not any(
             str(ref.get("reference_type")) == "atlas_patient"
             for ref in updated_specimen_refs

@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import create_engine, text
 
 import bloom_lims.tapdb_adapter as tapdb_adapter
 from bloom_lims.tapdb_adapter import generic_instance_lineage, generic_template
@@ -30,33 +31,14 @@ def test_instance_semantic_category_falls_back_to_parent_template():
     assert instance_semantic_category(instance) == "container"
 
 
-class _FakeSession:
-    def __init__(self) -> None:
-        self.executed: list[tuple[object, dict[str, str]]] = []
-
-    def execute(self, statement, params=None):
-        self.executed.append((statement, params or {}))
-
-    def close(self) -> None:
-        return None
-
-
 class _FakeTapdbConnection:
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
-        self.engine = object()
-        self._Session = self._raw_session
-        self.get_session_calls = 0
-        self.sessions: list[_FakeSession] = []
+        self.engine = create_engine("sqlite+pysqlite:///:memory:")
+        self.transaction_context_connections: list[object] = []
 
-    def _raw_session(self):
-        raise AssertionError("BLOOMdb3 must use TAPDBConnection.get_session()")
-
-    def get_session(self):
-        self.get_session_calls += 1
-        session = _FakeSession()
-        self.sessions.append(session)
-        return session
+    def install_transaction_context(self, connection) -> None:
+        self.transaction_context_connections.append(connection)
 
     def close(self) -> None:
         return None
@@ -78,10 +60,15 @@ def fake_tapdb(monkeypatch: pytest.MonkeyPatch) -> _FakeTapdbConnection:
             "engine_type": "local",
             "host": "localhost",
             "port": "5566",
+            "server_port": "5566",
             "user": "tester",
             "password": "",
             "database": "tapdb_bloom_dev",
             "schema_name": "tapdb_bloom_tests_dev",
+            "region": "us-west-2",
+            "iam_auth": False,
+            "allow_global_claims": True,
+            "config_path": "/tmp/tapdb-bloom-tests.yaml",
         },
     )
     monkeypatch.setattr(tapdb_adapter, "TAPDBConnection", _factory)
@@ -91,26 +78,38 @@ def fake_tapdb(monkeypatch: pytest.MonkeyPatch) -> _FakeTapdbConnection:
     return holder
 
 
-def test_bloomdb3_bootstraps_sessions_via_tapdb_connection(fake_tapdb):
+def test_bloomdb3_installs_tapdb_context_for_every_transaction(fake_tapdb):
     db = tapdb_adapter.BLOOMdb3(app_username="pytest@example.com")
     conn = fake_tapdb["conn"]
 
-    assert conn.get_session_calls == 1
     assert conn.kwargs["schema_name"] == "tapdb_bloom_tests_dev"
-    assert db.session is conn.sessions[0]
-    assert conn.sessions[0].executed[-1][1] == {"username": "pytest@example.com"}
+    assert conn.kwargs["config_identity"].startswith("/")
+    assert conn.kwargs["connection_role"] == "runtime"
+
+    db.session.execute(text("CREATE TABLE receipts (value INTEGER NOT NULL)"))
+    db.session.commit()
+    db.session.execute(text("INSERT INTO receipts VALUES (1)"))
+    db.session.commit()
+
+    with pytest.raises(RuntimeError, match="rollback probe"):
+        db.session.execute(text("INSERT INTO receipts VALUES (2)"))
+        raise RuntimeError("rollback probe")
+    db.session.rollback()
+
+    assert db.session.execute(text("SELECT value FROM receipts")).scalars().all() == [1]
+    assert len(conn.transaction_context_connections) == 4
 
     db.close()
 
 
-def test_bloomdb3_new_session_uses_tapdb_prepared_session(fake_tapdb):
+def test_bloomdb3_new_session_gets_its_own_transaction_context(fake_tapdb):
     db = tapdb_adapter.BLOOMdb3(app_username="pytest@example.com")
     conn = fake_tapdb["conn"]
 
     new_session = db.new_session()
+    new_session.execute(text("SELECT 1"))
 
-    assert conn.get_session_calls == 2
-    assert new_session is conn.sessions[-1]
-    assert new_session.executed[-1][1] == {"username": "pytest@example.com"}
+    assert conn.transaction_context_connections == [new_session.connection()]
 
+    new_session.close()
     db.close()

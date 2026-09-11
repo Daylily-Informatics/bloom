@@ -188,7 +188,19 @@ def test_observability_store_treats_zebra_day_as_dependency_not_managed_service(
     )
     monkeypatch.setattr("bloom_lims.observability.get_settings", lambda: settings)
 
-    store = BloomObservabilityStore()
+    store = BloomObservabilityStore(
+        dag_advertisement={
+            "extensions": ["tapdb.dag_v2"],
+            "dag_v2": {
+                "extension": "tapdb.dag_v2",
+                "contract": "dag:v2",
+                "service_id": "bloom",
+                "eligible": True,
+                "endpoints": [],
+                "features": {},
+            },
+        }
+    )
     _projection, payload = store.obs_services_snapshot()
 
     assert "atlas" in payload["dependencies"]["configured_services"]

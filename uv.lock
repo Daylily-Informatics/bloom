@@ -118,6 +118,27 @@ wheels = [
 ]
 
 [[package]]
+name = "bcrypt"
+version = "3.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/36/edc85ab295ceff724506252b774155eff8a238f13730c8b13badd33ef866/bcrypt-3.2.2.tar.gz", hash = "sha256:433c410c2177057705da2a9f2cd01dd157493b2a7ac14c8593a16b3dab6b6bfb", size = 42455, upload-time = "2022-05-01T17:58:52.348Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c2/05354b1d4351d2e686a32296cc9dd1e63f9909a580636df0f7b06d774600/bcrypt-3.2.2-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:7180d98a96f00b1050e93f5b0f556e658605dd9f524d0b0e68ae7944673f525e", size = 50049, upload-time = "2022-05-01T18:05:47.625Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/b3/1257f7d64ee0aa0eb4fb1de5da8c2647a57db7b737da1f2342ac1889d3b8/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:61bae49580dce88095d669226d5076d0b9d927754cedbdf76c6c9f5099ad6f26", size = 54914, upload-time = "2022-05-01T18:03:00.752Z" },
+    { url = "https://files.pythonhosted.org/packages/61/3d/dce83194830183aa700cab07c89822471d21663a86a0b305d1e5c7b02810/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:88273d806ab3a50d06bc6a2fc7c87d737dd669b76ad955f449c43095389bc8fb", size = 54403, upload-time = "2022-05-01T18:03:02.483Z" },
+    { url = "https://files.pythonhosted.org/packages/86/1b/f4d7425dfc6cd0e405b48ee484df6d80fb39e05f25963dbfcc2c511e8341/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:6d2cb9d969bfca5bc08e45864137276e4c3d3d7de2b162171def3d188bf9d34a", size = 62337, upload-time = "2022-05-01T18:05:49.524Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/df/289db4f31b303de6addb0897c8b5c01b23bd4b8c511ac80a32b08658847c/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2b02d6bfc6336d1094276f3f588aa1225a598e27f8e3388f4db9948cb707b521", size = 61026, upload-time = "2022-05-01T18:05:51.107Z" },
+    { url = "https://files.pythonhosted.org/packages/40/8f/b67b42faa2e4d944b145b1a402fc08db0af8fe2dfa92418c674b5a302496/bcrypt-3.2.2-cp36-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:a2c46100e315c3a5b90fdc53e429c006c5f962529bc27e1dfd656292c20ccc40", size = 64672, upload-time = "2022-05-01T18:05:52.748Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/9a/e1867f0b27a3f4ce90e21dd7f322f0e15d4aac2434d3b938dcf765e47c6b/bcrypt-3.2.2-cp36-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:7d9ba2e41e330d2af4af6b1b6ec9e6128e91343d0b4afb9282e54e5508f31baa", size = 56795, upload-time = "2022-05-01T18:03:04.028Z" },
+    { url = "https://files.pythonhosted.org/packages/18/76/057b0637c880e6cb0abdc8a867d080376ddca6ed7d05b7738f589cc5c1a8/bcrypt-3.2.2-cp36-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:cd43303d6b8a165c29ec6756afd169faba9396a9472cdff753fe9f19b96ce2fa", size = 62075, upload-time = "2022-05-01T18:05:54.412Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/64/cd93e2c3e28a5fa8bcf6753d5cc5e858e4da08bf51404a0adb6a412532de/bcrypt-3.2.2-cp36-abi3-win32.whl", hash = "sha256:4e029cef560967fb0cf4a802bcf4d562d3d6b4b1bf81de5ec1abbe0f1adb027e", size = 27916, upload-time = "2022-05-01T18:05:56.45Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/37/7cd297ff571c4d86371ff024c0e008b37b59e895b28f69444a9b6f94ca1a/bcrypt-3.2.2-cp36-abi3-win_amd64.whl", hash = "sha256:7ff2069240c6bbe49109fe84ca80508773a904f5a8cb960e02a977f7f519b129", size = 29581, upload-time = "2022-05-01T18:05:57.878Z" },
+]
+
+[[package]]
 name = "black"
 version = "26.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -159,7 +180,7 @@ dependencies = [
     { name = "cli-core-yo" },
     { name = "daylily-auth-cognito" },
     { name = "daylily-carrier-tracking" },
-    { name = "daylily-tapdb" },
+    { name = "daylily-tapdb", extra = ["aurora", "gui"] },
     { name = "defusedxml" },
     { name = "djlint" },
     { name = "fastapi" },
@@ -201,7 +222,7 @@ requires-dist = [
     { name = "cli-core-yo", specifier = "==2.1.1" },
     { name = "daylily-auth-cognito", specifier = "==2.1.5" },
     { name = "daylily-carrier-tracking", specifier = "==0.5.1" },
-    { name = "daylily-tapdb", git = "https://github.com/Daylily-Informatics/daylily-tapdb.git?rev=9.0.10" },
+    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==10.1.1rc1" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "djlint" },
     { name = "fastapi", specifier = ">=0.110.0" },
@@ -706,8 +727,8 @@ wheels = [
 
 [[package]]
 name = "daylily-tapdb"
-version = "9.0.10"
-source = { git = "https://github.com/Daylily-Informatics/daylily-tapdb.git?rev=9.0.10#12351b832276d35228527c3c9596e5d60e7c7824" }
+version = "10.1.1rc1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cli-core-yo" },
     { name = "jsonschema" },
@@ -719,6 +740,26 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "typer" },
     { name = "uuid6" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/ed/2f6a15d20be37592c667a166b09753542014d4f9414d82216d11441e7747/daylily_tapdb-10.1.1rc1.tar.gz", hash = "sha256:abf2e5b18184db736c8e54fb77cbc96e78c77921f0f65b7c8f026ebb20a8a5fb", size = 1337506, upload-time = "2026-09-11T04:57:59.561Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a2/b7/9f828b0343a65b032875139e4e8ab89418f97607656c2650107ab8b3e904/daylily_tapdb-10.1.1rc1-py3-none-any.whl", hash = "sha256:26de691dd5f9c8fac596a18119c9220f4ea78826094753b47f9eb936b0677ce7", size = 667238, upload-time = "2026-09-11T04:57:58.148Z" },
+]
+
+[package.optional-dependencies]
+aurora = [
+    { name = "boto3" },
+    { name = "botocore" },
+]
+gui = [
+    { name = "bcrypt" },
+    { name = "daylily-auth-cognito" },
+    { name = "fastapi" },
+    { name = "itsdangerous" },
+    { name = "jinja2" },
+    { name = "passlib", extra = ["bcrypt"] },
+    { name = "python-multipart" },
+    { name = "uvicorn" },
 ]
 
 [[package]]
@@ -1426,11 +1467,11 @@ wheels = [
 
 [[package]]
 name = "meridian-euid"
-version = "0.4.7"
+version = "0.4.8"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7c/ea/eff4b7b442f20fa5aa968735ee17f43f9d8e9621da89230426a43203ef5b/meridian_euid-0.4.7.tar.gz", hash = "sha256:27b65eba282a904a876c7df16b48a8329900190cf5830a5fd61776f89d98a62a", size = 19238, upload-time = "2026-06-04T09:47:05.716Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/33/599f4ce7a6d018ac307cadc604cdb32f02c5b4678fb9503b7216fd8a8d91/meridian_euid-0.4.8.tar.gz", hash = "sha256:54a67bf831088f52c395119d2cacac9354a60c3a1b084817d9b1d90f718a4b3d", size = 19365, upload-time = "2026-09-01T11:01:03.802Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/53/8c9b0dd4f9ec901b0289e6f7fc20163d588d20019edd6f437233cf834c91/meridian_euid-0.4.7-py3-none-any.whl", hash = "sha256:a369a21b4bc7835848ea424bc0a9b1f8273afb13e7ab0c9e83bdd9111a7dd1c8", size = 15316, upload-time = "2026-06-04T09:47:04.808Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/67/c6a33b4af287d8b9951f1d69ce7d62bf73cc83541272f7728c2118c14dfc/meridian_euid-0.4.8-py3-none-any.whl", hash = "sha256:c36e96b36c78da427b200bda7f76c23bd7db74dbe32b54a473134e2f1f61b946", size = 15352, upload-time = "2026-09-01T11:01:02.79Z" },
 ]
 
 [[package]]
@@ -1642,6 +1683,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/30/4b/90c937815137d43ce71ba043cd3566221e9df6b9c805f24b5d138c9d40a7/parso-0.8.7.tar.gz", hash = "sha256:eaaac4c9fdd5e9e8852dc778d2d7405897ec510f2a298071453e5e3a07914bb1", size = 401824, upload-time = "2026-05-01T23:13:02.138Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/5d/8268b644392ee874ee82a635cd0df1773de230bde356c38de28e298392cc/parso-0.8.7-py2.py3-none-any.whl", hash = "sha256:a8926eb2a1b915486941fdbd31e86a4baf88fe8c210f25f2f35ecec5b574ca1c", size = 107025, upload-time = "2026-05-01T23:12:58.867Z" },
+]
+
+[[package]]
+name = "passlib"
+version = "1.7.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/06/9da9ee59a67fae7761aab3ccc84fa4f3f33f125b370f1ccdb915bf967c11/passlib-1.7.4.tar.gz", hash = "sha256:defd50f72b65c5402ab2c573830a6978e5f202ad0d984793c8dde2c4152ebe04", size = 689844, upload-time = "2020-10-08T19:00:52.121Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1", size = 525554, upload-time = "2020-10-08T19:00:49.856Z" },
+]
+
+[package.optional-dependencies]
+bcrypt = [
+    { name = "bcrypt" },
 ]
 
 [[package]]

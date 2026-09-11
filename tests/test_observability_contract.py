@@ -91,32 +91,24 @@ def test_obs_services_uses_canonical_capability_vocabulary() -> None:
         },
         "/my_health": {"auth": "authenticated_self", "kind": "self"},
         "/auth_health": {"auth": "operator_or_service_token", "kind": "auth"},
-        "/api/dag/object/{euid}": {
+        "/api/dag/v2/object/{euid}": {
             "auth": "operator_or_service_token",
             "kind": "dag_exact_lookup",
         },
-        "/api/dag/data": {
+        "/api/dag/v2/data": {
             "auth": "operator_or_service_token",
             "kind": "dag_native_graph",
         },
-        "/api/dag/search": {
+        "/api/dag/v2/search": {
             "auth": "operator_or_service_token",
             "kind": "dag_object_search",
         },
-        "/api/dag/external": {
-            "auth": "operator_or_service_token",
-            "kind": "dag_external_graph",
-        },
-        "/api/dag/external/object": {
-            "auth": "operator_or_service_token",
-            "kind": "dag_external_object",
-        },
     }
     assert "bloom.anomalies_v1" in response.json()["extensions"]
-    assert "tapdb.dag_v1" in response.json()["extensions"]
-    assert "object_search" in response.json()["capabilities"]
+    assert "tapdb.dag_v2" in response.json()["extensions"]
+    assert "external_reference_search" in response.json()["capabilities"]
     assert "typed_external_identifier" in response.json()["external_ref_models"]
-    assert response.json()["tapdb_dag_contract_version"] == "dag:v1"
+    assert response.json()["tapdb_dag_contract_version"] == "dag:v2"
 
 
 def test_obs_services_exposes_dependency_metadata() -> None:

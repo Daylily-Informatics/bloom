@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from bloom_lims.atlas_references import replace_dewey_quant_reference
 from bloom_lims.integrations.dewey.client import DeweyClientError
 from bloom_lims.schemas.beta_lab import (
     BetaExtractionCreateRequest,
@@ -411,23 +412,9 @@ class _BetaLabStagesMixin:
             },
             template_code=self.DATA_TEMPLATE_BY_BETA_KIND.get("post_extract_qc_result"),
         )
-        if payload.quant_artifact_euid:
-            qc_props = self._props(qc_record)
-            external_payload = qc_props.get("external_payload")
-            if not isinstance(external_payload, dict):
-                external_payload = {}
-            external_payload["tapdb_graph"] = [
-                {
-                    "system": "dewey",
-                    "root_euid": payload.quant_artifact_euid,
-                    "target_euid": payload.quant_artifact_euid,
-                    "relationship_type": "uses_quant_artifact",
-                    "label": f"dewey:uses_quant_artifact:{payload.quant_artifact_euid}",
-                    "source_field": "quant_artifact_euid",
-                }
-            ]
-            qc_props["external_payload"] = external_payload
-            self._write_props(qc_record, qc_props)
+        replace_dewey_quant_reference(
+            self.bdb.session, qc_record, payload.quant_artifact_euid
+        )
         self.bobj.create_generic_instance_lineage_by_euids(
             output.euid,
             qc_record.euid,

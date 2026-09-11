@@ -57,8 +57,8 @@ from daylily_tapdb.models.template import (
     workflow_step_template,
     workflow_template,
 )
-from sqlalchemy import text
-from sqlalchemy.orm import Session, object_session
+from sqlalchemy import event
+from sqlalchemy.orm import Session, object_session, sessionmaker
 
 from bloom_lims.config import (
     apply_runtime_environment,
@@ -82,6 +82,16 @@ _KNOWN_LINEAGE_IDENTITIES = (
     "file_instance_lineage",
     "subject_instance_lineage",
 )
+
+
+def _explicit_bool(value: object, field: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise RuntimeError(f"Bloom TapDB {field} must be an explicit boolean")
 
 
 class _LineageQueryProxy:
@@ -179,7 +189,7 @@ file_set_instance_lineage = file_instance_lineage
 file_reference_instance_lineage = file_instance_lineage
 
 bloom_core = tapdb_core
-_COMPAT_BASE_CLASSES = SimpleNamespace(
+_MODEL_CLASSES = SimpleNamespace(
     generic_template=generic_template,
     generic_instance=generic_instance,
     generic_instance_lineage=generic_instance_lineage,
@@ -224,33 +234,7 @@ _COMPAT_BASE_CLASSES = SimpleNamespace(
     subject_instance_lineage=subject_instance_lineage,
     audit_log=audit_log,
 )
-Base = SimpleNamespace(classes=_COMPAT_BASE_CLASSES, metadata=TapDBBase.metadata)
-
-
-class _TransactionContext:
-    """Transaction context manager."""
-
-    def __init__(self, session: Session):
-        self.session = session
-        self.logger = logging.getLogger(__name__ + "._TransactionContext")
-
-    def __enter__(self) -> Session:
-        return self.session
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
-        if exc_type is not None:
-            self.logger.warning(
-                "Transaction rollback due to: %s: %s", exc_type.__name__, exc_val
-            )
-            self.session.rollback()
-        else:
-            try:
-                self.session.commit()
-            except Exception as exc:
-                self.logger.error("Commit failed, rolling back: %s", exc)
-                self.session.rollback()
-                raise
-        return False
+Base = SimpleNamespace(classes=_MODEL_CLASSES, metadata=TapDBBase.metadata)
 
 
 class BLOOMdb3:
@@ -277,11 +261,24 @@ class BLOOMdb3:
             pass
 
         cfg = get_tapdb_db_config()
-        engine_type = cfg.get("engine_type", "local")
+        engine_type = cfg["engine_type"]
+        if engine_type not in {"local", "aurora"}:
+            raise RuntimeError(
+                "Bloom requires an explicit local or aurora TapDB target"
+            )
         host = cfg["host"]
         port = cfg["port"]
-        region = cfg.get("region", "us-west-2")
-        iam_auth = str(cfg.get("iam_auth", "true")).lower() in ("true", "1", "yes")
+        region = cfg["region"]
+        iam_auth = _explicit_bool(cfg["iam_auth"], "iam_auth")
+        allow_global_rows = _explicit_bool(
+            cfg["allow_global_claims"], "allow_global_claims"
+        )
+        if engine_type == "aurora" and not str(cfg.get("secret_arn") or "").strip():
+            raise RuntimeError("Bloom Aurora runtime requires an explicit secret ARN")
+        if engine_type == "aurora" and (
+            not str(region).strip() or not cfg.get("server_port")
+        ):
+            raise RuntimeError("Bloom Aurora runtime requires region and server_port")
 
         self._conn = TAPDBConnection(
             db_hostname=f"{host}:{port}",
@@ -299,12 +296,19 @@ class BLOOMdb3:
             engine_type="aurora" if engine_type == "aurora" else "local",
             region=region,
             iam_auth=iam_auth,
+            secret_arn=cfg.get("secret_arn") or None,
             domain_code=self.domain_code,
             owner_repo_name=self.owner_repo_name,
+            tenant_id=cfg.get("tenant_id") or None,
+            allow_global_rows=allow_global_rows,
+            config_identity=str(cfg["config_path"]),
+            connection_role="runtime",
+            aws_profile=runtime_ctx.aws_profile,
+            sslrootcert=cfg.get("sslrootcert") or None,
+            server_port=(int(cfg["server_port"]) if engine_type == "aurora" else None),
         )
 
         self.engine = self._conn.engine
-        # Preserve the long-standing BLOOM ORM contract used across API/domain code.
         self.Base = Base
         # Install TapDB-style per-query metrics once per engine.
         try:
@@ -312,20 +316,21 @@ class BLOOMdb3:
         except Exception:
             # Metrics are best-effort; never block DB init.
             pass
-        self._Session = self._conn._Session
-        self.session = self._conn.get_session()
+        self._session_factory = sessionmaker(bind=self.engine)
+        self.session = self._new_contextual_session()
 
-        self._set_session_username(self.session)
+    def _new_contextual_session(self) -> Session:
+        """Create a caller-owned session with TapDB scope on every transaction."""
+        session = self._session_factory()
 
-    def _set_session_username(self, session: Session) -> None:
-        """Set audit username for the current session."""
-        try:
-            session.execute(
-                text("SET session.current_username = :username"),
-                {"username": self.app_username},
-            )
-        except Exception as exc:
-            self.logger.warning("Could not set session username: %s", exc)
+        @event.listens_for(session, "after_begin")
+        def _install_context(
+            _session: Session, transaction: object, connection: object
+        ) -> None:
+            if getattr(transaction, "parent", None) is None:
+                self._conn.install_transaction_context(connection)
+
+        return session
 
     def __enter__(self) -> "BLOOMdb3":
         return self
@@ -337,12 +342,10 @@ class BLOOMdb3:
         return False
 
     def transaction(self):
-        return _TransactionContext(self.session)
+        return self.session.begin()
 
     def new_session(self) -> Session:
-        session = self._conn.get_session()
-        self._set_session_username(session)
-        return session
+        return self._new_contextual_session()
 
     def close(self) -> None:
         if self.session:

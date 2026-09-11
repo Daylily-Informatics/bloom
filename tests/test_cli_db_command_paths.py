@@ -265,7 +265,12 @@ def test_ensure_tapdb_namespace_config_initializes_then_updates(
                 "--ui-port",
                 "8912",
                 "--user",
+                "bloom_runtime_local",
+                "--allow-global-claims",
+                "--operator-user",
                 "postgres",
+                "--operator-password",
+                "",
                 "--database",
                 "tapdb_shared_dev",
             ],
@@ -474,6 +479,8 @@ def test_seed_templates_split_core_and_client_ownership(
     runtime_ctx = SimpleNamespace(
         domain_code="Z",
         owner_repo_name="bloom",
+        config_path=tmp_path / "tapdb.yaml",
+        schema_name="tapdb_bloom_tests_dev",
         domain_registry_path=tmp_path / "domain_code_registry.json",
         prefix_ownership_registry_path=tmp_path / "prefix_ownership_registry.json",
     )
@@ -548,31 +555,16 @@ def test_seed_templates_split_core_and_client_ownership(
         )
 
     class FakeSession:
-        committed = 0
-        rolled_back = 0
+        flushed = 0
         closed = 0
-        executed: list[str] = []
 
-        def execute(self, statement):  # noqa: ANN001 - test double
-            self.executed.append(getattr(statement, "text", str(statement)))
-
-        def commit(self):
-            self.committed += 1
-
-        def rollback(self):
-            self.rolled_back += 1
+        def flush(self):
+            self.flushed += 1
 
         def close(self):
             self.closed += 1
 
-    class FakeEngine:
-        disposed = 0
-
-        def dispose(self):
-            self.disposed += 1
-
     fake_session = FakeSession()
-    fake_engine = FakeEngine()
     monkeypatch.setattr(db_commands, "seed_templates", fake_seed_templates)
     monkeypatch.setattr(
         db_commands,
@@ -581,9 +573,25 @@ def test_seed_templates_split_core_and_client_ownership(
     )
     monkeypatch.setattr(
         db_commands,
-        "BLOOMdb3",
-        lambda **_kwargs: SimpleNamespace(session=fake_session, engine=fake_engine),
+        "get_tapdb_db_config",
+        lambda: {
+            "operator_user": "postgres",
+            "tenant_id": "",
+            "allow_global_claims": True,
+        },
     )
+    from contextlib import contextmanager
+
+    @contextmanager
+    def fake_operator_connection(_cfg):
+        yield object()
+
+    monkeypatch.setattr(db_commands, "operator_connection", fake_operator_connection)
+    monkeypatch.setattr(db_commands, "Session", lambda **_kwargs: fake_session)
+    monkeypatch.setattr(
+        db_commands, "apply_transaction_context", lambda *_a, **_k: None
+    )
+    monkeypatch.setattr(db_commands, "assert_operator_role", lambda *_a, **_k: None)
 
     db_commands._seed_tapdb_templates("target", overwrite=False)
 
@@ -593,7 +601,7 @@ def test_seed_templates_split_core_and_client_ownership(
             {
                 "owner_repo_name": "daylily-tapdb",
                 "templates": ["SYS", "XRF"],
-                "overwrite": True,
+                "overwrite": False,
             },
         ),
         (
@@ -605,11 +613,8 @@ def test_seed_templates_split_core_and_client_ownership(
             {"owner_repo_name": "bloom", "templates": ["BAC"], "overwrite": False},
         ),
     ]
-    assert any("tapdb_identity_prefix_config" in sql for sql in fake_session.executed)
-    assert fake_session.committed == 1
-    assert fake_session.rolled_back == 0
+    assert fake_session.flushed == 1
     assert fake_session.closed == 1
-    assert fake_engine.disposed == 1
 
 
 def test_retire_obsolete_template_variants_only_deletes_stale_prefixes() -> None:
@@ -864,51 +869,10 @@ def test_claim_client_template_prefixes_repairs_ownerless_claim(
     assert payload["ownership"]["Z"]["BAC"]["issuer_app_code"] == "bloom"
 
 
-@pytest.mark.parametrize(
-    ("force", "expected_calls"),
-    [
-        (
-            False,
-            [
-                (["pg", "init"], False),
-                (
-                    [
-                        "pg",
-                        "start-local",
-                        "--port",
-                        str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
-                    ],
-                    True,
-                ),
-                (["db", "create"], False),
-                (["db", "schema", "apply"], True),
-                (["db", "schema", "migrate"], True),
-            ],
-        ),
-        (
-            True,
-            [
-                (["pg", "init"], False),
-                (
-                    [
-                        "pg",
-                        "start-local",
-                        "--port",
-                        str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
-                    ],
-                    True,
-                ),
-                (["db", "create"], False),
-                (["db", "schema", "apply", "--reinitialize"], True),
-                (["db", "schema", "migrate"], True),
-            ],
-        ),
-    ],
-)
+@pytest.mark.parametrize("force", [False, True])
 def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
     monkeypatch: pytest.MonkeyPatch,
     force: bool,
-    expected_calls: list[tuple[list[str], bool]],
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
     seeded: list[tuple[str, bool]] = []
@@ -939,35 +903,38 @@ def test_db_build_local_runs_explicit_tapdb_steps_before_bloom_seed(
 
     db_commands.db_build(force=force, target="local")
 
-    assert calls == expected_calls
+    expected_schema = ["db", "schema", "apply"]
+    if force:
+        expected_schema.append("--reinitialize")
+    assert calls[:5] == [
+        (["pg", "init"], True),
+        (
+            [
+                "pg",
+                "start-local",
+                "--port",
+                str(DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT),
+            ],
+            True,
+        ),
+        (["db", "create"], True),
+        (expected_schema, True),
+        (["db", "runtime-principal", "bootstrap", "--apply"], True),
+    ]
+    assert calls[5][0][:4] == ["db", "runtime-principal", "bind", "--receipt"]
+    bind_receipt = calls[5][0][4]
+    assert Path(bind_receipt).is_absolute()
+    assert calls[6] == (
+        ["db", "runtime-principal", "bind", "--receipt", bind_receipt, "--apply"],
+        True,
+    )
     assert seeded == [("target", force)]
 
 
-@pytest.mark.parametrize(
-    ("force", "expected_calls"),
-    [
-        (
-            False,
-            [
-                (["db", "create"], False),
-                (["db", "schema", "apply"], True),
-                (["db", "schema", "migrate"], True),
-            ],
-        ),
-        (
-            True,
-            [
-                (["db", "create"], False),
-                (["db", "schema", "apply", "--reinitialize"], True),
-                (["db", "schema", "migrate"], True),
-            ],
-        ),
-    ],
-)
-def test_db_build_aurora_skips_local_pg_bootstrap(
+@pytest.mark.parametrize("force", [False, True])
+def test_db_build_aurora_requires_explicit_operator_lifecycle(
     monkeypatch: pytest.MonkeyPatch,
     force: bool,
-    expected_calls: list[tuple[list[str], bool]],
 ) -> None:
     calls: list[tuple[list[str], bool]] = []
     seeded: list[tuple[str, bool]] = []
@@ -996,10 +963,11 @@ def test_db_build_aurora_skips_local_pg_bootstrap(
         ),
     )
 
-    db_commands.db_build(force=force, target="aurora")
+    with pytest.raises(Exception, match="explicit operator operations"):
+        db_commands.db_build(force=force, target="aurora")
 
-    assert calls == expected_calls
-    assert seeded == [("target", force)]
+    assert calls == []
+    assert seeded == []
 
 
 @pytest.mark.parametrize(

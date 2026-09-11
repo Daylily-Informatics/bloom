@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import typer
@@ -21,6 +22,12 @@ from daylily_tapdb.euid import (
     GENERIC_INSTANCE_LINEAGE_PREFIX,
     GENERIC_TEMPLATE_PREFIX,
 )
+from daylily_tapdb.runtime_principal import operator_connection
+from daylily_tapdb.security_context import (
+    TapdbTransactionContext,
+    apply_transaction_context,
+    assert_operator_role,
+)
 from daylily_tapdb.templates.loader import (
     allow_template_mutations,
     find_tapdb_core_config_dir,
@@ -29,6 +36,7 @@ from daylily_tapdb.templates.loader import (
 )
 from rich.console import Console
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from bloom_lims.cli._registry_v2 import (
     EXEMPT_MUTATING,
@@ -41,8 +49,9 @@ from bloom_lims.config import (
     DEFAULT_TAPDB_OWNER_REPO_NAME,
     apply_runtime_environment,
     get_settings,
+    get_tapdb_db_config,
 )
-from bloom_lims.tapdb_adapter import BLOOMdb3
+from bloom_lims.tapdb_adapter import Base
 from bloom_lims.template_identity import template_semantic_category
 
 db_app = typer.Typer(help="Database management commands routed through daylily-tapdb.")
@@ -243,7 +252,12 @@ def _ensure_tapdb_namespace_config(
         "--ui-port",
         _local_ui_port("target"),
         "--user",
+        "bloom_runtime_local",
+        "--allow-global-claims",
+        "--operator-user",
         "postgres",
+        "--operator-password",
+        "",
         "--database",
         ctx.physical_database or ctx.database_name,
     ]
@@ -272,60 +286,46 @@ def _seed_tapdb_templates(
         joined = "; ".join(issue.message for issue in errors)
         raise RuntimeError(f"Bloom template pack validation failed: {joined}")
 
-    core_templates: list[dict[str, object]] = []
-    client_templates: list[dict[str, object]] = []
-    for template in templates:
-        instance_prefix = str(template.get("instance_prefix") or "").strip().upper()
-        target_batch = (
-            core_templates
-            if instance_prefix in _TAPDB_CORE_TEMPLATE_PREFIXES
-            else client_templates
-        )
-        target_batch.append(template)
+    client_templates = list(templates)
 
     ctx = apply_runtime_environment(get_settings())
     domain_registry_path = Path(str(ctx.domain_registry_path)).expanduser().resolve()
     prefix_registry_path = (
         Path(str(ctx.prefix_ownership_registry_path)).expanduser().resolve()
     )
-    bdb = BLOOMdb3(app_username="bloom-cli")
-    try:
-        if core_templates:
-            _ensure_identity_prefix_config(
-                bdb.session,
-                owner_repo_name="daylily-tapdb",
+    cfg = get_tapdb_db_config()
+    operator_user = str(cfg.get("operator_user") or "").strip()
+    if not operator_user:
+        raise RuntimeError("TapDB template preparation requires target.operator_user")
+    with operator_connection(cfg, isolation_level="REPEATABLE READ") as connection:
+        session = Session(bind=connection, expire_on_commit=False)
+        apply_transaction_context(
+            session,
+            TapdbTransactionContext(
+                config_identity=str(ctx.config_path),
+                schema_name=ctx.schema_name,
                 domain_code=ctx.domain_code,
-            )
-            seed_templates(
-                bdb.session,
-                core_templates,
-                overwrite=True,
-                core_config_dir=core_config_dir,
-                domain_code=ctx.domain_code,
-                owner_repo_name="daylily-tapdb",
-                domain_registry_path=domain_registry_path,
-                prefix_registry_path=prefix_registry_path,
-            )
+                owner_repo_name=ctx.owner_repo_name,
+                tenant_id=cfg.get("tenant_id") or None,
+                actor="bloom-cli",
+                allow_global_rows=bool(cfg.get("allow_global_claims")),
+            ),
+            assert_runtime_role=False,
+        )
+        assert_operator_role(
+            session,
+            schema_name=ctx.schema_name,
+            operator_user=operator_user,
+        )
         if client_templates:
-            client_templates = [
-                template
-                for template in client_templates
-                if str(template.get("instance_prefix") or "").strip().upper()
-                not in _TAPDB_CORE_TEMPLATE_PREFIXES
-            ]
             _claim_client_template_prefixes(
                 prefix_registry_path=prefix_registry_path,
                 domain_code=ctx.domain_code,
                 owner_repo_name=ctx.owner_repo_name,
                 templates=client_templates,
             )
-            _ensure_identity_prefix_config(
-                bdb.session,
-                owner_repo_name=ctx.owner_repo_name,
-                domain_code=ctx.domain_code,
-            )
             seed_templates(
-                bdb.session,
+                session,
                 client_templates,
                 overwrite=overwrite,
                 core_config_dir=core_config_dir,
@@ -336,8 +336,8 @@ def _seed_tapdb_templates(
             )
             if overwrite:
                 retired = _retire_obsolete_template_variants(
-                    bdb.session,
-                    bdb.Base.classes.generic_template,
+                    session,
+                    Base.classes.generic_template,
                     client_templates,
                     domain_code=ctx.domain_code,
                 )
@@ -346,13 +346,8 @@ def _seed_tapdb_templates(
                         "[cyan]Retired obsolete Bloom template variants:[/cyan] "
                         f"{retired}"
                     )
-        bdb.session.commit()
-    except Exception:
-        bdb.session.rollback()
-        raise
-    finally:
-        bdb.session.close()
-        bdb.engine.dispose()
+        session.flush()
+        session.close()
 
 
 def _active_template_categories_by_semantic_key(
@@ -591,8 +586,11 @@ def db_build(
 ) -> None:
     """Build database/runtime via tapdb orchestration."""
     target_mode = target.strip().lower()
-    if target_mode not in {"local", "aurora"}:
-        raise typer.BadParameter("--target must be either local or aurora")
+    if target_mode != "local":
+        raise typer.BadParameter(
+            "--target must be local; Aurora migration and template/principal setup "
+            "are explicit operator operations"
+        )
 
     console.print(
         f"[cyan]Initializing BLOOM database via tapdb (target={target_mode})...[/cyan]"
@@ -600,29 +598,30 @@ def db_build(
     target_label = _current_target_label()
     _ensure_tapdb_namespace_config(target_label, target_mode=target_mode)
 
-    if target_mode == "local":
-        _ensure_schema_available_for_bloom_root()
-        local_port = _local_pg_port(target_label)
-        console.print(f"[cyan]Using local TapDB PostgreSQL port {local_port}[/cyan]")
-        _run_tapdb(["pg", "init"], check=False)
-        _run_tapdb(["pg", "start-local", "--port", local_port])
-        _run_tapdb(["db", "create"], check=False)
-        schema_args = ["db", "schema", "apply"]
-        if force:
-            schema_args.append("--reinitialize")
-        _run_tapdb(schema_args)
-        _run_tapdb(["db", "schema", "migrate"])
-        _seed_tapdb_templates(target_label, overwrite=force)
-        return
-
-    _ensure_schema_available_for_bloom_root()
-    _run_tapdb(["db", "create"], check=False)
+    local_port = _local_pg_port(target_label)
+    console.print(f"[cyan]Using local TapDB PostgreSQL port {local_port}[/cyan]")
+    _run_tapdb(["pg", "init"])
+    _run_tapdb(["pg", "start-local", "--port", local_port])
+    _run_tapdb(["db", "create"])
     schema_args = ["db", "schema", "apply"]
     if force:
         schema_args.append("--reinitialize")
     _run_tapdb(schema_args)
-    _run_tapdb(["db", "schema", "migrate"])
     _seed_tapdb_templates(target_label, overwrite=force)
+    _run_tapdb(["db", "runtime-principal", "bootstrap", "--apply"])
+    receipt_root = Path(tempfile.mkdtemp(prefix="bloom-local-principal-"))
+    bind_receipt = receipt_root / "bind-plan.json"
+    _run_tapdb(["db", "runtime-principal", "bind", "--receipt", str(bind_receipt)])
+    _run_tapdb(
+        [
+            "db",
+            "runtime-principal",
+            "bind",
+            "--receipt",
+            str(bind_receipt),
+            "--apply",
+        ]
+    )
 
 
 @db_app.command("seed")

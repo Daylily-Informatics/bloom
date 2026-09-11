@@ -24,8 +24,6 @@ class BetaLabService(
 ):
     """Implements the queue-centric Bloom beta wet-lab flow."""
 
-    EXTERNAL_REFERENCE_TEMPLATE_CODE = "generic/generic/external_object_link/1.0"
-    EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
     PROCESS_ITEM_REFERENCE_TYPE = "atlas_test_fulfillment_item"
     PATIENT_REFERENCE_TYPE = "atlas_patient"
     TRF_REFERENCE_TYPE = "atlas_trf"
