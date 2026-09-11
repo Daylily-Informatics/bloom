@@ -19,6 +19,49 @@ def _load_script(name: str):
 
 conversion = _load_script("bloom_tapdb10_conversion.py")
 sequence_transition = _load_script("bloom_sequence_transition_receipt.py")
+sequence_floors = _load_script("bloom_sequence_floor_prepare.py")
+xrf_templates = _load_script("bloom_tapdb10_xrf_templates.py")
+
+
+def test_sequence_floor_cli_input_contains_only_floors() -> None:
+    records = [{"name": "allocator", "value": 12, "source": "frozen-source"}]
+
+    document = sequence_floors._cli_floor_document(records)
+
+    assert document == {"floors": records}
+
+
+def test_xrf_template_validation_preserves_every_original_fingerprint() -> None:
+    before = {
+        "all_template_count": 239,
+        "all_template_fingerprints": {"1": "original-a", "2": "original-b"},
+        "existing": [],
+        "expected_inserted": 2,
+    }
+    after = {
+        "all_template_count": 241,
+        "all_template_fingerprints": {
+            "1": "original-a",
+            "2": "changed-original-b",
+            "3": "new-xrf-a",
+            "4": "new-xrf-b",
+        },
+        "existing": [{"subtype": "opaque"}, {"subtype": "tapdb_object"}],
+    }
+
+    with pytest.raises(ValueError, match="changed existing templates"):
+        xrf_templates._validate_after(before, after)
+
+
+def test_xrf_template_state_fingerprints_every_loaded_template(bdb) -> None:
+    _, definitions = xrf_templates._definitions()
+
+    state = xrf_templates._state(bdb.session, definitions)
+
+    assert len(state["all_template_fingerprints"]) == state["all_template_count"]
+    assert all(
+        len(value) == 64 for value in state["all_template_fingerprints"].values()
+    )
 
 
 def test_metadata_conversion_adds_only_envelope_and_archives_graph() -> None:

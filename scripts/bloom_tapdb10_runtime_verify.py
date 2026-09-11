@@ -93,7 +93,10 @@ def _validate_runtime(
         not any(cfg.get(key) for key in OPERATOR_FIELDS),
         "runtime config contains an operator field",
     )
-    _require(cfg.get("iam_auth") is False, "runtime IAM mode must be explicit false")
+    _require(
+        cfg.get("iam_auth") in (False, "false"),
+        "runtime IAM mode must be explicit false",
+    )
     _require(cfg.get("password") == "", "plaintext runtime password is forbidden")
     _require(bool(cfg.get("secret_arn")), "runtime secret reference is required")
 

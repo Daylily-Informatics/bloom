@@ -149,7 +149,8 @@ def _validate_configs(
         "runtime contains an operator field",
     )
     _require(
-        runtime.get("iam_auth") is False, "runtime IAM mode must be explicit false"
+        runtime.get("iam_auth") in (False, "false"),
+        "runtime IAM mode must be explicit false",
     )
     _require(runtime.get("password") == "", "runtime plaintext password is forbidden")
     _require(bool(runtime.get("secret_arn")), "runtime secret reference is required")
@@ -158,7 +159,10 @@ def _validate_configs(
         operator.get("operator_user") == target["operator_user"],
         "operator role differs from the reviewed owner census",
     )
-    _require(operator.get("operator_iam_auth") is False, "operator IAM must be false")
+    _require(
+        operator.get("operator_iam_auth") in (False, "false"),
+        "operator IAM must be false",
+    )
     _require(
         operator.get("operator_password") == "",
         "operator plaintext password is forbidden",

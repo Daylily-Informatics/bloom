@@ -8,8 +8,11 @@ import hashlib
 import importlib.metadata
 import json
 import os
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 TAPDB_VERSION = "10.1.1rc1"
 _CODES = {
@@ -80,10 +83,37 @@ def _validate_after(before: dict[str, Any], after: dict[str, Any]) -> None:
         != before["all_template_count"] + before["expected_inserted"]
         or len(after["existing"]) != 2
         or any(item not in after["existing"] for item in before["existing"])
+        or any(
+            after["all_template_fingerprints"].get(key) != fingerprint
+            for key, fingerprint in before["all_template_fingerprints"].items()
+        )
     ):
         raise ValueError(
             "XRF setup changed existing templates or inserted the wrong set"
         )
+
+
+def _receipt_value(value: Any) -> Any:
+    """Normalize complete ORM values for a stable, private receipt fingerprint."""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _receipt_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_receipt_value(item) for item in value]
+    return value
+
+
+def _complete_template_fingerprint(row: Any, columns: tuple[str, ...]) -> str:
+    from daylily_tapdb.identity_inventory import content_hash
+
+    return content_hash(
+        {field: _receipt_value(getattr(row, field, None)) for field in columns}
+    )
 
 
 def _definitions() -> tuple[Path, list[dict[str, Any]]]:
@@ -117,6 +147,7 @@ def _state(session: Any, definitions: list[dict[str, Any]]) -> dict[str, Any]:
     all_rows = (
         session.query(generic_template).order_by(generic_template.uid.asc()).all()
     )
+    all_columns = tuple(column.name for column in generic_template.__table__.columns)
     existing: list[dict[str, Any]] = []
     for definition in definitions:
         matches = [
@@ -154,6 +185,10 @@ def _state(session: Any, definitions: list[dict[str, Any]]) -> dict[str, Any]:
             )
     return {
         "all_template_count": len(all_rows),
+        "all_template_fingerprints": {
+            str(row.uid): _complete_template_fingerprint(row, all_columns)
+            for row in all_rows
+        },
         "existing": existing,
         "expected_inserted": 2 - len(existing),
     }

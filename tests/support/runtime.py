@@ -215,6 +215,7 @@ def create_temp_tapdb_config(
                 f'  ui_port: "{DEFAULT_BLOOM_WEB_PORT}"',
                 f'  user: "{resolved_user}"',
                 '  password: ""',
+                '  iam_auth: "false"',
                 '  tenant_id: ""',
                 "  allow_global_claims: true",
                 "  operator:",

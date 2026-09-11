@@ -20,6 +20,7 @@ RUN unset SETUPTOOLS_SCM_PRETEND_VERSION && uv sync --frozen --no-dev --no-insta
 COPY config ./config
 COPY auth ./auth
 COPY bloom_lims ./bloom_lims
+COPY scripts/bloom_tapdb10_runtime_verify.py ./scripts/bloom_tapdb10_runtime_verify.py
 COPY main.py ./main.py
 COPY static ./static
 COPY templates ./templates

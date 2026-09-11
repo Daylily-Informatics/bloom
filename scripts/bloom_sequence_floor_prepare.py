@@ -40,6 +40,22 @@ def _write_new(path: Path, value: dict[str, Any]) -> None:
         os.fsync(handle.fileno())
 
 
+def _require_new(path: Path) -> None:
+    if (
+        not path.is_absolute()
+        or path.resolve() != path
+        or not path.parent.is_dir()
+        or path.exists()
+        or path.is_symlink()
+    ):
+        raise ValueError("output must be a new canonical path in an existing directory")
+
+
+def _cli_floor_document(floors: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return exactly the public CLI's accepted floor input object."""
+    return {"floors": floors}
+
+
 def main() -> int:
     from daylily_tapdb.backup.recovery import inventory_floors, recovery_family_state
     from daylily_tapdb.identity_inventory import validate_receipt
@@ -50,10 +66,13 @@ def main() -> int:
     parser.add_argument("--source-next-plan", type=Path, required=True)
     parser.add_argument("--recovery-family", type=Path, required=True)
     parser.add_argument("--floors", type=Path, required=True)
+    parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()
     os.umask(0o077)
     if importlib.metadata.version("daylily-tapdb") != TAPDB_VERSION:
         raise RuntimeError(f"exact daylily-tapdb {TAPDB_VERSION} is required")
+    _require_new(args.floors)
+    _require_new(args.receipt)
     source = _read(args.source_contract)
     plan = _read(args.source_next_plan)
     family = _read(args.recovery_family)
@@ -98,10 +117,17 @@ def main() -> int:
         for item in records
     }
     floors = [unique[key] for key in sorted(unique)]
+    _write_new(args.floors, _cli_floor_document(floors))
     _write_new(
-        args.floors,
+        args.receipt,
         {
-            "floors": floors,
+            "schema_version": "bloom-sequence-floor-projection/v1",
+            "status": "prepared",
+            "floors": {
+                "path": str(args.floors),
+                "sha256": _sha256(args.floors),
+                "count": len(floors),
+            },
             "source_contract": {
                 "path": str(args.source_contract),
                 "sha256": _sha256(args.source_contract),

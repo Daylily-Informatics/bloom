@@ -84,6 +84,16 @@ _KNOWN_LINEAGE_IDENTITIES = (
 )
 
 
+def _explicit_bool(value: object, field: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise RuntimeError(f"Bloom TapDB {field} must be an explicit boolean")
+
+
 class _LineageQueryProxy:
     """Lightweight proxy that preserves iterable/.all() behavior for lineage access."""
 
@@ -259,14 +269,16 @@ class BLOOMdb3:
         host = cfg["host"]
         port = cfg["port"]
         region = cfg["region"]
-        iam_auth = cfg["iam_auth"]
-        allow_global_rows = cfg["allow_global_claims"]
-        if not isinstance(iam_auth, bool) or not isinstance(allow_global_rows, bool):
-            raise RuntimeError(
-                "Bloom TapDB auth and global scope must be explicit booleans"
-            )
+        iam_auth = _explicit_bool(cfg["iam_auth"], "iam_auth")
+        allow_global_rows = _explicit_bool(
+            cfg["allow_global_claims"], "allow_global_claims"
+        )
         if engine_type == "aurora" and not str(cfg.get("secret_arn") or "").strip():
             raise RuntimeError("Bloom Aurora runtime requires an explicit secret ARN")
+        if engine_type == "aurora" and (
+            not str(region).strip() or not cfg.get("server_port")
+        ):
+            raise RuntimeError("Bloom Aurora runtime requires region and server_port")
 
         self._conn = TAPDBConnection(
             db_hostname=f"{host}:{port}",
@@ -293,7 +305,7 @@ class BLOOMdb3:
             connection_role="runtime",
             aws_profile=runtime_ctx.aws_profile,
             sslrootcert=cfg.get("sslrootcert") or None,
-            server_port=int(cfg["server_port"]),
+            server_port=(int(cfg["server_port"]) if engine_type == "aurora" else None),
         )
 
         self.engine = self._conn.engine

@@ -30,6 +30,7 @@ ROOT=/home/ubuntu/bloom_ops/tapdb101-20260911
 OUT="$ROOT/receipts"
 JOURNAL="$ROOT/journal"
 TAPDB="$ROOT/venv/bin/tapdb"
+PYTHON="$ROOT/venv/bin/python"
 OPERATOR="$ROOT/operator.yaml"
 CONTROL="$ROOT/control-operator.yaml"
 RUNTIME=/home/ubuntu/.config/tapdb/bloom/bloom-day/tapdb-config.yaml
@@ -43,16 +44,17 @@ Every plan and result path below is create-exclusive. Preserve stdout, stderr, t
 
 ## 1. Close admission and freeze the source
 
-1. Close ordinary Bloom admission, stop the scoped Bloom Compose service, and leave all sibling services running. Stop its web process, in-container workers and schedulers together. Confirm no Bloom process remains. The B01 host inventory found no separate Bloom timer or cron; if the frozen check finds one, stop it before continuing.
-2. Drain acknowledged work before stopping. Retain queued work. Capture a final queue-state summary and require no running/leased/unacknowledged item; queued items may remain. Do not issue test GETs while draining because Bloom GET routes can write.
-3. Close operator sessions other than the one retained maintenance session. Capture the exact principal census and database activity. Require no session or prepared transaction other than the retained operator operation.
+1. Close ordinary Bloom admission while leaving the running process available only to the operator drain.
+2. Drain acknowledged work. Retain queued work. Capture a final queue-state summary and require no running/leased/unacknowledged item; queued items may remain. Do not issue test GETs while draining because Bloom GET routes can write.
+3. Stop the scoped Bloom Compose service and leave all sibling services running. Stop its web process, in-container workers and schedulers together. Confirm no Bloom process remains. The B01 host inventory found no separate Bloom timer or cron; if the frozen check finds one, stop it before continuing.
+4. Close operator sessions other than the one retained maintenance session. Capture the exact principal census and database activity. Require no session or prepared transaction other than the retained operator operation.
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
   db census --database tapdb_bloom_prod --receipt "$OUT/frozen-principal-census.json"
 ```
 
-4. Generate one recovery-family UUID and record it before the native capture. Capture the complete frozen source contract and immutable family in one native read-only operation.
+5. Generate one recovery-family UUID and record it before the native capture. Capture the complete frozen source contract and immutable family in one native read-only operation.
 
 ```bash
 FAMILY_ID='<one recorded lowercase UUID>'
@@ -76,14 +78,15 @@ JSON
   --receipt "$OUT/frozen-source-next-plan.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json"
-python "$ROOT/release/scripts/bloom_sequence_floor_prepare.py" \
+"$PYTHON" "$ROOT/release/scripts/bloom_sequence_floor_prepare.py" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --source-next-plan "$OUT/frozen-source-next-plan.json" \
   --recovery-family "$OUT/recovery-family.json" \
-  --floors "$OUT/transition-floors.json"
+  --floors "$OUT/transition-floors.json" \
+  --receipt "$OUT/transition-floor-projection.json"
 ```
 
-The projector validates the native plan against the frozen contract/family. It retains stored, allocated, source-next and family exposures and deduplicates only identical `(name, value, source)` records.
+The projector validates the native plan against the frozen contract/family. `transition-floors.json` contains exactly the CLI-owned `{"floors": [...]}` object; hashes and provenance stay in `transition-floor-projection.json`. It retains stored, allocated, source-next and family exposures and deduplicates only identical `(name, value, source)` records.
 
 ## 2. Apply the released schema migration
 
@@ -122,11 +125,11 @@ Require native `migration_result`, terminal `recovery_completion`, `principal_bi
 Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)`. The helper verifies every existing template fingerprint and inserts only a missing exact opaque/tapdb-object XRF template.
 
 ```bash
-python "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" plan \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" plan \
   --operator-config "$OPERATOR" --manifest "$MANIFEST" \
   --actor bloom-tapdb10-migration --receipt "$OUT/xrf-template-plan.json"
 XRF_PLAN_SHA='<sha256 of xrf-template-plan.json>'
-python "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" apply \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" apply \
   --operator-config "$OPERATOR" --manifest "$MANIFEST" \
   --actor bloom-tapdb10-migration --plan "$OUT/xrf-template-plan.json" \
   --reviewed-plan-sha256 "$XRF_PLAN_SHA" --review-reference "$REVIEW_REFERENCE" \
@@ -146,13 +149,13 @@ Capture the post-schema/post-template native identity baseline used to prove onl
 Plan and apply the reviewed Bloom conversion. The plan must report exactly 186 retained BGX identities: 182 Atlas, one Dewey and three unresolved/orphan; 160 active and 26 deleted. It must retain every legacy BGX UID/EUID, lineage, deletion state, original properties and duplicate evidence; the actual 26 duplicate groups have identical properties and mixed active/deleted evidence. It must repair 50 missing SYS envelopes, archive 93 explicitly matched graph payloads, and create only the reviewed canonical native assertion set. Any differing duplicate provenance, unresolved identity invention, deleted-source activation or unexpected count stops the operation.
 
 ```bash
-python "$ROOT/release/scripts/bloom_tapdb10_conversion.py" plan \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_conversion.py" plan \
   --operator-config "$OPERATOR" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --manifest "$MANIFEST" --actor bloom-tapdb10-migration \
   --receipt "$OUT/conversion-plan.json"
 CONVERSION_PLAN_SHA='<sha256 of conversion-plan.json>'
-python "$ROOT/release/scripts/bloom_tapdb10_conversion.py" apply \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_conversion.py" apply \
   --operator-config "$OPERATOR" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --manifest "$MANIFEST" --actor bloom-tapdb10-migration \
@@ -172,7 +175,7 @@ Capture and verify the final identity state for this conversion stage:
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipt "$OUT/post-bloom-conversion.json"
-python "$ROOT/release/scripts/bloom_tapdb10_identity_manifest.py" \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_identity_manifest.py" \
   --before "$OUT/pre-bloom-conversion.json" \
   --after "$OUT/post-bloom-conversion.json" \
   --conversion-plan "$OUT/conversion-plan.json" \
@@ -207,20 +210,19 @@ SEQUENCE_PLAN_SHA='<sha256 of sequence-plan.json>'
   --receipts-dir "$JOURNAL" \
   --establish-writer-fence --control-config "$CONTROL" \
   --provider-contract "$PROVIDER"
-"$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db sequences verify --floors "$OUT/transition-floors.json" \
-  --sequence-mappings "$MAPPINGS" \
-  --recovery-family "$OUT/recovery-family.json"
-python "$ROOT/release/scripts/bloom_sequence_transition_receipt.py" \
+"$PYTHON" "$ROOT/release/scripts/bloom_sequence_transition_receipt.py" \
   --plan "$OUT/sequence-plan.json" --result "$OUT/sequence-result.json" \
   --recovery-family "$OUT/recovery-family.json" \
   --prior-floors "$OUT/sequence-prior-floors.json" \
   --future-floors "$OUT/sequence-future-floors.json" \
   --receipt "$OUT/sequence-transition-verified.json" \
   --review-reference "$REVIEW_REFERENCE"
+"$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
+  db sequences verify --floors "$OUT/sequence-prior-floors.json" \
+  --sequence-mappings "$MAPPINGS"
 ```
 
-The verifier binds the plan, result inventory, fence release, exact configured target and physical target, and terminal recovery family. It verifies completion against the plan's prior floors. The result's newly reserved next values are retained as future recovery floors; they do not cause another advance. The first later allocation must exceed every applicable stored, allocated, source-next, reservation and family exposure while preserving increment, alignment, cache, bounds and ownership.
+The Bloom verifier runs immediately after apply and binds the plan, result inventory, fence release, exact configured target and physical target, and terminal recovery family. It verifies completion against the plan's prior floors and emits the separate prior/future files. The native verification then uses only `sequence-prior-floors.json`, without merging the recovery family that now contains the transition's new reservations. The result's newly reserved next values are retained as future recovery floors; they do not cause another advance. The first later allocation must exceed every applicable stored, allocated, source-next, reservation and family exposure while preserving increment, alignment, cache, bounds and ownership.
 
 If the native command or transport fails after an intent may have been written, inspect its terminal result and journal first. Do not repeat the plan. Use `tapdb db sequences reconcile` with the exact control config, journal, provider contract, mapping file, recovery family and latest fence/release intent; create and independently inspect its preflight receipt before `--apply`. Continue only after the native family has no pending operation and the target is safely released or deliberately remains closed.
 
@@ -229,17 +231,17 @@ If the native command or transport fails after an intent may have been written, 
 Install the reviewed runtime-only config at its exact canonical path. The operator config remains outside the container. Plan/apply bootstrap, then plan/apply the final binding through the Bloom helper. The helper keeps `config_identity` equal to the runtime path while overlaying the operator credentials only in memory; runtime and operator target fields must otherwise be identical.
 
 ```bash
-python "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bootstrap-plan \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bootstrap-plan \
   --runtime-config "$RUNTIME" --operator-config "$OPERATOR" \
   --manifest "$MANIFEST" --receipt "$OUT/runtime-bootstrap-plan.json"
-python "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bootstrap-apply \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bootstrap-apply \
   --runtime-config "$RUNTIME" --operator-config "$OPERATOR" \
   --manifest "$MANIFEST" --receipt "$OUT/runtime-bootstrap-plan.json" \
   --review-reference "$REVIEW_REFERENCE"
-python "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bind-plan \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bind-plan \
   --runtime-config "$RUNTIME" --operator-config "$OPERATOR" \
   --manifest "$MANIFEST" --receipt "$OUT/runtime-bind-plan.json"
-python "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bind-apply \
+"$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_principal_prepare.py" bind-apply \
   --runtime-config "$RUNTIME" --operator-config "$OPERATOR" \
   --manifest "$MANIFEST" --receipt "$OUT/runtime-bind-plan.json" \
   --review-reference "$REVIEW_REFERENCE"
@@ -253,12 +255,16 @@ Before promotion, read the then-current complete Dayhoff release manifest once. 
 
 Start the final Bloom image with external admission still closed. Bloom's container entrypoint initializes the exact TapDB CLI context, then executes `_verify_existing_tapdb`: it loads the released Bloom template requirements plus the two core XRF templates and calls public `require_seeded_templates` through a runtime-scoped connection. It creates or seeds nothing. The pinned TapDB GUI factory also receives the exact config path; schema migration, XRF preparation and principal setup remain operator-only steps.
 
-Run the fresh-session privilege verifier from the final container environment:
+Run the fresh-session privilege verifier from the final container environment. The final image packages the verifier at `/app/scripts/bloom_tapdb10_runtime_verify.py` and the manifest at `/app/config/migrations/bloom_tapdb_10_1_conversion.json`. Use a private transfer directory within the already-mounted host config tree; never mount the operator root/config into the runtime container.
 
 ```bash
-python "$ROOT/release/scripts/bloom_tapdb10_runtime_verify.py" \
-  --runtime-config "$RUNTIME" --manifest "$MANIFEST" \
-  --receipt "$OUT/runtime-verification.json"
+install -d -m 0700 /home/ubuntu/.config/bloom-day/migration-receipts
+docker exec dayhoff-day-bloom-1 python /app/scripts/bloom_tapdb10_runtime_verify.py \
+  --runtime-config /home/ubuntu/.config/tapdb/bloom/bloom-day/tapdb-config.yaml \
+  --manifest /app/config/migrations/bloom_tapdb_10_1_conversion.json \
+  --receipt /home/ubuntu/.config/bloom-day/migration-receipts/runtime-verification.json
+mv /home/ubuntu/.config/bloom-day/migration-receipts/runtime-verification.json \
+  "$OUT/runtime-verification.json"
 ```
 
 It requires Bloom `10.0.0` and TapDB `10.1.1rc1`, two consecutive scoped transactions, recovery after intentional rollback, the exact runtime login/config/domain/owner/global scope, template SELECT, required instance/lineage DML, sequence USAGE+SELECT with UPDATE denied and exact operator ownership, database TEMP/CREATE denied, schema CREATE denied, and no SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE/REPLICATION/INHERIT.
