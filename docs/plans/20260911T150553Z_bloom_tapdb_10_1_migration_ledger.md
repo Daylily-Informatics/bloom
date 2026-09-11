@@ -13,6 +13,7 @@ Status: active execution ledger
 - A sustained Bloom outage is accepted. The existing Aurora recovery arrangement is accepted. This execution creates no snapshot, dump, database copy, replacement database, or rehearsal database.
 - One production migration is permitted. Preserve acknowledged work, existing data, EUIDs, allocator guarantees, audit history, deleted history, authoritative lineage, and queued Bloom work.
 - Remove compatibility shims and fallback behavior. Minor features and outstanding pull-request integration remain phase 2 work after acceptance.
+- Restore `main` as the GitHub default and primary branch. Release work targets `main`; after merge, align the local checkout and default upstream with `main`.
 - Cost bounds: one final Bloom container build; one broad Bloom test/CI campaign with at most one informative rerun; focused checks only for changed behavior and demonstrated failures.
 
 ## Gate 0 baseline
@@ -37,7 +38,7 @@ Working states: `OPEN`, `IN_PROGRESS`, `ATTEMPTING_BUGFIX`. Terminal states: `SU
 | B02 | Implementation | Complete native TapDB API/config changes and the Bloom-specific conversion manifest and operator procedure. | Operator | OPEN | Inspect current source and actual data shapes; use public interfaces, explicit transactions/config, `set_cli_context`, `verify_existing`, non-overwriting template seed, and fail-hard validation. |
 | B03 | Independent review | Review identity preservation, allocator conversion, conversion manifest, and runtime-principal procedure before production migration. | Reviewer | OPEN | Reviewer receives exact files, compact focused evidence, inputs, invariants and specific questions after B02 is ready. |
 | B04 | Validation | Pass focused checks and the single designated broad Bloom run; record exact tested inputs and any informative rerun. | Operator | OPEN | Run focused checks during implementation, then one broad local or CI authority after changes settle. |
-| B05 | Release/build | Publish the annotated Bloom `10.0.0` major and build the one final image from the exact clean release commit. | Operator | OPEN | Merge reviewed release source through normal checks, create immutable GitHub release/tag, then use the Dayhoff service build and record release commit plus image digest. |
+| B05 | Release/build | Restore `main` as primary/default; publish the annotated Bloom `10.0.0` major and build the one final image from the exact clean release commit. | Operator | IN_PROGRESS | GitHub default branch changed from `jemdev10` to `main` and verified through `gh repo view`; both names were at baseline commit `948bc487415899eb50f024f2d421066a061f0a48`. Merge reviewed release source through normal checks, create immutable GitHub release/tag, then use the Dayhoff service build and record release commit plus image digest. |
 | B06 | Maintenance window | Stop all Bloom traffic/writers, capture frozen source/allocator/principal evidence, run released schema migration and reviewed Bloom conversion, then bind runtime access. | Operator | OPEN | No new backup artifacts. Use native receipts/fencing, inspect terminal native outcomes before any retry, and keep admission closed through B07. |
 | B07 | Acceptance | Pass native identity/allocator verification and controlled application acceptance; independently review final migration and privilege receipts. | Operator / Reviewer | OPEN | Verify manifest-only transformations, prior sequence floors and future recovery floors, fresh-session privileges, authenticated workflow, embedded GUI, Bloom DAG v2, Kahlo behavior, and health/log stability. |
 | B08 | Reopen/close | Reopen Bloom only after B07 succeeds, confirm health, close this ledger, and create the separate phase-2 backlog ledger. | Operator | OPEN | Preserve sibling services and shared infrastructure; use scoped Compose promotion only. |
@@ -62,3 +63,4 @@ Working states: `OPEN`, `IN_PROGRESS`, `ATTEMPTING_BUGFIX`. Terminal states: `SU
 ## Change log
 
 - 2026-09-11: Ledger created at execution start. B00 terminalized `SUCCESS`; B01-B08 remain ordered and open.
+- 2026-09-11: User amended B05 to make `main` the primary/default branch again. GitHub default branch changed and verified; release implementation remains in progress.
