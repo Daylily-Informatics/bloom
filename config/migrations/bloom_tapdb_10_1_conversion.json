@@ -13,7 +13,14 @@
       "unresolved_orphan": 3
     },
     "missing_properties_sys": 50,
+    "retired_graph_entries": 393,
     "retired_graph_rows": 93,
+    "archived_graph_rows": 21,
+    "archived_graph_entries": 111,
+    "unresolved_graph_rows": 72,
+    "unresolved_graph_entries": 282,
+    "mixed_graph_rows": 0,
+    "empty_graph_rows": 0,
     "retired_graph_rows_by_prefix": {
       "BCN": 30,
       "BCT": 47,

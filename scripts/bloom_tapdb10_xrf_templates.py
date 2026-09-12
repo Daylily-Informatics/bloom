@@ -16,6 +16,7 @@ from uuid import UUID
 
 TAPDB_VERSION = "10.1.3"
 _ROLES = {"opaque", "tapdb_object"}
+_TEMPLATE_OWNER = "bloom"
 _FIELDS = (
     "name",
     "polymorphic_discriminator",
@@ -152,7 +153,7 @@ def _state(session: Any, definitions: list[dict[str, Any]]) -> dict[str, Any]:
             row
             for row in all_rows
             if row.domain_code == "M"
-            and row.issuer_app_code == "daylily-tapdb"
+            and row.issuer_app_code == _TEMPLATE_OWNER
             and (row.category, row.type, row.subtype, row.version)
             == (
                 definition["category"],
@@ -278,6 +279,7 @@ def main() -> int:
         "script_sha256": _sha256(Path(__file__)),
         "target": target,
         "actor": args.actor,
+        "template_owner_repo_name": _TEMPLATE_OWNER,
         "definition_hashes": {
             row["subtype"]: content_hash({field: row.get(field) for field in _FIELDS})
             for row in definitions
@@ -310,7 +312,11 @@ def main() -> int:
         ):
             raise ValueError("reconcile requires the exact reserved apply receipt")
 
-    with operator_connection(cfg, read_only=args.operation != "apply") as connection:
+    with operator_connection(
+        cfg,
+        isolation_level="REPEATABLE READ",
+        read_only=args.operation != "apply",
+    ) as connection:
         physical = physical_target(connection, target)
         with Session(bind=connection, expire_on_commit=False) as session:
             apply_transaction_context(
@@ -372,7 +378,7 @@ def main() -> int:
                     overwrite=False,
                     core_config_dir=core_dir,
                     domain_code="M",
-                    owner_repo_name="daylily-tapdb",
+                    owner_repo_name=_TEMPLATE_OWNER,
                     domain_registry_path=Path(cfg["domain_registry_path"]),
                     prefix_registry_path=Path(cfg["prefix_ownership_registry_path"]),
                 )

@@ -14,6 +14,7 @@ import importlib.metadata
 import json
 import os
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -77,6 +78,50 @@ def _replace_reserved(path: Path, value: dict[str, Any]) -> None:
         os.fsync(directory_fd)
     finally:
         os.close(directory_fd)
+
+
+def _plan_equality_projection(plan: dict[str, Any]) -> dict[str, Any]:
+    """Normalize only the native dry-run receipt timestamp for plan comparison."""
+
+    projected = deepcopy(plan)
+    for change in projected["conversion"]["metadata_changes"]:
+        receipt = change["native_receipt"]
+        recorded_at = receipt.get("recorded_at")
+        if not isinstance(recorded_at, str) or not recorded_at:
+            raise ValueError("native mutation dry-run receipt lacks recorded_at")
+        parsed = datetime.fromisoformat(recorded_at)
+        if parsed.tzinfo is None:
+            raise ValueError("native mutation dry-run receipt timestamp lacks timezone")
+        receipt["recorded_at"] = "<native-dry-run-timestamp>"
+    return projected
+
+
+@contextmanager
+def _template_owner_scope(session: Any, owner_repo_name: str):
+    """Apply Bloom's runtime template-owner visibility to native XRF calls."""
+
+    from daylily_tapdb.models.template import generic_template
+    from sqlalchemy import event
+    from sqlalchemy.orm import with_loader_criteria
+
+    if not owner_repo_name or owner_repo_name != owner_repo_name.strip():
+        raise ValueError("template owner must be exact and non-empty")
+
+    def apply_owner_criterion(execute_state: Any) -> None:
+        if execute_state.is_select:
+            execute_state.statement = execute_state.statement.options(
+                with_loader_criteria(
+                    generic_template,
+                    generic_template.issuer_app_code == owner_repo_name,
+                    include_aliases=True,
+                )
+            )
+
+    event.listen(session, "do_orm_execute", apply_owner_criterion)
+    try:
+        yield
+    finally:
+        event.remove(session, "do_orm_execute", apply_owner_criterion)
 
 
 def _properties(payload: Any) -> dict[str, Any]:
@@ -164,6 +209,36 @@ def _graph_reference_keys(
         tenant = str(properties.get("atlas_tenant_id") or "").strip()
         keys.add((value, relationship, tenant, reference_type))
     return keys
+
+
+def _partition_graph_entries(
+    graph: list[dict[str, Any]],
+    allowed: set[tuple[str, str, str, str]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    archived: list[dict[str, Any]] = []
+    unresolved: list[dict[str, Any]] = []
+    for position, entry in enumerate(graph):
+        if str(entry.get("system") or "").strip() != "atlas":
+            raise ValueError("retired graph contains a non-Atlas entry")
+        root = str(entry.get("root_euid") or entry.get("target_euid") or "").strip()
+        relationship = str(entry.get("relationship_type") or "").strip()
+        tenant = str(entry.get("tenant_id") or "").strip()
+        source_field = str(entry.get("source_field") or "").strip()
+        if not root or not relationship or not source_field:
+            raise ValueError("retired graph entry is malformed")
+        candidates = {
+            key
+            for key in allowed
+            if key[0] == root
+            and key[1] == relationship
+            and key[2] == tenant
+            and key[3] == source_field
+        }
+        if candidates:
+            archived.append({"position": position, "entry": deepcopy(entry)})
+        else:
+            unresolved.append(deepcopy(entry))
+    return archived, unresolved
 
 
 def _converted_payload(
@@ -368,6 +443,13 @@ def _collect_plan(
     observed_prefixes: Counter[str] = Counter()
     missing_sys = 0
     graph_rows = 0
+    graph_entries = 0
+    archived_graph_rows = 0
+    archived_graph_entries = 0
+    unresolved_graph_rows = 0
+    unresolved_graph_entries = 0
+    mixed_graph_rows = 0
+    empty_graph_rows = 0
     for obj in session.query(generic_instance).order_by(generic_instance.uid.asc()):
         original = obj.json_addl
         if not isinstance(original, dict):
@@ -382,30 +464,30 @@ def _collect_plan(
             missing_sys += 1
         if graph_present:
             graph_rows += 1
+            graph_entries += len(graph)
             observed_prefixes[str(obj.euid_prefix)] += 1
             allowed = reference_keys.get(obj.uid, set())
-            for entry in graph:
-                if str(entry.get("system") or "").strip() != "atlas":
-                    raise ValueError("retired graph contains a non-Atlas entry")
-                root = str(
-                    entry.get("root_euid") or entry.get("target_euid") or ""
-                ).strip()
-                relationship = str(entry.get("relationship_type") or "").strip()
-                tenant = str(entry.get("tenant_id") or "").strip()
-                source_field = str(entry.get("source_field") or "").strip()
-                candidates = {
-                    key
-                    for key in allowed
-                    if key[0] == root
-                    and key[1] == relationship
-                    and (not tenant or key[2] == tenant)
-                    and key[3] == source_field
+            archived, unresolved = _partition_graph_entries(graph, allowed)
+            if not graph:
+                empty_graph_rows += 1
+            if archived:
+                archived_graph_rows += 1
+                archived_graph_entries += len(archived)
+                proposed[archive_key] = {
+                    "properties.external_payload.tapdb_graph": {
+                        "original_length": len(graph),
+                        "archived_entries": archived,
+                    }
                 }
-                if not root or not relationship or not source_field or not candidates:
-                    raise ValueError(
-                        "retired graph entry lacks a matching typed authoritative lineage"
-                    )
-        if not missing_properties and not graph_present:
+            else:
+                proposed.pop(archive_key, None)
+            if unresolved:
+                unresolved_graph_rows += 1
+                unresolved_graph_entries += len(unresolved)
+                proposed["properties"]["external_payload"]["tapdb_graph"] = unresolved
+            if archived and unresolved:
+                mixed_graph_rows += 1
+        if proposed == original:
             continue
         if obj.is_deleted:
             raise ValueError("reviewed metadata conversion cannot update a deleted row")
@@ -423,8 +505,9 @@ def _collect_plan(
                 "before": content_hash(original),
                 "after": content_hash(proposed),
                 "missing_properties": missing_properties,
-                "archived_graph_entries": len(graph),
-                "archived_graph_key": graph_present,
+                "archived_graph_entries": len(archived) if graph_present else 0,
+                "unresolved_graph_entries": len(unresolved) if graph_present else 0,
+                "archived_graph_key": bool(archived) if graph_present else False,
                 "native_receipt": receipt,
             }
         )
@@ -434,6 +517,17 @@ def _collect_plan(
         raise ValueError("SYS envelope count differs from reviewed manifest")
     if graph_rows != expected["retired_graph_rows"]:
         raise ValueError("retired graph row count differs from reviewed manifest")
+    graph_counts = {
+        "retired_graph_entries": graph_entries,
+        "archived_graph_rows": archived_graph_rows,
+        "archived_graph_entries": archived_graph_entries,
+        "unresolved_graph_rows": unresolved_graph_rows,
+        "unresolved_graph_entries": unresolved_graph_entries,
+        "mixed_graph_rows": mixed_graph_rows,
+        "empty_graph_rows": empty_graph_rows,
+    }
+    if any(graph_counts[key] != expected[key] for key in graph_counts):
+        raise ValueError("retired graph disposition differs from reviewed manifest")
     if (
         dict(sorted(observed_prefixes.items()))
         != expected["retired_graph_rows_by_prefix"]
@@ -503,6 +597,7 @@ def _collect_plan(
                 "legacy_bgx_deleted": deleted,
                 "missing_properties_sys": missing_sys,
                 "retired_graph_rows": graph_rows,
+                **graph_counts,
                 "retired_graph_rows_by_prefix": dict(sorted(observed_prefixes.items())),
                 "canonical_assertion_groups": len(assertions),
                 "legacy_dispositions": dict(sorted(dispositions.items())),
@@ -593,18 +688,19 @@ def _apply(session: Any, plan: dict[str, Any], *, actor: str) -> dict[str, Any]:
             asserted_at=datetime.fromisoformat(assertion["asserted_at"]),
             assertion_provenance=assertion_provenance,
         )
-        outcome = service.attach(source, spec)
-        outcomes[outcome.status] += 1
-        if not assertion["active"]:
-            detached = service.detach(
-                source,
-                target,
-                relationship_type=assertion["relationship_type"],
-                assertion_authority=authority,
-                deactivated_at=datetime.fromisoformat(assertion["deactivated_at"]),
-                deactivation_provenance=assertion_provenance,
-            )
-            outcomes[detached.status] += 1
+        with _template_owner_scope(session, "bloom"):
+            outcome = service.attach(source, spec)
+            outcomes[outcome.status] += 1
+            if not assertion["active"]:
+                detached = service.detach(
+                    source,
+                    target,
+                    relationship_type=assertion["relationship_type"],
+                    assertion_authority=authority,
+                    deactivated_at=datetime.fromisoformat(assertion["deactivated_at"]),
+                    deactivation_provenance=assertion_provenance,
+                )
+                outcomes[detached.status] += 1
     return dict(sorted(outcomes.items()))
 
 
@@ -893,7 +989,7 @@ def main() -> int:
                     )
                 )
                 return 0
-            if plan != reviewed:
+            if _plan_equality_projection(plan) != _plan_equality_projection(reviewed):
                 raise ValueError(
                     "live conversion plan changed after independent review"
                 )

@@ -60,28 +60,26 @@ Do not generate a new family ID. Do not recapture the source contract, source-ne
 
 The original schema operation is terminal and must never be replayed. Its retained result is `$OUT/schema-result.json`, SHA-256 `2853a09db4cbf7ef5c561afc606d9dc1a9ef3677f05d7439dee05c19a07047a8`, with recovery completion `000008-20260911T193433Z`. It committed eight migrations and released its writer fence. Preserve that result, its journal and every recovery-family exposure.
 
-With the exact `10.1.3` operator venv, plan a distinct delta operation against the retained source contract, mappings and recovery family:
+With the exact `10.1.3` operator venv, plan a distinct delta operation against the current committed schema checkpoint, mappings and recovery family. Preserve `$OUT/frozen-source-contract.json` as the immutable pre-migration source record, but do not pass it as `--source-contract` for this delta: the native option requires exact equality with the live inventory, and the terminal eight-migration operation has already changed that inventory. The delta preflight captures the complete current identity and sequence inventories, requires their physical family membership, retains all family definitions and floors, and rechecks the complete receipt under the writer fence before apply. Keep the explicit 256 MiB inventory receipt limit in the operator config.
 
-Capture the dry migration receipt with the native source contract, exact mappings, family and journal. `db schema migrate` deliberately omits the unsupported global `--json` option.
+Capture the dry migration receipt with the current native inventories, exact mappings, family and journal. `db schema migrate` deliberately omits the unsupported global `--json` option.
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day \
   db schema migrate --dry-run \
   --receipt "$OUT/schema-delta-1013-plan.json" \
-  --source-contract "$OUT/frozen-source-contract.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipts-dir "$JOURNAL"
 ```
 
-Require exactly these three pending migrations, in order, and reject any plan containing one of the already committed eight: `20260911_164426_runtime_tenant_allowlist.sql` (SHA-256 `50e936edee3f2ad11d4193e1f698809bc4e39b4370355e65f3f59b6c08ac40aa`), `20260911_171000_allowlisted_lineage_scope.sql` (SHA-256 `8ee9eff8eaa5b68e23354ebf3d87356fa6ccd4b865731c0e21c4e0ef06dccc1b`) and `20260911_210000_versioned_xrf_scope.sql` (SHA-256 `098566ee17de495944485dafdb6c86dddc57e968a4decff00808cbdf7b6a05fa`). Check the immutable target/physical target, exact source-contract and journal/family bindings, no unknown migration, and no principal binding. Record the delta plan SHA-256. Apply only that unchanged receipt while native fencing independently authenticates the Aurora provider and leaves only the operator trusted during the commit:
+Require exactly these three pending migrations, in order, and reject any plan containing one of the already committed eight: `20260911_164426_runtime_tenant_allowlist.sql` (SHA-256 `50e936edee3f2ad11d4193e1f698809bc4e39b4370355e65f3f59b6c08ac40aa`), `20260911_171000_allowlisted_lineage_scope.sql` (SHA-256 `8ee9eff8eaa5b68e23354ebf3d87356fa6ccd4b865731c0e21c4e0ef06dccc1b`) and `20260911_210000_versioned_xrf_scope.sql` (SHA-256 `098566ee17de495944485dafdb6c86dddc57e968a4decff00808cbdf7b6a05fa`). Check the immutable target/physical target, current complete inventories, exact journal/family binding, 256 MiB inventory limit, zero pending recovery intents, no unknown migration, and no principal binding. Record the delta plan SHA-256. Apply only that unchanged receipt while native fencing independently authenticates the Aurora provider and leaves only the operator trusted during the commit:
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day \
   db schema migrate --apply \
   --preflight-receipt "$OUT/schema-delta-1013-plan.json" \
   --receipt "$OUT/schema-delta-1013-result.json" \
-  --source-contract "$OUT/frozen-source-contract.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipts-dir "$JOURNAL" \
@@ -94,7 +92,7 @@ Require native `migration_result`, terminal `recovery_completion`, `principal_bi
 
 ## 3. Prepare XRF templates and convert Bloom data
 
-Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)`. The helper derives exact XRF coordinates from the installed package, verifies every loaded template fingerprint, preserves the historical `tapdb_object/1.0` definition unchanged, and additively inserts only missing canonical `opaque/1.0` and `tapdb_object/2.0` definitions. It never overwrites or reactivates a loaded definition.
+Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)` for owner `bloom`, matching the transaction owner of every XRF instance created by Bloom. The helper derives exact XRF coordinates from the installed package, verifies every loaded template fingerprint, preserves the historical `tapdb_object/1.0` definition and any core-owned package definitions unchanged, and additively inserts only missing Bloom-owned canonical `opaque/1.0` and `tapdb_object/2.0` definitions. It never overwrites or reactivates a loaded definition.
 
 ```bash
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" plan \
@@ -115,26 +113,26 @@ Capture the post-schema/post-template native identity baseline used to prove onl
   db identity inventory --source-version 10.1.3 \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
-  --receipt "$OUT/pre-bloom-conversion.json"
+  --receipt "$OUT/pre-bloom-conversion-v2.json" >/dev/null
 ```
 
-Plan and apply the reviewed Bloom conversion. The plan must report exactly 186 retained BGX identities: 182 Atlas, one Dewey and three unresolved/orphan; 160 active and 26 deleted. It must retain every legacy BGX UID/EUID, lineage, deletion state, original properties and duplicate evidence; the actual 26 duplicate groups have identical properties and mixed active/deleted evidence. It must repair 50 missing SYS envelopes, archive 93 explicitly matched graph payloads, and create only the reviewed canonical native assertion set. Any differing duplicate provenance, unresolved identity invention, deleted-source activation or unexpected count stops the operation.
+Plan and apply the reviewed Bloom conversion. The plan must report exactly 186 retained BGX identities: 182 Atlas, one Dewey and three unresolved/orphan; 160 active and 26 deleted. It must retain every legacy BGX UID/EUID, lineage, deletion state, original properties and duplicate evidence; the actual 26 duplicate groups have identical properties and mixed active/deleted evidence. It must repair 50 missing SYS envelopes and inspect all 93 rows containing 393 retired graph entries. Archive only the 111 entries on 21 rows that exactly match same-source authoritative BGX lineage by root, relationship, tenant and source field. Keep the 282 unmatched entries on 72 rows unchanged and explicit in their original metadata and relative order; create no identity or lineage for them. Mixed and empty graph rows must both be zero. Archived entries retain their original position and list length for reconstruction. The plan creates exactly 157 reviewed canonical native assertion groups. Any differing duplicate provenance, graph disposition, unresolved identity invention, deleted-source activation or unexpected count stops the operation.
 
 ```bash
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_conversion.py" plan \
   --operator-config "$OPERATOR" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --manifest "$MANIFEST" --actor bloom-tapdb10-migration \
-  --receipt "$OUT/conversion-plan.json"
-CONVERSION_PLAN_SHA='<sha256 of conversion-plan.json>'
+  --receipt "$OUT/conversion-plan-v5.json"
+CONVERSION_PLAN_SHA='<sha256 of conversion-plan-v5.json>'
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_conversion.py" apply \
   --operator-config "$OPERATOR" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --manifest "$MANIFEST" --actor bloom-tapdb10-migration \
-  --plan "$OUT/conversion-plan.json" \
+  --plan "$OUT/conversion-plan-v5.json" \
   --reviewed-plan-sha256 "$CONVERSION_PLAN_SHA" \
   --review-reference "$REVIEW_REFERENCE" \
-  --receipt "$OUT/conversion-result.json"
+  --receipt "$OUT/conversion-result-v5.json"
 ```
 
 Both helpers reserve the exact result path before mutation and atomically replace it with the terminal result. If a post-commit transport or result-write failure leaves the reservation, run that helper's `reconcile` operation with the same plan SHA and review reference. Reconciliation is read-only, validates the reviewed metadata/template state, all BGX preservation evidence and the exact native assertion set, and finalizes the reserved receipt. Never blind-replay an apply.
@@ -146,16 +144,16 @@ Capture and verify the final identity state for this conversion stage:
   db identity inventory --source-version 10.1.3 \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
-  --receipt "$OUT/post-bloom-conversion.json"
+  --receipt "$OUT/post-bloom-conversion-v2.json" >/dev/null
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_identity_manifest.py" \
-  --before "$OUT/pre-bloom-conversion.json" \
-  --after "$OUT/post-bloom-conversion.json" \
-  --conversion-plan "$OUT/conversion-plan.json" \
-  --manifest "$OUT/native-bloom-conversion-manifest.json"
+  --before "$OUT/pre-bloom-conversion-v2.json" \
+  --after "$OUT/post-bloom-conversion-v2.json" \
+  --conversion-plan "$OUT/conversion-plan-v5.json" \
+  --manifest "$OUT/native-bloom-conversion-manifest-v2.json"
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db identity verify --before "$OUT/pre-bloom-conversion.json" \
-  --after "$OUT/post-bloom-conversion.json" \
-  --conversion-manifest "$OUT/native-bloom-conversion-manifest.json" \
+  db identity verify --before "$OUT/pre-bloom-conversion-v2.json" \
+  --after "$OUT/post-bloom-conversion-v2.json" \
+  --conversion-manifest "$OUT/native-bloom-conversion-manifest-v2.json" \
   --sequence-mappings "$MAPPINGS"
 ```
 

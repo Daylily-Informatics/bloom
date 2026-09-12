@@ -42,6 +42,23 @@ def _identity(contract: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def _canonical_target(target: dict[str, Any]) -> dict[str, Any]:
+    canonical = dict(target)
+    port = canonical.get("port")
+    server_port = canonical.get("server_port", port)
+    if (
+        not isinstance(port, int)
+        or isinstance(port, bool)
+        or not isinstance(server_port, int)
+        or isinstance(server_port, bool)
+        or not 1 <= port <= 65535
+        or server_port != port
+    ):
+        raise ValueError("identity target ports are invalid or inconsistent")
+    canonical["server_port"] = server_port
+    return canonical
+
+
 def main() -> int:
     from daylily_tapdb.identity_inventory import (
         validate_receipt,
@@ -65,7 +82,8 @@ def main() -> int:
         or before["physical_target"] != after["physical_target"]
         or before["schema_name"] != after["schema_name"]
         or plan.get("schema_version") != "bloom-tapdb10-conversion-plan/v1"
-        or plan.get("target") != before["target"]
+        or _canonical_target(plan.get("target", {}))
+        != _canonical_target(before["target"])
         or plan.get("physical_target") != before["physical_target"]
     ):
         raise ValueError("identity receipts and reviewed conversion target differ")

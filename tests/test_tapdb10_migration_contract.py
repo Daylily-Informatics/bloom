@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,6 +19,7 @@ def _load_script(name: str):
 
 
 conversion = _load_script("bloom_tapdb10_conversion.py")
+identity_manifest = _load_script("bloom_tapdb10_identity_manifest.py")
 sequence_transition = _load_script("bloom_sequence_transition_receipt.py")
 sequence_floors = _load_script("bloom_sequence_floor_prepare.py")
 xrf_templates = _load_script("bloom_tapdb10_xrf_templates.py")
@@ -128,6 +130,63 @@ def test_metadata_conversion_adds_only_envelope_and_archives_graph() -> None:
     assert graph_present is True
 
 
+def test_graph_partition_archives_only_lineage_matches_with_positions() -> None:
+    matched = {
+        "system": "atlas",
+        "root_euid": "persisted-reference",
+        "relationship_type": "prepared_for_atlas_test",
+        "source_field": "atlas_test",
+    }
+    unresolved = {
+        "system": "atlas",
+        "root_euid": "unresolved-reference",
+        "relationship_type": "received_from_atlas_trf",
+        "source_field": "atlas_trf",
+    }
+
+    archived, retained = conversion._partition_graph_entries(
+        [unresolved, matched],
+        {
+            (
+                "persisted-reference",
+                "prepared_for_atlas_test",
+                "",
+                "atlas_test",
+            )
+        },
+    )
+
+    assert archived == [{"position": 1, "entry": matched}]
+    assert retained == [unresolved]
+
+
+def test_graph_partition_requires_exact_tenant_including_omitted_tenant() -> None:
+    base = {
+        "system": "atlas",
+        "root_euid": "persisted-reference",
+        "relationship_type": "prepared_for_atlas_test",
+        "source_field": "atlas_test",
+    }
+    omitted = dict(base)
+    mismatched = {**base, "tenant_id": "tenant-beta"}
+    matched = {**base, "tenant_id": "tenant-alpha"}
+
+    archived, retained = conversion._partition_graph_entries(
+        [omitted, mismatched, matched],
+        {
+            (
+                "persisted-reference",
+                "prepared_for_atlas_test",
+                "tenant-alpha",
+                "atlas_test",
+            )
+        },
+    )
+
+    assert archived == [{"position": 2, "entry": matched}]
+    assert retained == [omitted, mismatched]
+
+
 def test_metadata_conversion_repairs_only_missing_properties() -> None:
     converted, graph, graph_present = conversion._converted_payload(
         {"label": "retained"}, archive_key="bloom_tapdb10_archive"
@@ -136,6 +195,131 @@ def test_metadata_conversion_repairs_only_missing_properties() -> None:
     assert converted == {"label": "retained", "properties": {}}
     assert graph == []
     assert graph_present is False
+
+
+def test_conversion_plan_comparison_ignores_only_native_receipt_time() -> None:
+    planned = {
+        "conversion": {
+            "metadata_changes": [
+                {
+                    "uid": 7,
+                    "native_receipt": {
+                        "recorded_at": "2026-09-11T12:00:00+00:00",
+                        "actor": "migration",
+                        "changes": {"json_addl": {"new": {"properties": {}}}},
+                    },
+                }
+            ]
+        }
+    }
+    current = deepcopy(planned)
+    current["conversion"]["metadata_changes"][0]["native_receipt"]["recorded_at"] = (
+        "2026-09-11T12:01:00+00:00"
+    )
+
+    assert conversion._plan_equality_projection(
+        current
+    ) == conversion._plan_equality_projection(planned)
+
+    current["conversion"]["metadata_changes"][0]["native_receipt"]["actor"] = (
+        "changed-actor"
+    )
+    assert conversion._plan_equality_projection(
+        current
+    ) != conversion._plan_equality_projection(planned)
+
+
+def test_identity_manifest_requires_one_consistent_physical_port() -> None:
+    plan_target = {"port": 5432, "database": "tapdb_bloom_prod"}
+    inventory_target = {
+        **plan_target,
+        "server_port": 5432,
+    }
+
+    assert identity_manifest._canonical_target(
+        plan_target
+    ) == identity_manifest._canonical_target(inventory_target)
+
+    with pytest.raises(ValueError, match="ports are invalid or inconsistent"):
+        identity_manifest._canonical_target({**inventory_target, "server_port": 5433})
+
+
+def test_conversion_template_scope_selects_bloom_and_is_removed_on_error() -> None:
+    from daylily_tapdb import TemplateManager
+    from daylily_tapdb.models.template import generic_template
+    from sqlalchemy import create_engine
+    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy.ext.compiler import compiles
+    from sqlalchemy.orm import Session
+
+    @compiles(JSONB, "sqlite")
+    def compile_jsonb_for_sqlite(type_, compiler, **kwargs):
+        del type_, compiler, kwargs
+        return "JSON"
+
+    engine = create_engine("sqlite://")
+    generic_template.__table__.create(engine)
+    timestamp = datetime.now(UTC)
+    base = {
+        "euid_prefix": "TPX",
+        "tenant_id": None,
+        "domain_code": "M",
+        "name": "Opaque reference",
+        "created_dt": timestamp,
+        "modified_dt": timestamp,
+        "polymorphic_discriminator": "generic_template",
+        "category": "reference",
+        "type": "external_identifier",
+        "subtype": "opaque",
+        "version": "1.0",
+        "bstatus": "active",
+        "json_addl": {},
+        "is_singleton": False,
+        "is_deleted": False,
+        "instance_prefix": "XRF",
+        "instance_polymorphic_identity": None,
+        "validator_ref": "UNIVERSAL_PASS@1",
+        "json_addl_schema": None,
+    }
+    with engine.begin() as connection:
+        connection.execute(
+            generic_template.__table__.insert(),
+            [
+                {
+                    **base,
+                    "uid": 1,
+                    "euid": "persisted-core-template",
+                    "euid_seq": 1,
+                    "issuer_app_code": "daylily-tapdb",
+                },
+                {
+                    **base,
+                    "uid": 2,
+                    "euid": "persisted-bloom-template",
+                    "euid_seq": 2,
+                    "issuer_app_code": "bloom",
+                },
+            ],
+        )
+
+    with Session(engine) as session:
+        assert {
+            row.issuer_app_code for row in session.query(generic_template).all()
+        } == {"bloom", "daylily-tapdb"}
+        with pytest.raises(RuntimeError, match="prove listener removal"):
+            with conversion._template_owner_scope(session, "bloom"):
+                selected = TemplateManager().get_template(
+                    session,
+                    "reference/external_identifier/opaque/1.0/",
+                    domain_code="M",
+                )
+                assert selected is not None
+                assert selected.issuer_app_code == "bloom"
+                raise RuntimeError("prove listener removal")
+        session.expunge_all()
+        assert {
+            row.issuer_app_code for row in session.query(generic_template).all()
+        } == {"bloom", "daylily-tapdb"}
 
 
 def test_metadata_conversion_rejects_malformed_or_replayed_values() -> None:
