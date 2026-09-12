@@ -186,9 +186,9 @@ def test_conversion_plan_comparison_ignores_only_native_receipt_time() -> None:
         }
     }
     current = deepcopy(planned)
-    current["conversion"]["metadata_changes"][0]["native_receipt"][
-        "recorded_at"
-    ] = "2026-09-11T12:01:00+00:00"
+    current["conversion"]["metadata_changes"][0]["native_receipt"]["recorded_at"] = (
+        "2026-09-11T12:01:00+00:00"
+    )
 
     assert conversion._plan_equality_projection(
         current

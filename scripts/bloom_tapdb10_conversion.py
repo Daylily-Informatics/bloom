@@ -697,9 +697,7 @@ def _apply(session: Any, plan: dict[str, Any], *, actor: str) -> dict[str, Any]:
                     target,
                     relationship_type=assertion["relationship_type"],
                     assertion_authority=authority,
-                    deactivated_at=datetime.fromisoformat(
-                        assertion["deactivated_at"]
-                    ),
+                    deactivated_at=datetime.fromisoformat(assertion["deactivated_at"]),
                     deactivation_provenance=assertion_provenance,
                 )
                 outcomes[detached.status] += 1
