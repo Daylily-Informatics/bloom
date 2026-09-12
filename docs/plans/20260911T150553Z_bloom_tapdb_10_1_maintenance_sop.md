@@ -113,7 +113,7 @@ Capture the post-schema/post-template native identity baseline used to prove onl
   db identity inventory --source-version 10.1.3 \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
-  --receipt "$OUT/pre-bloom-conversion.json"
+  --receipt "$OUT/pre-bloom-conversion-v2.json" >/dev/null
 ```
 
 Plan and apply the reviewed Bloom conversion. The plan must report exactly 186 retained BGX identities: 182 Atlas, one Dewey and three unresolved/orphan; 160 active and 26 deleted. It must retain every legacy BGX UID/EUID, lineage, deletion state, original properties and duplicate evidence; the actual 26 duplicate groups have identical properties and mixed active/deleted evidence. It must repair 50 missing SYS envelopes and inspect all 93 rows containing 393 retired graph entries. Archive only the 111 entries on 21 rows that exactly match same-source authoritative BGX lineage by root, relationship, tenant and source field. Keep the 282 unmatched entries on 72 rows unchanged and explicit in their original metadata and relative order; create no identity or lineage for them. Mixed and empty graph rows must both be zero. Archived entries retain their original position and list length for reconstruction. The plan creates exactly 157 reviewed canonical native assertion groups. Any differing duplicate provenance, graph disposition, unresolved identity invention, deleted-source activation or unexpected count stops the operation.
@@ -123,16 +123,16 @@ Plan and apply the reviewed Bloom conversion. The plan must report exactly 186 r
   --operator-config "$OPERATOR" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --manifest "$MANIFEST" --actor bloom-tapdb10-migration \
-  --receipt "$OUT/conversion-plan.json"
-CONVERSION_PLAN_SHA='<sha256 of conversion-plan.json>'
+  --receipt "$OUT/conversion-plan-v5.json"
+CONVERSION_PLAN_SHA='<sha256 of conversion-plan-v5.json>'
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_conversion.py" apply \
   --operator-config "$OPERATOR" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --manifest "$MANIFEST" --actor bloom-tapdb10-migration \
-  --plan "$OUT/conversion-plan.json" \
+  --plan "$OUT/conversion-plan-v5.json" \
   --reviewed-plan-sha256 "$CONVERSION_PLAN_SHA" \
   --review-reference "$REVIEW_REFERENCE" \
-  --receipt "$OUT/conversion-result.json"
+  --receipt "$OUT/conversion-result-v5.json"
 ```
 
 Both helpers reserve the exact result path before mutation and atomically replace it with the terminal result. If a post-commit transport or result-write failure leaves the reservation, run that helper's `reconcile` operation with the same plan SHA and review reference. Reconciliation is read-only, validates the reviewed metadata/template state, all BGX preservation evidence and the exact native assertion set, and finalizes the reserved receipt. Never blind-replay an apply.
@@ -144,16 +144,16 @@ Capture and verify the final identity state for this conversion stage:
   db identity inventory --source-version 10.1.3 \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
-  --receipt "$OUT/post-bloom-conversion.json"
+  --receipt "$OUT/post-bloom-conversion-v2.json" >/dev/null
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_identity_manifest.py" \
-  --before "$OUT/pre-bloom-conversion.json" \
-  --after "$OUT/post-bloom-conversion.json" \
-  --conversion-plan "$OUT/conversion-plan.json" \
-  --manifest "$OUT/native-bloom-conversion-manifest.json"
+  --before "$OUT/pre-bloom-conversion-v2.json" \
+  --after "$OUT/post-bloom-conversion-v2.json" \
+  --conversion-plan "$OUT/conversion-plan-v5.json" \
+  --manifest "$OUT/native-bloom-conversion-manifest-v2.json"
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db identity verify --before "$OUT/pre-bloom-conversion.json" \
-  --after "$OUT/post-bloom-conversion.json" \
-  --conversion-manifest "$OUT/native-bloom-conversion-manifest.json" \
+  db identity verify --before "$OUT/pre-bloom-conversion-v2.json" \
+  --after "$OUT/post-bloom-conversion-v2.json" \
+  --conversion-manifest "$OUT/native-bloom-conversion-manifest-v2.json" \
   --sequence-mappings "$MAPPINGS"
 ```
 

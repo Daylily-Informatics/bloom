@@ -19,6 +19,7 @@ def _load_script(name: str):
 
 
 conversion = _load_script("bloom_tapdb10_conversion.py")
+identity_manifest = _load_script("bloom_tapdb10_identity_manifest.py")
 sequence_transition = _load_script("bloom_sequence_transition_receipt.py")
 sequence_floors = _load_script("bloom_sequence_floor_prepare.py")
 xrf_templates = _load_script("bloom_tapdb10_xrf_templates.py")
@@ -199,6 +200,21 @@ def test_conversion_plan_comparison_ignores_only_native_receipt_time() -> None:
     assert conversion._plan_equality_projection(
         current
     ) != conversion._plan_equality_projection(planned)
+
+
+def test_identity_manifest_requires_one_consistent_physical_port() -> None:
+    plan_target = {"port": 5432, "database": "tapdb_bloom_prod"}
+    inventory_target = {
+        **plan_target,
+        "server_port": 5432,
+    }
+
+    assert identity_manifest._canonical_target(
+        plan_target
+    ) == identity_manifest._canonical_target(inventory_target)
+
+    with pytest.raises(ValueError, match="ports are invalid or inconsistent"):
+        identity_manifest._canonical_target({**inventory_target, "server_port": 5433})
 
 
 def test_conversion_template_scope_selects_bloom_and_is_removed_on_error() -> None:
