@@ -128,6 +128,36 @@ def test_metadata_conversion_adds_only_envelope_and_archives_graph() -> None:
     assert graph_present is True
 
 
+def test_graph_partition_archives_only_lineage_matches_with_positions() -> None:
+    matched = {
+        "system": "atlas",
+        "root_euid": "persisted-reference",
+        "relationship_type": "prepared_for_atlas_test",
+        "source_field": "atlas_test",
+    }
+    unresolved = {
+        "system": "atlas",
+        "root_euid": "unresolved-reference",
+        "relationship_type": "received_from_atlas_trf",
+        "source_field": "atlas_trf",
+    }
+
+    archived, retained = conversion._partition_graph_entries(
+        [unresolved, matched],
+        {
+            (
+                "persisted-reference",
+                "prepared_for_atlas_test",
+                "",
+                "atlas_test",
+            )
+        },
+    )
+
+    assert archived == [{"position": 1, "entry": matched}]
+    assert retained == [unresolved]
+
+
 def test_metadata_conversion_repairs_only_missing_properties() -> None:
     converted, graph, graph_present = conversion._converted_payload(
         {"label": "retained"}, archive_key="bloom_tapdb10_archive"
