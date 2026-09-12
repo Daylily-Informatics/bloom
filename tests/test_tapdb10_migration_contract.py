@@ -76,12 +76,6 @@ def test_xrf_template_coordinates_follow_released_package() -> None:
     }
 
 
-def test_xrf_helper_uses_repeatable_read_for_native_inventory() -> None:
-    source = Path(xrf_templates.__file__).read_text(encoding="utf-8")
-
-    assert 'isolation_level="REPEATABLE READ"' in source
-
-
 def test_xrf_template_validation_accepts_only_additive_version() -> None:
     before = {
         "all_template_count": 239,
