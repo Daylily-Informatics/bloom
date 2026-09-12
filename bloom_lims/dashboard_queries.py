@@ -68,8 +68,7 @@ def recent_instances(bdb, *, beta_kinds: list | None = None) -> list:
         query = query.filter(
             model.json_addl["properties"]["beta_kind"].as_string().in_(beta_kinds)
         )
-    return (
-        query.order_by(model.created_dt.desc().nullslast(), model.uid.asc())
-        .limit(5)
-        .all()
-    )
+    ordering = [model.created_dt.desc()]
+    if beta_kinds is not None:
+        ordering = [model.created_dt.desc().nullslast(), model.uid.asc()]
+    return query.order_by(*ordering).limit(5).all()
