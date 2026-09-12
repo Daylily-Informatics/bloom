@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan or add the two exact TapDB 10.1 core XRF templates for Bloom."""
+"""Plan or add the package-declared TapDB 10.1 core XRF templates for Bloom."""
 
 from __future__ import annotations
 
@@ -14,11 +14,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-TAPDB_VERSION = "10.1.1rc1"
-_CODES = {
-    ("reference", "external_identifier", "opaque", "1.0"),
-    ("reference", "external_identifier", "tapdb_object", "1.0"),
-}
+TAPDB_VERSION = "10.1.3"
+_ROLES = {"opaque", "tapdb_object"}
 _FIELDS = (
     "name",
     "polymorphic_discriminator",
@@ -126,12 +123,13 @@ def _definitions() -> tuple[Path, list[dict[str, Any]]]:
     selected = [
         row
         for row in load_template_configs(root)
-        if tuple(row.get(key) for key in ("category", "type", "subtype", "version"))
-        in _CODES
+        if (row.get("category"), row.get("type"))
+        == ("reference", "external_identifier")
+        and row.get("subtype") in _ROLES
     ]
     if (
         len(selected) != 2
-        or {row["subtype"] for row in selected} != {"opaque", "tapdb_object"}
+        or {row["subtype"] for row in selected} != _ROLES
         or any(row.get("instance_prefix") != "XRF" for row in selected)
     ):
         raise ValueError(
@@ -177,7 +175,10 @@ def _state(session: Any, definitions: list[dict[str, Any]]) -> dict[str, Any]:
                 {
                     "uid": row.uid,
                     "euid": row.euid,
+                    "category": row.category,
+                    "type": row.type,
                     "subtype": row.subtype,
+                    "version": row.version,
                     "fingerprint": content_hash(
                         {field: getattr(row, field, None) for field in _FIELDS}
                     ),

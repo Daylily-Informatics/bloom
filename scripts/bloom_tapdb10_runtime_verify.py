@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-TAPDB_VERSION = "10.1.1rc1"
+TAPDB_VERSION = "10.1.3"
 OPERATOR_FIELDS = (
     "operator_user",
     "operator_password",
@@ -224,7 +224,7 @@ def main() -> int:
         "wrong TapDB version",
     )
     _require(
-        importlib.metadata.version("bloom_lims") == "10.0.0", "wrong Bloom release"
+        importlib.metadata.version("bloom_lims") == "10.0.1", "wrong Bloom release"
     )
     runtime_path = _file(args.runtime_config, private=True)
     manifest_path = _file(args.manifest)
