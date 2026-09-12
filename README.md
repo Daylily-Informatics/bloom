@@ -21,7 +21,7 @@
 
 Bloom is the LSMC internal material and container graph service. It owns laboratory containers, materials/content, equipment, lineage, recursive template creation, search, and graph views. Atlas owns orders and customer-facing accession context; Bloom owns the physical/material execution graph.
 
-Source release: `10.0.3`. Exact TapDB dependency: `daylily-tapdb[aurora,gui]==10.1.3` (see `pyproject.toml`). Python 3.12 or newer is required; the Bloom version is derived from Git by setuptools-scm.
+Source release: `10.0.4`. Exact TapDB dependency: `daylily-tapdb[aurora,gui]==10.1.3` (see `pyproject.toml`). Python 3.12 or newer is required; the Bloom version is derived from Git by setuptools-scm.
 
 The accepted deployment recorded on 2026-09-12 is Bloom `10.0.3` at `https://bloom.day.lsmc.bio`, with Kahlo `8.0.1` consuming its native DAG v2. The later phase-2 patch and deployment are tracked in the [phase-2 execution ledger](docs/plans/20260912T053000Z_bloom_phase_2_execution_ledger.md). See the [completed migration ledger](docs/plans/20260911T150553Z_bloom_tapdb_10_1_migration_ledger.md) and [phase-2 backlog](docs/plans/20260912T045329Z_bloom_phase_2_backlog.md).
 
