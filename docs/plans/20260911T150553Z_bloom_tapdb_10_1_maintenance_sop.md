@@ -1,15 +1,15 @@
-# Bloom 10.0.0 / TapDB 10.1.1rc1 Maintenance SOP
+# Bloom 10.0.1 / TapDB 10.1.3 Maintenance SOP
 
 Date: 2026-09-11
 
-Status: pre-migration review procedure
+Status: resumed post-schema review procedure
 
-This is the bounded production procedure governed by the sibling migration ledger. It performs one in-place migration of `tapdb_bloom_prod`; it creates no Aurora snapshot, dump, database copy, replacement database, or rehearsal database. A preservation or allocator failure keeps Bloom stopped.
+This is the bounded production procedure governed by the sibling migration ledger. It resumes the in-place migration of `tapdb_bloom_prod` from the committed TapDB `10.1.1rc1` schema checkpoint; it creates no Aurora snapshot, dump, database copy, replacement database, or rehearsal database. A preservation or allocator failure keeps Bloom stopped.
 
 ## Immutable target and operator capsule
 
-- Bloom release: annotated `10.0.0`, final release commit and image digest recorded in the ledger before the outage.
-- TapDB: `daylily-tapdb[aurora,gui]==10.1.1rc1`; annotated tag object `1ac2f09a1787b9e747eda582c45a628ca60b7020`; peeled commit `02ab7c9d0325dfcbf9dc47a03be66b62e0a22f2c`; wheel SHA-256 `26de691dd5f9c8fac596a18119c9220f4ea78826094753b47f9eb936b0677ce7`.
+- Bloom replacement release: annotated `10.0.1`, with final release commit and image digest recorded in the ledger before promotion.
+- TapDB: `daylily-tapdb[aurora,gui]==10.1.3`; annotated tag object `c043426f8d1418c9a3220aa41195dcea3a3587b4`; peeled commit `7eccfe1b4e0dc440ed08b97f8decf214648152a5`; wheel SHA-256 `835743adc8c28456e8d733d136abe31e672e0188a33ded16a99d625a22c128e5`; sdist SHA-256 `eefebb8af42e7baba5b8517daea861933fc7c8135fc0791d7bcde7f8d5762cf5`.
 - Target: client `bloom`, logical database `bloom-day`, physical database `tapdb_bloom_prod`, schema `tapdb_bloom_lsmcok1_local`, domain `M`, owner `bloom`.
 - Runtime role: `bloom_runtime_10`. Operator and every managed sequence granted to runtime: `dayhoff`, as established by the Bloom principal/allocator census.
 - Operator root: `/home/ubuntu/bloom_ops/tapdb101-20260911`; native journals: `/home/ubuntu/bloom_ops/tapdb101-20260911/journal`; ordinary outputs: `/home/ubuntu/bloom_ops/tapdb101-20260911/receipts`. Both directories are mode `0700`; files are mode `0600`.
@@ -17,7 +17,7 @@ This is the bounded production procedure governed by the sibling migration ledge
 - Control config: `/home/ubuntu/bloom_ops/tapdb101-20260911/control-operator.yaml`, using the same Aurora writer and operator identity but the existing `postgres` control database. It must resolve to a physical database different from `tapdb_bloom_prod`.
 - Runtime config identity: `/home/ubuntu/.config/tapdb/bloom/bloom-day/tapdb-config.yaml`. This exact absolute path is present on the host and in the Bloom container. It contains runtime credentials only. The principal helper overlays operator credentials in memory while retaining this runtime config identity.
 - Provider contract: `/home/ubuntu/bloom_ops/tapdb101-20260911/receipts/aurora-provider-contract.json`, pinned to authenticated RDS metadata for `dayhoff-lsmcok1-tapdb`, engine `aurora-postgresql`, engine version `16.13`, profile `lsmc`, region `us-west-2`, the exact cluster ARN/resource ID/writer endpoint, and `sslmode=verify-full`.
-- Sequence mapping input: `/home/ubuntu/bloom_ops/tapdb101-20260911/receipts/source-sequence-mappings.json`. Its reviewed initial value is `{}` because native catalog ownership, stored rows, template bindings and prefix configuration own the mappings. Any `unmapped` generator in the frozen source inventory is a preservation blocker; do not infer a mapping during the outage.
+- Sequence mapping input: `/home/ubuntu/bloom_ops/tapdb101-20260911/receipts/source-sequence-mappings.json`. It contains only the four independently approved source-declared prefix mappings for the actual dormant `AY`, `WSX`, `WX` and `XX` catalog allocators, preserving their frozen catalog positions. No other mapping may be inferred or added during the outage.
 - Conversion manifest: `config/migrations/bloom_tapdb_10_1_conversion.json` from the exact Bloom release commit.
 
 Before the window, install the exact release scripts and manifest under the operator root, create and hash the private configs/provider contract/mapping input, verify the pinned wheel and release artifacts, and record those hashes in B06. Preparing these files does not touch the database. The runtime config is placed at its canonical path only while Bloom is stopped.
@@ -42,73 +42,45 @@ REVIEW_REFERENCE='B03:<reviewed-commit-and-message>'
 
 Every plan and result path below is create-exclusive. Preserve stdout, stderr, terminal return code, file SHA-256 and the native journal head for each operation on the operator host. Do not put secrets or complete data receipts in Git.
 
-## 1. Close admission and freeze the source
+## 1. Recheck the closed outage; do not recapture the source
 
-1. Close ordinary Bloom admission while leaving the running process available only to the operator drain.
-2. Drain acknowledged work. Retain queued work. Capture a final queue-state summary and require no running/leased/unacknowledged item; queued items may remain. Do not issue test GETs while draining because Bloom GET routes can write.
-3. Stop the scoped Bloom Compose service and leave all sibling services running. Stop its web process, in-container workers and schedulers together. Confirm no Bloom process remains. The B01 host inventory found no separate Bloom timer or cron; if the frozen check finds one, stop it before continuing.
-4. Close operator sessions other than the one retained maintenance session. Capture the exact principal census and database activity. Require no session or prepared transaction other than the retained operator operation.
+Admission is already closed, Bloom is stopped, and the frozen source/family capsule is terminal. Recheck only the scoped admission marker, Bloom Compose/process state, active database sessions and prepared transactions. Require ordinary admission closed, no Bloom container or process, no Bloom writer, and no unexpected session or prepared transaction. Preserve siblings and do not issue an application request. A distinct read-only census may be written to `$OUT/resume-principal-census.json`; never replace the frozen census or source receipts.
 
-```bash
-"$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db census --database tapdb_bloom_prod --receipt "$OUT/frozen-principal-census.json"
-```
+The governing frozen evidence is already complete:
 
-5. Generate one recovery-family UUID and record it before the native capture. Capture the complete frozen source contract and immutable family in one native read-only operation.
+- recovery family `d869afb8-47a7-41dd-813a-f24d0ca96fa8`;
+- `$OUT/frozen-source-contract.json`, bound to physical `tapdb_bloom_prod`, all 66 allocators and the frozen Bloom population;
+- `$OUT/source-sequence-mappings.json`, containing only the four reviewed source-declared prefix mappings for the actual dormant `AY`, `WSX`, `WX` and `XX` catalog allocators, with their retained catalog positions;
+- `$OUT/frozen-source-next-plan.json`, `$OUT/transition-floors.json` and `$OUT/transition-floor-projection.json`; and
+- the existing family journal, including every schema fence, reservation and recovery exposure.
 
-```bash
-FAMILY_ID='<one recorded lowercase UUID>'
-"$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db identity inventory --source-version 9.0.10 \
-  --sequence-mappings "$MAPPINGS" \
-  --new-recovery-family-id "$FAMILY_ID" \
-  --family-receipts-dir "$JOURNAL" \
-  --family-receipt "$OUT/recovery-family.json" \
-  --receipt "$OUT/frozen-source-contract.json"
-```
+Do not generate a new family ID. Do not recapture the source contract, source-next plan or transition floors. Do not rerun the source inventory, floor projector or committed schema operation. These receipts remain the only source/family inputs for the resumed delta.
 
-Require the source contract target and physical target to match the immutable target, require all 66 observed generators to have a native `owned_column` or `prefix` mapping, and require no missing generator. Capture a dry native source-next plan; this does not advance an allocator.
+## 2. Preserve the committed schema checkpoint and apply only the 10.1.3 delta
 
-```bash
-cat >"$OUT/no-external-floors.json" <<'JSON'
-{"floors":[]}
-JSON
-"$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db sequences advance --floors "$OUT/no-external-floors.json" \
-  --receipt "$OUT/frozen-source-next-plan.json" \
-  --sequence-mappings "$MAPPINGS" \
-  --recovery-family "$OUT/recovery-family.json"
-"$PYTHON" "$ROOT/release/scripts/bloom_sequence_floor_prepare.py" \
-  --source-contract "$OUT/frozen-source-contract.json" \
-  --source-next-plan "$OUT/frozen-source-next-plan.json" \
-  --recovery-family "$OUT/recovery-family.json" \
-  --floors "$OUT/transition-floors.json" \
-  --receipt "$OUT/transition-floor-projection.json"
-```
+The original schema operation is terminal and must never be replayed. Its retained result is `$OUT/schema-result.json`, SHA-256 `2853a09db4cbf7ef5c561afc606d9dc1a9ef3677f05d7439dee05c19a07047a8`, with recovery completion `000008-20260911T193433Z`. It committed eight migrations and released its writer fence. Preserve that result, its journal and every recovery-family exposure.
 
-The projector validates the native plan against the frozen contract/family. `transition-floors.json` contains exactly the CLI-owned `{"floors": [...]}` object; hashes and provenance stay in `transition-floor-projection.json`. It retains stored, allocated, source-next and family exposures and deduplicates only identical `(name, value, source)` records.
-
-## 2. Apply the released schema migration
+With the exact `10.1.3` operator venv, plan a distinct delta operation against the retained source contract, mappings and recovery family:
 
 Capture the dry migration receipt with the native source contract, exact mappings, family and journal. `db schema migrate` deliberately omits the unsupported global `--json` option.
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day \
   db schema migrate --dry-run \
-  --receipt "$OUT/schema-plan.json" \
+  --receipt "$OUT/schema-delta-1013-plan.json" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipts-dir "$JOURNAL"
 ```
 
-Check that the plan has the immutable target/physical target, exact source-contract and journal/family bindings, no unknown migration, and no principal binding. Record its SHA-256. Apply only that unchanged receipt while native fencing independently authenticates the Aurora provider and leaves only the operator trusted during the commit:
+Require exactly these three pending migrations, in order, and reject any plan containing one of the already committed eight: `20260911_164426_runtime_tenant_allowlist.sql` (SHA-256 `50e936edee3f2ad11d4193e1f698809bc4e39b4370355e65f3f59b6c08ac40aa`), `20260911_171000_allowlisted_lineage_scope.sql` (SHA-256 `8ee9eff8eaa5b68e23354ebf3d87356fa6ccd4b865731c0e21c4e0ef06dccc1b`) and `20260911_210000_versioned_xrf_scope.sql` (SHA-256 `098566ee17de495944485dafdb6c86dddc57e968a4decff00808cbdf7b6a05fa`). Check the immutable target/physical target, exact source-contract and journal/family bindings, no unknown migration, and no principal binding. Record the delta plan SHA-256. Apply only that unchanged receipt while native fencing independently authenticates the Aurora provider and leaves only the operator trusted during the commit:
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day \
   db schema migrate --apply \
-  --preflight-receipt "$OUT/schema-plan.json" \
-  --receipt "$OUT/schema-result.json" \
+  --preflight-receipt "$OUT/schema-delta-1013-plan.json" \
+  --receipt "$OUT/schema-delta-1013-result.json" \
   --source-contract "$OUT/frozen-source-contract.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
@@ -118,11 +90,11 @@ Check that the plan has the immutable target/physical target, exact source-contr
   --provider-contract "$PROVIDER"
 ```
 
-Require native `migration_result`, terminal `recovery_completion`, `principal_binding_required=true`, and a released `writer_fence_release` before continuing. The release values are future recovery evidence, not an instruction to rerun the migration.
+Require native `migration_result`, terminal `recovery_completion`, `principal_binding_required=true`, and a released `writer_fence_release` before continuing. Bind the result to exactly the three reviewed migration SHA-256 values recorded in B03. The original and delta release values are retained future recovery evidence, not an instruction to rerun either migration. Any ambiguous result is reconciled from the native journal and terminal receipt; never replay the original eight or the delta apply.
 
 ## 3. Prepare XRF templates and convert Bloom data
 
-Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)`. The helper verifies every existing template fingerprint and inserts only a missing exact opaque/tapdb-object XRF template.
+Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)`. The helper derives exact XRF coordinates from the installed package, verifies every loaded template fingerprint, preserves the historical `tapdb_object/1.0` definition unchanged, and additively inserts only missing canonical `opaque/1.0` and `tapdb_object/2.0` definitions. It never overwrites or reactivates a loaded definition.
 
 ```bash
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" plan \
@@ -140,7 +112,7 @@ Capture the post-schema/post-template native identity baseline used to prove onl
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db identity inventory --source-version 10.1.1rc1 \
+  db identity inventory --source-version 10.1.3 \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipt "$OUT/pre-bloom-conversion.json"
@@ -171,7 +143,7 @@ Capture and verify the final identity state for this conversion stage:
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day --json \
-  db identity inventory --source-version 10.1.1rc1 \
+  db identity inventory --source-version 10.1.3 \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipt "$OUT/post-bloom-conversion.json"
@@ -267,7 +239,7 @@ mv /home/ubuntu/.config/bloom-day/migration-receipts/runtime-verification.json \
   "$OUT/runtime-verification.json"
 ```
 
-It requires Bloom `10.0.0` and TapDB `10.1.1rc1`, two consecutive scoped transactions, recovery after intentional rollback, the exact runtime login/config/domain/owner/global scope, template SELECT, required instance/lineage DML, sequence USAGE+SELECT with UPDATE denied and exact operator ownership, database TEMP/CREATE denied, schema CREATE denied, and no SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE/REPLICATION/INHERIT.
+It requires Bloom `10.0.1` and TapDB `10.1.3`, two consecutive scoped transactions, recovery after intentional rollback, the exact runtime login/config/domain/owner/global scope, template SELECT, required instance/lineage DML, sequence USAGE+SELECT with UPDATE denied and exact operator ownership, database TEMP/CREATE denied, schema CREATE denied, and no SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE/REPLICATION/INHERIT.
 
 With ordinary admission still closed, perform one authenticated application acceptance: login; one read/write/replay workflow; embedded GUI; Bloom DAG v2; and required Kahlo graph behavior without DAG v1 fallback. Confirm the replay preserves full migrated fulfillment properties and migration provenance. Capture allocator positions after the controlled write as additional future recovery exposures. Confirm a brief stable health/log interval without migration-related errors.
 

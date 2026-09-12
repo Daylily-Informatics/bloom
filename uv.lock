@@ -222,7 +222,7 @@ requires-dist = [
     { name = "cli-core-yo", specifier = "==2.1.1" },
     { name = "daylily-auth-cognito", specifier = "==2.1.5" },
     { name = "daylily-carrier-tracking", specifier = "==0.5.1" },
-    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==10.1.1rc1" },
+    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==10.1.3" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "djlint" },
     { name = "fastapi", specifier = ">=0.110.0" },
@@ -727,7 +727,7 @@ wheels = [
 
 [[package]]
 name = "daylily-tapdb"
-version = "10.1.1rc1"
+version = "10.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cli-core-yo" },
@@ -741,9 +741,9 @@ dependencies = [
     { name = "typer" },
     { name = "uuid6" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/ed/2f6a15d20be37592c667a166b09753542014d4f9414d82216d11441e7747/daylily_tapdb-10.1.1rc1.tar.gz", hash = "sha256:abf2e5b18184db736c8e54fb77cbc96e78c77921f0f65b7c8f026ebb20a8a5fb", size = 1337506, upload-time = "2026-09-11T04:57:59.561Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/b9/f483310cbcb4edce9381f91a4aaa6eceb7a945b01eb8a3ae537f6e30defa/daylily_tapdb-10.1.3.tar.gz", hash = "sha256:eefebb8af42e7baba5b8517daea861933fc7c8135fc0791d7bcde7f8d5762cf5", size = 1351798, upload-time = "2026-09-11T21:07:31.016Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/b7/9f828b0343a65b032875139e4e8ab89418f97607656c2650107ab8b3e904/daylily_tapdb-10.1.1rc1-py3-none-any.whl", hash = "sha256:26de691dd5f9c8fac596a18119c9220f4ea78826094753b47f9eb936b0677ce7", size = 667238, upload-time = "2026-09-11T04:57:58.148Z" },
+    { url = "https://files.pythonhosted.org/packages/db/06/0308adb1a8ec019cc6609831a731dffa2224ca104d4faafffc82e0e4b7d2/daylily_tapdb-10.1.3-py3-none-any.whl", hash = "sha256:835743adc8c28456e8d733d136abe31e672e0188a33ded16a99d625a22c128e5", size = 671448, upload-time = "2026-09-11T21:07:28.644Z" },
 ]
 
 [package.optional-dependencies]

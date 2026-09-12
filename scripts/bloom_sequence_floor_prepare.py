@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-TAPDB_VERSION = "10.1.1rc1"
+TAPDB_VERSION = "10.1.3"
 
 
 def _read(path: Path) -> dict[str, Any]:

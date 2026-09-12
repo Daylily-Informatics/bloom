@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-TAPDB_VERSION = "10.1.1rc1"
+TAPDB_VERSION = "10.1.3"
 
 
 def _read_object(path: Path) -> dict[str, Any]:

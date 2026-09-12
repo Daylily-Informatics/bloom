@@ -64,6 +64,44 @@ def test_xrf_template_state_fingerprints_every_loaded_template(bdb) -> None:
     )
 
 
+def test_xrf_template_coordinates_follow_released_package() -> None:
+    _, definitions = xrf_templates._definitions()
+
+    assert {
+        (item["category"], item["type"], item["subtype"], item["version"])
+        for item in definitions
+    } == {
+        ("reference", "external_identifier", "opaque", "1.0"),
+        ("reference", "external_identifier", "tapdb_object", "2.0"),
+    }
+
+
+def test_xrf_template_validation_accepts_only_additive_version() -> None:
+    before = {
+        "all_template_count": 239,
+        "all_template_fingerprints": {
+            "7": "historical-tapdb-object-v1",
+            "8": "unrelated-template",
+        },
+        "existing": [],
+        "expected_inserted": 2,
+    }
+    after = {
+        "all_template_count": 241,
+        "all_template_fingerprints": {
+            **before["all_template_fingerprints"],
+            "240": "new-opaque-v1",
+            "241": "new-tapdb-object-v2",
+        },
+        "existing": [
+            {"subtype": "opaque", "version": "1.0"},
+            {"subtype": "tapdb_object", "version": "2.0"},
+        ],
+    }
+
+    xrf_templates._validate_after(before, after)
+
+
 def test_metadata_conversion_adds_only_envelope_and_archives_graph() -> None:
     original = {
         "label": "retained",
