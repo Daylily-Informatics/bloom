@@ -92,7 +92,7 @@ Require native `migration_result`, terminal `recovery_completion`, `principal_bi
 
 ## 3. Prepare XRF templates and convert Bloom data
 
-Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)`. The helper derives exact XRF coordinates from the installed package, verifies every loaded template fingerprint, preserves the historical `tapdb_object/1.0` definition unchanged, and additively inserts only missing canonical `opaque/1.0` and `tapdb_object/2.0` definitions. It never overwrites or reactivates a loaded definition.
+Use the public packaged TapDB core definitions and `seed_templates(overwrite=False)` for owner `bloom`, matching the transaction owner of every XRF instance created by Bloom. The helper derives exact XRF coordinates from the installed package, verifies every loaded template fingerprint, preserves the historical `tapdb_object/1.0` definition and any core-owned package definitions unchanged, and additively inserts only missing Bloom-owned canonical `opaque/1.0` and `tapdb_object/2.0` definitions. It never overwrites or reactivates a loaded definition.
 
 ```bash
 "$PYTHON" "$ROOT/release/scripts/bloom_tapdb10_xrf_templates.py" plan \
