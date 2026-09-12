@@ -65,6 +65,7 @@ from bloom_lims.config import (
     get_settings,
     get_tapdb_db_config,
 )
+from bloom_lims.request_db import register_request_database
 from bloom_lims.tapdb_metrics import db_username_var, maybe_install_engine_metrics
 
 _KNOWN_LINEAGE_IDENTITIES = (
@@ -316,12 +317,18 @@ class BLOOMdb3:
         except Exception:
             # Metrics are best-effort; never block DB init.
             pass
+        self._closed = False
+        self._sessions: list[Session] = []
         self._session_factory = sessionmaker(bind=self.engine)
         self.session = self._new_contextual_session()
+        register_request_database(self)
 
     def _new_contextual_session(self) -> Session:
         """Create a caller-owned session with TapDB scope on every transaction."""
+        if self._closed:
+            raise RuntimeError("Cannot create a session on a closed Bloom database handle")
         session = self._session_factory()
+        self._sessions.append(session)
 
         @event.listens_for(session, "after_begin")
         def _install_context(
@@ -348,12 +355,20 @@ class BLOOMdb3:
         return self._new_contextual_session()
 
     def close(self) -> None:
-        if self.session:
-            try:
-                self.session.close()
-            except Exception as exc:
-                self.logger.warning("Error closing session: %s", exc)
-        self._conn.close()
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            # Session.close rolls back unfinished reads/writes; never auto-commit.
+            # Include sessions returned by new_session, not just the primary one.
+            for session in self._sessions:
+                try:
+                    session.close()
+                except Exception:
+                    self.logger.exception("Error closing Bloom database session")
+        finally:
+            self._sessions.clear()
+            self._conn.close()
 
 
 __all__ = [

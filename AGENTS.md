@@ -117,3 +117,9 @@ Activation does not export the deployment code. Set `BLOOM_DEPLOYMENT_CODE`, an 
 When runtime deployment is explicitly requested, confirm the selected service is running and the requested normal user flow works. Reuse valid migration/runtime evidence. Do not automatically initiate browser/permission/load test campaigns or collect new screenshots. Documentation-only work needs no production inspection or acceptance run.
 
 Use [docs/tapdb_10_operations.md](docs/tapdb_10_operations.md), [docs/how-tos.md](docs/how-tos.md), the completed migration ledger and the separate phase-2 backlog for current operating boundaries. Do not add compatibility shims, auth bypasses, inferred deployment defaults or sibling-service changes to resolve an out-of-scope defect.
+
+## Request cleanup and build provenance
+
+- HTTP request scope owns Bloom adapters through `RequestDatabaseMiddleware`, including sessions created by `new_session`. Keep explicit domain commits; request teardown must close/rollback, never auto-commit pending work. Standalone operations still own explicit close/context management.
+- Role-group constants and persistence/CLI boundaries use uppercase codes; do not add alternate group identities or rewrite existing memberships to fix casing.
+- Container builds supply exact `BLOOM_BUILD_BRANCH`, `BLOOM_BUILD_SHA` and release version. Preserve image-owned source metadata; an image digest is not a Git commit.

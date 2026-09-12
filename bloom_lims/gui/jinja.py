@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -126,7 +127,7 @@ def _run_git_command(*args: str) -> str:
 
 
 def _resolve_gui_metadata() -> Dict[str, str]:
-    """Resolve footer/help metadata from config and local git state."""
+    """Resolve source provenance from the checkout or explicit image metadata."""
     app_name = "BLOOM LIMS"
     support_email = ""
     github_repo_url = "https://github.com/Daylily-Informatics/bloom"
@@ -141,11 +142,28 @@ def _resolve_gui_metadata() -> Dict[str, str]:
     except Exception:
         pass
 
-    branch = _run_git_command("rev-parse", "--abbrev-ref", "HEAD") or "unavailable"
-    commit_hash = _run_git_command("rev-parse", "--short", "HEAD") or "unavailable"
-    tag = _run_git_command("describe", "--tags", "--exact-match")
-    if not tag:
-        tag = "unreleased"
+    repo_root = Path(__file__).resolve().parents[2]
+    if (repo_root / ".git").exists():
+        branch = _run_git_command("rev-parse", "--abbrev-ref", "HEAD")
+        commit_hash = _run_git_command("rev-parse", "HEAD")
+        tag = _run_git_command("describe", "--tags", "--exact-match") or "unreleased"
+        if not branch or not commit_hash:
+            raise RuntimeError("Bloom checkout source metadata is unavailable")
+    else:
+        build = {
+            key: os.environ.get(key, "").strip()
+            for key in ("BLOOM_BUILD_BRANCH", "BLOOM_BUILD_SHA", "BLOOM_BUILD_VERSION")
+        }
+        missing = [key for key, value in build.items() if not value]
+        if missing:
+            raise RuntimeError(
+                "Bloom image source metadata is required: " + ", ".join(missing)
+            )
+        branch = build["BLOOM_BUILD_BRANCH"]
+        commit_hash = build["BLOOM_BUILD_SHA"]
+        tag = build["BLOOM_BUILD_VERSION"]
+        if tag != __version__:
+            raise RuntimeError("Bloom image tag and installed package version differ")
 
     return {
         "app_name": app_name,

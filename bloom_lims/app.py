@@ -277,4 +277,7 @@ def create_app() -> FastAPI:
     app.include_router(gui_router)
 
     register_exception_handlers(app)
+    from bloom_lims.request_db import RequestDatabaseMiddleware
+
+    app.add_middleware(RequestDatabaseMiddleware)
     return app
