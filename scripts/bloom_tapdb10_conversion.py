@@ -14,6 +14,7 @@ import importlib.metadata
 import json
 import os
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -93,6 +94,34 @@ def _plan_equality_projection(plan: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("native mutation dry-run receipt timestamp lacks timezone")
         receipt["recorded_at"] = "<native-dry-run-timestamp>"
     return projected
+
+
+@contextmanager
+def _template_owner_scope(session: Any, owner_repo_name: str):
+    """Apply Bloom's runtime template-owner visibility to native XRF calls."""
+
+    from daylily_tapdb.models.template import generic_template
+    from sqlalchemy import event
+    from sqlalchemy.orm import with_loader_criteria
+
+    if not owner_repo_name or owner_repo_name != owner_repo_name.strip():
+        raise ValueError("template owner must be exact and non-empty")
+
+    def apply_owner_criterion(execute_state: Any) -> None:
+        if execute_state.is_select:
+            execute_state.statement = execute_state.statement.options(
+                with_loader_criteria(
+                    generic_template,
+                    generic_template.issuer_app_code == owner_repo_name,
+                    include_aliases=True,
+                )
+            )
+
+    event.listen(session, "do_orm_execute", apply_owner_criterion)
+    try:
+        yield
+    finally:
+        event.remove(session, "do_orm_execute", apply_owner_criterion)
 
 
 def _properties(payload: Any) -> dict[str, Any]:
@@ -659,18 +688,21 @@ def _apply(session: Any, plan: dict[str, Any], *, actor: str) -> dict[str, Any]:
             asserted_at=datetime.fromisoformat(assertion["asserted_at"]),
             assertion_provenance=assertion_provenance,
         )
-        outcome = service.attach(source, spec)
-        outcomes[outcome.status] += 1
-        if not assertion["active"]:
-            detached = service.detach(
-                source,
-                target,
-                relationship_type=assertion["relationship_type"],
-                assertion_authority=authority,
-                deactivated_at=datetime.fromisoformat(assertion["deactivated_at"]),
-                deactivation_provenance=assertion_provenance,
-            )
-            outcomes[detached.status] += 1
+        with _template_owner_scope(session, "bloom"):
+            outcome = service.attach(source, spec)
+            outcomes[outcome.status] += 1
+            if not assertion["active"]:
+                detached = service.detach(
+                    source,
+                    target,
+                    relationship_type=assertion["relationship_type"],
+                    assertion_authority=authority,
+                    deactivated_at=datetime.fromisoformat(
+                        assertion["deactivated_at"]
+                    ),
+                    deactivation_provenance=assertion_provenance,
+                )
+                outcomes[detached.status] += 1
     return dict(sorted(outcomes.items()))
 
 

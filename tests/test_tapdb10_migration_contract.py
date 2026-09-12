@@ -201,6 +201,84 @@ def test_conversion_plan_comparison_ignores_only_native_receipt_time() -> None:
     ) != conversion._plan_equality_projection(planned)
 
 
+def test_conversion_template_scope_selects_bloom_and_is_removed_on_error() -> None:
+    from daylily_tapdb import TemplateManager
+    from daylily_tapdb.models.template import generic_template
+    from sqlalchemy import create_engine
+    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy.ext.compiler import compiles
+    from sqlalchemy.orm import Session
+
+    @compiles(JSONB, "sqlite")
+    def compile_jsonb_for_sqlite(type_, compiler, **kwargs):
+        del type_, compiler, kwargs
+        return "JSON"
+
+    engine = create_engine("sqlite://")
+    generic_template.__table__.create(engine)
+    timestamp = datetime.now(UTC)
+    base = {
+        "euid_prefix": "TPX",
+        "tenant_id": None,
+        "domain_code": "M",
+        "name": "Opaque reference",
+        "created_dt": timestamp,
+        "modified_dt": timestamp,
+        "polymorphic_discriminator": "generic_template",
+        "category": "reference",
+        "type": "external_identifier",
+        "subtype": "opaque",
+        "version": "1.0",
+        "bstatus": "active",
+        "json_addl": {},
+        "is_singleton": False,
+        "is_deleted": False,
+        "instance_prefix": "XRF",
+        "instance_polymorphic_identity": None,
+        "validator_ref": "UNIVERSAL_PASS@1",
+        "json_addl_schema": None,
+    }
+    with engine.begin() as connection:
+        connection.execute(
+            generic_template.__table__.insert(),
+            [
+                {
+                    **base,
+                    "uid": 1,
+                    "euid": "persisted-core-template",
+                    "euid_seq": 1,
+                    "issuer_app_code": "daylily-tapdb",
+                },
+                {
+                    **base,
+                    "uid": 2,
+                    "euid": "persisted-bloom-template",
+                    "euid_seq": 2,
+                    "issuer_app_code": "bloom",
+                },
+            ],
+        )
+
+    with Session(engine) as session:
+        assert {
+            row.issuer_app_code for row in session.query(generic_template).all()
+        } == {"bloom", "daylily-tapdb"}
+        with pytest.raises(RuntimeError, match="prove listener removal"):
+            with conversion._template_owner_scope(session, "bloom"):
+                selected = TemplateManager().get_template(
+                    session,
+                    "reference/external_identifier/opaque/1.0/",
+                    domain_code="M",
+                )
+                assert selected is not None
+                assert selected.issuer_app_code == "bloom"
+                raise RuntimeError("prove listener removal")
+        session.expunge_all()
+        assert {
+            row.issuer_app_code for row in session.query(generic_template).all()
+        } == {"bloom", "daylily-tapdb"}
+
+
 def test_metadata_conversion_rejects_malformed_or_replayed_values() -> None:
     with pytest.raises(ValueError, match="properties must be an object"):
         conversion._converted_payload(
