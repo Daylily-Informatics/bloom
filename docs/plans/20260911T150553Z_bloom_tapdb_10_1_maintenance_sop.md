@@ -60,28 +60,26 @@ Do not generate a new family ID. Do not recapture the source contract, source-ne
 
 The original schema operation is terminal and must never be replayed. Its retained result is `$OUT/schema-result.json`, SHA-256 `2853a09db4cbf7ef5c561afc606d9dc1a9ef3677f05d7439dee05c19a07047a8`, with recovery completion `000008-20260911T193433Z`. It committed eight migrations and released its writer fence. Preserve that result, its journal and every recovery-family exposure.
 
-With the exact `10.1.3` operator venv, plan a distinct delta operation against the retained source contract, mappings and recovery family:
+With the exact `10.1.3` operator venv, plan a distinct delta operation against the current committed schema checkpoint, mappings and recovery family. Preserve `$OUT/frozen-source-contract.json` as the immutable pre-migration source record, but do not pass it as `--source-contract` for this delta: the native option requires exact equality with the live inventory, and the terminal eight-migration operation has already changed that inventory. The delta preflight captures the complete current identity and sequence inventories, requires their physical family membership, retains all family definitions and floors, and rechecks the complete receipt under the writer fence before apply. Keep the explicit 256 MiB inventory receipt limit in the operator config.
 
-Capture the dry migration receipt with the native source contract, exact mappings, family and journal. `db schema migrate` deliberately omits the unsupported global `--json` option.
+Capture the dry migration receipt with the current native inventories, exact mappings, family and journal. `db schema migrate` deliberately omits the unsupported global `--json` option.
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day \
   db schema migrate --dry-run \
   --receipt "$OUT/schema-delta-1013-plan.json" \
-  --source-contract "$OUT/frozen-source-contract.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipts-dir "$JOURNAL"
 ```
 
-Require exactly these three pending migrations, in order, and reject any plan containing one of the already committed eight: `20260911_164426_runtime_tenant_allowlist.sql` (SHA-256 `50e936edee3f2ad11d4193e1f698809bc4e39b4370355e65f3f59b6c08ac40aa`), `20260911_171000_allowlisted_lineage_scope.sql` (SHA-256 `8ee9eff8eaa5b68e23354ebf3d87356fa6ccd4b865731c0e21c4e0ef06dccc1b`) and `20260911_210000_versioned_xrf_scope.sql` (SHA-256 `098566ee17de495944485dafdb6c86dddc57e968a4decff00808cbdf7b6a05fa`). Check the immutable target/physical target, exact source-contract and journal/family bindings, no unknown migration, and no principal binding. Record the delta plan SHA-256. Apply only that unchanged receipt while native fencing independently authenticates the Aurora provider and leaves only the operator trusted during the commit:
+Require exactly these three pending migrations, in order, and reject any plan containing one of the already committed eight: `20260911_164426_runtime_tenant_allowlist.sql` (SHA-256 `50e936edee3f2ad11d4193e1f698809bc4e39b4370355e65f3f59b6c08ac40aa`), `20260911_171000_allowlisted_lineage_scope.sql` (SHA-256 `8ee9eff8eaa5b68e23354ebf3d87356fa6ccd4b865731c0e21c4e0ef06dccc1b`) and `20260911_210000_versioned_xrf_scope.sql` (SHA-256 `098566ee17de495944485dafdb6c86dddc57e968a4decff00808cbdf7b6a05fa`). Check the immutable target/physical target, current complete inventories, exact journal/family binding, 256 MiB inventory limit, zero pending recovery intents, no unknown migration, and no principal binding. Record the delta plan SHA-256. Apply only that unchanged receipt while native fencing independently authenticates the Aurora provider and leaves only the operator trusted during the commit:
 
 ```bash
 "$TAPDB" --config "$OPERATOR" --client-id bloom --database-name bloom-day \
   db schema migrate --apply \
   --preflight-receipt "$OUT/schema-delta-1013-plan.json" \
   --receipt "$OUT/schema-delta-1013-result.json" \
-  --source-contract "$OUT/frozen-source-contract.json" \
   --sequence-mappings "$MAPPINGS" \
   --recovery-family "$OUT/recovery-family.json" \
   --receipts-dir "$JOURNAL" \

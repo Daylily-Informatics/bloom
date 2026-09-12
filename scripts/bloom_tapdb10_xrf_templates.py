@@ -310,7 +310,11 @@ def main() -> int:
         ):
             raise ValueError("reconcile requires the exact reserved apply receipt")
 
-    with operator_connection(cfg, read_only=args.operation != "apply") as connection:
+    with operator_connection(
+        cfg,
+        isolation_level="REPEATABLE READ",
+        read_only=args.operation != "apply",
+    ) as connection:
         physical = physical_target(connection, target)
         with Session(bind=connection, expire_on_commit=False) as session:
             apply_transaction_context(
