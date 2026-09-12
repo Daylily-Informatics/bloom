@@ -2,7 +2,7 @@
 
 Bloom's GUI is the browser-facing operations surface for the service. It is where an authenticated operator inspects queue runtime, navigates material state, searches across the material graph, uses the graph explorer, and accesses admin-only observability and token-management pages. It is not a second application bolted on top of the API; it is part of the same FastAPI process and shares the same config, session, and RBAC vocabulary.
 
-Bloom now uses the `daylily-auth-cognito` 2.0 browser/session boundary. Browser sessions stay token-free, callback exchange is async in the web path, and runtime code should not depend on `daylily_auth_cognito.cli`.
+Bloom now uses the `daylily-auth-cognito==2.1.5` browser/session boundary. Browser sessions stay token-free, callback exchange is async in the web path, and runtime code should not depend on `daylily_auth_cognito.cli`.
 
 ## Session And Login Model
 
@@ -53,7 +53,9 @@ The codebase still contains test/dev bypass paths such as `BLOOM_OAUTH=no` and `
 | Admin metrics | `/admin/metrics` | raw DB metrics view |
 | Admin observability | `/admin/observability` | observability rollups |
 | Admin anomalies | `/admin/anomalies` | anomaly listing and detail pages |
-| Graph explorer | `/dindex2` | Cytoscape graph browser |
+| Bloom graph explorer | `/dindex2` | Bloom-specific Cytoscape graph browser |
+| Embedded TapDB GUI | `/tapdb` (default) | Native object/template/lineage/audit views through host-session auth |
+| Embedded TapDB graph | `/tapdb/graph` (default mount) | Native TapDB graph UI |
 
 The dashboard is the best summary of current product emphasis. Its cards and links point toward queue runtime, search, equipment, reagents, and admin, which matches the queue-centric beta posture documented elsewhere in the repo.
 
@@ -74,7 +76,7 @@ The GUI uses Bloom's current role ladder:
 | --- | --- |
 | `READ_ONLY` | inspect records and non-mutating surfaces |
 | `READ_WRITE` | perform normal record mutations and queue/runtime actions |
-| `ADMIN` | access admin pages, mounted TapDB admin, and admin-only graph mutations |
+| `ADMIN` | access Bloom admin pages and admin-only graph mutations; maps to admin in the TapDB host bridge |
 
 Current role permissions:
 
@@ -116,22 +118,13 @@ The admin page currently includes:
 - links to observability and anomaly views
 - dependency info, including Zebra Day admin links when configured
 
-### Mounted TapDB Admin
+### Embedded TapDB GUI
 
-TapDB admin is embedded under:
+The default mount is `/tapdb`, configured by `BLOOM_TAPDB_MOUNT_PATH`; `BLOOM_TAPDB_MOUNT_ENABLED=0` disables it. When enabled, a mount failure aborts startup. The implementation uses public `create_tapdb_gui_app` and `TapdbHostBridge` with an explicit TapDB config.
 
-```text
-/admin/tapdb
-```
+The bridge resolves the existing Bloom session and maps ADMIN to TapDB admin; other authenticated Bloom users map to TapDB user. READ_ONLY and READ_WRITE are therefore not separate native GUI roles. TapDB handles its route permissions. The entire mount is not guarded by the old Bloom-admin-only redirect wrapper.
 
-The mount is guarded before the request reaches TapDB:
-
-- unauthenticated browser requests redirect to `/login`
-- unauthenticated JSON/XHR gets `401`
-- non-admin browser requests redirect to `/user_home?admin_required=1`
-- non-admin JSON/XHR gets `403`
-
-This is a useful operational boundary: mounted TapDB admin is explicitly a Bloom-admin browser surface.
+Native object details are at `/tapdb/object/{euid}` and the native graph is at `/tapdb/graph` with the default mount. Use persisted identifiers only. Native graph consumers such as Kahlo use `/api/dag/v2/*`, separately from the Bloom graph explorer described below.
 
 ## Graph Explorer
 
@@ -222,32 +215,13 @@ The GUI is backed by `/api/v1/lab-actions/*`. The GUI should remain an operator-
 
 The detailed runbook is [`lab_actions.md`](lab_actions.md). It includes the exact template matrix, lineage vocabulary, API examples, and production rollout checklist.
 
-## Playwright Coverage
+## Evidence and release boundaries
 
-Current committed browser E2E coverage is deliberately narrow.
+The [completed migration ledger](plans/20260911T150553Z_bloom_tapdb_10_1_migration_ledger.md) records normal SSO/dashboard access on Bloom 10.0.1 and native graph display through Kahlo 8.0.1. The dashboard median improved from 910.05 ms to 282.65 ms in the recorded single-round comparison; stats improved by 1.994x. These are measurements tied to that migration, not fresh claims for every route or deployment.
 
-Authoritative files:
+The [phase-2 backlog](plans/20260912T045329Z_bloom_phase_2_backlog.md) includes stale footer branch/tag/commit text and long-lived request sessions. Use immutable release/image receipts for deployment provenance.
 
-- [../tests/e2e/README.md](../tests/e2e/README.md)
-- [../tests/e2e/test_auth_e2e.py](../tests/e2e/test_auth_e2e.py)
-
-Current coverage highlights:
-
-- login round trip through the browser
-- logout round trip
-- protected-route redirect after logout
-
-Current limitations:
-
-- no committed end-to-end coverage yet for dashboard actions, queue runtime, equipment, search, graph, or admin pages
-- no checked-in rich Playwright HTML report bundle or curated screenshot gallery
-
-So when you need to understand the GUI today, the real source hierarchy is:
-
-1. route code under `bloom_lims/gui/routes`
-2. templates under `templates/modern`
-3. GUI-focused tests
-4. then historical docs for context
+For current GUI behavior, consult routes under `bloom_lims/gui/routes`, templates under `templates/modern`, the public TapDB bridge and the native DAG integration. Existing GUI/browser tests are reference material. Do not run them, collect a new screenshot campaign or redeploy for a docs-only release; follow [AGENTS.md](../AGENTS.md).
 
 ## Practical Caveats
 

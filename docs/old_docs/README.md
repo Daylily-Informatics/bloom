@@ -1,19 +1,7 @@
-# Bloom Docs
+# Historical Bloom documentation
 
-## Start Here
+This directory is an archive of earlier designs, commands, deployment assumptions and execution evidence. It is not the current runtime or release procedure. Historical files are retained without rewriting the events they record.
 
-- [../README.md](../README.md): repo overview, quickstart, architecture, and integration boundaries
-- [AUTHENTICATION.md](AUTHENTICATION.md): auth behavior and Cognito details
-- [SEARCH_V2.md](SEARCH_V2.md): current search API and GUI notes
-- [bloom_beta_api_contracts.md](bloom_beta_api_contracts.md): current Bloom integration contract
-- [RELEASE_TAG_POLICY.md](RELEASE_TAG_POLICY.md): release tag format and legacy `v*` tag guidance
+Start with the current [README](../../README.md), [API reference](../apis.md), [GUI reference](../gui.md), [how-to guide](../how-tos.md), [TapDB 10 operations](../tapdb_10_operations.md) and [AGENTS.md](../../AGENTS.md). Dated migration receipts and open follow-up work are under [plans](../plans/).
 
-## Historical And Planning Docs
-
-This directory also contains execution plans, completion reports, and contract test notes. Those files are useful background, but the code and the root README are the current source of truth.
-
-When documents disagree:
-
-1. prefer current code and tests
-2. then prefer the root README and the files listed above
-3. treat planning docs as historical context
+Current code and explicit user instructions control when an archived command, template definition, version pin, EUID example or release/test policy disagrees. Never execute a historical migration, recreate an example EUID or treat an archived mandatory test/merge step as current authorization.

@@ -13,7 +13,7 @@
   <a href="#api">API</a> ·
   <a href="#gui">GUI</a> ·
   <a href="docs/lab_actions.md">Lab actions</a> ·
-  <a href="#testing-info">Tests</a>
+  <a href="#release-and-validation-policy">Releases</a>
 </p>
 </div>
 
@@ -21,7 +21,9 @@
 
 Bloom is the LSMC internal material and container graph service. It owns laboratory containers, materials/content, equipment, lineage, recursive template creation, search, and graph views. Atlas owns orders and customer-facing accession context; Bloom owns the physical/material execution graph.
 
-Current Dayhoff pin: `8.0.0`. Current TapDB dependency: `daylily-tapdb @ ...@9.0.10`.
+Documentation release: `10.0.2`. Exact TapDB dependency: `daylily-tapdb[aurora,gui]==10.1.3` (see `pyproject.toml`). Python 3.12 or newer is required; the Bloom version is derived from Git by setuptools-scm.
+
+The accepted deployment recorded on 2026-09-12 is Bloom `10.0.1` at `https://bloom.day.lsmc.bio`, with Kahlo `8.0.1` consuming its native DAG v2. This documentation release does not redeploy either service. See the [completed migration ledger](docs/plans/20260911T150553Z_bloom_tapdb_10_1_migration_ledger.md) and [phase-2 backlog](docs/plans/20260912T045329Z_bloom_phase_2_backlog.md).
 
 Bloom is internal-only in Dayhoff exposure policy. It must be reachable only through approved LSMC networks and Dayhoff-generated service credentials.
 
@@ -49,16 +51,17 @@ Bloom models physical/material execution. Atlas owns orders and customer accessi
 
 ## Quickstart
 
+From the intended Bloom checkout, use the explicit deployment identity and configuration described in [the how-to guide](docs/how-tos.md). Activation only prepares the environment; it does not set the deployment code or configure a database.
+
 ```bash
-cd /Users/jmajor/projects/mega_dayhoff/repos_work/bloom
-source ./activate <deploy-name>
+export BLOOM_DEPLOYMENT_CODE=bringup
+export XDG_CONFIG_HOME=/absolute/path/to/operator-config
+export BLOOM_CONFIG_PATH=/absolute/path/to/bloom-config-bringup.yaml
+source ./activate bringup
 bloom --help
-bloom config init --help
-bloom db build --target local
-bloom server start --port 8912
 ```
 
-Runtime config, service config, TapDB config, and registry paths must be passed explicitly. Do not rely on deployment-name guessing or `~/.config` fallback discovery.
+Replace the absolute path placeholders with the actual deployment files. Supply the TapDB config, domain registry, prefix ownership registry, schema, database and storage paths in Bloom YAML. `bloom db build --target local` is for an explicitly configured local database. Aurora schema migration, template preparation and runtime-principal setup are separate operator operations, never ordinary application startup. See [TapDB 10 operations](docs/tapdb_10_operations.md).
 
 ## CLI Interface
 
@@ -73,10 +76,11 @@ Common command families:
 | `bloom config ...` | Materialize explicit deployment-scoped service config. |
 | `bloom db ...` | Build or verify Bloom-owned local database state through supported paths. |
 | `bloom server ...` | Start the FastAPI service with explicit generated config. |
-| `bloom objects/templates/lineage ...` | Work with Bloom-owned containers, materials, templates, and lineages where exposed by the CLI. |
-| `bloom tokens/admin ...` | Manage supported internal/admin auth surfaces without printing secrets. |
+| `bloom users provision-local`, `bloom users issue-token` | Native user/token operations; token issuance prints a secret and requires protected output handling. |
+| `bloom integrations atlas ...` | Existing integration configuration/diagnostics; not a general service-management CLI. |
+| `bloom test ...`, `bloom quality ...` | Registered developer tools; off by default under the release policy. |
 
-For normal user/admin behavior, the CLI, API, and GUI are alternate surfaces over the same Bloom object, template, lineage, and auth capabilities. A feature should not be CLI-only, API-only, or GUI-only unless the docs say why.
+Object, template and lineage operations are exposed by the API and GUI. The current CLI registration does not contain `objects`, `templates`, `lineage`, `tokens` or `admin` command families; do not invent those commands.
 
 ## GUI
 
@@ -110,27 +114,28 @@ The lab-action route family includes:
 
 The generic run-set template is `set/run-set/generic/1.01`. It is used for sequencing-run sets and other temporary Bloom-owned sets of internal or external EUIDs.
 
+Native TapDB DAG v2 is mounted separately under `/api/dag/v2/*`, advertised with `tapdb.dag_v2` and `tapdb_dag_contract_version=dag:v2`. Kahlo consumes that contract. The embedded TapDB GUI defaults to `/tapdb`; its graph is `/tapdb/graph`.
+
 Health and observability routes include `/healthz`, `/readyz`, `/health`, `/obs_services`, `/api_health`, `/endpoint_health`, `/db_health`, `/my_health`, and `/auth_health` when configured for Dayhoff observability.
 
-## Testing Info
+## Release And Validation Policy
 
-Focused checks:
+Commit intended changes on the working branch, push it, create an immutable annotated numeric version tag, push that tag and create the GitHub release. A docs-only release needs no package/container build or deployment. For an authorized runtime release, deploy the selected tagged service image and confirm normal operation before considering PR/merge work.
 
-```bash
-python -m pytest tests -q
-python -m pytest tests/test_lsmc_ui_skin_system_contract.py -q
-```
+No tests, lint, coverage or CI campaign run by default. PR creation, branch merging and test execution require the user's explicit request twice for that action and scope. Existing test files and historical results are reference evidence, not instructions to rerun them. Do not deploy the full Dayhoff stack for a Bloom documentation edit.
 
-Deployed browser evidence should target `https://bloom.<deploy>.dev.lsmc.bio` and include the dashboard, object search/detail, TapDB mount, graph, and auth redirect surfaces. Current `jemdev5` deployment evidence is linked from Dayhoff `docs/plans/20260618T132900Z_jemdev5_dayhoff_7067_live_deploy_ledger.md`.
+Read [AGENTS.md](AGENTS.md) for the controlling workflow and [TapDB 10 operations](docs/tapdb_10_operations.md) for identity, immutable-template and allocator preservation rules.
 
 ## Technical Details, History, And Linkouts
 
 - [`docs/apis.md`](docs/apis.md): API details.
 - [`docs/gui.md`](docs/gui.md): GUI routes and screenshots when current.
-- [`docs/lab_actions.md`](docs/lab_actions.md): extraction/QC/library/pooling/set/sequencing-run action flow, spreadsheet upload schemas, template matrix, and production rollout checklist.
+- [`docs/lab_actions.md`](docs/lab_actions.md): extraction/QC/library/pooling/set/sequencing-run action flow, spreadsheet upload schemas, template matrix, and release boundaries.
 - [`docs/architecture.md`](docs/architecture.md): domain model and runtime boundaries.
 - [`docs/becoming_a_discoverable_service.md`](docs/becoming_a_discoverable_service.md): Dayhoff/Kahlo observability contract.
-- [`docs/plans/`](docs/plans/): active ledgers.
+- [`docs/how-tos.md`](docs/how-tos.md): explicit local setup and release commands.
+- [`docs/tapdb_10_operations.md`](docs/tapdb_10_operations.md): TapDB 10 startup, data preservation and migration boundaries.
+- [`docs/plans/`](docs/plans/): dated execution records and separate deferred backlogs.
 - [`docs/old_docs/`](docs/old_docs/): historical material only.
 
 Current Bloom language should use Container and Material separation. Order, OrderTest, SubjectRef, AccessionCase, and fulfillment semantics are Atlas-owned or cross-service references, not Bloom-owned order lifecycle objects.

@@ -1,5 +1,7 @@
 # Bloom Lab Actions
 
+All `<persisted-...-euid>` placeholders below must be replaced with actual identifiers returned by the owning service. They are not executable example identities. Existing records must keep their stored EUIDs.
+
 ## Overview
 
 Bloom lab actions are a temporary, Bloom-owned operator layer for moving real lab materials through a small number of common wet-lab setup flows:
@@ -15,11 +17,11 @@ The GUI route is `/lab-actions`. The API route family is `/api/v1/lab-actions/*`
 
 ## Current Template Matrix
 
-The current flow uses the existing Bloom template pack plus one new generic run-set template.
+The current flow uses the released Bloom template pack, including the generic run-set template.
 
 | Purpose | Semantic template path | Instance prefix | Notes |
 |---|---|---:|---|
-| Generic run/set object | `set/run-set/generic/1.01` | `BGS` | New template. Seeded as `category=set`, `type=run-set`, `subtype=generic`, `version=1.01`. Holds named sets, run metadata, members, external members, status, and arbitrary metadata. |
+| Generic run/set object | `set/run-set/generic/1.01` | `BGS` | Released template. Seeded as `category=set`, `type=run-set`, `subtype=generic`, `version=1.01`. Holds named sets, run metadata, members, external members, status, and arbitrary metadata. |
 | Extraction plate | `container/plate/fixed-plate-96/1.0` | `BCP` | Existing recursive 96-well plate template. Creates linked well containers. |
 | Sequencing-library plate | `container/plate/sequencing-library-plate-96/1.0` | `BCP` | Existing recursive 96-well plate template. Creates linked well containers. |
 | Plate well | `container/well/fixed-plate-well/1.0` | `BCW` | Created by recursive plate templates. |
@@ -31,7 +33,7 @@ The current flow uses the existing Bloom template pack plus one new generic run-
 | Sequencing index reagent | `material/reagent/sequencing-index/1.0` | `BNX` | Optional; callers may also store an index barcode string directly. |
 | gDNA quant data | `data/quantification/gdna/1.0` | `BDQ` | Optional per-well extraction output data. |
 
-No additional templates are required for the current implementation. The semantic paths above are the operator-facing shorthand used by the API and docs; the seed file stores Bloom's actual prefix-backed template identity in `category`, `type`, `subtype`, `version`, and `instance_prefix`. If production operators need separate EUID prefixes or stricter metadata for pool tubes, flowcells, reagent sets, or run kits, add those templates as a separate versioned template-pack change and update this matrix before production rollout.
+No additional templates are required for the current implementation. The seed file stores semantic identity in `category`, `type`, `subtype` and `version`; `instance_prefix` is a separate issuance field. Existing historical prefix/template differences do not authorize regenerating EUIDs or rewriting template semantics. If production operators need separate EUID prefixes or stricter metadata for pool tubes, flowcells, reagent sets, or run kits, add those templates as a separate versioned template-pack change and update this matrix before production rollout.
 
 ## Lineage Contract
 
@@ -68,7 +70,7 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/extraction-plates" \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "auto",
-    "tube_euids": ["Z-BCT-EXAMPLE1", "Z-BCT-EXAMPLE2"],
+    "tube_euids": ["<persisted-bct-example1-euid>", "<persisted-bct-example2-euid>"],
     "plate_name": "extraction plate",
     "create_run_set": true
   }'
@@ -79,10 +81,10 @@ Directed mode lets the caller specify destination wells. It can create a new pla
 ```json
 {
   "mode": "directed",
-  "plate_euid": "Z-BCP-EXISTING",
+  "plate_euid": "<persisted-bcp-existing-euid>",
   "assignments": [
-    {"tube_euid": "Z-BCT-EXAMPLE1", "row": "A", "col": 1},
-    {"tube_euid": "Z-BCT-EXAMPLE2", "row": "B", "col": 1}
+    {"tube_euid": "<persisted-bct-example1-euid>", "row": "A", "col": 1},
+    {"tube_euid": "<persisted-bct-example2-euid>", "row": "B", "col": 1}
   ]
 }
 ```
@@ -98,11 +100,11 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/extraction-qc-plates" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "source_plate_euid": "Z-BCP-EXTRACTION",
+    "source_plate_euid": "<persisted-bcp-extraction-euid>",
     "qc_plate_name": "extraction QC plate",
     "assignments": [
       {
-        "source_well_euid": "Z-BCW-SOURCEA1",
+        "source_well_euid": "<persisted-bcw-sourcea1-euid>",
         "qc_row": "A",
         "qc_col": 1,
         "result": "pass",
@@ -126,7 +128,7 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/seq-library-plates" \
   -H "Content-Type: application/json" \
   -d '{
     "mode": "plate_1_to_1",
-    "source_plate_euid": "Z-BCP-EXTRACTION",
+    "source_plate_euid": "<persisted-bcp-extraction-euid>",
     "plate_name": "seq library plate"
   }'
 ```
@@ -142,7 +144,7 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/seq-library-pools" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "input_euids": ["Z-BNQ-LIB1", "Z-BNQ-LIB2"],
+    "input_euids": ["<persisted-bnq-lib1-euid>", "<persisted-bnq-lib2-euid>"],
     "platform": "ILMN",
     "pool_name": "seq library"
   }'
@@ -161,7 +163,7 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/sets" \
   -d '{
     "name": "extraction reagent set",
     "description": "Reagents, machine, and operator for extraction batch",
-    "members": ["Z-BEQ-INSTRUMENT"],
+    "members": ["<persisted-beq-instrument-euid>"],
     "external_members": ["lot:REAGENT-2026-06-18"],
     "operator": "operator@example.com",
     "status": "created",
@@ -172,10 +174,10 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/sets" \
 Members can be appended later:
 
 ```bash
-curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/sets/Z-BGS-SET/members" \
+curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/sets/<persisted-bgs-set-euid>/members" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"members": ["Z-BCT-TUBE"], "external_members": ["vendor-kit:123"]}'
+  -d '{"members": ["<persisted-bct-tube-euid>"], "external_members": ["vendor-kit:123"]}'
 ```
 
 ### 6. Plate-Well Associated Data
@@ -187,7 +189,7 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/plate-well-data" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "plate_euid": "Z-BCP-EXTRACTION",
+    "plate_euid": "<persisted-bcp-extraction-euid>",
     "records": [
       {
         "row": "A",
@@ -210,11 +212,11 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/seq-runs" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "pool_tube_euid": "Z-BCT-POOL",
-    "pool_content_euid": "Z-BNP-POOLCONTENT",
+    "pool_tube_euid": "<persisted-bct-pool-euid>",
+    "pool_content_euid": "<persisted-bnp-poolcontent-euid>",
     "platform": "ILMN",
     "operator": "operator@example.com",
-    "instrument_euid": "Z-BEQ-SEQUENCER",
+    "instrument_euid": "<persisted-beq-sequencer-euid>",
     "flowcell_barcode": "FLOWCELL123",
     "status": "created"
   }'
@@ -227,7 +229,7 @@ Status values are `created`, `running`, `abandoned`, `complete`, and `error`.
 ILMN sample-sheet download is implemented:
 
 ```bash
-curl -sS "$BLOOM_URL/api/v1/lab-actions/seq-runs/Z-BGS-RUNSET/samplesheet" \
+curl -sS "$BLOOM_URL/api/v1/lab-actions/seq-runs/<persisted-bgs-runset-euid>/samplesheet" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -o SampleSheet.csv
 ```
@@ -269,7 +271,7 @@ The example workbook family with `Bulk Create`, `Transfer`, and `Annotation` she
 Any plate-like container can export a one-degree mapping CSV:
 
 ```bash
-curl -sS "$BLOOM_URL/api/v1/lab-actions/plates/Z-BCP-PLATE/mapping.csv" \
+curl -sS "$BLOOM_URL/api/v1/lab-actions/plates/<persisted-bcp-plate-euid>/mapping.csv" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -o plate_mapping.csv
 ```
@@ -295,7 +297,7 @@ curl -sS -X POST "$BLOOM_URL/api/v1/lab-actions/print-euids" \
   -H "Authorization: Bearer $BLOOM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "euids": ["Z-BCP-PLATE", "Z-BCT-POOL"],
+    "euids": ["<persisted-bcp-plate-euid>", "<persisted-bct-pool-euid>"],
     "lab": "SSF",
     "printer_id": "printer-id",
     "label_zpl_style": "euid",
@@ -327,43 +329,17 @@ The wizard has these panels:
 
 Successful actions populate downstream fields where possible, for example extraction plate EUID into the QC and library plate steps and pool tube/content EUIDs into the run-set step.
 
-## Production Rollout Checklist
+## Release and production changes
 
-Use this checklist when updating production later.
+Use the [working-branch release policy](how-tos.md#publish-a-documentation-release). Documentation changes need no tests, image build, Dayhoff pin update or redeploy. Runtime changes require an explicitly scoped selected-service deployment; do not trigger a full stack deployment or double-release Dayhoff for every edit.
 
-1. Confirm Bloom source is committed on the intended release branch.
-2. Confirm the template pack includes `set/run-set/generic/1.01`.
-3. Run focused local validation:
+Existing loaded template semantics remain immutable. `set/run-set/generic/1.01` is already part of the released template pack; changing its properties requires a new version. Add required new definitions through an authorized native operation without overwriting historical bindings. Do not run `refresh-templates` against production as a routine release step.
 
-   ```bash
-   source ./activate <deploy-name>
-   ruff check bloom_lims/api/v1/__init__.py bloom_lims/api/v1/lab_actions.py bloom_lims/api/v1/object_creation.py bloom_lims/api/v1/objects.py bloom_lims/domain/lab_actions.py bloom_lims/schemas/lab_actions.py bloom_lims/schemas/objects.py bloom_lims/gui/routes/modern.py tests/test_lab_actions_api.py tests/test_bloom_prefix_taxonomy.py
-   python -m pytest tests/test_lab_actions_api.py tests/test_bloom_prefix_taxonomy.py::test_wet_lab_templates_use_bloom_prefix_taxonomy tests/test_route_coverage_gaps_api.py::test_object_creation_plate_creates_96_linked_wells tests/test_template_instantiation_recursion.py -q --no-cov
-   python -m pytest tests/test_lab_actions_api.py tests/test_bloom_prefix_taxonomy.py::test_wet_lab_templates_use_bloom_prefix_taxonomy tests/test_route_coverage_gaps_api.py::test_object_creation_plate_creates_96_linked_wells tests/test_template_instantiation_recursion.py tests/test_api_v1.py::TestObjectCreationAPI tests/test_api_v1.py::TestObjectCreationPathTraversal -q --cov-reset --cov=bloom_lims.api.v1.lab_actions --cov=bloom_lims.domain.lab_actions --cov=bloom_lims.domain.lab_action_spreadsheets --cov=bloom_lims.schemas.lab_actions --cov=bloom_lims.api.v1.object_creation --cov=bloom_lims.schemas.objects --cov-report=term-missing --cov-report=json:coverage-lab-actions.json --cov-fail-under=81
-   ```
+No tests run by default. If the user explicitly requests a specific test scope twice, use the corresponding existing cases; this document does not authorize a suite. Normal deployment acceptance is the requested running service and actual user flow. Real printer jobs or production material creation require explicit scope; do not create lab objects merely to publish documentation.
 
-4. Release Bloom with an annotated semver tag.
-5. Update Dayhoff `services/pins.toml` to the new Bloom tag.
-6. Double-release Dayhoff if the normal Dayhoff self-pin release process is in scope.
-7. Refresh templates on the target deployment through the supported Bloom/Dayhoff path; do not manually insert templates in PostgreSQL.
-8. Restart only the Bloom container first for WIP proof.
-9. Verify:
-   - `/healthz`
-   - `/readyz`
-   - `/lab-actions`
-   - `/api/v1/lab-actions/extraction-plates` validation behavior
-   - 96-well plate recursive creation
-   - ILMN sample-sheet download
-   - non-ILMN explicit rejection
-   - plate mapping CSV
-   - mocked or approved printer path
-10. Only after Bloom WIP proof passes, decide whether to refresh the broader Dayhoff deployment.
+## Historical Implementation Evidence
 
-Do not run real print jobs or create production lab objects during deployment validation unless a human operator explicitly approves the exact test objects and printer.
-
-## Current Evidence
-
-The controlling ledger is:
+The original lab-action implementation ledger is:
 
 `docs/plans/20260618T000000Z_bloom_lab_action_flow_ledger.md`
 
@@ -371,4 +347,4 @@ Local screenshot evidence from the implementation pass:
 
 `output/playwright/bloom_lab_actions/lab_actions_wizard_local.png`
 
-The screenshot is local proof only. A production or `jemdev5` deployment still needs live browser evidence after the service is refreshed.
+The screenshot is historical local evidence, not current production proof. The accepted Bloom 10 migration and subsequent release boundaries are recorded in [the completed migration ledger](plans/20260911T150553Z_bloom_tapdb_10_1_migration_ledger.md). No new browser run or deployment is required for this documentation update.
