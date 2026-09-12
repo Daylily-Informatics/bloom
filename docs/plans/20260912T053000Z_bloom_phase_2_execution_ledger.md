@@ -1,6 +1,6 @@
 # Bloom phase-2 approved work and subsequent PR disposition
 
-Status: IN_PROGRESS
+Status: SUCCESS
 
 ## Gate 0
 
@@ -20,7 +20,7 @@ Status: IN_PROGRESS
 | P201 | Investigate retained historical graph records; propose disposition | Operator | SUCCESS | Read-only production query: 282 entries, 72 active rows, all lack linked legacy reference evidence; retain unchanged, no remote service contact or data mutation |
 | P205 | Reconcile issue 111 documentation | Operator | SUCCESS | GitHub issue remains OPEN; accepted 10.1.3 additive versioning resolved Bloom deployment blocker |
 | REL | Publish/deploy selected tagged services and confirm ordinary access | Operator | SUCCESS | Bloom tag/release 10.0.3, one image build, scoped Compose exit 0; all 11 sibling containers unchanged; selected containers running with zero restarts |
-| PRS | After REL, update outstanding Bloom PRs and close obsolete items; assess remaining | Operator | IN_PROGRESS | Refresh against final release, no PR branch updates/merges or test campaign |
+| PRS | After REL, update outstanding Bloom PRs and close obsolete items; assess remaining | Operator | SUCCESS | All six commented; #10/#6/#5/#4 closed as superseded targets; #9/#8 retained. [Assessment](20260912T215250Z_bloom_pr_disposition.md) |
 | P203 | Token rotation | Operator | NO_LONGER_NEEDED | Explicitly skipped for this round; existing token unchanged |
 
 PR closure wording will be clarified before any ambiguous closure; definite obsolete/superseded items can be handled from source evidence.
@@ -40,3 +40,7 @@ PR closure wording will be clarified before any ambiguous closure; definite obso
 - Post-access `/home/ubuntu/bloom_ops/phase2-20260912/post-access-sessions.json`: one idle runtime connection, oldest transaction age 0, no idle-in-transaction session. Both selected containers running, restart counts 0; Bloom log ERROR/Traceback count 0 during the startup interval. This is bounded running-service acceptance, not a test or load campaign.
 - Companion Dayhoff commit `9f889d5` pushed to its existing working branch; Bloom pin 10.0.3, Kahlo remains 8.0.1. No Dayhoff release, PR, merge or full deployment.
 - Approved runtime/investigation items are complete. PR inspection starts only after these receipts.
+
+## Final status
+
+All approved rows terminal: 7 SUCCESS, 1 NO_LONGER_NEEDED (token rotation explicitly skipped for this round). Objective complete. No tests, lint, coverage or CI campaign; one Bloom image build, no Kahlo rebuild, no PR creation or merges. Runtime acceptance is bounded ordinary access and the retained session/state receipts, not comprehensive behavior or long-duration load proof. Existing credentials, template semantics, graph history and migration/allocator receipts remain preserved.
