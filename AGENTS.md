@@ -1,3 +1,17 @@
+<!-- user-policy: tagged-production-first-20260912 -->
+# User release policy — 2026-09-12
+
+This explicit user instruction supersedes older release and test defaults in this file and in skills.
+
+- Default to a tagged Git release from the current working branch, with no tests run. Commit the intended release changes, create an immutable annotated numeric version tag, and deploy that exact tagged revision/image to the requested production service.
+- Get the tagged release running in production first. After production is stable and the user accepts it, PR creation and branch merging are separate later work, requiring the user's explicit request twice for the specific action and scope. Never decide to open a PR, merge to main, or merge one branch into another on the user's behalf.
+- Tests are off by default. Do not initiate pytest, lint, coverage, comprehensive tests, or a CI/test campaign unless the user explicitly requests that action and scope twice. Reuse existing valid evidence. Already-requested runtime availability/stability observations do not authorize a new test campaign.
+- Keep builds and deployments scoped to the selected service and final tagged revision. Do not trigger a full Dayhoff deployment for each code edit, change sibling services, or add intermediate build/test stages on your own.
+- Preserve unrelated dirty work and existing production identities. Never move or overwrite a pushed release tag. Use a working branch for follow-up changes; do not turn release publication into a main-branch merge workflow.
+- If this policy is violated, record the concrete action and available elapsed-time, token-usage, and billing evidence. The user may request monthly lost-time/token/cost summaries for an OpenAI credit petition; do not invent costs, imply a credit entitlement, or start recurring reporting without an explicit request.
+
+<!-- end-user-policy: tagged-production-first-20260912 -->
+
 # Shell Session Defaults
 
 - Default to an interactive shell for shell work. On this Mac, use the user's default shell unless the user explicitly asks for another shell.
