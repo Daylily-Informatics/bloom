@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -166,6 +167,38 @@ def test_metadata_conversion_repairs_only_missing_properties() -> None:
     assert converted == {"label": "retained", "properties": {}}
     assert graph == []
     assert graph_present is False
+
+
+def test_conversion_plan_comparison_ignores_only_native_receipt_time() -> None:
+    planned = {
+        "conversion": {
+            "metadata_changes": [
+                {
+                    "uid": 7,
+                    "native_receipt": {
+                        "recorded_at": "2026-09-11T12:00:00+00:00",
+                        "actor": "migration",
+                        "changes": {"json_addl": {"new": {"properties": {}}}},
+                    },
+                }
+            ]
+        }
+    }
+    current = deepcopy(planned)
+    current["conversion"]["metadata_changes"][0]["native_receipt"][
+        "recorded_at"
+    ] = "2026-09-11T12:01:00+00:00"
+
+    assert conversion._plan_equality_projection(
+        current
+    ) == conversion._plan_equality_projection(planned)
+
+    current["conversion"]["metadata_changes"][0]["native_receipt"]["actor"] = (
+        "changed-actor"
+    )
+    assert conversion._plan_equality_projection(
+        current
+    ) != conversion._plan_equality_projection(planned)
 
 
 def test_metadata_conversion_rejects_malformed_or_replayed_values() -> None:

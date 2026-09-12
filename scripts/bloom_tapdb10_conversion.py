@@ -79,6 +79,22 @@ def _replace_reserved(path: Path, value: dict[str, Any]) -> None:
         os.close(directory_fd)
 
 
+def _plan_equality_projection(plan: dict[str, Any]) -> dict[str, Any]:
+    """Normalize only the native dry-run receipt timestamp for plan comparison."""
+
+    projected = deepcopy(plan)
+    for change in projected["conversion"]["metadata_changes"]:
+        receipt = change["native_receipt"]
+        recorded_at = receipt.get("recorded_at")
+        if not isinstance(recorded_at, str) or not recorded_at:
+            raise ValueError("native mutation dry-run receipt lacks recorded_at")
+        parsed = datetime.fromisoformat(recorded_at)
+        if parsed.tzinfo is None:
+            raise ValueError("native mutation dry-run receipt timestamp lacks timezone")
+        receipt["recorded_at"] = "<native-dry-run-timestamp>"
+    return projected
+
+
 def _properties(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("historical json_addl must be an object")
@@ -943,7 +959,7 @@ def main() -> int:
                     )
                 )
                 return 0
-            if plan != reviewed:
+            if _plan_equality_projection(plan) != _plan_equality_projection(reviewed):
                 raise ValueError(
                     "live conversion plan changed after independent review"
                 )
