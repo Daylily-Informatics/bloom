@@ -11,9 +11,9 @@ from daylily_tapdb.web import (
     DagV2MountResult,
     mount_tapdb_dag_surfaces,
 )
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
-from bloom_lims.api.v1.dependencies import require_api_auth
+from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
 from bloom_lims.config import apply_runtime_environment
 
 _BLOOM_DAG_LIMITS = DagV2Limits(
@@ -21,6 +21,14 @@ _BLOOM_DAG_LIMITS = DagV2Limits(
     max_nodes=2_000,
     max_search_page_size=100,
 )
+
+
+async def _tapdb_dag_auth(
+    user: APIUser = Depends(require_api_auth),
+) -> dict[str, Any]:
+    """Expose Bloom's authenticated identity in TapDB's mapping contract."""
+
+    return user.dict()
 
 
 def mount_tapdb_dag_api(app: FastAPI) -> DagV2MountResult:
@@ -32,7 +40,7 @@ def mount_tapdb_dag_api(app: FastAPI) -> DagV2MountResult:
         config_path=runtime_ctx.config_path,
         service_id="bloom",
         display_name="Bloom",
-        auth_dependency=require_api_auth,
+        auth_dependency=_tapdb_dag_auth,
         limits=_BLOOM_DAG_LIMITS,
     )
     if not result.mounted or result.advertisement is None:

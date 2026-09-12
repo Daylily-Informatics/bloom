@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from types import SimpleNamespace
 
+from daylily_tapdb.web import dag_v2
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import bloom_lims.integrations.tapdb_mount as tapdb_mount
 import bloom_lims.tapdb_dag as tapdb_dag
+from bloom_lims.api.v1.dependencies import APIUser
 from bloom_lims.app import create_app
 
 
@@ -125,6 +128,14 @@ def test_canonical_tapdb_dag_search_route_is_mounted(monkeypatch):
     assert response.json()["detail"].startswith("Authentication required")
 
 
+def test_tapdb_dag_auth_maps_api_user_to_native_identity():
+    user = APIUser(email="operator@example.com", role="READ_ONLY")
+
+    authenticated = asyncio.run(tapdb_dag._tapdb_dag_auth(user))
+
+    assert dag_v2._actor_from_auth(authenticated) == "operator@example.com"
+
+
 def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
     captured: dict[str, object] = {}
 
@@ -161,7 +172,7 @@ def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
         "config_path": "/tmp/bloom-tapdb-config.yaml",
         "service_id": "bloom",
         "display_name": "Bloom",
-        "auth_dependency": tapdb_dag.require_api_auth,
+        "auth_dependency": tapdb_dag._tapdb_dag_auth,
         "limits": tapdb_dag._BLOOM_DAG_LIMITS,
     }
     assert result.mounted is True
