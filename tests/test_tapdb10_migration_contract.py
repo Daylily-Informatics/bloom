@@ -160,6 +160,33 @@ def test_graph_partition_archives_only_lineage_matches_with_positions() -> None:
     assert retained == [unresolved]
 
 
+def test_graph_partition_requires_exact_tenant_including_omitted_tenant() -> None:
+    base = {
+        "system": "atlas",
+        "root_euid": "persisted-reference",
+        "relationship_type": "prepared_for_atlas_test",
+        "source_field": "atlas_test",
+    }
+    omitted = dict(base)
+    mismatched = {**base, "tenant_id": "tenant-beta"}
+    matched = {**base, "tenant_id": "tenant-alpha"}
+
+    archived, retained = conversion._partition_graph_entries(
+        [omitted, mismatched, matched],
+        {
+            (
+                "persisted-reference",
+                "prepared_for_atlas_test",
+                "tenant-alpha",
+                "atlas_test",
+            )
+        },
+    )
+
+    assert archived == [{"position": 2, "entry": matched}]
+    assert retained == [omitted, mismatched]
+
+
 def test_metadata_conversion_repairs_only_missing_properties() -> None:
     converted, graph, graph_present = conversion._converted_payload(
         {"label": "retained"}, archive_key="bloom_tapdb10_archive"

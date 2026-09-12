@@ -231,7 +231,7 @@ def _partition_graph_entries(
             for key in allowed
             if key[0] == root
             and key[1] == relationship
-            and (not tenant or key[2] == tenant)
+            and key[2] == tenant
             and key[3] == source_field
         }
         if candidates:
