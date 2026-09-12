@@ -14,13 +14,13 @@ Status: IN_PROGRESS
 
 | ID | Requirement | Owner | Status | Evidence / next action |
 |---|---|---|---|---|
-| P204 | Close Bloom database sessions at request completion | Operator | IN_PROGRESS | Adapter and HTTP request lifecycle |
-| P207 | Canonical uppercase group codes across auth and CLI | Operator | IN_PROGRESS | rbac constants, GroupService and repository |
-| P202 | Accurate Bloom/Kahlo footer release provenance | Operator | IN_PROGRESS | Image build metadata and rendering |
+| P204 | Close Bloom database sessions at request completion | Operator | SUCCESS | 10.0.3 deployed; normal dashboard/object/graph access; post-access census: one idle connection, zero open transactions |
+| P207 | Canonical uppercase group codes across auth and CLI | Operator | SUCCESS | Shared constants now match native persistence and CLI normalization; existing human SSO and READ_ONLY Kahlo graph access succeed without identity/group mutation |
+| P202 | Accurate Bloom/Kahlo footer release provenance | Operator | SUCCESS | Authenticated pages show Bloom 10.0.3 / 84af628 and Kahlo 8.0.1 / 5dce7bf with exact working branches; Kahlo image unchanged |
 | P201 | Investigate retained historical graph records; propose disposition | Operator | SUCCESS | Read-only production query: 282 entries, 72 active rows, all lack linked legacy reference evidence; retain unchanged, no remote service contact or data mutation |
 | P205 | Reconcile issue 111 documentation | Operator | SUCCESS | GitHub issue remains OPEN; accepted 10.1.3 additive versioning resolved Bloom deployment blocker |
-| REL | Publish/deploy selected tagged services and confirm ordinary access | Operator | OPEN | No tests; no PR or merge |
-| PRS | After REL, update outstanding Bloom PRs and close obsolete items; assess remaining | Operator | OPEN | Refresh against final release, no PR branch updates/merges or test campaign |
+| REL | Publish/deploy selected tagged services and confirm ordinary access | Operator | SUCCESS | Bloom tag/release 10.0.3, one image build, scoped Compose exit 0; all 11 sibling containers unchanged; selected containers running with zero restarts |
+| PRS | After REL, update outstanding Bloom PRs and close obsolete items; assess remaining | Operator | IN_PROGRESS | Refresh against final release, no PR branch updates/merges or test campaign |
 | P203 | Token rotation | Operator | NO_LONGER_NEEDED | Explicitly skipped for this round; existing token unchanged |
 
 PR closure wording will be clarified before any ambiguous closure; definite obsolete/superseded items can be handled from source evidence.
@@ -31,3 +31,12 @@ PR closure wording will be clarified before any ambiguous closure; definite obso
 - Baseline runtime census during that read: one idle Bloom runtime session, no idle-in-transaction session at that instant. The previous lock evidence and current unclosed handler source demonstrate the lifecycle defect; it need not be reproduced with a load campaign.
 - Kahlo needs no rebuild: live Compose overrides image-owned 8.0.1 provenance with tag 7.0.0, branch container and a 64-character image digest. Remove only these overrides and fix their Dayhoff generator; restart only Kahlo. Preserve the same image and credential.
 - Bloom patch candidate: annotated 10.0.3, one image build; static review only before deployment. Acceptance is the running tagged service and ordinary authenticated access, not a test suite.
+
+## Runtime closeout before PR work
+
+- Published [Bloom 10.0.3](https://github.com/lsmc-bio/bloom/releases/tag/10.0.3), annotated tag at `84af628dcd6b135ba0785cfcf9081cbc64b3d399`. Exact image digest `sha256:5a373d5a4e8d66dd6137d2edbb8a48796e4bb0861b4c8130c93b40a3a1f225f5`. One build, no rerun.
+- Protected host deployment receipt `/home/ubuntu/bloom_ops/phase2-20260912/deployment.json`: Compose returned 0; Bloom container `74d4272c9db3`, Kahlo `53f225f0693d`; 11 sibling container IDs unchanged. Only Bloom image and three stale Kahlo metadata overrides changed. No credential or schema changes.
+- Normal SSO dashboard and existing object `M-BBX-E0C5` opened successfully; authenticated Kahlo graph for the already-persisted Bloom root loaded 6 nodes, 6 edges, zero external jumps and no traversal warnings. Footers show the released commits. Local receipt `/Users/jmajor/.codex/artifacts/bloom-phase2-20260912/browser-acceptance.json`.
+- Post-access `/home/ubuntu/bloom_ops/phase2-20260912/post-access-sessions.json`: one idle runtime connection, oldest transaction age 0, no idle-in-transaction session. Both selected containers running, restart counts 0; Bloom log ERROR/Traceback count 0 during the startup interval. This is bounded running-service acceptance, not a test or load campaign.
+- Companion Dayhoff commit `9f889d5` pushed to its existing working branch; Bloom pin 10.0.3, Kahlo remains 8.0.1. No Dayhoff release, PR, merge or full deployment.
+- Approved runtime/investigation items are complete. PR inspection starts only after these receipts.

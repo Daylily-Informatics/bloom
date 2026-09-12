@@ -2,18 +2,18 @@
 
 Date: 2026-09-12
 
-Status: open backlog; no item selected
+Status: approved items completed in the [phase-2 execution ledger](20260912T053000Z_bloom_phase_2_execution_ledger.md); PR assessment follows.
 
-The Bloom `10.0.1` / TapDB `10.1.3` production migration is accepted and ordinary access is open. This separate ledger contains deferred minor work only. Before selecting an item, refresh its source state and obtain any authorization required by the tagged-production-first workflow in `AGENTS.md`.
+The Bloom `10.0.1` / TapDB `10.1.3` production migration is accepted and ordinary access is open. This ledger tracks the approved minor work and remaining deferred scope. Before selecting an item, refresh its source state and obtain any authorization required by the tagged-production-first workflow in `AGENTS.md`.
 
 | ID | Deferred item | Current evidence | Status |
 |---|---|---|---|
-| P201 | Investigate 282 unresolved retired `tapdb_graph` entries retained unchanged on 72 rows. | Migration archived only 111 exact lineage-backed entries; no identity or lineage was invented. | OPEN |
-| P202 | Repair Bloom and Kahlo footer source metadata. | Runtime images and tags are proven, but Bloom omitted branch/commit and Kahlo displayed stale tag/commit text. | OPEN |
-| P203 | Rotate the Kahlo Bloom reader token before expiry. | Bloom-owned READ_ONLY identity `M-SYS-9T5J`; `internal_ro` token expires `2026-12-11T04:45:17.375690+00:00`. Keep legacy account/token untouched. Do not schedule automation without explicit approval. | OPEN |
-| P204 | Fix Bloom request-session lifetime. | Runtime PIDs 958 and 981 remained idle in transaction for about 48 minutes on generic-instance/lineage reads and blocked the additive template relation lock until only Bloom was stopped. | OPEN |
-| P205 | Reassess TapDB issue #111 documentation state. | Released `10.1.3` supplied the accepted additive versioned XRF behavior; [issue #111](https://github.com/Daylily-Informatics/daylily-tapdb/issues/111) remained open during migration. | OPEN |
+| P201 | Investigate 282 unresolved retired `tapdb_graph` entries retained unchanged on 72 rows. | Investigation completed: 282 entries on 72 active rows lack exact linked legacy reference evidence; retain unchanged. No data mutation or remote lookup. | SUCCESS |
+| P202 | Repair Bloom and Kahlo footer source metadata. | Bloom 10.0.3 footer now shows exact source metadata; Kahlo 8.0.1 image metadata restored by removing three stale Compose overrides. | SUCCESS |
+| P203 | Rotate the Kahlo Bloom reader token before expiry. | Explicitly skipped for this round. Existing token and expiry remain unchanged; no automation created. | NO_LONGER_NEEDED |
+| P204 | Fix Bloom request-session lifetime. | Request-scoped adapter cleanup deployed in 10.0.3; bounded post-access census shows no open transaction. | SUCCESS |
+| P205 | Reassess TapDB issue #111 documentation state. | Issue refreshed: still OPEN upstream; Bloom docs now distinguish resolved 10.1.3 deployment blocker from upstream lifecycle documentation. No upstream mutation. | SUCCESS |
 | P206 | Refresh and triage dependency pull requests. | Snapshot: #10 cryptography 48→50, #9 pyasn1 0.6.3→0.6.4, #8 Pillow 12.2→12.3, #6 Starlette 1.1→1.3.1, #5 pydantic-settings 2.14.1→2.14.2, #4 python-multipart 0.0.29→0.0.31. All were open, non-draft and based on `main`; mergeability was `UNKNOWN`. | OPEN |
-| P207 | Reconcile auth group casing across constants, repository output and CLI validation. | Static source review for docs release: `TapdbGroupRepository._to_group` returns uppercase codes; `ROLE_GROUPS`/role-group constants are lowercase; `users.provision_local` validates normalized uppercase inputs against mixed-case `SYSTEM_GROUP_CODES`. The accepted reader has an explicit READ_ONLY role; no runtime change or new test was made. | OPEN |
+| P207 | Reconcile auth group casing across constants, repository output and CLI validation. | Uppercase role-group constants now match repository and CLI normalization in 10.0.3; no stored roles, memberships or identities rewritten. | SUCCESS |
 
 No dependency PR was selected, changed or merged during migration closeout. Atlas and sibling service source, images, configuration and databases remain outside this backlog unless separately authorized.
