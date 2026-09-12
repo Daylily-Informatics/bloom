@@ -5,23 +5,13 @@ from typing import Dict, List
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 
-from bloom_lims.domain import BloomObj
+from bloom_lims.dashboard_queries import queue_summary, recent_instances
 from bloom_lims.gui.deps import _is_tapdb_reachable, require_auth
 from bloom_lims.gui.jinja import templates
 from bloom_lims.search import SearchRequest, SearchService
 from bloom_lims.tapdb_adapter import BLOOMdb3
 
 router = APIRouter()
-
-
-def _props(instance) -> dict:
-    payload = instance.json_addl if isinstance(instance.json_addl, dict) else {}
-    props = payload.get("properties", {})
-    return props if isinstance(props, dict) else {}
-
-
-def _is_queue_runtime_record(instance, beta_kind: str) -> bool:
-    return str(_props(instance).get("beta_kind") or "").strip() == beta_kind
 
 
 def _parse_csv_param(raw_value: str) -> List[str]:
@@ -86,53 +76,29 @@ async def modern_dashboard(request: Request, _=Depends(require_auth)):
 
     if not db_unavailable:
         try:
-            bobdb = BloomObj(BLOOMdb3(app_username=user_data.get("email", "anonymous")))
-            generic_rows = (
-                bobdb.session.query(bobdb.Base.classes.generic_instance)
-                .filter_by(is_deleted=False)
-                .all()
-            )
-            queue_definitions = [
-                row
-                for row in generic_rows
-                if _is_queue_runtime_record(row, "queue_definition")
-            ]
-            open_work_items = [
-                row
-                for row in generic_rows
-                if _is_queue_runtime_record(row, "beta_work_item")
-                and str(getattr(row, "bstatus", "") or "").strip().lower()
-                in {"open", "active"}
-            ]
-            stats = {
-                "queue_runtime_total": len(open_work_items),
-                "objects_total": len(generic_rows),
-                "equipment_total": bobdb.session.query(
-                    bobdb.Base.classes.equipment_instance
+            with BLOOMdb3(app_username=user_data.get("email", "anonymous")) as bdb:
+                counts = queue_summary(bdb)
+                stats = {
+                    "queue_runtime_total": counts["workflows_active"],
+                    "objects_total": counts["objects_total"],
+                    "equipment_total": bdb.session.query(
+                        bdb.Base.classes.equipment_instance
+                    )
+                    .filter_by(is_deleted=False)
+                    .count(),
+                    "reagents_total": bdb.session.query(
+                        bdb.Base.classes.content_instance
+                    )
+                    .filter(
+                        bdb.Base.classes.content_instance.is_deleted.is_(False),
+                        bdb.Base.classes.content_instance.subtype.like("%reagent%"),
+                    )
+                    .count(),
+                }
+                recent_queue_runtime = recent_instances(
+                    bdb, beta_kinds=counts["queue_kinds"]
                 )
-                .filter_by(is_deleted=False)
-                .count(),
-                "reagents_total": bobdb.session.query(
-                    bobdb.Base.classes.content_instance
-                )
-                .filter(
-                    bobdb.Base.classes.content_instance.is_deleted.is_(False),
-                    bobdb.Base.classes.content_instance.subtype.like("%reagent%"),
-                )
-                .count(),
-            }
-            recent_queue_runtime = sorted(
-                queue_definitions,
-                key=lambda row: getattr(row, "created_dt", None),
-                reverse=True,
-            )[:5]
-            recent_objects = (
-                bobdb.session.query(bobdb.Base.classes.generic_instance)
-                .filter_by(is_deleted=False)
-                .order_by(bobdb.Base.classes.generic_instance.created_dt.desc())
-                .limit(5)
-                .all()
-            )
+                recent_objects = recent_instances(bdb)
         except Exception:
             db_unavailable = True
 
