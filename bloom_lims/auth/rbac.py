@@ -145,13 +145,8 @@ def constrain_roles_by_scope(
     if cap_role is None:
         return []
 
-    cap_rank = ROLE_RANK[cap_role]
-    constrained = []
-    for role_name in normalized:
-        role_obj = _normalize_role(role_name)
-        if role_obj is None:
-            continue
-        if ROLE_RANK[role_obj] <= cap_rank:
-            constrained.append(role_obj.value)
-
-    return normalize_roles(constrained)
+    permitted = effective_permissions(normalized) & ROLE_PERMISSIONS[cap_role]
+    for role in sorted(Role, key=lambda item: ROLE_RANK[item], reverse=True):
+        if ROLE_PERMISSIONS[role] == permitted:
+            return [role.value]
+    return []

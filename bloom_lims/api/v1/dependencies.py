@@ -23,7 +23,6 @@ from bloom_lims.auth.rbac import (
     Permission,
     Role,
     effective_permissions,
-    has_permission,
     normalize_roles,
 )
 from bloom_lims.auth.services.groups import GroupService
@@ -61,7 +60,10 @@ class APIUser:
         self.user_id = user_id or email
         self.roles = normalized_roles
         self.groups = sorted(set(groups or []))
-        self.permissions = sorted(set(permissions or effective_permissions(self.roles)))
+        role_permissions = effective_permissions(self.roles)
+        self.permissions = sorted(
+            role_permissions if permissions is None else role_permissions & set(permissions)
+        )
         self.role = self.roles[0]
         self.auth_source = auth_source
         self.is_service_account = is_service_account
@@ -69,7 +71,8 @@ class APIUser:
         self.token_id = token_id
 
     def has_permission(self, permission: Permission | str) -> bool:
-        return has_permission(self.roles, permission)
+        value = permission.value if isinstance(permission, Permission) else str(permission).strip()
+        return bool(value) and value in self.permissions
 
     @property
     def is_admin(self) -> bool:
@@ -235,7 +238,7 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             roles=constrained_roles,
             groups=owner_groups,
             permissions=permissions,
-            role=constrained_roles[0] if constrained_roles else Role.READ_ONLY.value,
+            role=constrained_roles[0],
             auth_source="token",
             is_service_account=True,
             token_scope=token_row.scope,
