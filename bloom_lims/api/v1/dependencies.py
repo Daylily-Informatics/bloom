@@ -219,9 +219,15 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             )
 
         token_row = validation.token
-        constrained_roles, owner_groups = (
-            token_service.constrained_roles_for_token_owner(token=token_row)
-        )
+        try:
+            constrained_roles, owner_groups = (
+                token_service.constrained_roles_for_token_owner(token=token_row)
+            )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Bloom API token owner authorization was rejected",
+            ) from exc
         permissions = sorted(effective_permissions(constrained_roles))
         user = APIUser(
             email=f"token-user:{token_row.user_id}",
