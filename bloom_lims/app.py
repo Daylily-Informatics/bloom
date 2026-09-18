@@ -154,7 +154,10 @@ def create_app() -> FastAPI:
     app = FastAPI(lifespan=_lifespan, version=__version__)
     dag_mount = mount_tapdb_dag_api(app)
     app.state.observability = BloomObservabilityStore(
-        dag_advertisement=dag_mount.advertisement or {}
+        dag_advertisement=dag_mount.advertisement or {},
+        mounted_route_paths=lambda: {
+            route.path for route in app.routes if "GET" in (getattr(route, "methods", None) or set())
+        },
     )
     refresh_template_globals()
 
