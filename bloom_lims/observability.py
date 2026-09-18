@@ -481,7 +481,7 @@ def base_frame(request: Request, *, status: str) -> dict[str, Any]:
     return {
         "contract_version": CONTRACT_VERSION,
         "service": SERVICE_NAME,
-        "environment": settings.environment,
+        "environment": settings.deployment.name,
         "instance_id": _instance_id(),
         "observed_at": _utcnow(),
         "status": status,
