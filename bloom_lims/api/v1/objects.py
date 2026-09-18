@@ -6,9 +6,16 @@ CRUD endpoints for BloomObj (generic instances).
 
 import copy
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+
+from bloom_lims.api.v1.owner_contracts import (
+    PropertyNamespaceWrite,
+    canonical_sha256,
+    exact_euid,
+)
 
 from bloom_lims.schemas import (
     ObjectCreateSchema,
@@ -22,6 +29,73 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/objects", tags=["Objects"])
+
+
+@router.patch("/{euid}/properties/{namespace}")
+def add_property_namespace(
+    data: PropertyNamespaceWrite,
+    euid: str = Path(min_length=1, max_length=128),
+    namespace: str = Path(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]*$"),
+    user: APIUser = Depends(require_write),
+):
+    """Add one immutable metadata namespace with a locked whole-JSON precondition."""
+    try:
+        exact_euid(euid)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        from bloom_lims.tapdb_adapter import BLOOMdb3
+
+        with BLOOMdb3(app_username=user.email) as bdb:
+            with bdb.session.begin():
+                model = bdb.Base.classes.generic_instance
+                obj = bdb.session.query(model).filter(
+                    model.euid == euid, model.is_deleted.is_(False)
+                ).with_for_update().one_or_none()
+                if obj is None:
+                    raise HTTPException(status_code=404, detail="Live owner object not found")
+                before = copy.deepcopy(obj.json_addl)
+                if not isinstance(before, dict):
+                    raise HTTPException(status_code=409, detail="Owner json_addl must be an object")
+                properties = before.get("properties", {})
+                if not isinstance(properties, dict):
+                    raise HTTPException(status_code=409, detail="Owner properties must be an object")
+                before_sha = canonical_sha256(before)
+                value_sha = canonical_sha256(data.value)
+                if namespace in properties:
+                    if canonical_sha256(properties[namespace]) != value_sha:
+                        raise HTTPException(status_code=409, detail="Property namespace already has different content")
+                    outcome = "already_present"
+                    after_sha = before_sha
+                else:
+                    if before_sha != data.expected_json_addl_sha256:
+                        raise HTTPException(status_code=409, detail="Owner json_addl changed since the supplied precondition")
+                    after = copy.deepcopy(before)
+                    after.setdefault("properties", {})[namespace] = copy.deepcopy(data.value)
+                    obj.json_addl = after
+                    bdb.session.flush()
+                    after_sha = canonical_sha256(obj.json_addl)
+                    outcome = "created"
+                payload = {
+                    "schema": "bloom.property_namespace_write/1",
+                    "euid": obj.euid,
+                    "namespace": namespace,
+                    "outcome": outcome,
+                    "changed": outcome == "created",
+                    "expected_json_addl_sha256": data.expected_json_addl_sha256,
+                    "before_json_addl_sha256": before_sha,
+                    "after_json_addl_sha256": after_sha,
+                    "value_sha256": value_sha,
+                    "observed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            # The transaction has committed before any success is returned.
+            payload["receipt_sha256"] = canonical_sha256(payload)
+            return payload
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Conditional owner namespace write failed")
+        raise HTTPException(status_code=500, detail="Conditional owner namespace write failed") from exc
 
 
 def _is_singleton_template(template_row) -> bool:
