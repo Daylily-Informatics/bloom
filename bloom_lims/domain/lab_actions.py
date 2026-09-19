@@ -285,7 +285,6 @@ class LabActionsService:
             if self.bobj.get_by_euid(member) is None:
                 continue
             self._create_lineage(instance.euid, member, "run_set_member")
-            self._create_lineage(member, instance.euid, "associated_set")
         return instance
 
     def _well_from_plate_position(self, plate_euid: str, row: str, col: int):
@@ -370,7 +369,6 @@ class LabActionsService:
         for member in dict.fromkeys(request.members):
             if self.bobj.get_by_euid(member) is not None:
                 self._create_lineage(run_set.euid, member, "run_set_member")
-                self._create_lineage(member, run_set.euid, "associated_set")
         self.bdb.session.commit()
         return self.get_lab_set(run_set.euid)
 
@@ -391,7 +389,6 @@ class LabActionsService:
         for member in request.members:
             if self.bobj.get_by_euid(member) is not None:
                 self._create_lineage(run_set.euid, member, "run_set_member")
-                self._create_lineage(member, run_set.euid, "associated_set")
         self.bdb.session.commit()
         return self.get_lab_set(set_euid)
 

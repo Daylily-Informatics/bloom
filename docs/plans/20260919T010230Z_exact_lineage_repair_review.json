@@ -1,0 +1,893 @@
+{
+  "schema": "bloom.persisted_lineage_repair_review/v1",
+  "prepared_at": "2026-09-19T01:02:30Z",
+  "status": "PREPARED_REQUIRES_SEPARATE_DESTRUCTIVE_CONFIRMATION",
+  "executed": false,
+  "deployment": {
+    "service": "bloom",
+    "deployment": "day",
+    "version": "10.0.10",
+    "source_commit": "534b8136a4a8f5dbf02f886cdddef59d93e751c2",
+    "image": "sha256:a99a076fdfdabf40b19d01dd42189b22dce575f71afc12ae938e373810a5eb71",
+    "tapdb_runtime": "10.1.4"
+  },
+  "target_set_euid": "M-BGS-174",
+  "root_euid": "M-BRM-VG",
+  "cause": "LabActionsService stores every run-set membership as two opposing persisted directed edges: canonical run_set_member plus redundant associated_set. Native DAG v2 rejects the ten resulting two-edge cycles.",
+  "effect": "Soft-delete only the ten named associated_set lineage records. Keep all objects, ten canonical run_set_member records, unrelated lineage, metadata and audit history. No hard deletion, schema reset or graph-validation relaxation.",
+  "auth": "Apply only through Bloom's public owning API using an existing authorized owner-writer context after the separate destructive confirmation; no auth grants or DB bypass. Read observations used existing Kahlo reader.",
+  "preconditions": [
+    "Explicit destructive confirmation names this exact ten-edge repair and effect.",
+    "Final writer correction deployed, preventing new associated_set rows.",
+    "Re-read exact set lineage lists and exact all-ten audit/lineage selectors; require same endpoints, relationship types, active state, and preserved counterparts.",
+    "Retain immutable before snapshot and request/response receipts; fail on any unexpected identity or response. After partial failure, re-read and report the exact completed subset; never automatically retry with different targets."
+  ],
+  "acceptance": [
+    "Ten reverse edges no longer active; ten exact canonical membership edge IDs remain active.",
+    "Every original object and all unrelated set lineage remain unchanged.",
+    "Public audit records show the soft deletions under the executing owner actor.",
+    "Native GET /api/dag/v2/data?start_euid=M-BRM-VG&depth=4 succeeds with actual graph data, then Kahlo graph traversal is observed. New independent errors remain explicit."
+  ],
+  "source_authority": [
+    {
+      "path": "bloom_lims/domain/lab_actions.py",
+      "release": "10.0.10",
+      "lines": [
+        287,
+        288,
+        372,
+        373,
+        393,
+        394
+      ]
+    },
+    {
+      "path": "docs/lab_actions.md",
+      "release": "10.0.10",
+      "lines": [
+        51,
+        52
+      ]
+    },
+    {
+      "path": "bloom_lims/api/v1/lineages.py",
+      "release": "10.0.10",
+      "lines": [
+        159,
+        200
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "euid": "M-EDG-GAYQ",
+      "parent_euid": "M-BNQ-ZB",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GAXS",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNQ-ZB",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GAYQ?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GB0K",
+      "parent_euid": "M-BNQ-10H",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GAZN",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNQ-10H",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GB0K?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GB2F",
+      "parent_euid": "M-BNQ-11F",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GB1H",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNQ-11F",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GB2F?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GB4B",
+      "parent_euid": "M-BNQ-1JC",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GB3D",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNQ-1JC",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GB4B?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GB67",
+      "parent_euid": "M-BNX-13Z",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GB59",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNX-13Z",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GB67?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GB83",
+      "parent_euid": "M-BNX-14X",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GB75",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNX-14X",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GB83?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GBAZ",
+      "parent_euid": "M-BNX-15V",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GB91",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNX-15V",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GBAZ?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GBCV",
+      "parent_euid": "M-BNX-121",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GBBX",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BNX-121",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GBCV?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GBEQ",
+      "parent_euid": "M-BEQ-9RJA",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GBDS",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BEQ-9RJA",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GBEQ?hard_delete=false"
+      }
+    },
+    {
+      "euid": "M-EDG-GBGJ",
+      "parent_euid": "M-BCF-CD",
+      "child_euid": "M-BGS-174",
+      "relationship_type": "associated_set",
+      "preserve_membership": {
+        "euid": "M-EDG-GBFN",
+        "parent_euid": "M-BGS-174",
+        "child_euid": "M-BCF-CD",
+        "relationship_type": "run_set_member"
+      },
+      "delete_request": {
+        "method": "DELETE",
+        "path": "/api/v1/lineages/M-EDG-GBGJ?hard_delete=false"
+      }
+    }
+  ],
+  "observed": {
+    "reverse_audits": [
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GAYQ",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:13.660321+00:00",
+        "response_sha256": "7cd5841c0867e9b56191f5007b29594a1dcfc8475ce6e962a049c35f6fe2aa53",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWCG",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GAYQ",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GAYQ",
+            "category": "generic",
+            "type": "material:sample:sequencing-library:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNQ-ZB",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "3615d4450985c226c205325cc01aced1231f203f3916f02a03974fee84b4c67c"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GB0K",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:16.971036+00:00",
+        "response_sha256": "429eaf4d0de4ff73721ad55629f7f4e609edb10d58313c4ba22b1f1d435b0c10",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWEC",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GB0K",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GB0K",
+            "category": "generic",
+            "type": "material:sample:sequencing-library:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNQ-10H",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "547112fd9085c2ec4bd240a59ed6d9f70dd2ff0e3f5468e63adb9d489f907de9"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GB2F",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:20.695973+00:00",
+        "response_sha256": "1fe82afbc790792548506ebf095ad42510d31e8acff0207dd339b35e7d148e84",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWG7",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GB2F",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GB2F",
+            "category": "generic",
+            "type": "material:sample:sequencing-library:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNQ-11F",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "fc55099c1da00425d7c499f68630bfa4b7c342d027e7f0651a3a6afe0930baec"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GB4B",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:24.017763+00:00",
+        "response_sha256": "145ade73496e68a29fa0cba81932bfb4a3d3cc36d14db78b79e3815368a358da",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWJ3",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GB4B",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GB4B",
+            "category": "generic",
+            "type": "material:sample:sequencing-library:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNQ-1JC",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "5ef865a09d6cc0f68a4d71c74fa918e0fe109f7bb62b727c224e696999be2ed4"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GB67",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:27.347891+00:00",
+        "response_sha256": "89dc212bb1c392d1b92bb42d71def005cac3f9e94f5c11e6466a0e9c1996d3c4",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWMZ",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GB67",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GB67",
+            "category": "generic",
+            "type": "material:reagent:sequencing-index:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNX-13Z",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "3f99ef66a6bf9bacaf7a7686424bb9169f1f01cb4a8984f4923036ec14df1f16"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GB83",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:30.824251+00:00",
+        "response_sha256": "76fe7f663adc6a7e4d97bad5df79a56603c1a0f9257048ae683614114dfb52c2",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWPV",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GB83",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GB83",
+            "category": "generic",
+            "type": "material:reagent:sequencing-index:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNX-14X",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "a0d792dd9ef2b6d028b4c362a2ac9c6a6f87afc0c503dba1e6a1e6291e64743d"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GBAZ",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:34.206150+00:00",
+        "response_sha256": "0f83efdcbf305a6dbb7900e2c14d860e4d1cea7559ee5e4bbde1d111d132517c",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWRQ",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GBAZ",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GBAZ",
+            "category": "generic",
+            "type": "material:reagent:sequencing-index:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNX-15V",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "07e8551f45878009632bf2b0f92fe2bd850325ad76d4ff188d2db4118dc339c4"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GBCV",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:37.545639+00:00",
+        "response_sha256": "5814700fa745d1a0f1f11a92a544052b0c5e9b8ee72508c08633c56a4becfae6",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWTK",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GBCV",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GBCV",
+            "category": "generic",
+            "type": "material:reagent:sequencing-index:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BNX-121",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "8d6a2c426c59dc218b10080a4388054b169909c0f298371855ede1b4806c8114"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GBEQ",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:41.327090+00:00",
+        "response_sha256": "4d3c9a5f6fee2de88574db1e1b39ad07af1075d9c438a51f170c6216964b6018",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWWF",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GBEQ",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GBEQ",
+            "category": "generic",
+            "type": "equipment:sequencers:ont-promethion:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BEQ-9RJA",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "888ba9e2dfa080940297ea777abff7cf56ea63b7a8c739f3113dda0cf0f9eb4d"
+            }
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/search/v2/query",
+        "request": {
+          "query": "M-EDG-GBGJ",
+          "record_types": [
+            "lineage",
+            "audit"
+          ],
+          "include_deleted": true,
+          "page_size": 100,
+          "max_scan": 100,
+          "sort_order": "asc"
+        },
+        "http_status": 200,
+        "observed_at": "2026-09-19T01:01:44.644845+00:00",
+        "response_sha256": "4aa16424e63c4472f173f885d0ddb232c8488b0a65fd160191e6bd71e179debc",
+        "total": 2,
+        "truncated": false,
+        "items": [
+          {
+            "record_type": "audit",
+            "euid": "M-ADT-1RWYB",
+            "category": "",
+            "type": "generic_instance_lineage",
+            "subtype": "",
+            "status": "INSERT",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "rel_table_euid_fk": "M-EDG-GBGJ",
+              "column_name": null,
+              "changed_by_sha256": "868bdd9b3b4a37cdf4fbbc0cd16fdb3be48f71159f90d77b99b2a92dedd97bf4"
+            }
+          },
+          {
+            "record_type": "lineage",
+            "euid": "M-EDG-GBGJ",
+            "category": "generic",
+            "type": "container:flowcell:generic:1.0",
+            "subtype": "set:run-set:generic:1.01",
+            "status": "associated_set",
+            "created_dt": "2026-07-19T02:59:36.972615Z",
+            "metadata": {
+              "parent_instance_euid": "M-BCF-CD",
+              "child_instance_euid": "M-BGS-174",
+              "relationship_type": "associated_set",
+              "json_addl_sha256": "6bdacc0c55d7247b2ad0ad8f187edd338e14afd18b35a82a3221537be0c8fe4e"
+            }
+          }
+        ]
+      }
+    ],
+    "set_lineage_observations": [
+      {
+        "path": "/api/v1/lineages/?parent_euid=M-BGS-174&page_size=1000",
+        "observed_at": "2026-09-19T01:00:24.811959+00:00",
+        "http_status": 200,
+        "response_sha256": "5f778c4fafeef0245b0fed7b88563a97991abea7a5b04e482b8efca9709e2389",
+        "body": {
+          "items": [
+            {
+              "euid": "M-EDG-GAXS",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNQ-ZB",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GAZN",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNQ-10H",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GB1H",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNQ-11F",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GB3D",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNQ-1JC",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GB59",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNX-13Z",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GB75",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNX-14X",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GB91",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNX-15V",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GBBX",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BNX-121",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GBDS",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BEQ-9RJA",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GBFN",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BCF-CD",
+              "relationship_type": "run_set_member"
+            },
+            {
+              "euid": "M-EDG-GBP6",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BCF-CD",
+              "relationship_type": "run_uses_flowcell"
+            },
+            {
+              "euid": "M-EDG-M6M7",
+              "parent_euid": "M-BGS-174",
+              "child_euid": "M-BRN-257",
+              "relationship_type": "describes_sequencing_run"
+            }
+          ],
+          "total": 12,
+          "page": 1,
+          "page_size": 1000
+        }
+      },
+      {
+        "path": "/api/v1/lineages/?child_euid=M-BGS-174&page_size=1000",
+        "observed_at": "2026-09-19T01:00:25.526018+00:00",
+        "http_status": 200,
+        "response_sha256": "aa16c58c37b1a63a51fde31b2b8c2ccbcc3ac5a1ad400a302cb2320f85ba789d",
+        "body": {
+          "items": [
+            {
+              "euid": "M-EDG-GAYQ",
+              "parent_euid": "M-BNQ-ZB",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GB0K",
+              "parent_euid": "M-BNQ-10H",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GB2F",
+              "parent_euid": "M-BNQ-11F",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GB4B",
+              "parent_euid": "M-BNQ-1JC",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GB67",
+              "parent_euid": "M-BNX-13Z",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GB83",
+              "parent_euid": "M-BNX-14X",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GBAZ",
+              "parent_euid": "M-BNX-15V",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GBCV",
+              "parent_euid": "M-BNX-121",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GBEQ",
+              "parent_euid": "M-BEQ-9RJA",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GBGJ",
+              "parent_euid": "M-BCF-CD",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "associated_set"
+            },
+            {
+              "euid": "M-EDG-GBJE",
+              "parent_euid": "M-BAR-A66T",
+              "child_euid": "M-BGS-174",
+              "relationship_type": "user_updated"
+            }
+          ],
+          "total": 11,
+          "page": 1,
+          "page_size": 1000
+        }
+      }
+    ]
+  }
+}

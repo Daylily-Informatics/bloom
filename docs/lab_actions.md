@@ -49,12 +49,18 @@ Lab actions write explicit Bloom lineage records. The key relationship names are
 | `uses_index` | Library content | Index reagent | Library uses this sequencing index reagent. |
 | `pooled_from_container` | Source container | Pool tube | Pool tube was filled from this source container. |
 | `run_set_member` | Run set | Member EUID | Member belongs to the run set. |
-| `associated_set` | Member EUID | Run set | Reverse navigability for set membership. |
 | `run_uses_pool` | Sequencing run set | Pool tube/content | Run set uses this sequencing pool. |
 | `run_uses_instrument` | Sequencing run set | Instrument EUID | Run set uses this sequencer/instrument. |
 | `run_uses_reagent` | Sequencing run set | Reagent EUID | Run set uses this reagent. |
 
 `HOLDS_MATERIAL` and `DERIVED_FROM` also carry Bloom v0 edge metadata through the existing lineage metadata mechanism.
+
+Run-set membership has one authoritative `run_set_member` edge from the set to
+the member. Reverse navigation reads the same edge through its child endpoint;
+it must not create an `associated_set` edge back to the set. Reciprocal persisted
+edges create a cycle and violate the native DAG contract. Historical reverse
+edges require an explicitly approved, audited owner-service repair; deploying
+this writer change does not modify existing lineage.
 
 ## API Workflows
 
