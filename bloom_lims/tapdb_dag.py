@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
+import secrets
 from typing import Any
 
 from daylily_tapdb.web import (
@@ -11,10 +14,11 @@ from daylily_tapdb.web import (
     DagV2MountResult,
     mount_tapdb_dag_surfaces,
 )
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from bloom_lims.api.v1.dependencies import APIUser, require_api_auth
-from bloom_lims.config import apply_runtime_environment
+from bloom_lims.api.v1.dependencies import get_api_user
+from bloom_lims.config import apply_runtime_environment, get_settings
 
 _BLOOM_DAG_LIMITS = DagV2Limits(
     max_depth=12,
@@ -24,10 +28,27 @@ _BLOOM_DAG_LIMITS = DagV2Limits(
 
 
 async def _tapdb_dag_auth(
-    user: APIUser = Depends(require_api_auth),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
 ) -> dict[str, Any]:
     """Expose Bloom's authenticated identity in TapDB's mapping contract."""
 
+    token = str(credentials.credentials or "") if credentials else ""
+    if token.startswith("bloom_dag_"):
+        path = request.url.path
+        allowed = path in {
+            "/api/dag/manifest", "/api/dag/v2/data", "/api/dag/v2/search",
+        } or re.fullmatch(r"/api/dag/v2/object/[^/]+", path) is not None
+        if request.method != "GET" or not allowed:
+            raise HTTPException(status_code=403, detail="DAG read credential has no route scope")
+        settings = get_settings().api
+        expected = settings.dag_read_token_sha256
+        fingerprint = hashlib.sha256(token.encode()).hexdigest()
+        if not expected or not secrets.compare_digest(fingerprint, expected):
+            raise HTTPException(status_code=401, detail="Invalid DAG read credential")
+        return {"username": settings.dag_read_actor}
+
+    user = await get_api_user(request, credentials)
     return user.dict()
 
 

@@ -397,6 +397,10 @@ class _BetaLabStagesMixin:
             )
 
         normalized_metadata = self.normalize_execution_metadata(payload.metadata or {})
+        if payload.quant_artifact_euid:
+            if self.dewey_client is None:
+                raise ValueError("Dewey artifact validation is required for quant_artifact_euid")
+            self.dewey_client.require_persisted_artifact(payload.quant_artifact_euid)
         qc_record = self._create_data_record(
             beta_kind="post_extract_qc_result",
             name=f"post-extract-qc:{output.euid}",

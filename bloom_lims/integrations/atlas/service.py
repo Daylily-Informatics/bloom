@@ -43,6 +43,12 @@ class AtlasService:
             timeout_seconds=settings.atlas.timeout_seconds,
             verify_ssl=settings.atlas.verify_ssl,
         )
+        self.owner_client = AtlasClient(
+            base_url=settings.atlas.base_url,
+            token=str(getattr(settings.atlas, "dag_read_token", "") or ""),
+            timeout_seconds=settings.atlas.timeout_seconds,
+            verify_ssl=settings.atlas.verify_ssl,
+        )
         self.cache_ttl_seconds = max(1, int(settings.atlas.cache_ttl_seconds))
         self.atlas_tenant_id = str(settings.atlas.organization_id or "").strip()
         self.status_events_timeout_seconds = max(

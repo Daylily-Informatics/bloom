@@ -402,7 +402,7 @@ def test_legacy_bgx_preservation_retains_duplicate_and_deleted_evidence() -> Non
     assert [item["lineages"][0]["deleted"] for item in receipt] == [False, True]
 
 
-def test_converted_fulfillment_reference_round_trips_full_native_context(bdb) -> None:
+def test_converted_fulfillment_reference_requires_bounded_repair(bdb) -> None:
     from daylily_tapdb.external_references import ExternalReferenceService
 
     from bloom_lims.atlas_references import (
@@ -468,17 +468,19 @@ def test_converted_fulfillment_reference_round_trips_full_native_context(bdb) ->
 
     conversion._apply(bdb.session, plan, actor="migration-reader-proof")
     bdb.session.commit()
-    payload = list_reference_payloads(bdb.session, source)[0]
     before_replay = ExternalReferenceService(bdb.session).list_for_source(
         source, assertion_authority=ASSERTION_AUTHORITY, limit=100
     )["items"][0]
-    replace_references(bdb.session, source, [properties])
-    bdb.session.commit()
+    with pytest.raises(ValueError):
+        list_reference_payloads(bdb.session, source)
+    with pytest.raises(RuntimeError, match="bounded repair"):
+        replace_references(bdb.session, source, [properties])
     after_replay = ExternalReferenceService(bdb.session).list_for_source(
         source, assertion_authority=ASSERTION_AUTHORITY, limit=100
     )["items"][0]
 
-    assert payload == properties
+    assert after_replay["external_reference_euid"] == before_replay["external_reference_euid"]
+    assert after_replay["lineage_euid"] == before_replay["lineage_euid"]
     assert after_replay["assertion_provenance"] == before_replay["assertion_provenance"]
     assert after_replay["asserted_at"] == before_replay["asserted_at"]
 

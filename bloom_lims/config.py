@@ -650,6 +650,24 @@ class APISettings(BaseModel):
         default_factory=_get_default_api_version, description="API version"
     )
     prefix: str = Field(default="/api/v1", description="API URL prefix")
+    # Native DAG-v2 GET routes only; never add this credential to Bloom API tokens.
+    dag_read_token_sha256: str = Field(default="", description="DAG read bearer SHA256")
+    dag_read_actor: str = Field(default="", description="Prepared native DAG read actor")
+
+    @model_validator(mode="after")
+    def validate_dag_read_credential(self) -> "APISettings":
+        if bool(self.dag_read_token_sha256) != bool(self.dag_read_actor):
+            raise ValueError("Bloom DAG read token hash and actor must be configured together")
+        if self.dag_read_token_sha256 and not re.fullmatch(
+            r"[0-9a-f]{64}", self.dag_read_token_sha256
+        ):
+            raise ValueError("Bloom DAG read token hash must be lowercase SHA256")
+        if self.dag_read_actor and (
+            self.dag_read_actor != self.dag_read_actor.strip()
+            or len(self.dag_read_actor) > 128
+        ):
+            raise ValueError("Bloom DAG read actor must be exact and at most 128 characters")
+        return self
 
     pagination_default_size: int = Field(default=50, description="Default page size")
     pagination_max_size: int = Field(default=1000, description="Maximum page size")
@@ -873,6 +891,9 @@ class AtlasSettings(BaseModel):
 
     base_url: str = Field(default="", description="Atlas API base URL")
     token: str = Field(default="", description="Atlas API bearer token")
+    dag_read_token: str = Field(
+        default="", description="Atlas native DAG read-only bearer token"
+    )
     timeout_seconds: int = Field(default=10, description="Atlas API timeout seconds")
     cache_ttl_seconds: int = Field(
         default=300, description="Atlas response cache TTL in seconds"

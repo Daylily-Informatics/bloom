@@ -138,11 +138,24 @@ def _properties(payload: Any) -> dict[str, Any]:
 def _external_target(properties: dict[str, Any]):
     from daylily_tapdb.external_references import ExternalIdentifierTarget
 
-    from bloom_lims.atlas_references import canonical_kind, canonical_target
+    from bloom_lims.atlas_references import canonical_kind
 
     provider = str(properties.get("provider") or "").strip()
     if provider == "atlas":
-        return canonical_target(properties)
+        # This completed conversion records its original opaque target contract.
+        # Current writers use the native owner target in atlas_references.py.
+        value = str(properties.get("reference_value") or "")
+        if not value or value != value.strip():
+            raise ValueError("Historical Atlas reference_value must be exact")
+        tenant = str(properties.get("atlas_tenant_id") or "").strip().lower()
+        if tenant:
+            tenant = canonical_kind(tenant)
+        return ExternalIdentifierTarget(
+            namespace=f"atlas.{tenant}" if tenant else "atlas",
+            kind=canonical_kind(properties.get("reference_type")),
+            value=value,
+            scope="public_global",
+        )
     if provider != "dewey":
         raise ValueError("legacy BGX provider is not a supported canonical source")
     value = str(properties.get("reference_value") or "")

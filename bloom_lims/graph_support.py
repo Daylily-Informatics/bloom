@@ -121,7 +121,7 @@ def build_graph_elements_for_start(
         color = graph_node_color(node["category"], node["type"], node["subtype"])
         props = _props_from_json_addl(node.get("json_addl"))
         graph = _as_dict(props.get("graph"))
-        instance = bobj.get_by_euid(node_euid)
+        instance = bobj.get_by_euid(node["euid"])
         external_refs = [
             ref.to_public_dict(ref_index=index)
             for index, ref in enumerate(resolve_external_refs_for_object(instance))
@@ -261,15 +261,14 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
             system = _clean(payload.get("target_service_id"))
             root_euid = _clean(payload.get("target_object_euid"))
             tenant_id = _clean(payload.get("target_tenant_id")) or None
+            graph_expandable = system == "atlas"
+            reason = None
         elif target_type == "opaque":
-            namespace = _clean(payload.get("namespace"))
-            system = namespace.split(".", 1)[0]
+            system = _clean(payload.get("namespace"))
             root_euid = _clean(payload.get("value"))
-            tenant_id = (
-                namespace.removeprefix("atlas.") or None
-                if system == "atlas" and namespace != "atlas"
-                else None
-            )
+            tenant_id = None
+            graph_expandable = False
+            reason = "Opaque external identifiers do not identify a graph object"
         else:
             raise RuntimeError(
                 "native external reference has an unsupported target type"
@@ -277,18 +276,8 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
         relationship_type = _clean(payload.get("relationship_type"))
         if not (system and root_euid and relationship_type):
             raise RuntimeError("native external reference projection is incomplete")
-        href = None
-        if system == "atlas" and atlas_base_url:
-            params = {"start_euid": root_euid, "depth": 4}
-            if tenant_id:
-                params["tenant_id"] = tenant_id
-            href = f"{atlas_base_url}/graph?{urlencode(params)}"
-        reason = None
-        graph_expandable = system == "atlas"
-        if system == "atlas":
+        if graph_expandable:
             missing: list[str] = []
-            if not tenant_id:
-                missing.append("atlas_tenant_id")
             if not atlas_base_url:
                 missing.append("atlas.base_url")
             if not atlas_token:
@@ -296,6 +285,12 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
             if missing:
                 graph_expandable = False
                 reason = "Missing Atlas graph metadata: " + ", ".join(missing)
+        href = None
+        if graph_expandable:
+            params = {"start_euid": root_euid, "depth": 4}
+            if tenant_id is not None:
+                params["tenant_id"] = tenant_id
+            href = f"{atlas_base_url}/graph?{urlencode(params)}"
         ref = ExternalGraphRef(
             label=f"{system}:{relationship_type}:{root_euid}",
             system=system,
