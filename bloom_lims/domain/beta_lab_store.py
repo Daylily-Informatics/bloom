@@ -49,6 +49,7 @@ class _BetaLabStoreMixin:
         container_euid: str | None,
         container_template_code: str,
         specimen_name: str,
+        commit: bool = True,
     ):
         if container_euid:
             container = self._require_instance(container_euid)
@@ -59,6 +60,7 @@ class _BetaLabStoreMixin:
         container = self.bobj.create_instance_by_code(
             container_template_code,
             {"json_addl": {"properties": {"name": f"{specimen_name} container"}}},
+            commit=commit,
         )
         if container is None:
             raise ValueError("Failed to create container for specimen")

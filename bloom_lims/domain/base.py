@@ -424,7 +424,7 @@ class BloomObj:
         )
 
     # centralizing creation more cleanly.
-    def create_instance(self, template_euid, json_addl_overrides=None):
+    def create_instance(self, template_euid, json_addl_overrides=None, *, commit=True):
         """Given an EUID for an object template, instantiate an instance from the template.
             No child objects defined by the tmplate will be generated.
 
@@ -511,8 +511,10 @@ class BloomObj:
             update_recursive(parent_instance.json_addl, json_addl_overrides)
             self._apply_default_graph_metadata(parent_instance)
             self.session.add(parent_instance)
-            ##self.session.flush()
-            self.session.commit()
+            if commit:
+                self.session.commit()
+            else:
+                self.session.flush()
         except Exception as e:
             self.logger.error(f"Error creating instance from template {template_euid}")
             self.logger.error(e)
@@ -655,6 +657,7 @@ class BloomObj:
         max_depth,
         max_instances,
         state,
+        commit=True,
     ):
         if depth > max_depth:
             raise Exception(
@@ -679,7 +682,7 @@ class BloomObj:
 
         state["created_count"] += 1
         instance = self.create_instance(
-            template.euid, json_addl_overrides=json_addl_overrides or {}
+            template.euid, json_addl_overrides=json_addl_overrides or {}, commit=commit
         )
 
         layouts = template.json_addl.get("instantiation_layouts")
@@ -693,6 +696,7 @@ class BloomObj:
                 max_depth=max_depth,
                 max_instances=max_instances,
                 state=state,
+                commit=commit,
             )
 
         return instance
@@ -794,6 +798,7 @@ class BloomObj:
         max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
         max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
         state=None,
+        commit=True,
     ):
         if state is None:
             state = {"created_count": 0}
@@ -817,6 +822,7 @@ class BloomObj:
                         max_depth=max_depth,
                         max_instances=max_instances,
                         state=state,
+                        commit=commit,
                     )
                     lineage_record = self._new_instantiation_lineage(
                         parent_instance, child_instance, relationship_type
@@ -841,6 +847,7 @@ class BloomObj:
                         max_depth=max_depth,
                         max_instances=max_instances,
                         state=state,
+                        commit=commit,
                     )
                     lineage_record = self._new_instantiation_lineage(
                         parent_instance, child_instance, "generic"
@@ -912,7 +919,7 @@ class BloomObj:
             relationship_type=relationship_type,
         )
 
-    def create_instance_by_code(self, layout_str, layout_ds):
+    def create_instance_by_code(self, layout_str, layout_ds, *, commit=True):
         ret_obj = self._create_child_instance(
             layout_str,
             layout_ds,
@@ -922,6 +929,7 @@ class BloomObj:
             max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
             max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
             state={"created_count": 0},
+            commit=commit,
         )
 
         return ret_obj
@@ -937,6 +945,7 @@ class BloomObj:
         max_depth=MAX_TEMPLATE_INSTANTIATION_DEPTH,
         max_instances=MAX_TEMPLATE_INSTANTIATION_OBJECTS,
         state=None,
+        commit=True,
     ):
         (
             category,
@@ -979,6 +988,7 @@ class BloomObj:
             max_depth=max_depth,
             max_instances=max_instances,
             state=state,
+            commit=commit,
         )
 
         return new_instance

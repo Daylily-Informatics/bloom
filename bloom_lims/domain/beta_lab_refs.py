@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from bloom_lims.atlas_references import (
     list_reference_payloads,
@@ -13,6 +14,43 @@ from bloom_lims.tapdb_adapter import get_child_lineages
 
 
 class _BetaLabReferenceMixin:
+    def _atlas_tenant_contexts(self, instance) -> set[str]:
+        """Explicit registration scope and typed owner references must agree.
+
+        This scalar scopes independent registrations. It identifies no Atlas
+        business object and never creates or substitutes an object relationship.
+        """
+        values = set()
+        pending, visited = [instance], set()
+        while pending:
+            current = pending.pop()
+            if current.uid in visited:
+                continue
+            visited.add(current.uid)
+            direct = self._props(current).get("atlas_registration_tenant_id")
+            if direct:
+                values.add(str(UUID(str(direct))))
+            for reference in self._atlas_reference_payloads_for_instance(current):
+                tenant = reference.get("atlas_tenant_id")
+                if tenant:
+                    values.add(str(UUID(str(tenant))))
+            for lineage in get_child_lineages(current):
+                if lineage.is_deleted or lineage.relationship_type not in self._FULFILLMENT_CONTEXT_PARENT_RELATIONSHIPS:
+                    continue
+                parent = lineage.parent_instance
+                if parent is not None and not parent.is_deleted:
+                    pending.append(parent)
+        if len(values) > 1:
+            raise ValueError("Bloom Atlas registration and reference tenant contexts disagree")
+        return values
+
+    def _bind_atlas_registration_tenant(self, instance, atlas_context: dict[str, Any]) -> None:
+        tenant = str(UUID(str(atlas_context.get("atlas_tenant_id") or "")))
+        current = self._atlas_tenant_contexts(instance)
+        if current and current != {tenant}:
+            raise ValueError("Bloom Atlas registration and supplied tenant contexts disagree")
+        self._write_props(instance, {**self._props(instance), "atlas_registration_tenant_id": tenant})
+
     _FULFILLMENT_CONTEXT_PARENT_RELATIONSHIPS = frozenset(
         {
             "contains",
@@ -579,53 +617,10 @@ class _BetaLabReferenceMixin:
                 continue
             seen_test_euids.add(candidate)
             atlas_test_euids.append(candidate)
-        atlas_tenant_id = (
-            self._first_reachable_reference_value(
-                instance,
-                reference_type=self.TRF_REFERENCE_TYPE,
-                value_field="atlas_tenant_id",
-            )
-            or self._first_reachable_reference_value(
-                instance,
-                reference_type=self.TEST_REFERENCE_TYPE,
-                value_field="atlas_tenant_id",
-            )
-            or self._first_reachable_reference_value(
-                instance,
-                reference_type="order_euid",
-                value_field="atlas_tenant_id",
-            )
-            or self._first_reachable_reference_value(
-                instance,
-                reference_type="order_test_euid",
-                value_field="atlas_tenant_id",
-            )
-            or self._first_reachable_reference_value(
-                instance,
-                reference_type=self.TESTKIT_REFERENCE_TYPE,
-                value_field="atlas_tenant_id",
-            )
-            or self._first_reachable_reference_value(
-                instance,
-                reference_type=self.SHIPMENT_REFERENCE_TYPE,
-                value_field="atlas_tenant_id",
-            )
-            or self._first_reachable_reference_value(
-                instance,
-                reference_type=self.ORGANIZATION_SITE_REFERENCE_TYPE,
-                value_field="atlas_tenant_id",
-            )
-            or (patient_ref["atlas_tenant_id"] if patient_ref is not None else "")
-            or (
-                collection_event_ref["atlas_tenant_id"]
-                if collection_event_ref is not None
-                else ""
-            )
-        )
-        if not atlas_tenant_id and not fulfillment_items:
-            raise ValueError(
-                "Bloom Atlas context requires explicit atlas_tenant_id on a reachable reference"
-            )
+        tenant_contexts = self._atlas_tenant_contexts(instance)
+        if not tenant_contexts:
+            raise ValueError("Bloom Atlas context requires an explicit registration tenant or typed reference")
+        atlas_tenant_id = next(iter(tenant_contexts))
         if not fulfillment_items:
             return {
                 "atlas_tenant_id": atlas_tenant_id,
