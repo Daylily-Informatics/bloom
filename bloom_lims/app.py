@@ -280,6 +280,14 @@ def create_app() -> FastAPI:
     app.include_router(gui_router)
 
     register_exception_handlers(app)
+    from daylily_tapdb.revisions import RevisionConflict
+    from starlette.responses import JSONResponse
+
+    @app.exception_handler(RevisionConflict)
+    async def native_revision_conflict(_request, _exc):
+        return JSONResponse(status_code=409, content={
+            "code": "stale_revision", "detail": "An object or relationship changed; reread before retrying.",
+        })
     from bloom_lims.request_db import RequestDatabaseMiddleware
 
     app.add_middleware(RequestDatabaseMiddleware)

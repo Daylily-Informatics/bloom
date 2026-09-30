@@ -331,12 +331,43 @@ class BLOOMdb3:
         session = self._session_factory()
         self._sessions.append(session)
 
+        from dataclasses import replace
+        from daylily_tapdb.security_context import apply_transaction_context
+        from bloom_lims.attribution import current_attribution
+
+        def install(connection):
+            attribution = current_attribution()
+            apply_transaction_context(connection, replace(self._conn.transaction_context(),
+                                                          attribution=attribution),
+                                      assert_runtime_role=self._conn.connection_role == "runtime")
+            if self._conn.connection_role == "operator":
+                from daylily_tapdb.security_context import assert_operator_role
+                assert_operator_role(connection)
+            session.info["bloom_installed_attribution"] = attribution
+
         @event.listens_for(session, "after_begin")
         def _install_context(
             _session: Session, transaction: object, connection: object
         ) -> None:
             if getattr(transaction, "parent", None) is None:
-                self._conn.install_transaction_context(connection)
+                install(connection)
+
+        def refresh_identity():
+            connection = session.connection()
+            if session.info.get("bloom_installed_attribution") != current_attribution():
+                install(connection)
+
+        @event.listens_for(session, "do_orm_execute")
+        def _attribute_statement(_state):
+            refresh_identity()
+
+        @event.listens_for(session, "before_flush")
+        def _attribute_flush(_session, _context, _instances):
+            refresh_identity()
+
+        @event.listens_for(session, "after_soft_rollback")
+        def _reset_attribution_observation(_session, _previous_transaction):
+            session.info.pop("bloom_installed_attribution", None)
 
         return session
 

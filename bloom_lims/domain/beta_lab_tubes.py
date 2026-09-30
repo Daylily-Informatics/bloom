@@ -169,11 +169,12 @@ class _BetaLabTubeRequestsMixin:
                                  target_tenant_id=tube.tenant_id, target_object_kind="container")
 
     def _attach_tube_reference(self, source, target, relationship, digest):
+        from bloom_lims.reference_preconditions import reference_preconditions
         return ExternalReferenceService(self.bdb.session).attach(source, ExternalLinkSpec(
             target=target, relationship_type=relationship,
             assertion_authority=self.TUBE_IDENTIFIER_AUTHORITY, asserted_at=datetime.now(UTC),
             assertion_provenance="bloom.atlas-tube-request/v1:sha256:" + digest,
-        ))
+        ), **reference_preconditions(self.bdb.session, source, target, relationship))
 
     def _require_tube_assertion(self, euid, tenant):
         model = self.bdb.Base.classes.generic_instance

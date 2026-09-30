@@ -33,8 +33,11 @@ class RequestDatabaseMiddleware:
         # The shared stack also reaches sync handlers through their copied context.
         # Keep it alive through streaming responses and response background tasks.
         with ExitStack() as databases:
+            from bloom_lims.attribution import begin_request, end_request
+            identity_token = begin_request()
             token = _request_databases.set(databases)
             try:
                 await self.app(scope, receive, send)
             finally:
                 _request_databases.reset(token)
+                end_request(identity_token)

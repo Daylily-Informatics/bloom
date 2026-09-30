@@ -29,6 +29,7 @@ from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.auth.services.user_api_tokens import TOKEN_PREFIX, UserAPITokenService
 from bloom_lims.config import get_settings
 from bloom_lims.tapdb_adapter import BLOOMdb3
+from bloom_lims.attribution import verified_actor, verified_session, verified_token
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +209,6 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
     bdb = BLOOMdb3(app_username="api-token-auth")
     try:
         token_service = UserAPITokenService(bdb.session)
-        token_service.groups.ensure_system_groups()
         validation = token_service.validate_token(token_value)
         if (
             not validation.is_valid
@@ -222,6 +222,7 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             )
 
         token_row = validation.token
+        verified_token(str(token_row.id))
         try:
             constrained_roles, owner_groups = (
                 token_service.constrained_roles_for_token_owner(token=token_row)
@@ -292,6 +293,7 @@ async def get_api_user(
         )
 
     if hasattr(request, "session") and "user_data" in request.session:
+        verified_session(request)
         user_data = request.session.get("user_data", {})
         session_groups = user_data.get("service_groups")
         if not isinstance(session_groups, list):
@@ -342,6 +344,7 @@ async def get_api_user(
         if _cognito_get_user is not None:
             try:
                 claims = _cognito_get_user(credentials)
+                verified_actor(kind="human", issuer=claims["iss"], subject=claims["sub"])
                 request.state.auth_mode = "cognito"
                 request.state.authorized_by_email = claims.get("email", "token-user")
                 return _make_user(

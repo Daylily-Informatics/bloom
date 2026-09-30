@@ -69,11 +69,9 @@ class GroupService:
         self.repo.ensure_system_groups(SYSTEM_GROUP_CODES)
 
     def list_groups(self, include_inactive: bool = False) -> list[GroupRecord]:
-        self.ensure_system_groups()
         return self.repo.list_groups(include_inactive=include_inactive)
 
     def list_group_members(self, group_code: str) -> list[GroupMembershipRecord]:
-        self.ensure_system_groups()
         return self.repo.list_group_members(group_code=group_code)
 
     def add_user_to_group(
@@ -101,7 +99,6 @@ class GroupService:
         )
 
     def get_group_codes_for_user(self, user_id: str | None) -> list[str]:
-        self.ensure_system_groups()
         if not user_id:
             return []
         return self.repo.get_user_group_codes(user_id=user_id)

@@ -1,6 +1,7 @@
 """Bloom's native TapDB external-reference contract for Atlas identifiers."""
 
 from __future__ import annotations
+from bloom_lims.reference_preconditions import reference_preconditions, authority_preconditions
 
 import hashlib
 import json
@@ -256,6 +257,7 @@ def replace_references(
             service.detach(
                 source,
                 target,
+                **reference_preconditions(session, source, target, relation),
                 relationship_type=relation,
                 assertion_authority=ASSERTION_AUTHORITY,
                 deactivated_at=stamp,
@@ -289,6 +291,7 @@ def replace_references(
         source,
         ASSERTION_AUTHORITY,
         desired,
+        **authority_preconditions(session, source, ASSERTION_AUTHORITY),
         deactivated_at=stamp,
         deactivation_provenance=json.dumps(
             {"contract": PROVENANCE_CONTRACT, "operation": "replace"},
@@ -375,6 +378,7 @@ def replace_dewey_quant_reference(
         source,
         DEWEY_ASSERTION_AUTHORITY,
         desired,
+        **authority_preconditions(session, source, DEWEY_ASSERTION_AUTHORITY),
         deactivated_at=datetime.now(UTC),
         deactivation_provenance=json.dumps(
             {"contract": "bloom.dewey-reference/v1", "operation": "replace"},

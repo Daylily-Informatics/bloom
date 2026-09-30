@@ -222,7 +222,7 @@ requires-dist = [
     { name = "cli-core-yo", specifier = "==2.1.1" },
     { name = "daylily-auth-cognito", specifier = "==2.1.5" },
     { name = "daylily-carrier-tracking", specifier = "==0.5.1" },
-    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==10.1.4" },
+    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==11.0.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "djlint" },
     { name = "fastapi", specifier = ">=0.110.0" },
@@ -727,7 +727,7 @@ wheels = [
 
 [[package]]
 name = "daylily-tapdb"
-version = "10.1.4"
+version = "11.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cli-core-yo" },
@@ -741,9 +741,9 @@ dependencies = [
     { name = "typer" },
     { name = "uuid6" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d0/9b/9a7eecac0a58d6df0564ccab25381ffe9cfdfcfd04592237df004a7c25f5/daylily_tapdb-10.1.4.tar.gz", hash = "sha256:7f23b898ff2703622b616442a55f23892a7f4f8bfa24f9d67b0f794df43cb16b", size = 1356645, upload-time = "2026-09-13T08:46:20.618Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/67/4c/3f89cbac98875cd69b6f6234c7cb7cf325c7f804d73ee484fb11554b18d6/daylily_tapdb-11.0.0.tar.gz", hash = "sha256:2ac345c5af22604a35f7ed0f248dee194a86fe05b4cef2ea9f6d52443d16f04e", size = 1508968, upload-time = "2026-09-30T01:24:26.878Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/20/596a713372810f62141901c8c19458d3b52e1a54b41c2946be229bbda466/daylily_tapdb-10.1.4-py3-none-any.whl", hash = "sha256:c9fc9fab6548cbee39b07743fc0438148823ee576ebae7ad6254919d72b528dc", size = 676907, upload-time = "2026-09-13T08:46:19.086Z" },
+    { url = "https://files.pythonhosted.org/packages/83/85/f8bb5ae90a4a5934bd476edb484fb7973eba6014896439f46def443f7c49/daylily_tapdb-11.0.0-py3-none-any.whl", hash = "sha256:2772a9bbe3dc778378def4c2f368560062fe59353e5b30fbef2ceee2e5f62479", size = 744090, upload-time = "2026-09-30T01:24:25.199Z" },
 ]
 
 [package.optional-dependencies]
@@ -1713,7 +1713,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [

@@ -214,6 +214,8 @@ async def require_auth(request: Request):
     user_data = load_bloom_user_data(request)
     if not user_data:
         raise AuthenticationRequiredException()
+    from bloom_lims.attribution import verified_session
+    verified_session(request)
 
     if "role" not in user_data:
         user_data["role"] = "READ_WRITE"

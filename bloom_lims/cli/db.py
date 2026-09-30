@@ -298,6 +298,7 @@ def _seed_tapdb_templates(
     if not operator_user:
         raise RuntimeError("TapDB template preparation requires target.operator_user")
     with operator_connection(cfg, isolation_level="REPEATABLE READ") as connection:
+        from daylily_tapdb.security_context import invocation_attribution
         session = Session(bind=connection, expire_on_commit=False)
         apply_transaction_context(
             session,
@@ -308,6 +309,7 @@ def _seed_tapdb_templates(
                 owner_repo_name=ctx.owner_repo_name,
                 tenant_id=cfg.get("tenant_id") or None,
                 actor="bloom-cli",
+                attribution=invocation_attribution(),
                 allow_global_rows=bool(cfg.get("allow_global_claims")),
             ),
             assert_runtime_role=False,

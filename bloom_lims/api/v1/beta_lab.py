@@ -94,6 +94,9 @@ def _status_for_value_error(exc: ValueError) -> int:
 
 
 def _raise_beta_http_error(exc: Exception, *, logger_message: str) -> None:
+    from daylily_tapdb.revisions import RevisionConflict
+    if isinstance(exc, RevisionConflict):
+        raise HTTPException(status_code=409, detail="An object or relationship changed; reread before retrying") from exc
     if isinstance(exc, PermissionError):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     if isinstance(exc, TubeRequestNotFound):
