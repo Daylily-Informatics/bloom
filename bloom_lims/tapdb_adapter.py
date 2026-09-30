@@ -301,6 +301,7 @@ class BLOOMdb3:
             domain_code=self.domain_code,
             owner_repo_name=self.owner_repo_name,
             tenant_id=cfg.get("tenant_id") or None,
+            additional_tenant_ids=tuple(cfg["additional_tenant_ids"]),
             allow_global_rows=allow_global_rows,
             config_identity=str(cfg["config_path"]),
             connection_role="runtime",

@@ -10,12 +10,14 @@ from bloom_lims.domain.beta_lab_queue import _BetaLabQueueMixin
 from bloom_lims.domain.beta_lab_refs import _BetaLabReferenceMixin
 from bloom_lims.domain.beta_lab_stages import _BetaLabStagesMixin
 from bloom_lims.domain.beta_lab_store import _BetaLabStoreMixin
+from bloom_lims.domain.beta_lab_tubes import _BetaLabTubeRequestsMixin
 from bloom_lims.domain.execution_queue import ExecutionQueueService
 from bloom_lims.integrations.dewey.client import DeweyArtifactClient
 from bloom_lims.tapdb_adapter import BLOOMdb3
 
 
 class BetaLabService(
+    _BetaLabTubeRequestsMixin,
     _BetaLabMaterialsMixin,
     _BetaLabQueueMixin,
     _BetaLabStagesMixin,

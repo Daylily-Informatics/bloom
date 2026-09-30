@@ -13,8 +13,8 @@ from bloom_lims.template_identity import template_semantic_category
 class _BetaLabMaterialsMixin:
     @staticmethod
     def _validate_registration_properties(properties):
-        if "atlas_registration_tenant_id" in properties:
-            raise ValueError("Atlas registration tenant is managed by atlas_context, not object properties")
+        if any(key in properties for key in ("atlas_registration_tenant_id", "idempotency_key", "beta_kind", "request_digest", "request_key")):
+            raise ValueError("Registration identity and request metadata are managed by the service, not object properties")
 
     @staticmethod
     def _explicit_tube_name(properties):
@@ -166,63 +166,6 @@ class _BetaLabMaterialsMixin:
             },
         )
         response = self._material_response(specimen, created=True)
-        self.bdb.session.commit()
-        return response
-
-    def create_empty_tube(
-        self,
-        *,
-        payload,
-        idempotency_key: str | None,
-    ):
-        self._validate_registration_properties(payload.properties or {})
-        requested_name = self._explicit_tube_name(payload.properties)
-        if idempotency_key:
-            existing = self._find_container_record(
-                beta_kind="atlas_tube",
-                idempotency_key=idempotency_key,
-            )
-            if existing is not None:
-                return self._tube_response(existing, created=False)
-
-        container = self._resolve_or_create_container(
-            container_euid=None,
-            container_template_code=payload.container_template_code,
-            specimen_name="atlas-tube",
-            commit=False,
-        )
-        self._bind_atlas_registration_tenant(container, payload.atlas_context.model_dump())
-        container.bstatus = payload.status or container.bstatus
-        props = self._props(container)
-        props["beta_kind"] = "atlas_tube"
-        if idempotency_key:
-            props["idempotency_key"] = idempotency_key
-        if payload.properties:
-            props.update(payload.properties)
-        if requested_name is not None:
-            container.name = requested_name
-        self._write_props(container, props)
-        self._replace_container_entity_references(
-            container,
-            atlas_context=payload.atlas_context.model_dump(),
-        )
-        self._replace_fulfillment_item_references(
-            container,
-            atlas_context=payload.atlas_context.model_dump(),
-        )
-        self._record_action(
-            target_instance=container,
-            action_key="create_empty_tube",
-            captured_data={
-                "container_template_code": payload.container_template_code,
-                "status": payload.status,
-                "properties": payload.properties or {},
-                "atlas_context": payload.atlas_context.model_dump(),
-                "idempotency_key": idempotency_key or "",
-            },
-            result={"status": "success", "container_euid": container.euid},
-        )
-        response = BetaTubeResponse.model_validate(self._tube_response(container, created=True)).model_dump()
         self.bdb.session.commit()
         return response
 
