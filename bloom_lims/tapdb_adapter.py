@@ -369,6 +369,8 @@ class BLOOMdb3:
         def _reset_attribution_observation(_session, _previous_transaction):
             session.info.pop("bloom_installed_attribution", None)
 
+        from bloom_lims.revisions import install_revision_guard
+        install_revision_guard(session)
         return session
 
     def __enter__(self) -> "BLOOMdb3":

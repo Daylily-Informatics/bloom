@@ -43,6 +43,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
 
 from sqlalchemy.orm import Session
+from daylily_tapdb.revisions import RevisionConflict
 
 from bloom_lims.config import get_settings
 
@@ -95,6 +96,7 @@ class BatchJob:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     error: Optional[str] = None
+    error_code: Optional[int] = None
     results: List[Dict[str, Any]] = field(default_factory=list)
     errors: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -118,9 +120,15 @@ class BatchJob:
             if self.completed_at
             else None,
             "error": self.error,
+            "error_code": self.error_code,
             "result_count": len(self.results),
             "error_count": len(self.errors),
         }
+
+
+# Job receipts contain no sessions; request-owned adapters remain independent.
+_batch_jobs: Dict[str, BatchJob] = {}
+_batch_cancel_flags: Dict[str, bool] = {}
 
 
 class BatchProcessor:
@@ -149,8 +157,8 @@ class BatchProcessor:
         self._Base = bdb.Base
         self.chunk_size = chunk_size
         self.max_concurrent = max_concurrent
-        self._jobs: Dict[str, BatchJob] = {}
-        self._cancel_flags: Dict[str, bool] = {}
+        self._jobs = _batch_jobs
+        self._cancel_flags = _batch_cancel_flags
 
     def _chunks(self, items: List[T], size: int) -> Generator[List[T], None, None]:
         """Split list into chunks."""
@@ -189,6 +197,7 @@ class BatchProcessor:
         count: int,
         data_generator: Optional[Callable[[int], Dict[str, Any]]] = None,
         name_pattern: str = "Object_{index}",
+        job: Optional[BatchJob] = None,
     ) -> BatchJob:
         """
         Create multiple objects from a template.
@@ -202,7 +211,7 @@ class BatchProcessor:
         Returns:
             BatchJob with created object EUIDs
         """
-        job = self.create_job("bulk_create", count)
+        job = job if job is not None else self.create_job("bulk_create", count)
         job.status = JobStatus.RUNNING
         job.started_at = datetime.now(UTC)
 
@@ -246,6 +255,8 @@ class BatchProcessor:
                         job.progress.succeeded += 1
                         job.results.append({"index": i, "name": name})
 
+                    except RevisionConflict:
+                        raise
                     except Exception as e:
                         job.progress.failed += 1
                         job.errors.append({"index": i, "error": str(e)})
@@ -259,6 +270,12 @@ class BatchProcessor:
 
             job.status = JobStatus.COMPLETED
 
+        except RevisionConflict as e:
+            self._session.rollback()
+            job.status = JobStatus.FAILED
+            job.error = str(e)
+            job.error_code = 409
+            job.errors.append({"error": "revision_conflict", "detail": str(e), "status_code": 409})
         except Exception as e:
             job.status = JobStatus.FAILED
             job.error = str(e)
@@ -271,6 +288,7 @@ class BatchProcessor:
     async def bulk_update_objects(
         self,
         updates: List[Dict[str, Any]],
+        job: Optional[BatchJob] = None,
     ) -> BatchJob:
         """
         Update multiple objects by EUID.
@@ -281,7 +299,7 @@ class BatchProcessor:
         Returns:
             BatchJob with update results
         """
-        job = self.create_job("bulk_update", len(updates))
+        job = job if job is not None else self.create_job("bulk_update", len(updates))
         job.status = JobStatus.RUNNING
         job.started_at = datetime.now(UTC)
 
@@ -306,9 +324,11 @@ class BatchProcessor:
                         )
 
                         if obj:
-                            for key, value in item.items():
-                                if key != "euid" and hasattr(obj, key):
-                                    setattr(obj, key, value)
+                            changes = {key: value for key, value in item.items() if key != "euid"}
+                            if set(changes) - {"name", "bstatus", "json_addl", "is_deleted"}:
+                                raise ValueError("Batch updates accept only native mutable object fields")
+                            for key, value in changes.items():
+                                setattr(obj, key, value)
 
                             job.progress.succeeded += 1
                             job.results.append({"euid": euid, "status": "updated"})
@@ -316,6 +336,8 @@ class BatchProcessor:
                             job.progress.skipped += 1
                             job.errors.append({"euid": euid, "error": "not_found"})
 
+                    except RevisionConflict:
+                        raise
                     except Exception as e:
                         job.progress.failed += 1
                         job.errors.append({"euid": euid, "error": str(e)})
@@ -326,6 +348,12 @@ class BatchProcessor:
 
             job.status = JobStatus.COMPLETED
 
+        except RevisionConflict as e:
+            self._session.rollback()
+            job.status = JobStatus.FAILED
+            job.error = str(e)
+            job.error_code = 409
+            job.errors.append({"error": "revision_conflict", "detail": str(e), "status_code": 409})
         except Exception as e:
             job.status = JobStatus.FAILED
             job.error = str(e)
@@ -338,6 +366,7 @@ class BatchProcessor:
         self,
         euids: List[str],
         soft_delete: bool = True,
+        job: Optional[BatchJob] = None,
     ) -> BatchJob:
         """
         Delete multiple objects by EUID.
@@ -349,7 +378,7 @@ class BatchProcessor:
         Returns:
             BatchJob with deletion results
         """
-        job = self.create_job("bulk_delete", len(euids))
+        job = job if job is not None else self.create_job("bulk_delete", len(euids))
         job.status = JobStatus.RUNNING
         job.started_at = datetime.now(UTC)
 
@@ -378,6 +407,8 @@ class BatchProcessor:
                         else:
                             job.progress.skipped += 1
 
+                    except RevisionConflict:
+                        raise
                     except Exception as e:
                         job.progress.failed += 1
                         job.errors.append({"euid": euid, "error": str(e)})
@@ -388,6 +419,12 @@ class BatchProcessor:
 
             job.status = JobStatus.COMPLETED
 
+        except RevisionConflict as e:
+            self._session.rollback()
+            job.status = JobStatus.FAILED
+            job.error = str(e)
+            job.error_code = 409
+            job.errors.append({"error": "revision_conflict", "detail": str(e), "status_code": 409})
         except Exception as e:
             job.status = JobStatus.FAILED
             job.error = str(e)
@@ -457,6 +494,9 @@ async def bulk_create(
                 results["created"] += 1
 
             session.commit()
+        except RevisionConflict:
+            session.rollback()
+            raise
         except Exception as e:
             session.rollback()
             results["failed"] += len(chunk)
@@ -503,14 +543,19 @@ async def bulk_update(
                 )
 
                 if obj:
-                    for key, value in item.items():
-                        if key != id_field and hasattr(obj, key):
-                            setattr(obj, key, value)
+                    changes = {key: value for key, value in item.items() if key != id_field}
+                    if set(changes) - {"name", "bstatus", "json_addl", "is_deleted"}:
+                        raise ValueError("Batch updates accept only native mutable object fields")
+                    for key, value in changes.items():
+                        setattr(obj, key, value)
                     results["updated"] += 1
                 else:
                     results["not_found"] += 1
 
             session.commit()
+        except RevisionConflict:
+            session.rollback()
+            raise
         except Exception as e:
             session.rollback()
             results["failed"] += len(chunk)
@@ -564,6 +609,9 @@ async def bulk_delete(
                     results["not_found"] += 1
 
             session.commit()
+        except RevisionConflict:
+            session.rollback()
+            raise
         except Exception as e:
             session.rollback()
             results["failed"] += len(chunk)

@@ -59,3 +59,47 @@ def test_empty_authority_set_still_requires_source_revision(monkeypatch):
         list_for_source=lambda *_a, **_kw: {"items": [], "page": {"next_cursor": None}}))
     result = module.authority_preconditions(db, SimpleNamespace(record_revision=0), "test-authority")
     assert result == {"expected_source_revision": 0, "expected_lineage_revisions": {}}
+
+
+def test_sync_background_tasks_keep_actor_snapshot_and_clear_reused_thread():
+    from daylily_tapdb.security_context import Attribution
+    from bloom_lims.core.async_operations import BackgroundTaskManager
+
+    async def run():
+        manager = BackgroundTaskManager(max_workers=1)
+        try:
+            jobs = []
+            for subject in ("first-actor", "second-actor"):
+                value = Attribution("human", "test-authority", subject, "bloom", subject, subject)
+                with identities.explicit_attribution(value):
+                    jobs.append(await manager.submit(identities.current_attribution))
+            with identities.explicit_attribution(None):
+                jobs.append(await manager.submit(identities.current_attribution))
+            results = [await manager.get_result(job, timeout=2) for job in jobs]
+            assert [result.result.actor_subject for result in results[:2]] == ["first-actor", "second-actor"]
+            assert results[2].result is None
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(run())
+
+
+def test_batch_writers_authenticate_before_background_dispatch():
+    from bloom_lims.api.v1.batch import router
+    from bloom_lims.api.v1.dependencies import require_write
+
+    writers = [route for route in router.routes if route.path in
+               {"/batch/create", "/batch/update", "/batch/delete"}]
+    assert len(writers) == 3
+    assert all(any(dependency.call is require_write for dependency in route.dependant.dependencies)
+               for route in writers)
+
+
+def test_equipment_writers_require_verified_write_identity():
+    from bloom_lims.api.v1.equipment import router
+    from bloom_lims.api.v1.dependencies import require_write
+
+    writers = [route for route in router.routes if "POST" in route.methods]
+    assert len(writers) == 2
+    assert all(any(dependency.call is require_write for dependency in route.dependant.dependencies)
+               for route in writers)

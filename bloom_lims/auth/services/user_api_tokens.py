@@ -180,6 +180,7 @@ class UserAPITokenService:
         new_revision = self.repo.create_revision(
             token_id=token.id,
             revision_no=revision.revision_no + 1,
+            expected_revision=revision.record_revision,
             token_hash=revision.token_hash,
             status=TOKEN_STATUS_REVOKED,
             expires_at=revision.expires_at,
@@ -235,6 +236,7 @@ class UserAPITokenService:
         self.repo.create_revision(
             token_id=token.id,
             revision_no=revision.revision_no + 1,
+            expected_revision=revision.record_revision,
             token_hash=revision.token_hash,
             status=revision.status,
             expires_at=revision.expires_at,

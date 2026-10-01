@@ -37,7 +37,8 @@ class RequestDatabaseMiddleware:
             identity_token = begin_request()
             token = _request_databases.set(databases)
             try:
-                await self.app(scope, receive, send)
+                from bloom_lims.revisions import run_with_revision_response
+                await run_with_revision_response(self.app, scope, receive, send)
             finally:
                 _request_databases.reset(token)
                 end_request(identity_token)

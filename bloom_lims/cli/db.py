@@ -300,6 +300,8 @@ def _seed_tapdb_templates(
     with operator_connection(cfg, isolation_level="REPEATABLE READ") as connection:
         from daylily_tapdb.security_context import invocation_attribution
         session = Session(bind=connection, expire_on_commit=False)
+        from bloom_lims.revisions import install_revision_guard
+        install_revision_guard(session)
         apply_transaction_context(
             session,
             TapdbTransactionContext(

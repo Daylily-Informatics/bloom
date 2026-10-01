@@ -67,6 +67,7 @@ class UserTokenRecord:
 
 @dataclass(frozen=True)
 class UserTokenRevisionRecord:
+    record_revision: int
     id: str
     token_id: str
     revision_no: int
@@ -204,6 +205,7 @@ class TapdbUserAPITokenRepository:
         *,
         token_id: str,
         revision_no: int,
+        expected_revision: int,
         token_hash: str,
         status: str,
         expires_at: datetime,
@@ -218,6 +220,8 @@ class TapdbUserAPITokenRepository:
         token_instance = self._find_token_instance(token_id)
         if token_instance is None:
             raise ValueError(f"Unknown token_id: {token_id}")
+        from bloom_lims.revisions import expect_revision
+        expect_revision(self.db, token_instance, expected_revision)
         token_props = self._props(token_instance)
         token_props.update(
             {
@@ -360,6 +364,7 @@ class TapdbUserAPITokenRepository:
         if token_id is None or expires_at is None:
             return None
         return UserTokenRevisionRecord(
+            record_revision=revision_instance.record_revision,
             id=revision_id,
             token_id=token_id,
             revision_no=int(props.get("revision_no", 0)),

@@ -1,7 +1,8 @@
 """Explicit verified initiators for native TapDB 11 transactions."""
 
+from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import uuid4
 
 from daylily_tapdb.security_context import Attribution, invocation_attribution
@@ -11,6 +12,8 @@ from daylily_tapdb.security_context import Attribution, invocation_attribution
 class RequestIdentity:
     request_id: str
     attribution: Attribution | None = None
+    revision_conflict: str | None = None
+    conflicted_sessions: list = field(default_factory=list)
 
 
 _identity: ContextVar[RequestIdentity | None] = ContextVar("bloom_write_identity", default=None)
@@ -60,3 +63,34 @@ def verified_token(token_id: str):
     issuer = build_bloom_web_session_config().public_base_url.rstrip("/") + "/auth/api-token"
     # This authenticates a delegated credential, not an asserted upstream human.
     return verified_actor(kind="service", issuer=issuer, subject=token_id)
+
+
+@contextmanager
+def explicit_attribution(value: Attribution | None):
+    """Snapshot one task's initiator; never inherit a reused executor's actor."""
+    token = _identity.set(RequestIdentity(value.request_id if value else str(uuid4()), value))
+    try:
+        yield
+    finally:
+        _identity.reset(token)
+
+
+def record_revision_conflict(message: str, session=None) -> None:
+    state = _identity.get()
+    if state is not None:
+        state.revision_conflict = message
+        if session is not None and session not in state.conflicted_sessions:
+            state.conflicted_sessions.append(session)
+
+
+def current_revision_conflict() -> str | None:
+    state = _identity.get()
+    return state.revision_conflict if state is not None else None
+
+
+def rollback_conflicted_sessions() -> None:
+    """Called after ORM execution unwinds, before returning a conflict response."""
+    state = _identity.get()
+    if state is not None:
+        while state.conflicted_sessions:
+            state.conflicted_sessions.pop().rollback()
