@@ -222,7 +222,7 @@ requires-dist = [
     { name = "cli-core-yo", specifier = "==2.1.1" },
     { name = "daylily-auth-cognito", specifier = "==2.1.5" },
     { name = "daylily-carrier-tracking", specifier = "==0.5.1" },
-    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==11.0.1" },
+    { name = "daylily-tapdb", extras = ["aurora", "gui"], specifier = "==11.0.2" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "djlint" },
     { name = "fastapi", specifier = ">=0.110.0" },
@@ -727,7 +727,7 @@ wheels = [
 
 [[package]]
 name = "daylily-tapdb"
-version = "11.0.1"
+version = "11.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cli-core-yo" },
@@ -741,9 +741,9 @@ dependencies = [
     { name = "typer" },
     { name = "uuid6" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/5d/5dff1f912e01c78e6169e36001cc8bc7312331602aafbb2f5bc3d1845fd3/daylily_tapdb-11.0.1.tar.gz", hash = "sha256:bd646f98fb02b1d3e907bf55ada2273d684eae242f2b3d5fa697ec4ed18f9dd2", size = 1519143, upload-time = "2026-09-30T21:37:29.298Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/02/ee1a82b1c34f156aab6a5d8e16d4682e803435bb3f1e193aa7b3afef705c/daylily_tapdb-11.0.2.tar.gz", hash = "sha256:8dbb7bed5c63e0d9bd438a9daeace1b2be359e0c3a56287db054ad7e4d9fda75", size = 1529156, upload-time = "2026-10-02T00:20:48.862Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/aa/cdddd574a86db98bd377d3537232a9170d53f34556c24fdb34e2e1c5b846/daylily_tapdb-11.0.1-py3-none-any.whl", hash = "sha256:ab7c74e127dd18433bf72eb4698ee0220a47a9573dd3a089512cd263451dfd64", size = 746537, upload-time = "2026-09-30T21:37:27.105Z" },
+    { url = "https://files.pythonhosted.org/packages/24/8d/4bd6109ce7519e759547540265c67eef1ea977874a0d0b95d62d483bb0a3/daylily_tapdb-11.0.2-py3-none-any.whl", hash = "sha256:9dd729bcff1c013df0ebb7d04c41ebed39a39158dfce80fc16865deb183da813", size = 752851, upload-time = "2026-10-02T00:20:47.23Z" },
 ]
 
 [package.optional-dependencies]
