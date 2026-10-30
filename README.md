@@ -139,3 +139,7 @@ Read [AGENTS.md](AGENTS.md) for the controlling workflow and [TapDB 10 operation
 - [`docs/old_docs/`](docs/old_docs/): historical material only.
 
 Current Bloom language should use Container and Material separation. Order, OrderTest, SubjectRef, AccessionCase, and fulfillment semantics are Atlas-owned or cross-service references, not Bloom-owned order lifecycle objects.
+
+## Analysis pipelines through Ursa
+
+See [the eleven-command API guide and service responsibilities](docs/analysis-pipelines-via-ursa.md).

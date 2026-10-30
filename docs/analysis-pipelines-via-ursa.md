@@ -1,0 +1,5 @@
+# Analysis pipelines through Ursa
+
+The [versioned Ursa API guide](https://github.com/lsmc-bio/daylily-ursa/blob/14.1.104/docs/analysis-pipelines-via-ursa.md) documents all eleven production catalog commands, exact policy-mode submissions, idempotent replay, job/execution monitoring, failure evidence, full-root S3 results, Dewey registration and native cleanup. Its release contract is Ursa14.1.104 / DYEC22.0.1 / DayOA20.0.0; actual deployment and catalog publication are separate facts.
+
+Bloom owns sequencing-run identities, platform metadata and biological relationships. Register or reuse the exact completed run through Bloom before Ursa SeqQC admission. The client supplies that persisted identity in `sequencing_context`; fixture labels are never EUIDs. Sample analyses require explicit approved biological bindings; neither Bloom documentation nor Ursa admission implies an inferred Illumina/ONT pairing. Cross-service relationships use typed external references and lineage. This is a documentation-only release; Bloom runtime behavior is unchanged.
