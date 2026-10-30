@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
+from daylily_tapdb.web.dag_v2 import validate_dag_v2_manifest
 
 
 class DeweyClientError(RuntimeError):
@@ -40,6 +41,45 @@ class DeweyArtifactClient:
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
+
+    def require_persisted_artifact(self, artifact_euid: str) -> dict[str, Any]:
+        """Verify an exact owner-issued artifact through Dewey's native DAG contract."""
+        value = str(artifact_euid or "")
+        if not value or value != value.strip():
+            raise DeweyClientError("Dewey artifact EUID must be exact")
+        base = _require_https_url(self.base_url, field_name="Dewey base URL")
+        try:
+            manifest_response = requests.get(
+                f"{base}/api/dag/manifest", headers=self._headers(),
+                timeout=max(1, int(self.timeout_seconds)), verify=self.verify_ssl,
+            )
+            manifest_response.raise_for_status()
+            reason = validate_dag_v2_manifest(
+                manifest_response.json(), expected_service_id="dewey"
+            )
+            if reason is not None:
+                raise DeweyClientError(f"Dewey native manifest rejected: {reason.value}")
+            from urllib.parse import quote
+
+            response = requests.get(
+                f"{base}/api/dag/v2/object/{quote(value, safe='')}",
+                headers=self._headers(), timeout=max(1, int(self.timeout_seconds)),
+                verify=self.verify_ssl,
+            )
+            response.raise_for_status()
+            body = response.json()
+        except (requests.RequestException, ValueError) as exc:
+            raise DeweyClientError(f"Dewey native artifact lookup failed: {exc}") from exc
+        if (
+            not isinstance(body, dict)
+            or body.get("service_id") != "dewey"
+            or body.get("euid") != value
+            or body.get("record_type") != "instance"
+            or body.get("category") != "data"
+            or body.get("type") != "artifact"
+        ):
+            raise DeweyClientError("Dewey native object is not the exact artifact")
+        return body
 
     def register_artifact(
         self,

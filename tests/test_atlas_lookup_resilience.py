@@ -6,8 +6,11 @@ import hashlib
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
 import bloom_lims.integrations.atlas.client as atlas_client_mod
 import bloom_lims.integrations.atlas.service as atlas_service_mod
+from bloom_lims.atlas_references import require_atlas_owner_kind
 from bloom_lims.integrations.atlas.client import AtlasClient, AtlasClientError
 from bloom_lims.integrations.atlas.service import AtlasDependencyError, AtlasService
 
@@ -58,6 +61,69 @@ def test_atlas_client_does_not_fall_back_to_legacy_trf_lookup_path(monkeypatch):
 
     assert len(calls) == 1
     assert calls[0].endswith("/api/integrations/bloom/v1/lookups/trfs/TRF-101")
+
+
+def test_atlas_client_requires_exact_native_owner_scope(monkeypatch):
+    calls = []
+    tenant_id = "28ce303b-0712-402b-927e-b770c5979fcf"
+
+    def fake_get(url, headers=None, timeout=None, verify=None):
+        calls.append((url, headers))
+        if url.endswith("/api/dag/manifest"):
+            return _FakeResponse(200, {"service_id": "atlas"})
+        return _FakeResponse(200, {
+            "service_id": "atlas", "euid": "owner-issued-value",
+            "record_type": "instance", "tenant_id": tenant_id,
+        })
+
+    monkeypatch.setattr(atlas_client_mod.requests, "get", fake_get)
+    monkeypatch.setattr(atlas_client_mod, "validate_dag_v2_manifest", lambda payload, expected_service_id: None)
+    client = AtlasClient(base_url="https://atlas.example.org", token="tok")
+
+    receipt = client.require_native_object("owner-issued-value")
+    assert receipt["tenant_id"] == tenant_id
+    assert [url for url, _ in calls] == [
+        "https://atlas.example.org/api/dag/manifest",
+        "https://atlas.example.org/api/dag/v2/object/owner-issued-value",
+    ]
+    assert all(headers["Authorization"] == "Bearer tok" for _, headers in calls)
+
+
+def test_atlas_service_native_owner_uses_separate_dag_read_token(monkeypatch):
+    settings = SimpleNamespace(atlas=SimpleNamespace(
+        base_url="https://atlas.example.org", token="integration-token",
+        dag_read_token="dag-read-token", timeout_seconds=5, verify_ssl=True,
+        cache_ttl_seconds=60, organization_id="",
+    ))
+    monkeypatch.setattr(atlas_service_mod, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        atlas_client_mod, "validate_dag_v2_manifest",
+        lambda payload, expected_service_id: None,
+    )
+    calls = []
+
+    def fake_get(url, headers=None, timeout=None, verify=None):
+        calls.append(headers["Authorization"])
+        if url.endswith("/api/dag/manifest"):
+            return _FakeResponse(200, {"service_id": "atlas"})
+        return _FakeResponse(200, {
+            "service_id": "atlas", "euid": "owner-issued-value",
+            "record_type": "instance", "tenant_id": None,
+        })
+
+    monkeypatch.setattr(atlas_client_mod.requests, "get", fake_get)
+    service = AtlasService()
+    service.owner_client.require_native_object("owner-issued-value")
+    assert calls == ["Bearer dag-read-token", "Bearer dag-read-token"]
+    assert service.client.token == "integration-token"
+
+
+def test_atlas_owner_kind_is_checked_against_native_template():
+    receipt = {"category": "fulfillment", "type": "fulfillment-slot",
+               "subtype": "generic", "version": "1.0"}
+    require_atlas_owner_kind("atlas_test_fulfillment_item", receipt)
+    with pytest.raises(ValueError, match="owner kind differs"):
+        require_atlas_owner_kind("atlas_patient", receipt)
 
 
 def test_atlas_service_returns_stale_cached_payload_on_upstream_error(monkeypatch):

@@ -5,17 +5,33 @@ from __future__ import annotations
 from bloom_lims.schemas.beta_lab import (
     BetaAcceptedMaterialCreateRequest,
     BetaMaterialResponse,
+    BetaTubeResponse,
 )
 from bloom_lims.template_identity import template_semantic_category
 
 
 class _BetaLabMaterialsMixin:
+    @staticmethod
+    def _validate_registration_properties(properties):
+        if any(key in properties for key in ("atlas_registration_tenant_id", "idempotency_key", "beta_kind", "request_digest", "request_key")):
+            raise ValueError("Registration identity and request metadata are managed by the service, not object properties")
+
+    @staticmethod
+    def _explicit_tube_name(properties):
+        if "name" not in properties:
+            return None
+        name = properties["name"]
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Tube name must be a nonblank string when provided")
+        return name
+
     def register_accepted_material(
         self,
         *,
         payload: BetaAcceptedMaterialCreateRequest,
         idempotency_key: str | None,
     ) -> BetaMaterialResponse:
+        self._validate_registration_properties(payload.properties)
         if idempotency_key:
             existing = self._find_content_record(
                 beta_kind="accepted_material",
@@ -28,11 +44,15 @@ class _BetaLabMaterialsMixin:
             container_euid=payload.container_euid,
             container_template_code=payload.container_template_code,
             specimen_name=payload.specimen_name or "accepted-material",
+            commit=False,
         )
+        self._bind_atlas_registration_tenant(container, payload.atlas_context.model_dump())
         specimen = self.bobj.create_instance_by_code(
             payload.specimen_template_code,
             {"json_addl": {"properties": payload.properties or {}}},
+            commit=False,
         )
+        self._bind_atlas_registration_tenant(specimen, payload.atlas_context.model_dump())
         specimen.bstatus = payload.status or specimen.bstatus
         specimen_props = self._props(specimen)
         specimen_props["beta_kind"] = "accepted_material"
@@ -145,58 +165,9 @@ class _BetaLabMaterialsMixin:
                 "container_euid": container.euid if container is not None else None,
             },
         )
+        response = self._material_response(specimen, created=True)
         self.bdb.session.commit()
-        return self._material_response(specimen, created=True)
-
-    def create_empty_tube(
-        self,
-        *,
-        payload,
-        idempotency_key: str | None,
-    ):
-        if idempotency_key:
-            existing = self._find_container_record(
-                beta_kind="atlas_tube",
-                idempotency_key=idempotency_key,
-            )
-            if existing is not None:
-                return self._tube_response(existing, created=False)
-
-        container = self._resolve_or_create_container(
-            container_euid=None,
-            container_template_code=payload.container_template_code,
-            specimen_name="atlas-tube",
-        )
-        container.bstatus = payload.status or container.bstatus
-        props = self._props(container)
-        props["beta_kind"] = "atlas_tube"
-        if idempotency_key:
-            props["idempotency_key"] = idempotency_key
-        if payload.properties:
-            props.update(payload.properties)
-        self._write_props(container, props)
-        self._replace_container_entity_references(
-            container,
-            atlas_context=payload.atlas_context.model_dump(),
-        )
-        self._replace_fulfillment_item_references(
-            container,
-            atlas_context=payload.atlas_context.model_dump(),
-        )
-        self._record_action(
-            target_instance=container,
-            action_key="create_empty_tube",
-            captured_data={
-                "container_template_code": payload.container_template_code,
-                "status": payload.status,
-                "properties": payload.properties or {},
-                "atlas_context": payload.atlas_context.model_dump(),
-                "idempotency_key": idempotency_key or "",
-            },
-            result={"status": "success", "container_euid": container.euid},
-        )
-        self.bdb.session.commit()
-        return self._tube_response(container, created=True)
+        return response
 
     def update_tube(
         self,
@@ -204,6 +175,8 @@ class _BetaLabMaterialsMixin:
         container_euid: str,
         payload,
     ):
+        self._validate_registration_properties(payload.properties or {})
+        requested_name = self._explicit_tube_name(payload.properties or {})
         container = self._require_instance(container_euid)
         template = self._require_template(
             f"{container.category}/{container.type}/{container.subtype}/{container.version}"
@@ -217,8 +190,11 @@ class _BetaLabMaterialsMixin:
         if payload.properties:
             props.update(payload.properties)
             self._write_props(container, props)
+        if requested_name is not None:
+            container.name = requested_name
         if payload.atlas_context is not None:
             atlas_context = payload.atlas_context.model_dump()
+            self._bind_atlas_registration_tenant(container, atlas_context)
             self._replace_container_entity_references(
                 container, atlas_context=atlas_context
             )
@@ -245,8 +221,9 @@ class _BetaLabMaterialsMixin:
                 "current_status": container.bstatus,
             },
         )
+        response = BetaTubeResponse.model_validate(self._tube_response(container, created=True)).model_dump()
         self.bdb.session.commit()
-        return self._tube_response(container, created=True)
+        return response
 
     def update_specimen(
         self,
@@ -254,6 +231,7 @@ class _BetaLabMaterialsMixin:
         specimen_euid: str,
         payload,
     ):
+        self._validate_registration_properties(payload.properties or {})
         specimen = self._require_instance(specimen_euid)
         template = self._require_template(
             f"{specimen.category}/{specimen.type}/{specimen.subtype}/{specimen.version}"
@@ -269,6 +247,7 @@ class _BetaLabMaterialsMixin:
             self._write_props(specimen, props)
         if payload.atlas_context is not None:
             atlas_context = payload.atlas_context.model_dump()
+            self._bind_atlas_registration_tenant(specimen, atlas_context)
             self._replace_collection_event_reference(
                 specimen, atlas_context=atlas_context
             )
@@ -299,8 +278,9 @@ class _BetaLabMaterialsMixin:
                 "current_status": specimen.bstatus,
             },
         )
+        response = self._material_response(specimen, created=True)
         self.bdb.session.commit()
-        return self._material_response(specimen, created=True)
+        return response
 
     def _material_response(self, specimen, *, created: bool) -> BetaMaterialResponse:
         atlas_context = dict(self._atlas_context_for_instance(specimen))

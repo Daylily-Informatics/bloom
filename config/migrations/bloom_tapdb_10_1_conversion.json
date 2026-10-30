@@ -1,0 +1,52 @@
+{
+  "archive": {
+    "graph_path": "properties.external_payload.tapdb_graph",
+    "root_key": "bloom_tapdb10_archive"
+  },
+  "expected": {
+    "legacy_bgx_active": 160,
+    "legacy_bgx_deleted": 26,
+    "legacy_bgx_total": 186,
+    "legacy_dispositions": {
+      "canonical_atlas": 182,
+      "canonical_dewey": 1,
+      "unresolved_orphan": 3
+    },
+    "missing_properties_sys": 50,
+    "retired_graph_entries": 393,
+    "retired_graph_rows": 93,
+    "archived_graph_rows": 21,
+    "archived_graph_entries": 111,
+    "unresolved_graph_rows": 72,
+    "unresolved_graph_entries": 282,
+    "mixed_graph_rows": 0,
+    "empty_graph_rows": 0,
+    "retired_graph_rows_by_prefix": {
+      "BCN": 30,
+      "BCT": 47,
+      "BDT": 6,
+      "BNB": 9,
+      "BNS": 1
+    }
+  },
+  "legacy_reference": {
+    "category": "generic",
+    "euid_prefix": "BGX",
+    "relationship_type": "has_external_reference",
+    "subtype": "external_object_link",
+    "type": "generic"
+  },
+  "schema_version": "bloom-tapdb10-conversion-manifest/v1",
+  "target": {
+    "allow_global_claims": true,
+    "client_id": "bloom",
+    "database": "tapdb_bloom_prod",
+    "database_name": "bloom-day",
+    "domain_code": "M",
+    "engine_type": "aurora",
+    "operator_user": "dayhoff",
+    "owner_repo_name": "bloom",
+    "runtime_user": "bloom_runtime_10",
+    "schema_name": "tapdb_bloom_lsmcok1_local"
+  }
+}

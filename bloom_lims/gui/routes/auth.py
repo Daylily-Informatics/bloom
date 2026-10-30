@@ -292,6 +292,8 @@ def _build_bloom_principal(decoded_token: dict) -> tuple[SessionPrincipal, dict]
             )
 
     cognito_sub = decoded_token.get("sub")
+    from bloom_lims.attribution import verified_actor
+    verified_actor(kind="human", issuer=decoded_token["iss"], subject=cognito_sub)
     cognito_groups = decoded_token.get("cognito:groups")
     identity_groups = (
         [str(item).strip() for item in cognito_groups if str(item).strip()]
@@ -434,8 +436,10 @@ def _build_bloom_principal_from_external_broker(
         str(group).strip() for group in user.get("groups") or [] if str(group).strip()
     ]
     subject = str(
-        user.get("canonical_user_id") or user.get("sub") or user.get("user_id") or email
+        user.get("canonical_user_id") or user.get("sub") or user.get("user_id") or ""
     )
+    from bloom_lims.attribution import verified_actor
+    verified_actor(kind="human", issuer=broker.login_url, subject=subject)
     try:
         service_roles, service_groups, resolved_user_id, persisted_role = (
             _resolve_login_roles_and_groups(

@@ -1,12 +1,12 @@
 # Bloom APIs
 
-This document describes the current HTTP surface that the Bloom app mounts today. It is grounded in `bloom_lims/api/v1/__init__.py`, the router modules under `bloom_lims/api/v1/`, and the current API-focused test suite.
+This document describes the current HTTP surface that the Bloom app mounts today. It is grounded in `bloom_lims/api/v1/__init__.py`, the router modules under `bloom_lims/api/v1/`, and `bloom_lims/tapdb_dag.py`. Existing test files are reference material and are not a release execution requirement.
 
 ## API Design Rules
 
 Current API behavior has a few consistent patterns:
 
-- The primary contract is versioned under `/api/v1`.
+- Bloom application APIs use `/api/v1`; native TapDB DAG v2 uses `/api/dag/v2` and its published manifest.
 - Payloads are EUID-centered. Many tests explicitly assert that internal UUID fields are not exposed in response payloads.
 - Read/write authorization is RBAC-based, with three main roles: `READ_ONLY`, `READ_WRITE`, and `ADMIN`.
 - External integration routes add group gates on top of token auth, especially `API_ACCESS`, `ENABLE_ATLAS_API`, and `ENABLE_URSA_API`.
@@ -71,7 +71,9 @@ For Atlas-facing automation, a valid bearer token is necessary but not sufficien
 | Execution queue | `/api/v1/execution` | read/write/admin by action | operator-facing |
 | Batch jobs | `/api/v1/batch` | general API auth | operator-facing |
 | Async tasks | `/api/v1/tasks` | general API auth | operator-facing |
-| Graph v1 | `/api/v1/graph` | general API auth | minimal stable surface |
+| Bloom graph helpers | `/api/v1/graph` | general API auth | Bloom-specific, not the native TapDB DAG contract |
+| Native TapDB DAG v2 | `/api/dag/v2` | Bloom API auth | advertised `tapdb.dag_v2` / `dag:v2`; manifest at `/api/dag/manifest` |
+| Lab actions | `/api/v1/lab-actions` | read/write by operation | wet-lab operator actions |
 | External specimens | `/api/v1/external/specimens` | external token auth plus Atlas enablement | integration-specific |
 | Atlas bridge | `/api/v1/external/atlas` | external token auth plus Atlas enablement | integration-specific |
 | Beta lab | `/api/v1/external/atlas/beta` | external token auth plus Atlas enablement | beta/integration-specific |
@@ -185,7 +187,20 @@ Legacy `/api/v1/search` and `/api/v1/search/export` routes are removed.
 
 ## Graph And Lineage
 
-### Versioned Graph API
+### Native TapDB DAG v2
+
+The pinned TapDB web integration mounts:
+
+- `GET /api/dag/manifest`
+- `GET /api/dag/v2/object/{euid}`
+- `GET /api/dag/v2/data`
+- `GET /api/dag/v2/search`
+
+Bloom's public integration delegates authentication through `require_api_auth`, returning the identity mapping expected by TapDB. Application limits are maximum depth 12, maximum nodes 2,000 and maximum search page size 100. The native manifest describes the actual endpoint contract. `/obs_services` advertises `tapdb.dag_v2` and exact `tapdb_dag_contract_version=dag:v2`; Kahlo requires both, without v1 fallback.
+
+A consumer token needs a persisted owner visible in the intended Bloom namespace, an explicit Bloom role and an allowed scope. For read-only consumption use an explicitly READ_ONLY owner plus `internal_ro`; limiting an ADMIN-only token to `internal_ro` does not synthesize a READ_ONLY role. Preserve original credentials and identities when adding a separate service reader. See [TapDB 10 operations](tapdb_10_operations.md#native-graph-and-read-only-consumers).
+
+### Bloom-Specific Graph API
 
 The versioned graph router is intentionally small:
 
@@ -205,7 +220,7 @@ The richer graph viewer used by the GUI is not under `/api/v1`. It currently liv
 - `POST /api/lineage`
 - `DELETE /api/object/{euid}`
 
-That split matters for clients. If you are writing service-to-service code, prefer the versioned routes. If you are extending the graph browser, you will also touch the GUI helper endpoints.
+These helper APIs remain mounted for Bloom-specific behavior. New native graph consumers use `/api/dag/v2/*` and its manifest. Do not interpret `/api/v1/graph` as a native TapDB DAG v1 fallback.
 
 Example graph data response shape from tests:
 
@@ -216,7 +231,7 @@ Example graph data response shape from tests:
     "edges": [{"data": {"id": "E1", "source": "N1", "target": "N2"}}]
   },
   "meta": {
-    "start_euid": "AY1",
+    "start_euid": "<persisted-start-euid>",
     "depth": 3
   }
 }

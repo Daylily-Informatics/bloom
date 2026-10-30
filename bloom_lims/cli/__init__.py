@@ -10,6 +10,8 @@ from cli_core_yo.app import create_app as _create_app
 from cli_core_yo.app import run
 from cli_core_yo.spec import (
     CliSpec,
+    ContextOptionSpec,
+    InvocationContextSpec,
     ConfigSpec,
     EnvSpec,
     PluginSpec,
@@ -115,6 +117,10 @@ spec = CliSpec(
         activate_script_name=f"{ACTIVATE_SCRIPT} <deploy-name>",
         deactivate_script_name=DEACTIVATE_SCRIPT,
     ),
+    context=InvocationContextSpec(options=[ContextOptionSpec(
+        name="attribution", option_flags=("--attribution",), value_type="str",
+        help="Path to an explicit TapDB v1 attribution JSON envelope for database writes.",
+    )]),
     plugins=PluginSpec(
         explicit=[
             "bloom_lims.cli.server.register",

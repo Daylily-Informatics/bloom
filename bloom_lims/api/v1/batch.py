@@ -7,14 +7,17 @@ Endpoints for bulk processing operations.
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from bloom_lims.core.batch_operations import (
     BatchProcessor,
     JobStatus,
-    get_batch_processor,
+    _batch_jobs,
+    _batch_cancel_flags,
 )
+
+from .dependencies import require_write
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +78,7 @@ def get_bdb():
     return BLOOMdb3()
 
 
-@router.post("/create", response_model=JobResponse)
+@router.post("/create", response_model=JobResponse, dependencies=[Depends(require_write)])
 async def bulk_create_objects(
     request: BulkCreateRequest,
     background_tasks: BackgroundTasks,
@@ -105,6 +108,7 @@ async def bulk_create_objects(
                 count=request.count,
                 data_generator=data_gen,
                 name_pattern=request.name_pattern,
+                job=job,
             )
 
         background_tasks.add_task(run_job)
@@ -126,7 +130,7 @@ async def bulk_create_objects(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/update", response_model=JobResponse)
+@router.post("/update", response_model=JobResponse, dependencies=[Depends(require_write)])
 async def bulk_update_objects(
     request: BulkUpdateRequest,
     background_tasks: BackgroundTasks,
@@ -143,7 +147,7 @@ async def bulk_update_objects(
         job = processor.create_job("bulk_update", len(request.updates))
 
         async def run_job():
-            await processor.bulk_update_objects(request.updates)
+            await processor.bulk_update_objects(request.updates, job=job)
 
         background_tasks.add_task(run_job)
 
@@ -164,7 +168,7 @@ async def bulk_update_objects(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/delete", response_model=JobResponse)
+@router.post("/delete", response_model=JobResponse, dependencies=[Depends(require_write)])
 async def bulk_delete_objects(
     request: BulkDeleteRequest,
     background_tasks: BackgroundTasks,
@@ -184,6 +188,7 @@ async def bulk_delete_objects(
             await processor.bulk_delete_objects(
                 euids=request.euids,
                 soft_delete=request.soft_delete,
+                job=job,
             )
 
         background_tasks.add_task(run_job)
@@ -212,8 +217,7 @@ async def list_batch_jobs(
 ):
     """List all batch jobs with optional status filter."""
     try:
-        processor = get_batch_processor()
-        jobs = processor.get_all_jobs()
+        jobs = list(_batch_jobs.values())
 
         if status:
             jobs = [j for j in jobs if j.status.value == status]
@@ -232,8 +236,7 @@ async def list_batch_jobs(
 async def get_batch_job(job_id: str):
     """Get batch job status and progress."""
     try:
-        processor = get_batch_processor()
-        job = processor.get_job(job_id)
+        job = _batch_jobs.get(job_id)
 
         if not job:
             raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
@@ -258,9 +261,8 @@ async def get_batch_job(job_id: str):
 async def cancel_batch_job(job_id: str):
     """Request cancellation of a running batch job."""
     try:
-        processor = get_batch_processor()
-
-        if processor.cancel_job(job_id):
+        if job_id in _batch_cancel_flags:
+            _batch_cancel_flags[job_id] = True
             return {
                 "success": True,
                 "message": f"Cancellation requested for job {job_id}",

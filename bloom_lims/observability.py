@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import socket
 from collections import Counter, deque
+from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from math import ceil
@@ -130,7 +132,12 @@ class FamilyRollup:
 
 
 class BloomObservabilityStore:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        dag_advertisement: dict[str, Any],
+        mounted_route_paths: Callable[[], set[str]],
+    ) -> None:
         self._lock = RLock()
         self._started_at = _utcnow()
         self._endpoint_rollups: dict[tuple[str, str], EndpointRollup] = {}
@@ -138,7 +145,9 @@ class BloomObservabilityStore:
         self._db_probes: deque[dict[str, Any]] = deque(maxlen=25)
         self._auth_recent: deque[dict[str, Any]] = deque(maxlen=25)
         self._auth_status_counts: Counter[str] = Counter()
-        self._obs_services_snapshot = self._build_obs_services_snapshot()
+        self._dag_advertisement = deepcopy(dag_advertisement)
+        bloom_tapdb_dag_obs_services_fragment(self._dag_advertisement)
+        self._mounted_route_paths = mounted_route_paths
 
     @property
     def started_at(self) -> str:
@@ -158,7 +167,9 @@ class BloomObservabilityStore:
     def _managed_services(self) -> list[dict[str, Any]]:
         return []
 
-    def _build_obs_services_snapshot(self) -> dict[str, Any]:
+    def _build_obs_services_snapshot(
+        self, *, dag_advertisement: dict[str, Any]
+    ) -> dict[str, Any]:
         snapshot = {
             "status": "ok",
             "endpoints": [
@@ -218,9 +229,9 @@ class BloomObservabilityStore:
                 "observed_services": [],
             },
             "managed_services": self._managed_services(),
-            "observed_at": self._started_at,
+            "observed_at": _utcnow(),
         }
-        fragment = bloom_tapdb_dag_obs_services_fragment()
+        fragment = bloom_tapdb_dag_obs_services_fragment(dag_advertisement)
         known_endpoints = {
             (str(item.get("path") or ""), str(item.get("kind") or ""))
             for item in snapshot["endpoints"]
@@ -330,19 +341,17 @@ class BloomObservabilityStore:
             self._auth_status_counts[status] += 1
 
     def obs_services_snapshot(self) -> tuple[ProjectionMetadata, dict[str, Any]]:
-        snapshot = dict(self._obs_services_snapshot)
-        dependencies = snapshot.get("dependencies")
-        if isinstance(dependencies, dict):
-            snapshot["dependencies"] = {
-                "configured_services": list(
-                    dependencies.get("configured_services") or []
-                ),
-                "observed_services": list(dependencies.get("observed_services") or []),
-            }
-        snapshot["managed_services"] = [
-            dict(item) for item in snapshot.get("managed_services") or []
-        ]
-        observed_at = str(snapshot.get("observed_at") or self._started_at)
+        # Re-observe the current process's mounted contract and configured inventory.
+        # Endpoint liveness/readiness remains a separate probe, not an inferred claim.
+        snapshot = self._build_obs_services_snapshot(
+            dag_advertisement=self._dag_advertisement
+        )
+        mounted_paths = self._mounted_route_paths()
+        missing = sorted({item["path"] for item in snapshot["endpoints"]} - mounted_paths)
+        if missing:
+            raise RuntimeError("Advertised Bloom capability routes are not mounted: " + ", ".join(missing))
+        observed_at = _utcnow()
+        snapshot["observed_at"] = observed_at
         return self.projection(observed_at=observed_at), snapshot
 
     def api_health(self) -> tuple[ProjectionMetadata, list[dict[str, Any]]]:
@@ -477,7 +486,7 @@ def base_frame(request: Request, *, status: str) -> dict[str, Any]:
     return {
         "contract_version": CONTRACT_VERSION,
         "service": SERVICE_NAME,
-        "environment": settings.environment,
+        "environment": settings.deployment.name,
         "instance_id": _instance_id(),
         "observed_at": _utcnow(),
         "status": status,

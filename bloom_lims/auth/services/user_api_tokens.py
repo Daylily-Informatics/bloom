@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from daylily_tapdb.user_authorization import resolve_user_authorization
 from sqlalchemy.orm import Session
 
 from bloom_lims.auth.rbac import (
@@ -24,7 +25,6 @@ from bloom_lims.auth.repositories.tapdb.user_api_tokens import (
     UserTokenRevisionRecord,
     UserTokenUsageRecord,
 )
-from bloom_lims.auth.repositories.tapdb.users import resolve_user_record
 from bloom_lims.auth.services.groups import GroupService
 
 TOKEN_PREFIX = "blm_"
@@ -180,6 +180,7 @@ class UserAPITokenService:
         new_revision = self.repo.create_revision(
             token_id=token.id,
             revision_no=revision.revision_no + 1,
+            expected_revision=revision.record_revision,
             token_hash=revision.token_hash,
             status=TOKEN_STATUS_REVOKED,
             expires_at=revision.expires_at,
@@ -235,6 +236,7 @@ class UserAPITokenService:
         self.repo.create_revision(
             token_id=token.id,
             revision_no=revision.revision_no + 1,
+            expected_revision=revision.record_revision,
             token_hash=revision.token_hash,
             status=revision.status,
             expires_at=revision.expires_at,
@@ -295,15 +297,22 @@ class UserAPITokenService:
         *,
         token: UserTokenRecord,
     ) -> tuple[list[str], list[str]]:
-        owner_record = resolve_user_record(
-            self.db, token.user_id, include_inactive=True
-        )
-        if owner_record is None or not owner_record.role:
+        try:
+            owner_uid = int(token.user_id)
+        except (TypeError, ValueError) as exc:
+            raise PermissionError("Token owner must be an exact canonical user UID") from exc
+        if not 0 < owner_uid < 2**63 or str(owner_uid) != token.user_id:
+            raise PermissionError("Token owner must be an exact canonical user UID")
+        owner_record = resolve_user_authorization(self.db, owner_uid)
+        if owner_record is None or not owner_record.is_active or not owner_record.role:
             raise PermissionError(
-                f"Token owner {token.user_id!r} has no explicit Bloom role"
+                f"Token owner {token.user_id!r} has no active explicit Bloom authorization"
             )
         owner = self.groups.resolve_user_roles_and_groups(
             user_id=token.user_id,
             role_hint=owner_record.role,
         )
-        return constrain_roles_by_scope(owner.roles, token.scope), owner.groups
+        constrained = constrain_roles_by_scope(owner.roles, token.scope)
+        if not constrained:
+            raise PermissionError("Token scope has no authorized Bloom permissions")
+        return constrained, owner.groups

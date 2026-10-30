@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from types import SimpleNamespace
 
-from fastapi import APIRouter, FastAPI
+from daylily_tapdb.web import dag_v2
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import bloom_lims.integrations.tapdb_mount as tapdb_mount
 import bloom_lims.tapdb_dag as tapdb_dag
+from bloom_lims.api.v1.dependencies import APIUser
 from bloom_lims.app import create_app
 
 
@@ -119,19 +122,22 @@ def test_bloom_single_app_serves_api_and_tapdb_mount(monkeypatch):
 def test_canonical_tapdb_dag_search_route_is_mounted(monkeypatch):
     monkeypatch.delenv("BLOOM_DEV_AUTH_BYPASS", raising=False)
     with _client() as client:
-        response = client.get("/api/dag/search", follow_redirects=False)
+        response = client.get("/api/dag/v2/search", follow_redirects=False)
 
     assert response.status_code == 401
     assert response.json()["detail"].startswith("Authentication required")
 
 
-def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
-    captured: dict[str, str] = {}
-    router = APIRouter()
+def test_tapdb_dag_auth_maps_api_user_to_native_identity():
+    user = APIUser(email="operator@example.com", role="READ_ONLY")
 
-    @router.get("/api/dag/search")
-    async def _search():
-        return {"status": "ok"}
+    authenticated = asyncio.run(tapdb_dag._tapdb_dag_auth(user))
+
+    assert dag_v2._actor_from_auth(authenticated) == "operator@example.com"
+
+
+def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(
         tapdb_dag,
@@ -143,21 +149,33 @@ def test_tapdb_dag_mount_uses_explicit_bloom_context(monkeypatch):
     )
     monkeypatch.setattr(
         tapdb_dag,
-        "create_tapdb_dag_router",
-        lambda **kwargs: (
-            captured.update({key: str(value) for key, value in kwargs.items()})
-            or router
+        "mount_tapdb_dag_surfaces",
+        lambda app, **kwargs: (
+            captured.update({"app": app, **kwargs})
+            or SimpleNamespace(
+                mounted=True,
+                advertisement={
+                    "extensions": ["tapdb.dag_v2"],
+                    "dag_v2": {"contract": "dag:v2"},
+                },
+                reason=None,
+                diagnostic=None,
+            )
         ),
     )
 
     app = FastAPI()
-    tapdb_dag.mount_tapdb_dag_api(app)
+    result = tapdb_dag.mount_tapdb_dag_api(app)
 
     assert captured == {
+        "app": app,
         "config_path": "/tmp/bloom-tapdb-config.yaml",
-        "service_name": "bloom",
+        "service_id": "bloom",
+        "display_name": "Bloom",
+        "auth_dependency": tapdb_dag._tapdb_dag_auth,
+        "limits": tapdb_dag._BLOOM_DAG_LIMITS,
     }
-    assert "/api/dag/search" in {route.path for route in app.routes}
+    assert result.mounted is True
 
 
 def test_app_shutdown_cleanup_runs(monkeypatch):

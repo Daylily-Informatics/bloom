@@ -185,13 +185,11 @@ def create_temp_tapdb_config(
         or os.environ.get("BLOOM_TAPDB_LOCAL_PG_PORT")
         or DEFAULT_BLOOM_TAPDB_LOCAL_PG_PORT
     ).strip()
-    resolved_user = str(user or "postgres").strip()
-    tmp_path = (
-        Path(tempfile.gettempdir()) / f"bloom_tapdb_config_{secrets.token_hex(16)}.yaml"
-    )
-    registry_base = (
-        Path(tempfile.gettempdir()) / f"bloom_tapdb_registry_{secrets.token_hex(8)}"
-    )
+    resolved_user = str(user or "bloom_runtime_local").strip()
+    runtime_base = Path(tempfile.gettempdir()) / "bloom_tapdb10_tests"
+    runtime_base.mkdir(parents=True, exist_ok=True)
+    tmp_path = runtime_base / "tapdb-config.yaml"
+    registry_base = runtime_base / "registries"
     registry_base.mkdir(parents=True, exist_ok=True)
     domain_registry_path, prefix_registry_path = _write_registry_files(registry_base)
     os.environ["TAPDB_DOMAIN_REGISTRY_PATH"] = str(domain_registry_path)
@@ -217,7 +215,13 @@ def create_temp_tapdb_config(
                 f'  ui_port: "{DEFAULT_BLOOM_WEB_PORT}"',
                 f'  user: "{resolved_user}"',
                 '  password: ""',
-                '  database: "tapdb_bloom_dev"',
+                '  iam_auth: "false"',
+                '  tenant_id: ""',
+                "  allow_global_claims: true",
+                "  operator:",
+                '    user: "postgres"',
+                '    password: ""',
+                '  database: "tapdb_bloom_dev_10_1"',
                 '  schema_name: "tapdb_bloom_tests_dev"',
                 '  domain_code: "Z"',
                 '  cognito_user_pool_id: "us-west-2_test-pool"',
@@ -261,7 +265,7 @@ def create_temp_bloom_config(*, tapdb_config_path: Path) -> Path:
                 "  client_id: bloom",
                 "  database_name: bloom",
                 "  schema_name: tapdb_bloom_tests_dev",
-                "  physical_database: tapdb_bloom_dev",
+                "  physical_database: tapdb_bloom_dev_10_1",
                 "  owner_repo_name: bloom",
                 "  domain_code: Z",
                 f"  domain_registry_path: {domain_registry_path}",

@@ -7,8 +7,10 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
 
+from daylily_tapdb.external_references import ExternalReferenceService
+from sqlalchemy.orm import object_session
+
 from bloom_lims.config import get_settings
-from bloom_lims.tapdb_adapter import get_parent_lineages
 
 GRAPH_CATEGORY_COLORS = {
     "workflow": "#00FF7F",
@@ -29,19 +31,6 @@ GRAPH_CATEGORY_COLORS = {
 GRAPH_SUBTYPE_COLORS = {
     "well": "#70658C",
     "file_set": "#228080",
-}
-
-EXTERNAL_REFERENCE_RELATIONSHIP = "has_external_reference"
-ATLAS_REFERENCE_FIELD_BY_TYPE = {
-    "atlas_trf": "atlas_trf_euid",
-    "atlas_patient": "atlas_patient_euid",
-    "atlas_shipment": "atlas_shipment_euid",
-    "atlas_testkit": "atlas_testkit_euid",
-    "atlas_test": "atlas_test_euid",
-    "atlas_test_process_item": "atlas_test_fulfillment_item_euid",
-    "atlas_test_fulfillment_item": "atlas_test_fulfillment_item_euid",
-    "atlas_collection_event": "atlas_collection_event_euid",
-    "atlas_organization_site": "atlas_organization_site_euid",
 }
 
 
@@ -132,7 +121,11 @@ def build_graph_elements_for_start(
         color = graph_node_color(node["category"], node["type"], node["subtype"])
         props = _props_from_json_addl(node.get("json_addl"))
         graph = _as_dict(props.get("graph"))
-        external_refs = _explicit_refs_from_props(props)
+        instance = bobj.get_by_euid(node["euid"])
+        external_refs = [
+            ref.to_public_dict(ref_index=index)
+            for index, ref in enumerate(resolve_external_refs_for_object(instance))
+        ]
         node_data = {
             "id": str(node["euid"]),
             "euid": str(node["euid"]),
@@ -254,26 +247,37 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
     atlas_base_url = str(settings.atlas.base_url or "").strip().rstrip("/")
     atlas_token = str(settings.atlas.token or "").strip()
     refs: dict[tuple[str, str, str, str, str], ExternalGraphRef] = {}
-    for payload in _explicit_refs_from_props(_props(obj)):
-        system = _clean(payload.get("system"))
-        root_euid = _clean(payload.get("root_euid"))
+    session = object_session(obj)
+    if session is None:
+        raise RuntimeError(
+            "native external references require an attached TapDB object"
+        )
+    page = ExternalReferenceService(session).list_for_source(obj, limit=100)
+    if page["page"]["next_cursor"] is not None:
+        raise RuntimeError("one Bloom object exceeds the reviewed 100-reference bound")
+    for payload in page["items"]:
+        target_type = _clean(payload.get("target_type"))
+        if target_type == "tapdb_object":
+            system = _clean(payload.get("target_service_id"))
+            root_euid = _clean(payload.get("target_object_euid"))
+            tenant_id = _clean(payload.get("target_tenant_id")) or None
+            graph_expandable = system == "atlas"
+            reason = None
+        elif target_type == "opaque":
+            system = _clean(payload.get("namespace"))
+            root_euid = _clean(payload.get("value"))
+            tenant_id = None
+            graph_expandable = False
+            reason = "Opaque external identifiers do not identify a graph object"
+        else:
+            raise RuntimeError(
+                "native external reference has an unsupported target type"
+            )
         relationship_type = _clean(payload.get("relationship_type"))
-        tenant_id = _clean(payload.get("tenant_id")) or None
         if not (system and root_euid and relationship_type):
-            continue
-        href = None
-        graph_expandable = False
-        reason = None
-        if system == "atlas":
-            if atlas_base_url and root_euid:
-                params = {"start_euid": root_euid, "depth": 4}
-                if tenant_id:
-                    params["tenant_id"] = tenant_id
-                href = f"{atlas_base_url}/graph?{urlencode(params)}"
-            graph_expandable = True
+            raise RuntimeError("native external reference projection is incomplete")
+        if graph_expandable:
             missing: list[str] = []
-            if not tenant_id:
-                missing.append("atlas_tenant_id")
             if not atlas_base_url:
                 missing.append("atlas.base_url")
             if not atlas_token:
@@ -281,9 +285,14 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
             if missing:
                 graph_expandable = False
                 reason = "Missing Atlas graph metadata: " + ", ".join(missing)
+        href = None
+        if graph_expandable:
+            params = {"start_euid": root_euid, "depth": 4}
+            if tenant_id is not None:
+                params["tenant_id"] = tenant_id
+            href = f"{atlas_base_url}/graph?{urlencode(params)}"
         ref = ExternalGraphRef(
-            label=_clean(payload.get("label"))
-            or f"{system}:{relationship_type}:{root_euid}",
+            label=f"{system}:{relationship_type}:{root_euid}",
             system=system,
             root_euid=root_euid,
             tenant_id=tenant_id,
@@ -291,76 +300,6 @@ def resolve_external_refs_for_object(obj: Any) -> list[ExternalGraphRef]:
             graph_expandable=graph_expandable,
             reason=reason,
             relationship_type=relationship_type,
-        )
-        refs[
-            (
-                ref.system,
-                ref.label,
-                ref.root_euid,
-                ref.tenant_id or "",
-                relationship_type,
-            )
-        ] = ref
-    try:
-        lineages = list(get_parent_lineages(obj))
-    except Exception:
-        lineages = []
-    for lineage in lineages:
-        if (
-            getattr(lineage, "is_deleted", False)
-            or getattr(lineage, "relationship_type", "")
-            != EXTERNAL_REFERENCE_RELATIONSHIP
-        ):
-            continue
-        external_ref = getattr(lineage, "child_instance", None)
-        if external_ref is None or getattr(external_ref, "is_deleted", False):
-            continue
-        if (
-            getattr(external_ref, "category", "") != "generic"
-            or getattr(external_ref, "type", "") != "generic"
-            or getattr(external_ref, "subtype", "") != "external_object_link"
-        ):
-            continue
-        payload = _props(external_ref)
-        if _clean(payload.get("provider")) != "atlas":
-            continue
-        ref_type = _clean(payload.get("reference_type"))
-        root_euid = _atlas_root_euid(payload)
-        tenant_id = _clean(payload.get("atlas_tenant_id")) or None
-        href = None
-        if atlas_base_url and root_euid:
-            params = {"start_euid": root_euid, "depth": 4}
-            if tenant_id:
-                params["tenant_id"] = tenant_id
-            href = f"{atlas_base_url}/graph?{urlencode(params)}"
-
-        reason = None
-        graph_expandable = True
-        missing: list[str] = []
-        if not root_euid:
-            missing.append("root_euid")
-        if not tenant_id:
-            missing.append("atlas_tenant_id")
-        if not atlas_base_url:
-            missing.append("atlas.base_url")
-        if not atlas_token:
-            missing.append("atlas.token")
-        if missing:
-            graph_expandable = False
-            reason = "Missing Atlas graph metadata: " + ", ".join(missing)
-
-        label = _clean(payload.get("label")) or (
-            f"atlas:{ref_type}:{root_euid or _clean(payload.get('reference_value')) or 'unknown'}"
-        )
-        ref = ExternalGraphRef(
-            label=label,
-            system="atlas",
-            root_euid=root_euid,
-            tenant_id=tenant_id,
-            href=href,
-            graph_expandable=graph_expandable,
-            reason=reason,
-            relationship_type=_atlas_relationship_type(payload),
         )
         refs[
             (
@@ -488,60 +427,3 @@ def _props(instance: Any) -> dict[str, Any]:
 def _props_from_json_addl(json_addl: Any) -> dict[str, Any]:
     payload = _as_dict(json_addl)
     return _as_dict(payload.get("properties"))
-
-
-def _explicit_refs_from_props(props: dict[str, Any]) -> list[dict[str, Any]]:
-    external_payload = _as_dict(props.get("external_payload"))
-    raw_refs = _as_list(external_payload.get("tapdb_graph"))
-    refs: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
-    for raw_ref in raw_refs:
-        row = _as_dict(raw_ref)
-        system = _clean(row.get("system"))
-        root_euid = _clean(row.get("root_euid") or row.get("target_euid"))
-        relationship_type = _clean(row.get("relationship_type"))
-        if not (system and root_euid and relationship_type):
-            continue
-        tenant_id = _clean(row.get("tenant_id"))
-        key = (system, root_euid, relationship_type, tenant_id)
-        if key in seen:
-            continue
-        seen.add(key)
-        public_ref = dict(row)
-        public_ref["system"] = system
-        public_ref["root_euid"] = root_euid
-        public_ref["target_euid"] = _clean(row.get("target_euid")) or root_euid
-        public_ref["relationship_type"] = relationship_type
-        public_ref["graph_expandable"] = bool(public_ref.get("graph_expandable", True))
-        if tenant_id:
-            public_ref["tenant_id"] = tenant_id
-        if not _clean(public_ref.get("label")):
-            public_ref["label"] = f"{system}:{relationship_type}:{root_euid}"
-        public_ref["ref_index"] = len(refs)
-        refs.append(public_ref)
-    return refs
-
-
-def _atlas_root_euid(payload: dict[str, Any]) -> str:
-    ref_type = _clean(payload.get("reference_type"))
-    field_name = ATLAS_REFERENCE_FIELD_BY_TYPE.get(ref_type, "")
-    if field_name:
-        direct = _clean(payload.get(field_name))
-        if direct:
-            return direct
-    return _clean(payload.get("reference_value"))
-
-
-def _atlas_relationship_type(payload: dict[str, Any]) -> str:
-    ref_type = _clean(payload.get("reference_type"))
-    return {
-        "atlas_test_fulfillment_item": "fulfills_atlas_test_fulfillment_item",
-        "atlas_test_process_item": "fulfills_atlas_test_fulfillment_item",
-        "atlas_patient": "derived_from_atlas_patient",
-        "atlas_trf": "received_from_atlas_trf",
-        "atlas_test": "prepared_for_atlas_test",
-        "atlas_testkit": "received_with_atlas_testkit",
-        "atlas_shipment": "received_in_atlas_shipment",
-        "atlas_organization_site": "received_from_atlas_organization_site",
-        "atlas_collection_event": "collected_during_atlas_event",
-    }.get(ref_type, f"references_{ref_type or 'atlas_object'}")

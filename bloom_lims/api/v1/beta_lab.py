@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from daylily_tapdb.advisory_locks import AdvisoryLockTimeoutError
+from daylily_tapdb.external_references import ExternalReferenceContractError
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from bloom_lims.api.v1.dependencies import (
@@ -13,6 +15,7 @@ from bloom_lims.api.v1.dependencies import (
 )
 from bloom_lims.auth.rbac import Permission
 from bloom_lims.domain.beta_lab import BetaLabService
+from bloom_lims.domain.beta_lab_tubes import TubeRequestConflict, TubeRequestNotFound
 from bloom_lims.domain.execution_queue import (
     ExecutionQueueConflictError,
     ExecutionQueueError,
@@ -47,6 +50,9 @@ from bloom_lims.schemas.beta_lab import (
     BetaRunResponse,
     BetaSpecimenUpdateRequest,
     BetaTubeCreateRequest,
+    BetaTubeIdentityResponse,
+    BetaTubeRegisterExistingRequest,
+    BetaTubeRequestResponse,
     BetaTubeResponse,
     BetaTubeUpdateRequest,
 )
@@ -61,6 +67,14 @@ def require_external_write(
 ) -> APIUser:
     if not user.has_permission(Permission.BLOOM_WRITE):
         raise HTTPException(status_code=403, detail="Write permission required")
+    return user
+
+
+def require_external_atlas_read(
+    user: APIUser = Depends(require_external_atlas_api_enabled),
+) -> APIUser:
+    if not user.has_permission(Permission.BLOOM_READ):
+        raise HTTPException(status_code=403, detail="Read permission required")
     return user
 
 
@@ -80,6 +94,15 @@ def _status_for_value_error(exc: ValueError) -> int:
 
 
 def _raise_beta_http_error(exc: Exception, *, logger_message: str) -> None:
+    from daylily_tapdb.revisions import RevisionConflict
+    if isinstance(exc, RevisionConflict):
+        raise HTTPException(status_code=409, detail="An object or relationship changed; reread before retrying") from exc
+    if isinstance(exc, PermissionError):
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if isinstance(exc, TubeRequestNotFound):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, (TubeRequestConflict, AdvisoryLockTimeoutError, ExternalReferenceContractError)):
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if isinstance(exc, ValueError):
         raise HTTPException(
             status_code=_status_for_value_error(exc),
@@ -125,7 +148,7 @@ async def register_accepted_material(
 async def create_empty_tube(
     payload: BetaTubeCreateRequest,
     user: APIUser = Depends(require_external_write),
-    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=200),
 ):
     service = BetaLabService(app_username=user.email)
     try:
@@ -138,6 +161,51 @@ async def create_empty_tube(
             exc,
             logger_message="Failed creating empty Bloom tube",
         )
+    finally:
+        service.close()
+
+
+@router.post("/tubes/register-existing", response_model=BetaTubeResponse)
+async def register_existing_tube(
+    payload: BetaTubeRegisterExistingRequest,
+    user: APIUser = Depends(require_external_write),
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=200),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.register_existing_tube(payload=payload, idempotency_key=idempotency_key)
+    except Exception as exc:
+        _raise_beta_http_error(exc, logger_message="Failed registering existing physical tube")
+    finally:
+        service.close()
+
+
+@router.get("/tube-requests/{request_key}", response_model=BetaTubeRequestResponse)
+async def get_tube_request(
+    request_key: str,
+    atlas_tenant_id: str = Query(...),
+    user: APIUser = Depends(require_external_atlas_read),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.get_tube_request(request_key=request_key, atlas_tenant_id=atlas_tenant_id)
+    except Exception as exc:
+        _raise_beta_http_error(exc, logger_message="Failed reading tube request receipt")
+    finally:
+        service.close()
+
+
+@router.get("/tubes/{container_euid}/identity", response_model=BetaTubeIdentityResponse)
+async def get_tube_identity(
+    container_euid: str,
+    atlas_tenant_id: str = Query(...),
+    user: APIUser = Depends(require_external_atlas_read),
+):
+    service = BetaLabService(app_username=user.email)
+    try:
+        return service.get_tube_identity(container_euid=container_euid, atlas_tenant_id=atlas_tenant_id)
+    except Exception as exc:
+        _raise_beta_http_error(exc, logger_message="Failed reading physical tube identity")
     finally:
         service.close()
 

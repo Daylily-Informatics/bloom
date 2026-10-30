@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+import unicodedata
 from typing import Any, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 CanonicalQueueName = Literal[
     "extraction_prod",
@@ -186,10 +188,48 @@ class BetaAcceptedMaterialCreateRequest(BaseModel):
 
 
 class BetaTubeCreateRequest(BaseModel):
-    container_template_code: str = Field(default="container/tube/tube-generic-10ml/1.0")
-    status: str = Field(default="active")
+    model_config = ConfigDict(extra="forbid")
+
+    container_template_code: str = Field(min_length=1, max_length=256)
+    status: str = Field(default="active", min_length=1, max_length=128)
     properties: dict[str, Any] = Field(default_factory=dict)
     atlas_context: AtlasFulfillmentContext
+
+    @model_validator(mode="after")
+    def validate_tube_request(self) -> "BetaTubeCreateRequest":
+        parts = self.container_template_code.split("/")
+        if len(parts) != 4 or any(not part or part != part.strip() or "*" in part for part in parts):
+            raise ValueError("An exact category/type/subtype/version template is required")
+        self.atlas_context.atlas_tenant_id = str(UUID(self.atlas_context.atlas_tenant_id))
+        return self
+
+
+class BetaTubeIdentifier(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    namespace: str = Field(pattern=r"^[a-z][a-z0-9._-]*$", max_length=128)
+    kind: Literal["uuid", "barcode", "opaque"]
+    value: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def normalize_identifier(self) -> "BetaTubeIdentifier":
+        self.tenant_id = str(UUID(self.tenant_id))
+        if self.kind == "uuid":
+            self.value = str(UUID(self.value))
+        elif self.value != self.value.strip() or any(unicodedata.category(char) == "Cc" for char in self.value):
+            raise ValueError("Opaque identifiers must be exact nonblank text without control characters")
+        return self
+
+
+class BetaTubeRegisterExistingRequest(BetaTubeCreateRequest):
+    identifier: BetaTubeIdentifier
+
+    @model_validator(mode="after")
+    def validate_identifier_tenant(self) -> "BetaTubeRegisterExistingRequest":
+        if self.identifier.tenant_id != self.atlas_context.atlas_tenant_id:
+            raise ValueError("Identifier and Atlas context tenant must agree")
+        return self
 
 
 class BetaTubeUpdateRequest(BaseModel):
@@ -223,6 +263,41 @@ class BetaTubeResponse(BaseModel):
     idempotency_key: str | None = None
     current_queue: str | None = None
     created: bool = True
+    request_key: str | None = None
+    request_digest: str | None = None
+    operation: Literal["create", "register-existing"] | None = None
+    owner_service: Literal["bloom"] = "bloom"
+    tenant_id: str | None = None
+    atlas_tenant_id: str | None = None
+    container_template_code: str | None = None
+    identifier: BetaTubeIdentifier | None = None
+    identifier_reference_euid: str | None = None
+    identifier_lineage_euid: str | None = None
+
+
+class BetaTubeRequestResponse(BaseModel):
+    atlas_tenant_id: str
+    request_key: str
+    request_digest: str
+    operation: Literal["create", "register-existing"]
+    state: Literal["completed"]
+    request_payload: dict[str, Any]
+    response: BetaTubeResponse
+
+
+class BetaTubeIdentifierEvidence(BaseModel):
+    identifier: BetaTubeIdentifier
+    identifier_reference_euid: str
+    identifier_lineage_euid: str
+
+
+class BetaTubeIdentityResponse(BaseModel):
+    owner_service: Literal["bloom"] = "bloom"
+    atlas_tenant_id: str
+    tenant_id: str | None
+    container_euid: str
+    container_template_code: str
+    identifiers: list[BetaTubeIdentifierEvidence]
 
 
 class BetaQueueTransitionRequest(BaseModel):

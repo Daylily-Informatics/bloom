@@ -1,162 +1,38 @@
-# Becoming A Discoverable Service
+# Bloom Discoverability and Deployment Contract
 
-In the Dayhoff bundle, a "discoverable service" is not a service that registers itself with a separate service-discovery daemon. It is a repo that follows the control-plane contract Dayhoff expects: a known activation path, a stable CLI, deployment-scoped runtime artifacts, deterministic bootstrap/start commands, and a readiness endpoint that proves the service is live.
+Bloom exposes service identity and native graph capabilities through authenticated observability routes. Dayhoff supplies explicit deployment configuration and selects the service image; Kahlo consumes Bloom's advertised native DAG contract. This document describes Bloom's source contract, not an unverified snapshot of a sibling repository's catalog.
 
-Bloom already fits that model, but a few details matter if you are trying to understand how it becomes visible and runnable inside the broader stack.
+## Runtime entrypoint and configuration
 
-## How Dayhoff Sees Bloom
+The Bloom CLI entrypoint is `bloom_lims.cli:main`; registered command groups are listed in the [README](../README.md#cli-interface). Local activation uses `source ./activate <deploy-name>` and only prepares the environment. It does not seed config or export deployment identity.
 
-`../../dayhoff/services/services.yaml` currently describes Bloom as:
+The container entrypoint is `bloom_lims.container_entry`. It requires an existing absolute `BLOOM_CONFIG_PATH`, explicit `HOST` and `PORT`, initializes the Bloom and TapDB contexts, verifies existing templates and starts the foreground server. The usual Bloom service port is 8912, but the deployment must pass its actual port explicitly. Do not use a local bootstrap command as a production container startup action.
 
-| Field | Current catalog value |
-| --- | --- |
-| repo | `bloom` |
-| role | `bloom` |
-| cli | `bloom` |
-| host port | `8912` |
-| container port | `8912` |
-| exposure | `private` |
-| domain | `bloom` |
-| liveness | `/healthz` |
-| readiness | `/readyz` |
+Schema migration, template preparation and runtime-principal setup happen before production startup. `bloom db build --target local` is limited to local preparation; it rejects Aurora. See [TapDB 10 operations](tapdb_10_operations.md).
 
-Bloom also appears in the `deploy_default` repo set alongside Atlas, Dewey, Ursa, Kahlo, and Zebra Day.
+## Authenticated discovery
 
-That is the bundle-level discoverability signal: Dayhoff knows Bloom exists, which port it wants, how to start it, and which readiness path to probe.
+Bloom exposes `/healthz`, `/readyz`, detailed `/health` routes and authenticated observability routes including `/obs_services`, `/api_health`, `/endpoint_health`, `/db_health`, `/my_health` and `/auth_health`.
 
-## Repo-Local Contract Bloom Must Expose
+`bloom_lims/observability.py` obtains graph capability data from the native mount advertisement. Consumers must retain both:
 
-For Bloom to remain discoverable, the repo needs to keep exposing a stable local contract.
+- the extension `tapdb.dag_v2`;
+- `tapdb_dag_contract_version` with the exact value `dag:v2`.
 
-### 1. Activation Path
+The native `/api/dag/manifest` describes `/api/dag/v2/object/{euid}`, `/api/dag/v2/data` and `/api/dag/v2/search`. Do not substitute Bloom's `/api/v1/graph` helper surface when the native contract is missing or fails. Mounting the native surfaces is mandatory in `create_app`; an invalid advertisement aborts startup.
 
-Bloom's repo entrypoint is:
+The embedded browser GUI defaults to `/tapdb`; its public host bridge consumes the existing Bloom session. It is distinct from service-token authentication for native DAG APIs.
 
-```bash
-source ./activate <deploy-name>
-```
+## Kahlo read-only consumption
 
-This is the first piece of the discoverability contract. Dayhoff expects each service repo to activate itself from its own root.
+Kahlo needs an explicit Bloom target URL and Authorization credential, a persisted Bloom-owned user with an explicit READ_ONLY role, and an allowed `internal_ro` token. The accepted migration used native `API_ACCESS` and `BLOOM-READONLY` group codes. An ADMIN-only owner's token is not converted to READ_ONLY merely by narrowing the scope.
 
-### 2. Deployment-Scoped Runtime Artifacts
+The migration's recorded Kahlo 8.0.1 correction preserves `tapdb_dag_contract_version` in its typed capability snapshot. A targeted Bloom-only poll advertised `dag:v2`, and the authenticated graph rendered six nodes and six edges with zero external jumps. Refer to the [completed ledger](plans/20260911T150553Z_bloom_tapdb_10_1_migration_ledger.md); do not repeat this operation during a docs-only release or turn a Bloom refresh into a fleet-wide action.
 
-Bloom's local state is deploy-name scoped:
+## Exposure and release ownership
 
-```text
-~/.config/bloom-<deploy-name>/bloom-config-<deploy-name>.yaml
-~/.config/tapdb/bloom/bloom-<deploy-name>/tapdb-config.yaml
-~/.config/tapdb/bloom/bloom-<deploy-name>/<tapdb-env>/uploads
-```
+Bloom is LSMC-internal only. Dayhoff owns approved-network ingress, service hostnames, TLS and broker routing. Do not infer public URLs from internal ports, add wildcard vhosts or expose Bloom globally. Each deployment supplies its own explicit namespace, configuration and credentials.
 
-This matters because Dayhoff's deploy model is built around `--deploy-name`. Service identity is not just a port number; it is the combination of repo, deploy name, config files, and runtime namespace.
+The recorded accepted production state is Bloom 10.0.1 / TapDB 10.1.3 at `https://bloom.day.lsmc.bio`, with Kahlo 8.0.1. A documentation tag does not update the Dayhoff pin or that running image. For authorized runtime changes, promote only selected containers using the exact tagged image digest and preserve sibling manifest entries.
 
-### 3. Bootstrap
-
-Bloom's current repo-local bootstrap command is:
-
-```bash
-bloom db build --target local
-```
-
-This is Bloom delegating runtime/bootstrap work to TapDB through its own supported CLI surface.
-
-### 4. Start
-
-Bloom's service start contract is:
-
-```bash
-bloom server start --port 8912
-```
-
-### 5. Readiness
-
-Bloom's orchestrator-facing readiness path is:
-
-```text
-/readyz
-```
-
-The corresponding local probe is:
-
-```bash
-curl -k https://127.0.0.1:8912/readyz
-```
-
-## Important Catalog Drift To Know About
-
-There is currently some drift between the Dayhoff service catalog and the repo-local Bloom contract:
-
-- the service catalog still shows `conda_env_name: BLOOM`
-- the catalog bootstrap command still shows `bloom db init` instead of `bloom db build --target local`
-- repo-local Bloom now expects deployment-scoped env names like `BLOOM-<deploy-name>`
-- repo-local Bloom's supported bootstrap command is `bloom db build --target local`
-
-For actual Bloom operation, treat the repo-local Bloom CLI and docs as the current truth. The catalog entry should be kept aligned, but the service's own CLI is authoritative for how Bloom boots today.
-
-## Host, Domain, Port, And Exposure
-
-Current Dayhoff-facing Bloom identity is intentionally simple:
-
-- local HTTPS port: `8912`
-- private service domain label: `bloom`
-- liveness: `/healthz`
-- readiness: `/readyz`
-
-For local direct use, that typically means:
-
-```text
-https://localhost:8912
-https://127.0.0.1:8912/readyz
-```
-
-For Dayhoff-managed deployments, the final hostname and exposure pattern can be shaped by the broader deployment stack, ingress, and public-root-domain configuration. Bloom itself does not own that routing layer; it owns the predictable service behavior behind it.
-
-## What Bloom Must Keep Stable To Stay Discoverable
-
-Bloom stays easy for Dayhoff and sibling services to find when these remain stable:
-
-- repo-root `activate`
-- `bloom` CLI entrypoint
-- deployment-scoped YAML and TapDB config conventions
-- the service port and readiness endpoint
-- the HTTP API location and GUI root
-
-If one of those changes, Bloom is still the same service in a code sense, but it becomes harder for the rest of the ecology to find and run consistently.
-
-## Bloom's Role In "Finding What Is Running, Where"
-
-Bloom helps answer that question in two different ways.
-
-### Material-State Discovery
-
-At the domain level, Bloom helps other systems find:
-
-- which material exists
-- which container it is in
-- which lineage edges produced it
-- which external references connect it back to Atlas and the rest of the stack
-
-### Service-Level Discovery
-
-At the operational level, Bloom participates in Dayhoff's discoverability model by being a well-behaved service repo:
-
-- predictable activation
-- predictable config paths
-- predictable bootstrap and start commands
-- predictable health probes
-
-So Bloom is not a general service registry, but it is a discoverable node in a convention-driven stack.
-
-## Practical Checklist
-
-If you are making Bloom newly deployable in a Dayhoff environment, the practical checklist is:
-
-1. Ensure the repo activates with `source ./activate <deploy-name>`.
-2. Ensure Bloom config is present at the deployment-scoped YAML path.
-3. Ensure the TapDB namespace config exists and matches the deploy name.
-4. Bootstrap with `bloom db build --target local`.
-5. Start with `bloom server start --port 8912`.
-6. Verify `https://127.0.0.1:8912/readyz`.
-7. Make sure Dayhoff's service catalog and repo-local CLI contract agree.
-
-If those seven steps work, Bloom is discoverable in the Dayhoff sense.
+Publish docs using the [working-branch tagged-release procedure](how-tos.md#publish-a-documentation-release). No tests or redeployment are implied. PR and merge work remains a separate action requiring the user's explicit request twice.

@@ -1,0 +1,49 @@
+{
+  "baseline_commit": "1c500a71b04f185099b9b4ec38534554e60da41a",
+  "baseline_release": "10.0.8",
+  "builds_run": false,
+  "entries": [
+    {
+      "bytes": 24614,
+      "path": "bloom_lims/observability.py",
+      "sha256": "0838334aac313a31e64c2b6062b7f797a906a7e1a675a5e68f238b1fdbdfc486"
+    },
+    {
+      "bytes": 8525,
+      "path": "docs/plans/20260918T193010Z_collect_owner_snapshot.py",
+      "sha256": "eaf52cd71a4af29632b99122f0f2033f8f9ebd6c939d267561c01021bc855e29"
+    },
+    {
+      "bytes": 9413,
+      "path": "docs/plans/20260918T194037Z_collect_owner_snapshot.py",
+      "sha256": "2df23b7cc1f8939c1b7d618441d0c5e7fd183b140b6ec4d602f168037d9cb849"
+    },
+    {
+      "bytes": 22956,
+      "path": "docs/plans/20260918T194400Z_owner_namespace_executor.py",
+      "sha256": "b32a913059c701ee22910751f33d4d019f418209c01d8c17c2864cc9d5f8c94d"
+    },
+    {
+      "bytes": 24507,
+      "path": "docs/plans/20260918T195317Z_owner_namespace_executor.py",
+      "sha256": "6ccefea686783d93280dd4472de0aad7180aa3ee24d16c94dcdfb16c48bfb265"
+    },
+    {
+      "bytes": 8881,
+      "path": "docs/plans/20260918T195300Z_bloom_owner_preconditions_and_identity_ledger.md",
+      "sha256": "1841358a2900ee3e51b47cc0f227a39ba61154a0281a2bf4e654705b282214e0"
+    },
+    {
+      "bytes": 3202,
+      "path": "docs/plans/20260918T195600Z_bloom_identity_and_alias_contract_successor.md",
+      "sha256": "dc1e7581d376e7d730eed75f47250c204d91144b6a8f0d4f5a0a8b29a1139b6e"
+    }
+  ],
+  "prepared_at": "2026-09-18T19:55:21.117780+00:00",
+  "product_source_scope": [
+    "bloom_lims/observability.py"
+  ],
+  "runtime_mutation_performed_by_agent": false,
+  "schema": "bloom.owner-identity-source-allowlist/1",
+  "tests_run": false
+}

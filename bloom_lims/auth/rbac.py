@@ -27,12 +27,12 @@ class Permission(StrEnum):
 API_ACCESS_GROUP = "API_ACCESS"
 ENABLE_ATLAS_API_GROUP = "ENABLE_ATLAS_API"
 ENABLE_URSA_API_GROUP = "ENABLE_URSA_API"
-BLOOM_READONLY_GROUP = "bloom-readonly"
-BLOOM_READWRITE_GROUP = "bloom-readwrite"
-BLOOM_ADMIN_GROUP = "bloom-admin"
-BLOOM_RND_GROUP = "bloom-rnd"
-BLOOM_CLINICAL_GROUP = "bloom-clinical"
-BLOOM_AUDITOR_GROUP = "bloom-auditor"
+BLOOM_READONLY_GROUP = "BLOOM-READONLY"
+BLOOM_READWRITE_GROUP = "BLOOM-READWRITE"
+BLOOM_ADMIN_GROUP = "BLOOM-ADMIN"
+BLOOM_RND_GROUP = "BLOOM-RND"
+BLOOM_CLINICAL_GROUP = "BLOOM-CLINICAL"
+BLOOM_AUDITOR_GROUP = "BLOOM-AUDITOR"
 
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.READ_ONLY: {
@@ -145,13 +145,8 @@ def constrain_roles_by_scope(
     if cap_role is None:
         return []
 
-    cap_rank = ROLE_RANK[cap_role]
-    constrained = []
-    for role_name in normalized:
-        role_obj = _normalize_role(role_name)
-        if role_obj is None:
-            continue
-        if ROLE_RANK[role_obj] <= cap_rank:
-            constrained.append(role_obj.value)
-
-    return normalize_roles(constrained)
+    permitted = effective_permissions(normalized) & ROLE_PERMISSIONS[cap_role]
+    for role in sorted(Role, key=lambda item: ROLE_RANK[item], reverse=True):
+        if ROLE_PERMISSIONS[role] == permitted:
+            return [role.value]
+    return []

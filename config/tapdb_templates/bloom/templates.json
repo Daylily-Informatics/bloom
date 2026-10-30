@@ -14456,6 +14456,50 @@
           "redacted_context"
         ]
       }
+    },
+    {
+      "name": "Atlas Tube Request Receipt",
+      "polymorphic_discriminator": "data_template",
+      "category": "data",
+      "type": "accession-request",
+      "subtype": "tube",
+      "version": "1.0",
+      "instance_prefix": "BD",
+      "instance_polymorphic_identity": "data_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "managed_by": "bloom",
+        "description": "Atomic Atlas tube request digest and immutable response receipt; native reference lineage owns its result relationship.",
+        "semantic_category": "data",
+        "action_groups": {},
+        "action_imports": {},
+        "instantiation_layouts": [],
+        "properties": {},
+        "singleton": "0"
+      }
+    },
+    {
+      "name": "Physical Tube Identity Assertion",
+      "polymorphic_discriminator": "data_template",
+      "category": "data",
+      "type": "accession-identity",
+      "subtype": "tube",
+      "version": "1.0",
+      "instance_prefix": "BD",
+      "instance_polymorphic_identity": "data_instance",
+      "bstatus": "active",
+      "is_singleton": false,
+      "json_addl": {
+        "managed_by": "bloom",
+        "description": "Tenant-scoped physical tube identifier assertion; native references own identifier and verified container relationships.",
+        "semantic_category": "data",
+        "action_groups": {},
+        "action_imports": {},
+        "instantiation_layouts": [],
+        "properties": {},
+        "singleton": "0"
+      }
     }
   ]
 }

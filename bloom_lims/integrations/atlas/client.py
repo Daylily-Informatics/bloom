@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import quote
+from uuid import UUID
 
 import requests
+from daylily_tapdb.web.dag_v2 import validate_dag_v2_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,36 @@ class AtlasClient:
         return self._get_json(
             f"/api/integrations/bloom/v1/lookups/testkits/{kit_barcode}"
         )
+
+    def require_native_object(self, euid: str) -> dict[str, Any]:
+        """Require the exact Atlas-owned persisted object and native tenant scope."""
+        value = str(euid or "")
+        if not value or value != value.strip():
+            raise AtlasClientError("Atlas native object EUID must be exact")
+        manifest = self._get_json("/api/dag/manifest")
+        reason = validate_dag_v2_manifest(manifest, expected_service_id="atlas")
+        if reason is not None:
+            raise AtlasClientError(f"Atlas native manifest rejected: {reason.value}")
+        body = self._get_json(f"/api/dag/v2/object/{quote(value, safe='')}")
+        if (
+            body.get("service_id") != "atlas"
+            or body.get("euid") != value
+            or body.get("record_type") != "instance"
+        ):
+            raise AtlasClientError("Atlas native object identity or record type differs")
+        if "tenant_id" not in body:
+            raise AtlasClientError("Atlas native object has no tenant scope field")
+        tenant = body["tenant_id"]
+        if tenant is not None:
+            if not isinstance(tenant, str):
+                raise AtlasClientError("Atlas native tenant must be a UUID string")
+            try:
+                parsed = UUID(tenant)
+            except ValueError as exc:
+                raise AtlasClientError("Atlas native tenant is not a UUID") from exc
+            if str(parsed) != tenant:
+                raise AtlasClientError("Atlas native tenant UUID is not canonical")
+        return body
 
     def get_container_trf_context(
         self, container_euid: str, tenant_id: str

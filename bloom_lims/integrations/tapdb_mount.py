@@ -98,10 +98,16 @@ def _request_next_path(request: Any) -> str:
 
 
 def _tapdb_host_user(request: Any) -> dict[str, Any] | None:
-    user_data = _resolve_bloom_user_data(request.scope)
+    from bloom_lims.gui.web_session import load_bloom_user_data
+    user_data = load_bloom_user_data(request)
     if user_data is None:
         return None
-    return _tapdb_user_from_bloom_user_data(user_data)
+    from bloom_lims.attribution import verified_session
+    attribution = verified_session(request)
+    return {**_tapdb_user_from_bloom_user_data(user_data),
+            "actor_kind": attribution.actor_kind,
+            "actor_issuer": attribution.actor_issuer,
+            "actor_subject": attribution.actor_subject}
 
 
 def _build_tapdb_host_bridge() -> TapdbHostBridge:

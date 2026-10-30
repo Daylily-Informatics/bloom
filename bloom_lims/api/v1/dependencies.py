@@ -23,13 +23,13 @@ from bloom_lims.auth.rbac import (
     Permission,
     Role,
     effective_permissions,
-    has_permission,
     normalize_roles,
 )
 from bloom_lims.auth.services.groups import GroupService
 from bloom_lims.auth.services.user_api_tokens import TOKEN_PREFIX, UserAPITokenService
 from bloom_lims.config import get_settings
 from bloom_lims.tapdb_adapter import BLOOMdb3
+from bloom_lims.attribution import verified_actor, verified_session, verified_token
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,10 @@ class APIUser:
         self.user_id = user_id or email
         self.roles = normalized_roles
         self.groups = sorted(set(groups or []))
-        self.permissions = sorted(set(permissions or effective_permissions(self.roles)))
+        role_permissions = effective_permissions(self.roles)
+        self.permissions = sorted(
+            role_permissions if permissions is None else role_permissions & set(permissions)
+        )
         self.role = self.roles[0]
         self.auth_source = auth_source
         self.is_service_account = is_service_account
@@ -69,7 +72,8 @@ class APIUser:
         self.token_id = token_id
 
     def has_permission(self, permission: Permission | str) -> bool:
-        return has_permission(self.roles, permission)
+        value = permission.value if isinstance(permission, Permission) else str(permission).strip()
+        return bool(value) and value in self.permissions
 
     @property
     def is_admin(self) -> bool:
@@ -205,7 +209,6 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
     bdb = BLOOMdb3(app_username="api-token-auth")
     try:
         token_service = UserAPITokenService(bdb.session)
-        token_service.groups.ensure_system_groups()
         validation = token_service.validate_token(token_value)
         if (
             not validation.is_valid
@@ -219,9 +222,16 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             )
 
         token_row = validation.token
-        constrained_roles, owner_groups = (
-            token_service.constrained_roles_for_token_owner(token=token_row)
-        )
+        verified_token(str(token_row.id))
+        try:
+            constrained_roles, owner_groups = (
+                token_service.constrained_roles_for_token_owner(token=token_row)
+            )
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Bloom API token owner authorization was rejected",
+            ) from exc
         permissions = sorted(effective_permissions(constrained_roles))
         user = APIUser(
             email=f"token-user:{token_row.user_id}",
@@ -229,7 +239,7 @@ def _authenticate_bloom_token(request: Request, token_value: str) -> APIUser:
             roles=constrained_roles,
             groups=owner_groups,
             permissions=permissions,
-            role=constrained_roles[0] if constrained_roles else Role.READ_ONLY.value,
+            role=constrained_roles[0],
             auth_source="token",
             is_service_account=True,
             token_scope=token_row.scope,
@@ -283,6 +293,7 @@ async def get_api_user(
         )
 
     if hasattr(request, "session") and "user_data" in request.session:
+        verified_session(request)
         user_data = request.session.get("user_data", {})
         session_groups = user_data.get("service_groups")
         if not isinstance(session_groups, list):
@@ -333,6 +344,7 @@ async def get_api_user(
         if _cognito_get_user is not None:
             try:
                 claims = _cognito_get_user(credentials)
+                verified_actor(kind="human", issuer=claims["iss"], subject=claims["sub"])
                 request.state.auth_mode = "cognito"
                 request.state.authorized_by_email = claims.get("email", "token-user")
                 return _make_user(

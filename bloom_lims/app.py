@@ -152,7 +152,13 @@ def create_app() -> FastAPI:
             stop_all_writers()
 
     app = FastAPI(lifespan=_lifespan, version=__version__)
-    app.state.observability = BloomObservabilityStore()
+    dag_mount = mount_tapdb_dag_api(app)
+    app.state.observability = BloomObservabilityStore(
+        dag_advertisement=dag_mount.advertisement or {},
+        mounted_route_paths=lambda: {
+            route.path for route in app.routes if "GET" in (getattr(route, "methods", None) or set())
+        },
+    )
     refresh_template_globals()
 
     @app.middleware("http")
@@ -259,7 +265,6 @@ def create_app() -> FastAPI:
     setup_bloom_session_middleware(app)
 
     mount_tapdb_admin_subapp(app)
-    mount_tapdb_dag_api(app)
 
     # Add rate limiting middleware for API endpoints (disable with BLOOM_RATE_LIMIT=no)
     if os.environ.get("BLOOM_RATE_LIMIT", "yes").lower() != "no":
@@ -275,4 +280,15 @@ def create_app() -> FastAPI:
     app.include_router(gui_router)
 
     register_exception_handlers(app)
+    from daylily_tapdb.revisions import RevisionConflict
+    from starlette.responses import JSONResponse
+
+    @app.exception_handler(RevisionConflict)
+    async def native_revision_conflict(_request, _exc):
+        return JSONResponse(status_code=409, content={
+            "code": "stale_revision", "detail": "An object or relationship changed; reread before retrying.",
+        })
+    from bloom_lims.request_db import RequestDatabaseMiddleware
+
+    app.add_middleware(RequestDatabaseMiddleware)
     return app

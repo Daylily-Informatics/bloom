@@ -3,7 +3,7 @@ ARG PYTHON_VERSION=3.12
 
 FROM ghcr.io/astral-sh/uv:0.5.30-python${PYTHON_VERSION}-bookworm-slim AS builder
 
-ARG SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
+ARG SETUPTOOLS_SCM_PRETEND_VERSION
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_BLOOM_LIMS=${SETUPTOOLS_SCM_PRETEND_VERSION} \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -20,12 +20,23 @@ RUN unset SETUPTOOLS_SCM_PRETEND_VERSION && uv sync --frozen --no-dev --no-insta
 COPY config ./config
 COPY auth ./auth
 COPY bloom_lims ./bloom_lims
+COPY scripts/bloom_tapdb10_runtime_verify.py ./scripts/bloom_tapdb10_runtime_verify.py
 COPY main.py ./main.py
 COPY static ./static
 COPY templates ./templates
 RUN unset SETUPTOOLS_SCM_PRETEND_VERSION && uv sync --frozen --no-dev
 
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+ARG SETUPTOOLS_SCM_PRETEND_VERSION
+ARG BLOOM_BUILD_BRANCH
+ARG BLOOM_BUILD_SHA
+RUN test -n "$SETUPTOOLS_SCM_PRETEND_VERSION" \
+    && test -n "$BLOOM_BUILD_BRANCH" \
+    && test -n "$BLOOM_BUILD_SHA"
+ENV BLOOM_BUILD_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION} \
+    BLOOM_BUILD_BRANCH=${BLOOM_BUILD_BRANCH} \
+    BLOOM_BUILD_SHA=${BLOOM_BUILD_SHA}
 
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \

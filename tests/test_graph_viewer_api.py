@@ -223,7 +223,11 @@ class TestGraphViewerApis:
             )
         ]
 
-        nodes, _edges = _build_graph_elements_for_start(fake_bobj, "BCN-1", 3)
+        with patch(
+            "bloom_lims.graph_support.resolve_external_refs_for_object",
+            return_value=[],
+        ):
+            nodes, _edges = _build_graph_elements_for_start(fake_bobj, "BCN-1", 3)
         assert nodes
         node_data = nodes[0]["data"]
         assert node_data["type"] == "tube"
@@ -258,17 +262,6 @@ class TestGraphViewerApis:
                                 }
                             ],
                         },
-                        "external_payload": {
-                            "tapdb_graph": [
-                                {
-                                    "system": "atlas",
-                                    "root_euid": "AT-TST-1",
-                                    "relationship_type": "prepared_for_atlas_test",
-                                    "label": "prepared_for_atlas_test: AT-TST-1",
-                                    "source_field": "external_payload.tapdb_graph",
-                                }
-                            ]
-                        },
                     }
                 },
                 0,
@@ -279,14 +272,23 @@ class TestGraphViewerApis:
             )
         ]
 
-        nodes, _edges = _build_graph_elements_for_start(fake_bobj, "BCN-1", 3)
+        native_ref = _FakeExternalRef(
+            system="atlas",
+            root_euid="AT-TST-1",
+            relationship_type="references_atlas_atlas_test",
+        )
+        with patch(
+            "bloom_lims.graph_support.resolve_external_refs_for_object",
+            return_value=[native_ref],
+        ):
+            nodes, _edges = _build_graph_elements_for_start(fake_bobj, "BCN-1", 3)
         node_data = nodes[0]["data"]
         assert node_data["created_dt"] == "2026-05-01T00:00:00+00:00"
         assert node_data["modified_dt"] == "2026-05-02T00:00:00+00:00"
         assert node_data["external_refs"][0]["system"] == "atlas"
         assert (
             node_data["external_refs"][0]["relationship_type"]
-            == "prepared_for_atlas_test"
+            == "references_atlas_atlas_test"
         )
         meta = build_graph_meta_for_nodes(nodes)
         assert meta["expected_fanout"][0]["euid"] == "BCN-1"
@@ -339,6 +341,10 @@ class TestGraphViewerApis:
         with (
             patch("bloom_lims.gui.routes.graph.BLOOMdb3", _DummyDB),
             patch("bloom_lims.gui.routes.graph.BloomObj", return_value=fake_bobj),
+            patch(
+                "bloom_lims.graph_support.resolve_external_refs_for_object",
+                return_value=[],
+            ),
         ):
             response = client.get("/api/object/BCN-TEST")
 

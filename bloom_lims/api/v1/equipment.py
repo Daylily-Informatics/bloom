@@ -7,12 +7,14 @@ Endpoints for equipment management, maintenance, and calibration tracking.
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from bloom_lims.schemas import (
     EquipmentCreateSchema,
     MaintenanceRecordSchema,
 )
+
+from .dependencies import require_write
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +118,7 @@ async def get_equipment(euid: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/", response_model=Dict[str, Any])
+@router.post("/", response_model=Dict[str, Any], dependencies=[Depends(require_write)])
 async def create_equipment(data: EquipmentCreateSchema):
     """Create new equipment from a template."""
     try:
@@ -143,7 +145,7 @@ async def create_equipment(data: EquipmentCreateSchema):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{euid}/maintenance")
+@router.post("/{euid}/maintenance", dependencies=[Depends(require_write)])
 async def record_maintenance(euid: str, data: MaintenanceRecordSchema):
     """Record a maintenance event for equipment."""
     try:

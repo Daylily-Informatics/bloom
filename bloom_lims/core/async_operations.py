@@ -41,6 +41,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from bloom_lims.attribution import current_attribution, explicit_attribution
 from bloom_lims.config import get_settings
 from bloom_lims.tapdb_adapter import BLOOMdb3
 
@@ -284,15 +285,16 @@ class BackgroundTaskManager:
                 status=TaskStatus.PENDING,
             )
 
-        # Create and schedule the task
-        if asyncio.iscoroutinefunction(func):
-            task = asyncio.create_task(
-                self._run_async_task(task_id, func, *args, **kwargs)
-            )
-        else:
-            task = asyncio.create_task(
-                self._run_sync_task(task_id, func, *args, **kwargs)
-            )
+        # Give detached tasks their own holder with the submitting actor snapshot.
+        with explicit_attribution(current_attribution()):
+            if asyncio.iscoroutinefunction(func):
+                task = asyncio.create_task(
+                    self._run_async_task(task_id, func, *args, **kwargs)
+                )
+            else:
+                task = asyncio.create_task(
+                    self._run_sync_task(task_id, func, *args, **kwargs)
+                )
 
         self._pending_futures[task_id] = task
         logger.debug(f"Submitted task {task_id}")
@@ -330,11 +332,14 @@ class BackgroundTaskManager:
         await self._update_status(task_id, TaskStatus.RUNNING)
 
         loop = asyncio.get_event_loop()
+        attribution = current_attribution()
+
+        def run_with_identity():
+            with explicit_attribution(attribution):
+                return func(*args, **kwargs)
+
         try:
-            result = await loop.run_in_executor(
-                self._executor,
-                lambda: func(*args, **kwargs),
-            )
+            result = await loop.run_in_executor(self._executor, run_with_identity)
             await self._complete_task(task_id, result)
         except asyncio.CancelledError:
             await self._update_status(task_id, TaskStatus.CANCELLED)
