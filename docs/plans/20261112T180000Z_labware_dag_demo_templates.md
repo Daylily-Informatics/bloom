@@ -12,7 +12,9 @@ Live status: the native template builder accepted validation, but Save failed wi
 
 Existing exploratory object M-BCT-AA4M was created earlier through the native GUI using an older template. It is retained and is not part of the all-new cohort.
 
-Next: after authorized release/deployment of the prepared repair, load the pack through native Save; create its cohort; add cross-object lineage using owning controls; publish returned EUIDs. The conceptual document update is saved, including two diagrams and explicit pending status for the live EUID demonstration.
+Release/deployment approved on November12: user selected “Release and deploy to Bloom day.” TapDB11.0.10 publishes the prepared fix while retaining11.0.9 changes. Bloom10.1.4 pins that release and includes this pack. Build only the final tagged image on i-07df3a933e4839f52/us-west-2, and deploy Bloom only through the existing selected-service controls. No tests, PR, merges, sibling rollout, credentials or DB configuration changes.
+
+Next: after deployment, load the pack through native Save; create its cohort; add cross-object lineage using owning controls; publish returned EUIDs. The conceptual document update is saved, including two diagrams and explicit pending status for the live EUID demonstration.
 
 # Pack semantics
 
