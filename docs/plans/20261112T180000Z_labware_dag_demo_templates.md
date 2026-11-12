@@ -8,11 +8,11 @@ Source: existing clean branch `codex/bloom-ursa-api-guide-20261030`. Live Bloom 
 
 Pack: `config/tapdb_templates/bloom/labware_dag_demo_20261112.json`, 26 insert-only definitions with subtype prefix `demo-20261112-`. Loaded by the normal Bloom seed-directory discovery when this revision is included in a deployment. Seeding definitions does not instantiate the demonstration cohort automatically.
 
-Live status: the native template builder accepted validation, but Save failed with `Capture requires an active REPEATABLE READ or SERIALIZABLE transaction`. The approved CLI loader then stopped at its operator preflight with `RuntimePrincipalError`. Its explicit runtime target has no operator configuration. No new template was committed by either attempt. Awaiting the existing operator configuration or authority to prepare the native builder fix; no credentials or runtime files were changed.
+Live status: the native template builder accepted validation, but Save failed with `Capture requires an active REPEATABLE READ or SERIALIZABLE transaction`. The approved CLI loader then stopped at its operator preflight with `RuntimePrincipalError`. Its explicit runtime target has no operator configuration. No new template was committed by either attempt. User subsequently authorized preparing the native builder fix. It is committed and pushed as TapDB8ddcdb8 on codex/template-save-isolation-20261112, based on deployed11.0.2. No credentials or runtime files were changed. Release/deployment to Bloom day is awaiting a separate answer.
 
 Existing exploratory object M-BCT-AA4M was created earlier through the native GUI using an older template. It is retained and is not part of the all-new cohort.
 
-Next: load the pack through an authorized supported path; create its cohort; add the cross-object lineage relationships using owning controls; publish returned EUIDs in the document. Document editing can continue independently.
+Next: after authorized release/deployment of the prepared repair, load the pack through native Save; create its cohort; add cross-object lineage using owning controls; publish returned EUIDs. The conceptual document update is saved, including two diagrams and explicit pending status for the live EUID demonstration.
 
 # Pack semantics
 
@@ -43,4 +43,5 @@ Use Bloom's supported seed command in a deployment containing this pack when its
 | Approved CLI load | Blocked | Operator preflight; no operator configured |
 | Source commit | Included in this commit | This pack and this ledger only |
 | Live cohort and cross-edges | Pending | No new cohort EUID yet |
-| Native document update | In progress | Existing Google Doc |
+| Native document update | Saved | Conceptual DAG section, two figures, terminology and full-transfer corrections; live EUIDs explicitly pending |
+| Builder source repair | Prepared | TapDB8ddcdb8 pushed; no tests or deployment |
